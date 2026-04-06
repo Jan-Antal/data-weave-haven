@@ -124,9 +124,12 @@ type Mapping = Record<TargetKey, number | null>;
 interface RowData {
   values: Record<TargetKey, string>;
   selected: boolean;
-  status: "valid" | "warning" | "error";
+  status: "valid" | "warning" | "error" | "update" | "unchanged";
   rawIdx: number;
   duplicateCode?: boolean;
+  dbId?: string;
+  changedFields?: Set<string>;
+  dbValues?: Record<string, string>;
 }
 
 // ── Example data for format guide ─────────────────────────────────
@@ -146,6 +149,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   const [sheets, setSheets] = useState<ParsedSheet[]>([]);
   const [uploadTime, setUploadTime] = useState<Date | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [importMode, setImportMode] = useState<"new" | "update">("new");
 
   // Step 2
   const [activeSheet, setActiveSheet] = useState(0);
@@ -155,7 +159,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   // Step 3
   const [rows, setRows] = useState<RowData[]>([]);
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "overwrite">("skip");
-  const [existingCodes, setExistingCodes] = useState<Set<string>>(new Set());
+  const [_existingCodes, setExistingCodes] = useState<Set<string>>(new Set());
 
   // Step 4
   const [importResult, setImportResult] = useState<{ imported: number; warnings: number; skipped: number } | null>(null);
@@ -255,7 +259,10 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   };
 
   const usedColIndices = useMemo(() => new Set(Object.values(mapping).filter(v => v !== null) as number[]), [mapping]);
-  const requiredMapped = TARGET_FIELDS.filter(f => f.required).every(f => mapping[f.key] !== null && mapping[f.key] !== undefined);
+  const requiredFieldsForMode = importMode === "update"
+    ? TARGET_FIELDS.filter(f => f.key === "item_code")
+    : TARGET_FIELDS.filter(f => f.required);
+  const requiredMapped = requiredFieldsForMode.every(f => mapping[f.key] !== null && mapping[f.key] !== undefined);
 
   const handleSheetChange = (idx: number) => {
     setActiveSheet(idx);
@@ -269,11 +276,14 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
     const { data: existingItems } = await supabase
       .from("tpv_items")
-      .select("item_code")
+      .select("id, item_code, nazev, popis, pocet, cena, konstrukter, notes, status, sent_date, accepted_date")
       .eq("project_id", projectId)
       .is("deleted_at", null);
-    const codes = new Set((existingItems || []).map(i => i.item_code).filter(Boolean) as string[]);
+    const existingList = (existingItems || []) as any[];
+    const codes = new Set(existingList.map(i => i.item_code).filter(Boolean) as string[]);
     setExistingCodes(codes);
+
+    const existingMap = new Map(existingList.map(e => [e.item_code, e]));
 
     const built: RowData[] = [];
     for (let rawIdx = 0; rawIdx < currentSheet.rows.length; rawIdx++) {
@@ -296,16 +306,68 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       const hasCode = !!values.item_code;
       const hasName = !!values.nazev;
       const isDuplicate = hasCode && codes.has(values.item_code);
-      const status: "valid" | "warning" | "error" =
-        (!hasCode || !hasName) ? "error" : isDuplicate ? "warning" : "valid";
 
-      built.push({
-        values: values as Record<TargetKey, string>,
-        selected: status !== "error",
-        status,
-        rawIdx,
-        duplicateCode: isDuplicate,
-      });
+      if (importMode === "update") {
+        // Update mode logic
+        if (!hasCode) {
+          built.push({ values: values as Record<TargetKey, string>, selected: false, status: "error", rawIdx });
+          continue;
+        }
+        const dbRow = existingMap.get(values.item_code);
+        if (!dbRow) {
+          // New item — not in DB
+          built.push({
+            values: values as Record<TargetKey, string>,
+            selected: hasName, // auto-select if has name
+            status: hasName ? "valid" : "error",
+            rawIdx,
+          });
+          continue;
+        }
+        // Compare mapped fields
+        const changedFields = new Set<string>();
+        const dbValues: Record<string, string> = {};
+        for (const f of TARGET_FIELDS) {
+          if (f.key === "item_code") continue;
+          if (mapping[f.key] === null || mapping[f.key] === undefined) continue;
+          const excelVal = values[f.key] || "";
+          const numericFields = ["pocet", "cena"];
+          let dbVal: string;
+          if (numericFields.includes(f.key)) {
+            dbVal = dbRow[f.key] !== null && dbRow[f.key] !== undefined ? String(dbRow[f.key]) : "";
+            const excelNum = parseNumericValue(excelVal);
+            const dbNum = dbRow[f.key] !== null ? Number(dbRow[f.key]) : null;
+            if (excelNum !== dbNum) changedFields.add(f.key);
+          } else {
+            dbVal = String(dbRow[f.key] ?? "");
+            if (excelVal !== dbVal) changedFields.add(f.key);
+          }
+          dbValues[f.key] = numericFields.includes(f.key)
+            ? (dbRow[f.key] !== null && dbRow[f.key] !== undefined ? String(dbRow[f.key]) : "")
+            : String(dbRow[f.key] ?? "");
+        }
+        built.push({
+          values: values as Record<TargetKey, string>,
+          selected: changedFields.size > 0,
+          status: changedFields.size > 0 ? "update" : "unchanged",
+          rawIdx,
+          duplicateCode: true,
+          dbId: dbRow.id,
+          changedFields,
+          dbValues,
+        });
+      } else {
+        // New import mode (existing logic)
+        const status: "valid" | "warning" | "error" =
+          (!hasCode || !hasName) ? "error" : isDuplicate ? "warning" : "valid";
+        built.push({
+          values: values as Record<TargetKey, string>,
+          selected: status !== "error",
+          status,
+          rawIdx,
+          duplicateCode: isDuplicate,
+        });
+      }
     }
     setRows(built);
   };
@@ -316,15 +378,18 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     const skipped = rows.length - selected.length;
     const warnings = rows.filter(r => r.status === "warning").length;
     const errors = rows.filter(r => r.status === "error").length;
-    return { selected: selected.length, skipped, warnings, errors, total: rows.length };
-  }, [rows]);
+    const updates = rows.filter(r => r.status === "update").length;
+    const unchanged = rows.filter(r => r.status === "unchanged").length;
+    const newItems = importMode === "update" ? rows.filter(r => r.status === "valid").length : 0;
+    return { selected: selected.length, skipped, warnings, errors, total: rows.length, updates, unchanged, newItems };
+  }, [rows, importMode]);
 
   const toggleRow = (idx: number) => {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, selected: !r.selected } : r));
   };
 
   const selectAll = (val: boolean) => {
-    setRows(prev => prev.map(r => r.status !== "error" ? { ...r, selected: val } : r));
+    setRows(prev => prev.map(r => (r.status !== "error" && r.status !== "unchanged") ? { ...r, selected: val } : r));
   };
 
   // ── Step 3 → 4: Import ────────────────────────────────────
@@ -334,57 +399,106 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     setImporting(true);
 
     try {
-      const duplicates = toImport.filter(r => r.duplicateCode);
-      const newItems = toImport.filter(r => !r.duplicateCode);
+      if (importMode === "update") {
+        // Update mode: update existing, insert new
+        const toUpdate = toImport.filter(r => r.status === "update" && r.dbId);
+        const toInsert = toImport.filter(r => r.status === "valid"); // new items
 
-      if (newItems.length > 0) {
-        const items = newItems.map(r => ({
-          project_id: projectId,
-          item_code: r.values.item_code || "Bez kódu",
-          nazev: r.values.nazev || null,
-          popis: r.values.popis || null,
-          konstrukter: r.values.konstrukter || null,
-          notes: r.values.notes || null,
-          pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
-          cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
-          status: r.values.status || null,
-          sent_date: r.values.sent_date || null,
-          accepted_date: r.values.accepted_date || null,
-          imported_at: new Date().toISOString(),
-          import_source: file?.name || null,
-        }));
-        const { error } = await supabase.from("tpv_items").insert(items as any);
-        if (error) throw error;
-      }
-
-      if (duplicates.length > 0 && duplicateMode === "overwrite") {
-        for (const r of duplicates) {
-          await supabase.from("tpv_items")
-            .update({
-              nazev: r.values.nazev || null,
-              popis: r.values.popis || null,
-              konstrukter: r.values.konstrukter || null,
-              notes: r.values.notes || null,
-              pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
-              cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
-              status: r.values.status || null,
-              sent_date: r.values.sent_date || null,
-              accepted_date: r.values.accepted_date || null,
-            } as any)
-            .eq("project_id", projectId)
-            .eq("item_code", r.values.item_code)
-            .is("deleted_at", null);
+        for (const r of toUpdate) {
+          const updateData: Record<string, any> = {};
+          for (const fieldKey of r.changedFields || []) {
+            const numericFields = ["pocet", "cena"];
+            if (numericFields.includes(fieldKey)) {
+              updateData[fieldKey] = r.values[fieldKey as TargetKey] ? parseNumericValue(r.values[fieldKey as TargetKey]) : null;
+            } else {
+              updateData[fieldKey] = r.values[fieldKey as TargetKey] || null;
+            }
+          }
+          if (Object.keys(updateData).length > 0) {
+            await supabase.from("tpv_items").update(updateData as any).eq("id", r.dbId!);
+          }
         }
+
+        if (toInsert.length > 0) {
+          const items = toInsert.map(r => ({
+            project_id: projectId,
+            item_code: r.values.item_code || "Bez kódu",
+            nazev: r.values.nazev || null,
+            popis: r.values.popis || null,
+            konstrukter: r.values.konstrukter || null,
+            notes: r.values.notes || null,
+            pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
+            cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+            status: r.values.status || null,
+            sent_date: r.values.sent_date || null,
+            accepted_date: r.values.accepted_date || null,
+            imported_at: new Date().toISOString(),
+            import_source: file?.name || null,
+          }));
+          const { error } = await supabase.from("tpv_items").insert(items as any);
+          if (error) throw error;
+        }
+
+        setImportResult({
+          imported: toInsert.length,
+          warnings: toUpdate.length, // repurpose as "updated"
+          skipped: rows.length - toImport.length,
+        });
+      } else {
+        // New import mode (existing logic)
+        const duplicates = toImport.filter(r => r.duplicateCode);
+        const newItems = toImport.filter(r => !r.duplicateCode);
+
+        if (newItems.length > 0) {
+          const items = newItems.map(r => ({
+            project_id: projectId,
+            item_code: r.values.item_code || "Bez kódu",
+            nazev: r.values.nazev || null,
+            popis: r.values.popis || null,
+            konstrukter: r.values.konstrukter || null,
+            notes: r.values.notes || null,
+            pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
+            cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+            status: r.values.status || null,
+            sent_date: r.values.sent_date || null,
+            accepted_date: r.values.accepted_date || null,
+            imported_at: new Date().toISOString(),
+            import_source: file?.name || null,
+          }));
+          const { error } = await supabase.from("tpv_items").insert(items as any);
+          if (error) throw error;
+        }
+
+        if (duplicates.length > 0 && duplicateMode === "overwrite") {
+          for (const r of duplicates) {
+            await supabase.from("tpv_items")
+              .update({
+                nazev: r.values.nazev || null,
+                popis: r.values.popis || null,
+                konstrukter: r.values.konstrukter || null,
+                notes: r.values.notes || null,
+                pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
+                cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+                status: r.values.status || null,
+                sent_date: r.values.sent_date || null,
+                accepted_date: r.values.accepted_date || null,
+              } as any)
+              .eq("project_id", projectId)
+              .eq("item_code", r.values.item_code)
+              .is("deleted_at", null);
+          }
+        }
+
+        const importedCount = newItems.length + (duplicateMode === "overwrite" ? duplicates.length : 0);
+        const skippedDups = duplicateMode === "skip" ? duplicates.length : 0;
+
+        setImportResult({
+          imported: importedCount,
+          warnings: duplicates.length,
+          skipped: rows.length - toImport.length + skippedDups,
+        });
       }
 
-      const importedCount = newItems.length + (duplicateMode === "overwrite" ? duplicates.length : 0);
-      const skippedDups = duplicateMode === "skip" ? duplicates.length : 0;
-
-      setImportResult({
-        imported: importedCount,
-        warnings: duplicates.length,
-        skipped: rows.length - toImport.length + skippedDups,
-      });
       qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
       setStep(4);
     } catch (err) {
@@ -404,6 +518,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     setImportResult(null);
     setUploadTime(null);
     setExistingCodes(new Set());
+    setImportMode("new");
   };
 
   if (!open) return null;
@@ -515,6 +630,35 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                         </Table>
                       </div>
                     )}
+
+                    {/* Import mode selector */}
+                    <div className="rounded-lg border p-3 space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Režim importu</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-lg border-2 p-3 text-left transition-colors",
+                            importMode === "new" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                          )}
+                          onClick={() => setImportMode("new")}
+                        >
+                          <p className="text-sm font-semibold">Nový import</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Vloží nové položky, duplicity volitelně přepíše</p>
+                        </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            "rounded-lg border-2 p-3 text-left transition-colors",
+                            importMode === "update" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                          )}
+                          onClick={() => setImportMode("update")}
+                        >
+                          <p className="text-sm font-semibold">Aktualizovat existující</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">Aktualizuje jen změněná pole, zachová status a poznámky</p>
+                        </button>
+                      </div>
+                    </div>
 
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={handleCancel}>Zrušit</Button>
@@ -709,7 +853,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
             {!requiredMapped && (
               <div className="flex items-center gap-2 px-3 py-2 bg-destructive/5 border border-destructive/20 rounded-md text-xs text-destructive">
                 <AlertTriangle className="h-3.5 w-3.5" />
-                Povinná pole (Kód Prvku, Název Prvku) musí být namapována pro pokračování
+                {importMode === "update"
+                  ? "Kód Prvku musí být namapován pro aktualizaci"
+                  : "Povinná pole (Kód Prvku, Název Prvku) musí být namapována pro pokračování"}
               </div>
             )}
 
@@ -736,13 +882,35 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                   <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-foreground bg-card">
                     {stats.total} položek celkem
                   </div>
-                  <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-green-700 bg-green-50 border-green-200">
-                    {stats.selected} k importu
-                  </div>
-                  {stats.warnings > 0 && (
-                    <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-orange-700 bg-orange-50 border-orange-200">
-                      {stats.warnings} varování (duplicity)
-                    </div>
+                  {importMode === "update" ? (
+                    <>
+                      {stats.updates > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-orange-700 bg-orange-50 border-orange-200">
+                          {stats.updates} ke změně
+                        </div>
+                      )}
+                      {stats.unchanged > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-muted-foreground bg-muted/30">
+                          {stats.unchanged} beze změny
+                        </div>
+                      )}
+                      {stats.newItems > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-green-700 bg-green-50 border-green-200">
+                          {stats.newItems} nových
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-green-700 bg-green-50 border-green-200">
+                        {stats.selected} k importu
+                      </div>
+                      {stats.warnings > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-orange-700 bg-orange-50 border-orange-200">
+                          {stats.warnings} varování (duplicity)
+                        </div>
+                      )}
+                    </>
                   )}
                   {stats.errors > 0 && (
                     <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-red-700 bg-red-50 border-red-200">
@@ -751,7 +919,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                   )}
                 </div>
                 <div className="flex gap-2 items-center">
-                  {stats.warnings > 0 && (
+                  {importMode === "new" && stats.warnings > 0 && (
                     <Select value={duplicateMode} onValueChange={v => setDuplicateMode(v as "skip" | "overwrite")}>
                       <SelectTrigger className="h-8 text-xs w-[180px]">
                         <SelectValue />
@@ -768,7 +936,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                   <Button variant="outline" size="sm" onClick={handleCancel}>Zrušit</Button>
                   <Button size="sm" onClick={doImport} disabled={importing || stats.selected === 0} className="bg-green-600 hover:bg-green-700 text-white">
                     {importing ? (
-                      <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importuji...</>
+                      <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Zpracovávám...</>
+                    ) : importMode === "update" ? (
+                      <>Aktualizovat {stats.selected} položek</>
                     ) : (
                       <>Importovat {stats.selected} položek</>
                     )}
@@ -782,7 +952,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10 sticky top-0 bg-card z-10">
-                      <Checkbox checked={rows.filter(r => r.status !== "error").every(r => r.selected)} onCheckedChange={(v) => selectAll(!!v)} />
+                      <Checkbox checked={rows.filter(r => r.status !== "error" && r.status !== "unchanged").every(r => r.selected)} onCheckedChange={(v) => selectAll(!!v)} />
                     </TableHead>
                     <TableHead className="w-10 sticky top-0 bg-card z-10">#</TableHead>
                     <TableHead className="w-10 sticky top-0 bg-card z-10"></TableHead>
@@ -802,15 +972,29 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                           isExcluded && "bg-muted/30",
                           !isExcluded && row.status === "warning" && "bg-amber-50",
                           !isExcluded && row.status === "error" && "bg-red-50/30",
+                          !isExcluded && row.status === "update" && "bg-orange-50/50",
+                          row.status === "unchanged" && "bg-muted/20",
                         )}
-                        style={isExcluded ? { opacity: 0.55 } : undefined}
+                        style={isExcluded && row.status !== "unchanged" ? { opacity: 0.55 } : row.status === "unchanged" ? { opacity: 0.45 } : undefined}
                       >
                         <TableCell>
-                          <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(idx)} disabled={row.status === "error"} />
+                          <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(idx)} disabled={row.status === "error" || row.status === "unchanged"} />
                         </TableCell>
                         <TableCell className="text-muted-foreground">{row.rawIdx + 1}</TableCell>
                         <TableCell>
                           {row.status === "valid" && row.selected && <Check className="h-3.5 w-3.5 text-green-600" />}
+                          {row.status === "update" && (
+                            <Tooltip>
+                              <TooltipTrigger><AlertTriangle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger>
+                              <TooltipContent>{row.changedFields?.size || 0} polí se změní</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {row.status === "unchanged" && (
+                            <Tooltip>
+                              <TooltipTrigger><Check className="h-3.5 w-3.5 text-muted-foreground/50" /></TooltipTrigger>
+                              <TooltipContent>Beze změny</TooltipContent>
+                            </Tooltip>
+                          )}
                           {row.status === "warning" && (
                             <Tooltip>
                               <TooltipTrigger><AlertTriangle className="h-3.5 w-3.5 text-amber-500" /></TooltipTrigger>
@@ -820,18 +1004,30 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                           {row.status === "error" && (
                             <Tooltip>
                               <TooltipTrigger><X className="h-3.5 w-3.5 text-red-500" style={{ opacity: 1 }} /></TooltipTrigger>
-                              <TooltipContent>Chybí povinné pole (Kód Prvku nebo Název Prvku)</TooltipContent>
+                              <TooltipContent>Chybí povinné pole</TooltipContent>
                             </Tooltip>
                           )}
                         </TableCell>
-                        {TARGET_FIELDS.map(f => (
-                          <TableCell key={f.key} className={cn(
-                            (f.key === "popis" || f.key === "item_code") && "font-semibold",
-                            f.key === "notes" && "max-w-[300px] truncate font-normal",
-                          )}>
-                            {row.values[f.key] ?? ""}
-                          </TableCell>
-                        ))}
+                        {TARGET_FIELDS.map(f => {
+                          const isChanged = row.changedFields?.has(f.key);
+                          const oldVal = row.dbValues?.[f.key];
+                          return (
+                            <TableCell key={f.key} className={cn(
+                              (f.key === "popis" || f.key === "item_code") && "font-semibold",
+                              f.key === "notes" && "max-w-[300px] truncate font-normal",
+                              isChanged && "bg-orange-100/80 font-medium",
+                            )}>
+                              {isChanged ? (
+                                <span>
+                                  <span className="line-through text-muted-foreground/60 mr-1">{oldVal || "—"}</span>
+                                  <span className="text-orange-800">{row.values[f.key] || "—"}</span>
+                                </span>
+                              ) : (
+                                row.values[f.key] ?? ""
+                              )}
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     );
                   })}
@@ -845,11 +1041,15 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         {step === 4 && importResult && (
           <div className="max-w-xl mx-auto mt-8 space-y-6">
             <div className="grid grid-cols-3 gap-4">
-              {[
+              {(importMode === "update" ? [
+                { label: "Nových", value: importResult.imported, color: "border-green-300 bg-green-50 text-green-800" },
+                { label: "Aktualizováno", value: importResult.warnings, color: "border-orange-300 bg-orange-50 text-orange-800" },
+                { label: "Přeskočeno", value: importResult.skipped, color: "border-muted bg-muted/30 text-muted-foreground" },
+              ] : [
                 { label: "Importováno", value: importResult.imported, color: "border-green-300 bg-green-50 text-green-800" },
                 { label: "Varování", value: importResult.warnings, color: "border-orange-300 bg-orange-50 text-orange-800" },
                 { label: "Přeskočeno", value: importResult.skipped, color: "border-muted bg-muted/30 text-muted-foreground" },
-              ].map(c => (
+              ]).map(c => (
                 <Card key={c.label} className={cn("border", c.color)}>
                   <CardContent className="p-4 text-center">
                     <p className="text-2xl font-bold">{c.value}</p>
@@ -860,7 +1060,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
             </div>
 
             <div className="text-center p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-800">
-              ✓ Import dokončen — {importResult.imported} položek úspěšně importováno
+              {importMode === "update"
+                ? `✓ Aktualizace dokončena — ${importResult.warnings} položek aktualizováno${importResult.imported > 0 ? `, ${importResult.imported} nových přidáno` : ""}`
+                : `✓ Import dokončen — ${importResult.imported} položek úspěšně importováno`}
             </div>
 
             <div className="flex justify-center gap-3">
