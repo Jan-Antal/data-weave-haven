@@ -46,6 +46,17 @@ Rules:
 - Never mention "Alfred" or "AI" in the output
 - Maximum 8 lines total`;
 
+function parseCzechDate(raw: string | null): Date | null {
+  if (!raw) return null;
+  // Try ISO first
+  const iso = new Date(raw);
+  if (!isNaN(iso.getTime())) return iso;
+  // Czech format: "15. 5. 2026" or "15.5.2026"
+  const m = raw.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return null;
+}
+
 async function buildProjectData(supabase: ReturnType<typeof createClient>, projectId: string): Promise<string | null> {
   // Find project by partial match
   let { data: projects } = await supabase
