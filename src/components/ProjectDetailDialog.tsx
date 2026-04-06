@@ -29,6 +29,7 @@ import { dispatchDocCountUpdate, migrateDocCountCache, setDocCountAbsolute } fro
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
+import { StagesCostSection } from "./StagesCostSection";
 import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
 import { useFileSelection } from "@/hooks/useFileSelection";
 import { FileSelectionBar, FolderDropTarget, useFileDragVisuals, useDropFlash } from "./DocumentDragDrop";
