@@ -1379,11 +1379,11 @@ export type Database = {
           import_source: string | null
           imported_at: string | null
           item_name: string
-          item_type: string | null
           konstrukter: string | null
-          nazev_prvku: string | null
+          nazev: string | null
           notes: string | null
           pocet: number | null
+          popis: string | null
           project_id: string
           sent_date: string | null
           status: string | null
@@ -1401,11 +1401,11 @@ export type Database = {
           import_source?: string | null
           imported_at?: string | null
           item_name: string
-          item_type?: string | null
           konstrukter?: string | null
-          nazev_prvku?: string | null
+          nazev?: string | null
           notes?: string | null
           pocet?: number | null
+          popis?: string | null
           project_id: string
           sent_date?: string | null
           status?: string | null
@@ -1423,11 +1423,11 @@ export type Database = {
           import_source?: string | null
           imported_at?: string | null
           item_name?: string
-          item_type?: string | null
           konstrukter?: string | null
-          nazev_prvku?: string | null
+          nazev?: string | null
           notes?: string | null
           pocet?: number | null
+          popis?: string | null
           project_id?: string
           sent_date?: string | null
           status?: string | null
