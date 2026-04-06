@@ -110,9 +110,8 @@ async function extractFromExcel(fileBuffer: ArrayBuffer, fileName: string): Prom
           role: "user",
           content: [
             {
-              type: "document",
+              type: "file",
               source: { type: "file", file_id: fileId },
-              title: fileName,
             },
             {
               type: "text",
