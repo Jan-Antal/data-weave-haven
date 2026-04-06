@@ -743,6 +743,34 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           <Printer className="h-4 w-4" />
           <span className="hidden sm:inline">Průvodka</span>
         </button>
+        {/* CN diff check */}
+        {canManageTPV && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant={cnHasDiff ? "destructive" : "outline"}
+                onClick={() => cnHasDiff ? setCnDiffOpen(true) : checkCN()}
+                disabled={cnChecking}
+                className="relative"
+              >
+                {cnChecking ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : cnHasDiff ? (
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                ) : (
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                )}
+                {cnHasDiff ? `CN rozdíly (${cnDiff!.entries.length})` : "Kontrola CN"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {cnHasDiff
+                ? "CN byla změněna — kliknutím zobrazíte rozdíly"
+                : "Porovnat cenovou nabídku s aktuálním TPV seznamem"}
+            </TooltipContent>
+          </Tooltip>
+        )}
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
             <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
