@@ -120,11 +120,13 @@ async function buildProjectData(supabase: ReturnType<typeof createClient>, proje
     weeksActive = Math.max(1, Math.round((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)));
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const overdue = p.datum_smluvni && p.datum_smluvni < today && p.status !== "Dokončeno" && p.status !== "Fakturace";
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const deadlineDate = parseCzechDate(p.datum_smluvni);
+  const overdue = deadlineDate && deadlineDate < today && p.status !== "Dokončeno" && p.status !== "Fakturace";
   let daysToDeadline: number | null = null;
-  if (p.datum_smluvni) {
-    daysToDeadline = Math.round((new Date(p.datum_smluvni).getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000));
+  if (deadlineDate) {
+    daysToDeadline = Math.round((deadlineDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
   }
 
   return `PROJECT DATA:
