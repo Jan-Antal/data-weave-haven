@@ -1014,6 +1014,14 @@ export type Database = {
       project_stages: {
         Row: {
           architekt: string | null
+          cost_doprava_pct: number | null
+          cost_is_custom: boolean | null
+          cost_material_pct: number | null
+          cost_montaz_pct: number | null
+          cost_overhead_pct: number | null
+          cost_preset_id: string | null
+          cost_production_pct: number | null
+          cost_subcontractors_pct: number | null
           created_at: string
           currency: string | null
           datum_smluvni: string | null
@@ -1049,6 +1057,14 @@ export type Database = {
         }
         Insert: {
           architekt?: string | null
+          cost_doprava_pct?: number | null
+          cost_is_custom?: boolean | null
+          cost_material_pct?: number | null
+          cost_montaz_pct?: number | null
+          cost_overhead_pct?: number | null
+          cost_preset_id?: string | null
+          cost_production_pct?: number | null
+          cost_subcontractors_pct?: number | null
           created_at?: string
           currency?: string | null
           datum_smluvni?: string | null
@@ -1084,6 +1100,14 @@ export type Database = {
         }
         Update: {
           architekt?: string | null
+          cost_doprava_pct?: number | null
+          cost_is_custom?: boolean | null
+          cost_material_pct?: number | null
+          cost_montaz_pct?: number | null
+          cost_overhead_pct?: number | null
+          cost_preset_id?: string | null
+          cost_production_pct?: number | null
+          cost_subcontractors_pct?: number | null
           created_at?: string
           currency?: string | null
           datum_smluvni?: string | null
