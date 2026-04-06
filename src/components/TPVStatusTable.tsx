@@ -454,7 +454,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
       </TableCell>
       {v("project_id") && <TableCell className="font-sans font-semibold text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" : isFieldReadOnly, isSummaryRow: isSummary }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" && !(field === "percent_tpv" && computedPct != null) : (field) => (field === "percent_tpv" && computedPct != null) ? true : isFieldReadOnly(field), isSummaryRow: isSummary }))}
     </TableRow>
   );
 });
@@ -752,6 +752,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                     tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
+                    tpvItems={tpvItemsByProject.get(p.project_id)}
                     onToggleExpand={toggleExpand}
                     onAddStage={handleAddStage}
                     onOpenTPVList={handleOpenTPVList}
