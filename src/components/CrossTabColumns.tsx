@@ -199,7 +199,7 @@ function renderCell(
           <TableCell key={key}>
             <span className="inline-flex items-center gap-1">
               <StatusBadge status={plusMatch[1].trim()} />
-              <span className="text-[10px] text-muted-foreground">{plusMatch[2]}</span>
+              <span className="text-xs text-muted-foreground">{plusMatch[2]}</span>
             </span>
           </TableCell>
         );
