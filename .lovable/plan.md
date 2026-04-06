@@ -1,67 +1,42 @@
 
 
-# Opravy etap — 7 bodů
+# Opravy etap — 4 body
 
-## Problémy a řešení
+## 1. Poznámka (pm_poznamka) nejde zapsat u multi-stage projektu
 
-### 1. Vážená marže je 100× větší
-**Root cause**: `projectStageDisplay.ts` normalizuje marži (0.25 → 25), ale výsledek (`weightedMarze = 25`) se pak v `ProjectRow` uloží jako `String(25)` do `displayProject.marze`. Funkce `formatMarze` pak znovu násobí ×100 → zobrazí 2500%.
+**Root cause**: `isFieldReadOnly` pro multi-stage vrací `true` pro vše kromě `architekt` a `klient`.
 
-**Fix**: V `projectStageDisplay.ts` výsledek `weightedMarze` ponechat v **decimal** formátu (0.25), ne v procentech. Změnit normalizaci: vždy pracovat s decimal hodnotami, výsledek nezaokrouhlovat na procenta ale na decimal (1 des. místo v %). Konkrétně: `weightedMarze` vracet jako decimal (např. 0.25), ne 25.
+**Fix**: Přidat `pm_poznamka` a `tpv_poznamka` do výjimek v `ProjectInfoTable.tsx`, `PMStatusTable.tsx`, `TPVStatusTable.tsx`:
+```
+(field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka"
+```
 
-Alternativně a jednodušeji: v `ProjectRow` kde se staví `marze: String(overrides.weightedMarze)` — přeměnit na decimal: `String(overrides.weightedMarze / 100)`. Stejná oprava v `StagesCostSection.tsx`.
+## 2. Po změně etapy se nepřerenderuje řádek projektu
 
-**Soubory**: `src/lib/projectStageDisplay.ts`, `src/components/StagesCostSection.tsx`
+**Root cause**: `useUpdateStage` invaliduje jen `["project_stages", projectId]`, ale `ProjectRow` závisí na `stagesRaw` (z `useAllProjectStages`), kde query key je jiný.
 
-### 2. Vizuální odlišení — border-l nahradit podsvícením
-Smazat `border-l-2 border-primary/20`. Místo toho přidat `bg-muted/40` na summary řádky (obdobný styl jako hover). Odstranit `italic` class z `summaryClass` v `CrossTabColumns.tsx` — ponechat jen normální text, případně jen `text-muted-foreground` pro computed pole.
+**Fix**: V `useUpdateStage` onSuccess přidat invalidaci `["all-project-stages"]` (nebo jakýkoli key používá `useAllProjectStages`). Ověřit přesný key a přidat.
 
-**Soubory**: `src/components/ProjectInfoTable.tsx`, `src/components/PMStatusTable.tsx`, `src/components/TPVStatusTable.tsx`, `src/components/CrossTabColumns.tsx`
+## 3. Architekt v etapách se má automaticky brát z projektu
 
-### 3. StagesCostSection do ostatních detailů
-`StagesCostSection` se renderuje v `ProjectDetailDialog.tsx`. Potřeba ověřit, že se zobrazuje správně s auto-sum togglem a přidáváním etap.
+**Root cause**: `architekt` je v `EDITABLE_INHERITED` — kopíruje se při vytvoření, ale pak se edituje nezávisle.
 
-**Soubor**: `src/components/ProjectDetailDialog.tsx`
+**Fix**: Přesunout `architekt` z `EDITABLE_INHERITED` do `READ_ONLY_INHERITED` v `stageInheritance.ts`. V stage renderingu zobrazit vždy `project.architekt` (read-only). V `buildInheritedStageData` se architekt stále zkopíruje, ale stage row ho zobrazí z projektu.
 
-### 4. Multi-status — barva prvního statusu
-`StatusBadge` hledá přesný match na label. "Výroba (+2)" nenajde shodu → žádná barva.
+## 4. Status "(+1)" text je příliš malý
 
-**Fix**: V `CrossTabColumns.tsx` case `"status"` — pokud `isSummaryRow` a status obsahuje "(+", parsovat base status (před " (+") a renderovat jako `StatusBadge` s base statusem + suffix badge s počtem.
+**Root cause**: V `CrossTabColumns.tsx` suffix badge má `text-[10px]`.
 
-**Soubor**: `src/components/CrossTabColumns.tsx`
-
-### 5. Architekt + Klient — vždy z projektu, ne z etapy
-V `displayProject` merge logice (single-stage): neměnit `architekt` ani `klient` — ty zůstávají vždy z projektu. V `CrossTabColumns.tsx` `case "architekt"` a `case "klient"` — pokud `isSummaryRow`, nemají být read-only, zůstávají editovatelné na úrovni projektu.
-
-Aktuálně `isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly` → to dělá ALL fields read-only pro multi-stage. Potřeba výjimku pro `architekt`, `klient`.
-
-**Fix**: V `ProjectRow` renderKeys mapping: `isFieldReadOnly` pro multi-stage → `(field) => field !== "architekt" && field !== "klient"`.
-
-**Soubory**: `src/components/ProjectInfoTable.tsx`, `src/components/PMStatusTable.tsx`, `src/components/TPVStatusTable.tsx`
-
-### 6. PM a Kalkulant — zobrazit jména (Adam / Jakub)
-Místo "3 PM" zobrazit `"Adam / Jakub"` (spojit jména lomítkem). Přidat to samé pro `kalkulant`.
-
-**Fix**: V `projectStageDisplay.ts`:
-- `pmSummary`: místo `"${pms.size} PM"` → `[...pms].join(" / ")`
-- Přidat `kalkulantSummary` do `ProjectDisplayOverrides` se stejnou logikou
-- V `ProjectRow` merge: `kalkulant: overrides.kalkulantSummary ?? p.kalkulant`
-
-**Soubory**: `src/lib/projectStageDisplay.ts`, `src/components/ProjectInfoTable.tsx`, `src/components/PMStatusTable.tsx`, `src/components/TPVStatusTable.tsx`
-
-### 7. Konstruktér summary
-Přidat stejnou logiku pro `konstrukter` — zobrazit jména spojená " / ".
-
-**Soubor**: `src/lib/projectStageDisplay.ts` + všechny 3 tabulky
+**Fix**: Změnit na `text-xs` (12px), aby odpovídal velikosti textu `StatusBadge`.
 
 ## Soubory ke změně
 
 | Soubor | Změny |
 |--------|-------|
-| `src/lib/projectStageDisplay.ts` | Fix weighted marže (decimal), PM/kalkulant/konstruktér jako jména, přidat `kalkulantSummary` + `konstrukterSummary` |
-| `src/components/CrossTabColumns.tsx` | Odstranit italic, fix status badge barvy pro summary, architekt/klient editovatelné |
-| `src/components/ProjectInfoTable.tsx` | bg-muted/40 místo border-l, architekt/klient výjimka z read-only, kalkulant/konstruktér summary |
-| `src/components/PMStatusTable.tsx` | Stejné jako ProjectInfoTable |
-| `src/components/TPVStatusTable.tsx` | Stejné jako ProjectInfoTable |
-| `src/components/StagesCostSection.tsx` | Fix weighted marže display |
+| `src/components/ProjectInfoTable.tsx` | pm_poznamka výjimka z read-only |
+| `src/components/PMStatusTable.tsx` | Stejné |
+| `src/components/TPVStatusTable.tsx` | Stejné |
+| `src/hooks/useProjectStages.ts` | Invalidovat all-project-stages po uložení etapy |
+| `src/lib/stageInheritance.ts` | Přesunout `architekt` do READ_ONLY_INHERITED |
+| `src/components/CrossTabColumns.tsx` | Status suffix velikost text-xs |
 
