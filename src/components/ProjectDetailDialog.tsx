@@ -296,7 +296,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // TPV items for auto percent_tpv
   const { data: detailTpvItems = [] } = useTPVItems(project?.project_id ?? "");
   const computedPercentTpv = useMemo(() => computeTPVProgress(detailTpvItems), [detailTpvItems]);
-  const hasAutoPercent = computedPercentTpv != null;
+  // Effective auto percent: TPV items > stage average > null
+  const effectiveAutoPercent = computedPercentTpv ?? stageOverrides.percentTpvAvg;
+  const hasAutoPercent = effectiveAutoPercent != null;
+  const autoPercentLabel = computedPercentTpv != null ? "(auto z položek)" : stageOverrides.percentTpvAvg != null ? "(průměr z etap)" : "";
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
@@ -1336,14 +1339,14 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           </MobileTapField>
         </div>
         <div>
-          <Label className="text-xs">% Rozpracovanost {hasAutoPercent && <span className="text-muted-foreground font-normal ml-1">(auto z položek)</span>}</Label>
-          <MobileTapField displayValue={hasAutoPercent ? `${computedPercentTpv} %` : (form.percent_tpv ? `${form.percent_tpv} %` : "")} disabled={isSectionReadOnly("tpv") || hasAutoPercent}>
+          <Label className="text-xs">% Rozpracovanost {hasAutoPercent && <span className="text-muted-foreground font-normal ml-1">{autoPercentLabel}</span>}</Label>
+          <MobileTapField displayValue={hasAutoPercent ? `${effectiveAutoPercent} %` : (form.percent_tpv ? `${form.percent_tpv} %` : "")} disabled={isSectionReadOnly("tpv") || hasAutoPercent}>
             {({ autoFocus }) => (
               <div className="relative">
                 <Input
                   type={isSectionReadOnly("tpv") || hasAutoPercent ? "text" : "number"}
                   className={cn("no-spinners pr-8", (isSectionReadOnly("tpv") || hasAutoPercent) && roClass)}
-                  value={hasAutoPercent ? `${computedPercentTpv}` : (isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv)}
+                  value={hasAutoPercent ? `${effectiveAutoPercent}` : (isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv)}
                   onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
                   placeholder="0"
                   disabled={isSectionReadOnly("tpv") || hasAutoPercent}
