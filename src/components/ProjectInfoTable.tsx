@@ -106,13 +106,22 @@ function singleStageMatches(
 }
 
 // ── Expand arrow ────────────────────────────────────────────────────
-function ExpandArrow({ isExpanded, stageCount }: { isExpanded: boolean; stageCount: number }) {
-  if (stageCount <= 1) return <span className="w-5 h-5" />;
-  const hasStages = stageCount > 0;
-  if (isExpanded) {
-    return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
+function ExpandArrow({ isExpanded, stageCount, onAddStage }: { isExpanded: boolean; stageCount: number; onAddStage?: () => void }) {
+  if (stageCount <= 1) {
+    return (
+      <button
+        className="h-5 w-5 inline-flex items-center justify-center text-muted-foreground/40 hover:text-accent transition-colors"
+        title="Přidat etapu"
+        onClick={(e) => { e.stopPropagation(); onAddStage?.(); }}
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    );
   }
-  return <ChevronRight className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground/50"}`} />;
+  if (isExpanded) {
+    return <ChevronDown className="h-5 w-5 stroke-[3] text-accent" />;
+  }
+  return <ChevronRight className="h-5 w-5 stroke-[3] text-accent" />;
 }
 
 // ── Stage row ───────────────────────────────────────────────────────
@@ -382,12 +391,14 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 // ── Memoized project row ────────────────────────────────────────────
 interface ProjectRowProps {
   project: Project;
+  stages?: ProjectStage[];
   docCount: number | undefined;
   docFailed?: boolean;
   isExpanded: boolean;
   stageCount: number;
   tpvCount: number;
   onToggleExpand: (pid: string) => void;
+  onAddStage?: (pid: string) => void;
   onOpenTPVList: (projectId: string, projectName: string) => void;
   isVisible: (key: string) => boolean;
   renderKeys: string[];
