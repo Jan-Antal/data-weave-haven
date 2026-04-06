@@ -26,7 +26,7 @@ Field definitions:
 SKIP: totals, subtotals, section headers, transport, montáž.
 Return ONLY valid JSON array.`;
 
-// ─── XLSX to TSV conversion ───────────────────────────────────────────────────
+// ─── XLSX → structured item list ─────────────────────────────────────────────
 
 function parseSharedStrings(xml: string): string[] {
   const strings: string[] = [];
@@ -72,7 +72,23 @@ function parseWorksheetCells(xml: string, ss: string[]): (string | null)[][] {
   return rows;
 }
 
-async function xlsxToTsv(buffer: ArrayBuffer): Promise<string> {
+const ITEM_CODE_RE = /^[A-Z]\d{2,3}$/;
+const STOP_TEXTS = ['celkem součet', 'celkem bez dph', 'cena celkem', 'doprava', 'montáž', 'manipulace', 'odvoz', 'jiné náklady', 'cenová nabídka platí', 'platební podmínky', 'technologická doba'];
+
+function isStopText(text: string): boolean {
+  const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return STOP_TEXTS.some(s => t.includes(s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+}
+
+interface ParsedItem {
+  kod: string;
+  nazev: string;
+  pocet: number | null;
+  cena: number | null;
+  popis: string;
+}
+
+async function parseXlsxItems(buffer: ArrayBuffer): Promise<ParsedItem[]> {
   const zipReader = new ZipReader(new BlobReader(new Blob([buffer])));
   const entries = await zipReader.getEntries();
   let ssXml = '', wsXml = '';
@@ -83,17 +99,58 @@ async function xlsxToTsv(buffer: ArrayBuffer): Promise<string> {
   await zipReader.close();
   const ss = parseSharedStrings(ssXml);
   const rows = parseWorksheetCells(wsXml, ss);
-  return rows.map(r => r.map(c => c ?? '').join('\t')).join('\n');
+
+  const items: ParsedItem[] = [];
+  let current: ParsedItem | null = null;
+  let collecting = true;
+
+  for (const row of rows) {
+    const col0 = row[0]?.trim() ?? '';
+    const col1 = row[1]?.trim() ?? '';
+    const col3 = row[3];
+    const col4 = row[4];
+
+    if (ITEM_CODE_RE.test(col0)) {
+      const hasCena = col4 !== null && col4 !== '';
+      if (current && !hasCena && !col3) {
+        if (col1) current.popis += (current.popis ? ' ' : '') + col1;
+        continue;
+      }
+      if (current) items.push(current);
+      current = {
+        kod: col0,
+        nazev: col1,
+        pocet: col3 ? parseFloat(col3) : null,
+        cena: col4 ? parseFloat(col4) : null,
+        popis: '',
+      };
+      collecting = true;
+    } else if (current && collecting) {
+      if (!col0 && col1) {
+        if (isStopText(col1)) { collecting = false; continue; }
+        current.popis += (current.popis ? ' ' : '') + col1;
+      }
+    }
+  }
+  if (current) items.push(current);
+
+  return items.filter(i => i.cena !== null);
 }
 
-// ─── Excel extraction (XLSX → TSV → Claude as plaintext) ─────────────────────
+// ─── Excel extraction (XLSX → pre-parsed items → Claude for cleanup) ──────────
 
 async function extractFromExcel(fileBuffer: ArrayBuffer, fileName: string): Promise<any[]> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-  const csvText = await xlsxToTsv(fileBuffer);
-  console.log(`Converted ${fileName} to TSV (${csvText.length} chars), sending to Claude`);
+  const parsedItems = await parseXlsxItems(fileBuffer);
+  console.log(`Pre-parsed ${parsedItems.length} items from ${fileName}`);
+
+  if (parsedItems.length === 0) return [];
+
+  const structuredText = parsedItems.map(i =>
+    `${i.kod} | ${i.nazev} | počet: ${i.pocet ?? 1} | cena: ${i.cena} Kč | popis: ${i.popis || '–'}`
+  ).join('\n');
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -105,10 +162,20 @@ async function extractFromExcel(fileBuffer: ArrayBuffer, fileName: string): Prom
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 8192,
-      system: SYSTEM_PROMPT,
+      system: `You clean and structure pre-parsed furniture line items from a Czech cenová nabídka.
+Return ONLY a valid JSON array, no markdown, no explanation.
+
+Fields:
+- item_name: the code exactly as given (T01, K01, etc.)
+- nazev: short item name, max 40 chars, no dimensions or materials
+- popis: the full popis text exactly as given, do not shorten or summarize
+- cena: unit price as number (CZK)
+- pocet: quantity as number
+
+Do not skip any items. Do not add items not in the input.`,
       messages: [{
         role: "user",
-        content: `Here is the Excel file "${fileName}" as tab-separated text:\n\n${csvText}`,
+        content: `Clean these pre-parsed items into JSON:\n\n${structuredText}`,
       }],
     }),
   });
