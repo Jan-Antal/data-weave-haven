@@ -1,94 +1,72 @@
 
 
-# CN Change Detection — Background Diff with Warning Badge
+# Rename `tpv_items.item_name` → `item_code` & Fix Runtime Error
 
-## Understanding
+## Context
 
-The user wants:
-1. When a new CN document is uploaded to the "Cenová nabídka" SharePoint folder, **automatically** (in background) extract and compare it against current TPV items
-2. Show a **warning icon** in the TPV List header if differences are found
-3. Clicking the warning opens a **diff popup** showing: new items, removed items, changed price/quantity
-4. User can accept/dismiss changes from the popup
-5. This should NOT depend on a previous extraction snapshot — it compares **CN document vs current `tpv_items`** directly
-6. The comparison must run in the background without blocking the user
+The column `tpv_items.item_name` stores "kód prvku" (e.g. T01, BK-N11), not a name. The production tables already use `item_code` for the same concept. Renaming `tpv_items.item_name` → `item_code` will unify the naming convention across all tables.
 
-## Architecture
+Additionally, there's a runtime error (Tooltip not imported in TPVList.tsx) that needs fixing.
 
-```text
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────┐
-│ Upload CN file   │───▶│ Background       │───▶│ Store diff  │
-│ to SharePoint    │    │ extraction       │    │ in state    │
-└─────────────────┘    │ (edge function)  │    └──────┬──────┘
-                       └──────────────────┘           │
-                                                       ▼
-                                              ┌─────────────────┐
-                                              │ Warning badge   │
-                                              │ in TPV List     │
-                                              │ header          │
-                                              └────────┬────────┘
-                                                       │ click
-                                                       ▼
-                                              ┌─────────────────┐
-                                              │ Diff dialog     │
-                                              │ with accept     │
-                                              └─────────────────┘
+## Scope
+
+**Database**: Rename column `tpv_items.item_name` → `item_code` via migration.
+
+**~25+ files** referencing `tpv_items.item_name` need updating. The production tables (`production_inbox`, `production_schedule`, `production_expedice`) keep their `item_name` column — there it stores the display name (e.g. "Šatní skříň"), which is correct semantics.
+
+## Migration
+
+```sql
+ALTER TABLE tpv_items RENAME COLUMN item_name TO item_code;
 ```
 
-## Changes
+No data changes needed — same values, just the column name.
 
-### 1. New hook: `src/hooks/useCNDiff.ts`
-- Accepts `projectId` and current `tpv_items` array
-- Provides `checkCN()` function that:
-  - Calls the existing `extract-tpv-from-sharepoint` edge function (action: "search" then "extract")
-  - Compares extracted items against current `tpv_items` by matching `kod_prvku` ↔ `item_name`
-  - Computes diff: `added[]`, `removed[]`, `changed[]` (with old/new values for cena, pocet, nazev)
-  - Stores result in state
-- Exposes: `diff`, `isChecking`, `hasDifferences`, `checkCN()`, `clearDiff()`
-- No DB table needed — diff is ephemeral, computed on demand
+## Files to Update
 
-### 2. New component: `src/components/CNDiffDialog.tsx`
-- Shows a table of differences grouped by type (new / changed / removed)
-- Color coding: green rows = new items, yellow = changed (shows old → new), red = removed
-- Checkboxes per row to select which changes to apply
-- "Aktualizovat vybrané" button:
-  - Inserts new items into `tpv_items`
-  - Updates changed items' cena/pocet/nazev
-  - Optionally soft-deletes removed items (with confirmation)
-- "Označit jako zkontrolováno" button to dismiss without changes
+### Core TPV hooks & components
+1. **`src/hooks/useTPVItems.tsx`** — All references to `item_name` → `item_code` in queries, mutations, inserts
+2. **`src/hooks/useAllTPVItems.ts`** — Query references
+3. **`src/hooks/useCNDiff.ts`** — Matching logic `item.item_name` → `item.item_code`
+4. **`src/components/TPVList.tsx`** — Table rendering, add item, sort, filter + fix missing Tooltip import
+5. **`src/components/CNDiffDialog.tsx`** — Insert mapping and display
+6. **`src/components/assistant/TPVExtractor.tsx`** — Save mapping `item_name: item.kod_prvku` → `item_code: item.kod_prvku`
+7. **`src/components/ExcelImportWizard.tsx`** — Target field mapping and duplicate check
 
-### 3. Update `src/components/TPVList.tsx`
-- Import and use `useCNDiff` hook
-- Add `AlertTriangle` warning icon next to the toolbar (between project title and buttons)
-  - Only visible when `hasDifferences === true`
-  - Tooltip on hover: "CN byla změněna — zkontrolovat"
-  - Click opens `CNDiffDialog`
-- Add a "Kontrola CN" button in toolbar (always visible when `canManageTPV`)
-  - Triggers `checkCN()` manually
-  - Shows spinner while checking
+### Production integration (where tpv_items.item_name was read)
+8. **`src/lib/recalculateProductionHours.ts`** — Select and match logic (`t.item_name` → `t.item_code`)
+9. **`src/hooks/useProductionProgress.ts`** — Select query for tpv_items
+10. **`src/hooks/useProductionStatuses.ts`** — If it reads tpv_items
 
-### 4. Auto-trigger on CN upload
-- In `TPVList.tsx`, watch for changes in SharePoint `cenova_nabidka` files
-  - After `TPVExtractor` closes with success (`onSuccess`), auto-run `checkCN()` in background
-  - This also covers the case where CN was uploaded via DocumentDragDrop or any other method — user can manually trigger "Kontrola CN"
+### Production components (where production tables' item_name stays but code interactions change)
+11. **`src/components/production/PlanVyrobyTableView.tsx`** — Where it cross-references tpv_items
+12. **`src/components/production/ForecastOverlay.tsx`** — tpv_items select
+13. **`src/components/production/ForecastSafetyNet.tsx`** — tpv_items select
+14. **`src/components/production/InboxPanel.tsx`** — If it references tpv code
+15. **`src/components/production/SplitItemDialog.tsx`** — No change (uses production_schedule.item_name)
+16. **`src/components/production/SpillSuggestionPanel.tsx`** — No change (production tables)
 
-## Diff Logic (in `useCNDiff`)
+### Other files
+17. **`src/pages/Index.tsx`** — Mobile add item: `item_name` → `item_code`
+18. **`src/components/mobile/MobileTPVCardList.tsx`** — Interface + rendering
+19. **`src/components/mobile/MobileDetailProjektSheet.tsx`** — If it reads item_name from tpv
+20. **`src/components/RecycleBin.tsx`** — `nameField="item_name"` → `"item_code"`
+21. **`src/components/ProjectDetailDialog.tsx`** — If it references tpv item_name
+22. **`src/data/projects.ts`** — If relevant
+23. **`src/lib/exportExcel.ts`** / **`src/lib/exportPdf.ts`** — If they reference tpv item_name
 
-```text
-Match by: extracted.kod_prvku === tpv_item.item_name
+### Edge Functions
+24. **`supabase/functions/seed-test-env/index.ts`** — Test data inserts use `item_name`
+25. **`supabase/functions/extract-tpv-from-sharepoint/index.ts`** — Already uses `kod_prvku` in AI schema (done previously)
+26. **`supabase/functions/extract-tpv/index.ts`** — Already uses `kod_prvku` (done previously)
 
-For each extracted item:
-  - If no matching tpv_item → "added"
-  - If matching tpv_item exists but cena/pocet/nazev differs → "changed"
-  
-For each tpv_item:
-  - If no matching extracted item → "removed" (only flagged, not auto-deleted)
-```
+### Type file (auto-generated, no manual edit)
+- `src/integrations/supabase/types.ts` — Will auto-update after migration
 
-## No DB Migration Needed
-The diff is computed client-side and stored in React state. No snapshot table required since we compare CN document directly against live `tpv_items`.
+## Runtime Error Fix
+- **`src/components/TPVList.tsx`**: Add missing import for `Tooltip, TooltipTrigger, TooltipContent` from `@/components/ui/tooltip` and wrap with `TooltipProvider`
 
-## Technical Notes
-- Reuses existing `extract-tpv-from-sharepoint` edge function — no backend changes
-- The background extraction is fire-and-forget: errors are silently caught, user sees no disruption
-- If multiple CN files exist, uses the same "pick" logic as TPVExtractor (latest/largest match)
+## Key Principle
+- Only `tpv_items` column changes. Production tables keep `item_name` (it's the display name there) and `item_code` (the code) — those are already correct.
+- The `TPVItem` TypeScript type will change from `item_name: string` to `item_code: string`.
 
