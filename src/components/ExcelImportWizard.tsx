@@ -149,6 +149,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   const [sheets, setSheets] = useState<ParsedSheet[]>([]);
   const [uploadTime, setUploadTime] = useState<Date | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [importMode, setImportMode] = useState<"new" | "update">("new");
 
   // Step 2
   const [activeSheet, setActiveSheet] = useState(0);
@@ -158,7 +159,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   // Step 3
   const [rows, setRows] = useState<RowData[]>([]);
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "overwrite">("skip");
-  const [existingCodes, setExistingCodes] = useState<Set<string>>(new Set());
+  const [_existingCodes, setExistingCodes] = useState<Set<string>>(new Set());
 
   // Step 4
   const [importResult, setImportResult] = useState<{ imported: number; warnings: number; skipped: number } | null>(null);
