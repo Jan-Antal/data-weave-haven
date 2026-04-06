@@ -5,8 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle } from "lucide-react";
+import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle, Eye } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
+import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
+import { useSharePointDocs } from "@/hooks/useSharePointDocs";
 
 
 interface ExtractedItem {
