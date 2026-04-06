@@ -557,6 +557,9 @@ function DocsTabContent({ projectId }: { projectId: string }) {
           uploadFile = new File([file], newName, { type: file.type });
         }
         await sp.uploadFile(catKey, uploadFile);
+        if (catKey === "cenova_nabidka") {
+          window.dispatchEvent(new CustomEvent("cn-file-uploaded", { detail: { projectId } }));
+        }
         toast.success(`Nahráno: ${uploadFile.name}`);
       } catch {
         toast.error(`Chyba při nahrávání: ${file.name}`);

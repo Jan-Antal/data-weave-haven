@@ -463,6 +463,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         const result = await chunked.uploadLargeFile(project.project_id, folder, uploadFile);
         sp.listFiles(categoryKey, true);
         dispatchDocCountUpdate(project.project_id, 1);
+        if (categoryKey === "cenova_nabidka") {
+          window.dispatchEvent(new CustomEvent("cn-file-uploaded", { detail: { projectId: project.project_id } }));
+        }
         const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
         logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: uploadFile.name, detail: catLabel });
       } catch (err: any) {
@@ -473,6 +476,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       try {
         await sp.uploadFile(categoryKey, uploadFile);
         dispatchDocCountUpdate(project.project_id, 1);
+        if (categoryKey === "cenova_nabidka") {
+          window.dispatchEvent(new CustomEvent("cn-file-uploaded", { detail: { projectId: project.project_id } }));
+        }
         toast({ title: "Soubor nahrán", description: uploadFile.name });
         const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
         logActivity({ projectId: project.project_id, actionType: "document_uploaded", newValue: uploadFile.name, detail: catLabel });

@@ -43,8 +43,6 @@ import { logActivity } from "@/lib/activityLog";
 import { TPVExtractor } from "./assistant/TPVExtractor";
 import { useCNDiff } from "@/hooks/useCNDiff";
 import { CNDiffDialog } from "./CNDiffDialog";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { TooltipProvider } from "@/components/ui/tooltip";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_code", label: "Kód prvku" },
@@ -119,16 +117,21 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const currentProject = useMemo(() => allProjects.find((p) => p.project_id === projectId), [allProjects, projectId]);
   const queryClient = useQueryClient();
 
-  // CN diff detection — auto-check on mount
+  // CN diff detection — triggered by file upload events only
   const { diff: cnDiff, isChecking: cnChecking, hasDifferences: cnHasDiff, checkCN, clearDiff: clearCNDiff } = useCNDiff(projectId, items);
 
-  const cnAutoCheckedRef = useRef(false);
+  // Listen for CN file uploads from ProjectDetailDialog / MobileDetailProjektSheet
   useEffect(() => {
-    if (items.length > 0 && !cnAutoCheckedRef.current) {
-      cnAutoCheckedRef.current = true;
-      checkCN();
-    }
-  }, [items.length, checkCN]);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.projectId === projectId) {
+        // Delay to let SharePoint index the new file
+        setTimeout(() => checkCN(), 2000);
+      }
+    };
+    window.addEventListener("cn-file-uploaded", handler);
+    return () => window.removeEventListener("cn-file-uploaded", handler);
+  }, [projectId, checkCN]);
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
@@ -725,20 +728,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         {cnChecking && (
           <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
         )}
-        {cnHasDiff && !cnChecking && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setCnDiffOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors cursor-pointer"
-              >
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {cnDiff!.entries.length}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>CN byla změněna — kliknutím zobrazíte rozdíly</TooltipContent>
-          </Tooltip>
-        )}
         <button
           onClick={() => setDetailOpen(true)}
           className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -781,6 +770,22 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       {editMode && (
         <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg">
           Režim úpravy sloupců
+        </div>
+      )}
+
+      {/* CN diff warning banner */}
+      {cnDiff && cnDiff.entries.length > 0 && (
+        <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 text-orange-800 text-sm px-4 py-2.5 rounded-lg mb-2">
+          <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0" />
+          <span className="flex-1">
+            Cenová nabídka byla změněna — nalezeno <strong>{cnDiff.entries.length}</strong> rozdílů oproti TPV seznamu
+          </span>
+          <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-100" onClick={() => setCnDiffOpen(true)}>
+            Zobrazit změny
+          </Button>
+          <Button size="sm" variant="ghost" className="text-orange-600 hover:bg-orange-100" onClick={clearCNDiff}>
+            Ignorovat
+          </Button>
         </div>
       )}
 
@@ -1280,7 +1285,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       {cnDiff && (
         <CNDiffDialog
           open={cnDiffOpen}
-          onClose={() => {
+          onClose={() => setCnDiffOpen(false)}
+          onApplied={() => {
             setCnDiffOpen(false);
             clearCNDiff();
           }}
