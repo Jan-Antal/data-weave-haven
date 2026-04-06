@@ -50,6 +50,62 @@ function isApplianceOnly(item: { nazev: string; popis: string }): boolean {
   return APPLIANCE_RE.test(item.nazev.trim());
 }
 
+// ─── Module-level extraction cache (15 min TTL) ──────────────────────────────
+const CACHE_TTL_MS = 15 * 60 * 1000;
+
+interface ExtractionCacheEntry {
+  items: ExtractedItem[];
+  fileName: string;
+  sourceDoc: { itemId?: string; fileName: string; blobUrl?: string };
+  timestamp: number;
+}
+
+const extractionCache = new Map<string, ExtractionCacheEntry>();
+
+function getCachedExtraction(projectId: string): ExtractionCacheEntry | null {
+  const entry = extractionCache.get(projectId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    extractionCache.delete(projectId);
+    return null;
+  }
+  return entry;
+}
+
+// ─── Error Boundary for DocumentPreviewModal ─────────────────────────────────
+class PreviewErrorBoundary extends Component<
+  { children: ReactNode; onError?: () => void },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Preview iframe error caught:", error, info);
+    this.props.onError?.();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60">
+          <div className="bg-background rounded-lg p-6 shadow-xl text-center space-y-3 max-w-sm">
+            <AlertCircle className="h-8 w-8 text-destructive mx-auto" />
+            <p className="text-sm">Náhled dokumentu selhal.</p>
+            <Button size="sm" variant="outline" onClick={() => this.setState({ hasError: false })}>
+              Zavřít
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose, open }: TPVExtractorProps) {
   const [phase, setPhase] = useState<Phase>("searching");
   const [matches, setMatches] = useState<SPMatch[]>([]);
