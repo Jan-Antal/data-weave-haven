@@ -170,6 +170,26 @@ export function useUpdateTPVItem() {
           // Silent fail for notifications
         }
       })();
+
+      // Auto-recalculate percent_tpv when status changes
+      if (field === "status") {
+        (async () => {
+          try {
+            const { data: allItems } = await supabase
+              .from("tpv_items")
+              .select("status")
+              .eq("project_id", projectId)
+              .is("deleted_at", null);
+            if (allItems && allItems.length > 0) {
+              const pct = computeTPVProgress(allItems as TPVItem[]);
+              if (pct != null) {
+                await supabase.from("projects").update({ percent_tpv: pct } as any).eq("project_id", projectId);
+                qc.invalidateQueries({ queryKey: ["projects"] });
+              }
+            }
+          } catch {}
+        })();
+      }
     },
     onError: () => {
       toast({ title: "Chyba", variant: "destructive" });
