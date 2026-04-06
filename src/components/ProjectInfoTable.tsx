@@ -442,12 +442,13 @@ const ProjectRow = memo(function ProjectRow({
   isFieldReadOnly,
 }: ProjectRowProps) {
   // Merge stage data into project display for multi-stage summary
+  const computedPct = useMemo(() => tpvItems ? computeTPVProgress(tpvItems) : null, [tpvItems]);
   const displayProject = useMemo(() => {
     const overrides = getProjectDisplayOverrides(stagesRaw);
+    let base: Project;
     if (overrides.isSingleStage && overrides.singleStage) {
-      // Single stage: show stage data directly on project row
       const s = overrides.singleStage;
-      return {
+      base = {
         ...p,
         status: s.status ?? p.status,
         datum_smluvni: s.datum_smluvni ?? p.datum_smluvni,
@@ -456,10 +457,8 @@ const ProjectRow = memo(function ProjectRow({
         prodejni_cena: s.prodejni_cena ?? p.prodejni_cena,
         marze: s.marze ?? p.marze,
       } as Project;
-    }
-    if (!overrides.isSingleStage) {
-      // Multi-stage: show summary with weighted margin
-      return {
+    } else if (!overrides.isSingleStage) {
+      base = {
         ...p,
         status: overrides.statusSummary ?? p.status,
         datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni,
@@ -469,9 +468,15 @@ const ProjectRow = memo(function ProjectRow({
         prodejni_cena: overrides.totalPrice ?? p.prodejni_cena,
         marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze,
       } as Project;
+    } else {
+      base = p;
     }
-    return p;
-  }, [p, stagesRaw]);
+    // Override percent_tpv with computed value from TPV items
+    if (computedPct != null) {
+      return { ...base, percent_tpv: computedPct } as Project;
+    }
+    return base;
+  }, [p, stagesRaw, computedPct]);
 
   const isSummary = stageCount > 1;
 
