@@ -1,91 +1,118 @@
 
 
-# Import Excel — režim "Aktualizovat existující"
+# AMI Asistent — upgrade na datový asistent
 
-## Problém
+## Současný stav
 
-Dnes jediný způsob jak hromadně aktualizovat ceny (nebo jiná pole) je: exportovat → upravit → smazat vše → importovat znovu. Tím se ztratí stopa zpracování (status, konstruktér, poznámky, vazba na produkci).
+- `AmiAssistant.tsx` existuje ale **není nikde renderovaný** (odstraněn z App/Index)
+- Edge funkce `ami-assistant` funguje — pouze navigační nápověda (system prompt popisuje UI)
+- AI nemá přístup k žádným projektovým datům
 
-## Řešení
+## Cíl
 
-Přidat do ExcelImportWizard třetí režim importu — **"Aktualizovat existující"** — který:
-1. Matchuje řádky z Excelu na existující TPV položky podle `item_code`
-2. Aktualizuje **jen namapovaná pole** (např. jen cenu), ostatní pole nechá beze změny
-3. Nové kódy (nenalezené v DB) volitelně přidá jako nové položky
-4. Nezmazané položky zůstanou nedotčené
+Asistent, který umí odpovědět na otázky typu:
+- "Jak jsme na tom s projektem Generali?"
+- "Které projekty jsou po termínu?"
+- "Kolik hodin zbývá na Z-2605?"
+- "Kdo je PM na projektu XY?"
 
-## Změny v `src/components/ExcelImportWizard.tsx`
-
-### 1. Nový import mode selector (Step 1, po nahrání souboru)
-
-Přidat volbu režimu pod info o souboru:
-- **"Nový import"** (výchozí) — stávající chování, vloží nové + volitelně přepíše duplicity
-- **"Aktualizovat existující"** — matchuje podle kódu, aktualizuje jen vybraná pole
+## Architektura
 
 ```text
-State: importMode: "new" | "update"  (default "new")
+Frontend (AmiAssistant.tsx)
+  ↓ sends user message
+Edge function (ami-assistant)
+  ↓ 1. Query DB for context (projects, TPV, schedule, progress)
+  ↓ 2. Build rich system prompt with real data
+  ↓ 3. Stream AI response back
 ```
 
-### 2. Step 3 (Preview) — změny pro update režim
+## Změny
 
-Když `importMode === "update"`:
-- `buildRows()` porovná Excel hodnoty s DB hodnotami, označí **změněné buňky** (highlight)
-- Řádky kde `item_code` neexistuje v DB → status "new" (zelená, volitelně přidat)
-- Řádky kde `item_code` existuje a **nic se nezměnilo** → automaticky odškrtnuté
-- Řádky kde `item_code` existuje a **pole se liší** → selected, změněné buňky zvýrazněné (oranžově)
-- Stats: "X položek k aktualizaci, Y beze změny, Z nových"
+### 1. Edge funkce `supabase/functions/ami-assistant/index.ts`
 
-### 3. Step 3 → 4 (doImport) — update logika
+**Nová logika před voláním AI:**
 
-Když `importMode === "update"`:
-- Pro existující položky: `UPDATE` jen polí která jsou namapovaná **a** mají jinou hodnotu
-- Pro nové položky (pokud selected): `INSERT` jako dnes
-- Nezmazává nic, nedotýká se nenamapovaných polí
+Když přijde chat zpráva (ne feedback), edge funkce:
+1. Vytvoří Supabase client (service role)
+2. Načte **kontext z DB** — vždy, pro každý dotaz:
+   - `projects` (non-deleted): `project_id, project_name, status, pm, konstrukter, datum_smluvni, prodejni_cena, klient, hodiny_tpv, percent_tpv`
+   - `production_schedule` agregace: per-project counts by status (scheduled/in_progress/completed/paused)
+   - `production_inbox` counts per project
+   - `tpv_items` counts per project (non-deleted)
+   - `project_plan_hours`: planned hours per project
+   - `production_hours_log` via `get_hours_by_project()` RPC: actual hours per project
+3. Sestaví **data context block** jako structured text:
+   ```
+   === PROJEKTOVÁ DATA ===
+   Projekt Z-2605-001 "Generali":
+   - Status: Výroba, PM: Novák, Konstruktér: Dvořák
+   - Smluvní termín: 2026-05-15
+   - TPV: 42 položek, 85% pokrytí
+   - Výroba: 12 hotovo, 8 naplánováno, 3 pozastaveno
+   - Hodiny: plán 320h, skutečnost 210h (66%)
+   ...
+   ```
+4. Přidá tento blok do system promptu
 
-### 4. Duplicate mode dropdown
+**Aktualizovaný system prompt** — rozšířit o:
+- Instrukce k odpovídání na projektové dotazy
+- Pokud se ptá na konkrétní projekt, AI najde ho v datech a odpoví
+- Pokud se ptá obecně ("co hoří?"), AI vyhodnotí projekty po termínu, pozastavené, s nízkým progress
 
-- V režimu "new": zobrazit jako dnes (skip/overwrite)
-- V režimu "update": skrýt (vždy overwrite, ale jen změněná pole)
+**Limit dat**: Max 50 aktivních projektů v kontextu (oříznutí na relevantní). Pokud je projektů víc, zahrnout jen aktivní/rozpracované.
 
-## Implementační detail
+### 2. Frontend `src/components/AmiAssistant.tsx`
+
+- Beze změn v logice (streaming funguje)
+- Aktualizovat **QUICK_CHIPS** na datové dotazy:
+  ```
+  "📊 Jak jsme na tom s projekty?"
+  "🔥 Které projekty hoří?"  
+  "💬 Napsat zprávu adminovi"
+  ```
+
+### 3. Rendering — vrátit komponentu do app
+
+- V `src/App.tsx` (nebo `src/pages/Index.tsx`): importovat a renderovat `<AmiAssistant />` globálně (v rámci autentizovaného layoutu)
+
+## Detaily DB dotazů v edge funkci
 
 ```typescript
-// V buildRows pro update mode:
-const { data: existing } = await supabase
+// 1. Projekty
+const { data: projects } = await supabase
+  .from("projects")
+  .select("project_id, project_name, status, pm, konstrukter, datum_smluvni, prodejni_cena, klient, hodiny_tpv, percent_tpv, currency")
+  .is("deleted_at", null)
+  .eq("is_test", false)
+  .limit(50);
+
+// 2. TPV counts
+const { data: tpvCounts } = await supabase
   .from("tpv_items")
-  .select("id, item_code, nazev, popis, pocet, cena, konstrukter, notes, status, sent_date, accepted_date")
-  .eq("project_id", projectId)
+  .select("project_id")
   .is("deleted_at", null);
 
-const existingMap = new Map(existing?.map(e => [e.item_code, e]) || []);
+// 3. Schedule status counts
+const { data: schedule } = await supabase
+  .from("production_schedule")
+  .select("project_id, status");
 
-// Pro každý řádek z Excelu:
-const dbRow = existingMap.get(values.item_code);
-if (dbRow) {
-  // Porovnat jen namapovaná pole
-  const changedFields: string[] = [];
-  for (const f of TARGET_FIELDS) {
-    if (mapping[f.key] === null) continue; // nemapováno → přeskočit
-    if (f.key === "item_code") continue;
-    const excelVal = values[f.key];
-    const dbVal = String(dbRow[f.key] ?? "");
-    if (excelVal !== dbVal) changedFields.push(f.key);
-  }
-  // status: changedFields.length > 0 ? "update" : "unchanged"
-}
+// 4. Plan hours
+const { data: planHours } = await supabase
+  .from("project_plan_hours")
+  .select("project_id, hodiny_plan");
+
+// 5. Actual hours
+const { data: actualHours } = await supabase
+  .rpc("get_hours_by_project");
 ```
 
-## UX Flow
+Toto se agreguje do textového kontextu pro AI.
 
-1. Nahraju Excel s aktualizovanými cenami
-2. Vyberu režim "Aktualizovat existující"
-3. Namapuji sloupce (stačí jen Kód + Cena)
-4. V náhledu vidím: "42 položek, 38 s novou cenou, 4 beze změny"
-5. Změněné buňky jsou zvýrazněné oranžově (stará → nová hodnota)
-6. Kliknu "Aktualizovat 38 položek"
-7. Hotovo — status, konstruktér, poznámky, vazba na produkci zůstaly
+## Soubory k úpravě
 
-## Soubory
-
-1. **`src/components/ExcelImportWizard.tsx`** — přidat `importMode` state, upravit `buildRows()`, `doImport()`, a UI pro Step 1 (mode selector) a Step 3 (change highlighting)
+1. **`supabase/functions/ami-assistant/index.ts`** — DB dotazy + rozšířený system prompt
+2. **`src/components/AmiAssistant.tsx`** — nové quick chips
+3. **`src/App.tsx`** — renderovat `<AmiAssistant />` v autentizovaném layoutu
 
