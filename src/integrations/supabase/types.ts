@@ -1378,7 +1378,7 @@ export type Database = {
           id: string
           import_source: string | null
           imported_at: string | null
-          item_name: string
+          item_code: string
           konstrukter: string | null
           nazev: string | null
           notes: string | null
@@ -1400,7 +1400,7 @@ export type Database = {
           id?: string
           import_source?: string | null
           imported_at?: string | null
-          item_name: string
+          item_code: string
           konstrukter?: string | null
           nazev?: string | null
           notes?: string | null
@@ -1422,7 +1422,7 @@ export type Database = {
           id?: string
           import_source?: string | null
           imported_at?: string | null
-          item_name?: string
+          item_code?: string
           konstrukter?: string | null
           nazev?: string | null
           notes?: string | null

@@ -338,7 +338,7 @@ const Index = () => {
                     handleMobileProjectTap(mobileTPVProject);
                   }}
                   onAddItem={(name) => {
-                    addTPVItem.mutate({ project_id: mobileTPVProjectId, item_name: name });
+                    addTPVItem.mutate({ project_id: mobileTPVProjectId, item_code: name });
                   }}
                   onOpenImport={() => {}}
                   canManageTPV={canManageTPVMobile}

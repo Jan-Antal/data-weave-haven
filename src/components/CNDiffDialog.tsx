@@ -53,7 +53,7 @@ export function CNDiffDialog({ open, onClose, diff, projectId, currency = "CZK" 
         .filter((e): e is Extract<CNDiffEntry, { type: "added" }> => e.type === "added")
         .map((e) => ({
           project_id: projectId,
-          item_name: e.extracted.kod_prvku,
+          item_code: e.extracted.kod_prvku,
           nazev: e.extracted.nazev,
           popis: e.extracted.popis || null,
           cena: e.extracted.cena,
@@ -217,7 +217,7 @@ export function CNDiffDialog({ open, onClose, diff, projectId, currency = "CZK" 
                         <Minus className="h-3 w-3" /> Chybí
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-semibold">{entry.current.item_name}</TableCell>
+                    <TableCell className="font-mono text-xs font-semibold">{entry.current.item_code}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {entry.current.nazev || ""}
                       {(entry.current.cena ?? 0) > 0 && (

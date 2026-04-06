@@ -13,7 +13,7 @@ interface TPVItem {
   id: string;
   nazev: string | null;
   popis: string | null;
-  item_name: string;
+  item_code: string;
   konstrukter: string | null;
   status: string | null;
   pocet: number | null;
@@ -62,7 +62,7 @@ export function MobileTPVCardList({
     const q = search.toLowerCase();
     if (!q) return items;
     return items.filter(item => {
-      const code = (item.item_name || "").toLowerCase();
+      const code = (item.item_code || "").toLowerCase();
       const name = (item.nazev || "").toLowerCase();
       return code.includes(q) || name.includes(q);
     });
@@ -119,7 +119,7 @@ export function MobileTPVCardList({
             const statusOpt = statusOptions.find(o => o.label === item.status);
             const statusColor = statusOpt?.color;
             const isExpanded = expandedId === item.id;
-            const vyrobaStatuses = productionStatusMap.get(item.item_name || item.nazev || "") || [];
+            const vyrobaStatuses = productionStatusMap.get(item.item_code || item.nazev || "") || [];
             const vyrobaLabel = vyrobaStatuses[0]?.label || "";
 
             return (
@@ -132,7 +132,7 @@ export function MobileTPVCardList({
                 {/* Compact view: 3 fields */}
                 <div className="p-3 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold font-sans text-primary truncate max-w-[160px]" title={item.item_name || "—"}>{item.item_name || "—"}</span>
+                    <span className="text-[11px] font-bold font-sans text-primary truncate max-w-[160px]" title={item.item_code || "—"}>{item.item_code || "—"}</span>
                     {isExpanded
                       ? <ChevronUp className="h-3 w-3 text-muted-foreground shrink-0" />
                       : <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />

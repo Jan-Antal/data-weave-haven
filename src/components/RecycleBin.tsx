@@ -123,7 +123,7 @@ function RecordRow({
   if (isTPV) {
     displayName = (
       <>
-        <span className="font-bold">{record.item_name}</span>
+        <span className="font-bold">{record.item_code}</span>
         {record.nazev && <span className="text-muted-foreground"> — {record.nazev}</span>}
       </>
     );
@@ -231,7 +231,7 @@ export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
                 </TabsContent>
               )}
               <TabsContent value="tpv" className="mt-0">
-                <RecordList table="tpv_items" nameField="item_name" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete && !isTestUser} isTPV />
+                <RecordList table="tpv_items" nameField="item_code" emptyText="Žádné smazané TPV položky" canPermanentDelete={canPermanentDelete && !isTestUser} isTPV />
               </TabsContent>
             </div>
           </Tabs>
