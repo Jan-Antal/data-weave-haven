@@ -273,11 +273,14 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
 
     const { data: existingItems } = await supabase
       .from("tpv_items")
-      .select("item_code")
+      .select("id, item_code, nazev, popis, pocet, cena, konstrukter, notes, status, sent_date, accepted_date")
       .eq("project_id", projectId)
       .is("deleted_at", null);
-    const codes = new Set((existingItems || []).map(i => i.item_code).filter(Boolean) as string[]);
+    const existingList = (existingItems || []) as any[];
+    const codes = new Set(existingList.map(i => i.item_code).filter(Boolean) as string[]);
     setExistingCodes(codes);
+
+    const existingMap = new Map(existingList.map(e => [e.item_code, e]));
 
     const built: RowData[] = [];
     for (let rawIdx = 0; rawIdx < currentSheet.rows.length; rawIdx++) {
@@ -300,16 +303,68 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
       const hasCode = !!values.item_code;
       const hasName = !!values.nazev;
       const isDuplicate = hasCode && codes.has(values.item_code);
-      const status: "valid" | "warning" | "error" =
-        (!hasCode || !hasName) ? "error" : isDuplicate ? "warning" : "valid";
 
-      built.push({
-        values: values as Record<TargetKey, string>,
-        selected: status !== "error",
-        status,
-        rawIdx,
-        duplicateCode: isDuplicate,
-      });
+      if (importMode === "update") {
+        // Update mode logic
+        if (!hasCode) {
+          built.push({ values: values as Record<TargetKey, string>, selected: false, status: "error", rawIdx });
+          continue;
+        }
+        const dbRow = existingMap.get(values.item_code);
+        if (!dbRow) {
+          // New item — not in DB
+          built.push({
+            values: values as Record<TargetKey, string>,
+            selected: hasName, // auto-select if has name
+            status: hasName ? "valid" : "error",
+            rawIdx,
+          });
+          continue;
+        }
+        // Compare mapped fields
+        const changedFields = new Set<string>();
+        const dbValues: Record<string, string> = {};
+        for (const f of TARGET_FIELDS) {
+          if (f.key === "item_code") continue;
+          if (mapping[f.key] === null || mapping[f.key] === undefined) continue;
+          const excelVal = values[f.key] || "";
+          const numericFields = ["pocet", "cena"];
+          let dbVal: string;
+          if (numericFields.includes(f.key)) {
+            dbVal = dbRow[f.key] !== null && dbRow[f.key] !== undefined ? String(dbRow[f.key]) : "";
+            const excelNum = parseNumericValue(excelVal);
+            const dbNum = dbRow[f.key] !== null ? Number(dbRow[f.key]) : null;
+            if (excelNum !== dbNum) changedFields.add(f.key);
+          } else {
+            dbVal = String(dbRow[f.key] ?? "");
+            if (excelVal !== dbVal) changedFields.add(f.key);
+          }
+          dbValues[f.key] = numericFields.includes(f.key)
+            ? (dbRow[f.key] !== null && dbRow[f.key] !== undefined ? String(dbRow[f.key]) : "")
+            : String(dbRow[f.key] ?? "");
+        }
+        built.push({
+          values: values as Record<TargetKey, string>,
+          selected: changedFields.size > 0,
+          status: changedFields.size > 0 ? "update" : "unchanged",
+          rawIdx,
+          duplicateCode: true,
+          dbId: dbRow.id,
+          changedFields,
+          dbValues,
+        });
+      } else {
+        // New import mode (existing logic)
+        const status: "valid" | "warning" | "error" =
+          (!hasCode || !hasName) ? "error" : isDuplicate ? "warning" : "valid";
+        built.push({
+          values: values as Record<TargetKey, string>,
+          selected: status !== "error",
+          status,
+          rawIdx,
+          duplicateCode: isDuplicate,
+        });
+      }
     }
     setRows(built);
   };
