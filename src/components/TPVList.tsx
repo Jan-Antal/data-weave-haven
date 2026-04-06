@@ -1277,9 +1277,27 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       <TPVExtractor
         projectId={projectId}
         open={extractorOpen}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["tpv_items", projectId] })}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["tpv_items", projectId] });
+          // Auto-trigger CN diff check in background after extraction
+          setTimeout(() => checkCN(), 1500);
+        }}
         onClose={() => setExtractorOpen(false)}
       />
+
+      {/* CN Diff Dialog */}
+      {cnDiff && (
+        <CNDiffDialog
+          open={cnDiffOpen}
+          onClose={() => {
+            setCnDiffOpen(false);
+            clearCNDiff();
+          }}
+          diff={cnDiff}
+          projectId={projectId}
+          currency={currency}
+        />
+      )}
     </div>
   );
 }
