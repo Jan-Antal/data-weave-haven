@@ -284,6 +284,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
+
+  // Stage data for multi-stage finance logic
+  const { data: detailStages = [] } = useProjectStages(project?.project_id ?? "");
+  const isMultiStage = detailStages.length >= 2;
+  const stageOverrides = useMemo(() => getProjectDisplayOverrides(detailStages), [detailStages]);
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
