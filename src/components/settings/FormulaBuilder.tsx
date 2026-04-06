@@ -82,7 +82,10 @@ interface PresetDef {
   subtitle: string;
   description: string;
   html: string;
+  modules: string[];
 }
+
+const ALL_MODULES = ["Plán Výroby", "Analytics", "Výroba", "Detail Projektu", "Slack Report"] as const;
 
 const PRESETS: Record<string, PresetDef> = {
   scheduled_czk_hist: {
@@ -90,48 +93,56 @@ const PRESETS: Record<string, PresetDef> = {
     subtitle: "(scheduled_czk pre historické HIST_ položky)",
     description: "Koľko Kč predstavuje historický bundle v Pláne Výroby. Používa sa pre týždne importované z Alvena (kód začína HIST_), kde nie sú TPV položky — hodnota sa dopočíta z podielu odpracovaných hodín voči celkovému plánu projektu.",
     html: `${tok("FLOOR(","fn")} ( ${tok("scheduled_hours","var")} ÷ ${tok("hodiny_plan","var")} ) × ${tok("prodejni_cena","var")} × ${tok("eur_czk","var")} )`,
+    modules: ["Plán Výroby"],
   },
   scheduled_czk_tpv: {
     label: "Hodnota bundle — TPV",
     subtitle: "(scheduled_czk pre normálne TPV položky)",
     description: "Koľko Kč predstavuje bundle v Pláne Výroby pre štandardné TPV položky. Zobrazuje sa v stĺpci Prodej. Hodnota = predajná cena položky z TPV prepočítaná na CZK — pre EUR projekty sa násobí kurzom.",
     html: `${tok("FLOOR(","fn")} ${tok("tpv_cena","var")} × ${tok("pocet","var")} × ${tok("eur_czk","var")} )`,
+    modules: ["Plán Výroby"],
   },
   scheduled_hours: {
     label: "Hodiny bundle",
     subtitle: "(scheduled_hours)",
     description: "Koľko výrobných hodín zaberie jedna naplánovaná položka v Pláne Výroby. Počíta sa z predajnej ceny položky — od nej sa odráta marža, vezme sa len výrobný podiel a vydelí hodinovou sadzbou. Pre rozdelené bundles (split) sa výsledok ešte škáluje pomerom daného týždňa voči celku.",
     html: `${tok("FLOOR(","fn")} ${tok("itemCostCzk","var")} × ( 1 - ${tok("marze","var")} ) × ${tok("production_pct","var")} ÷ ${tok("hourly_rate","var")} )`,
+    modules: ["Plán Výroby", "Analytics"],
   },
   hodiny_plan_projekt: {
     label: "Hodiny projektu — z ceny",
     subtitle: "(hodiny_plan zo zdroja Project / prodejni_cena)",
     description: "Celkový počet plánovaných hodín projektu vypočítaný z predajnej ceny celého projektu. Používa sa ako fallback keď TPV nie je kompletné (suma TPV < 60 % predajnej ceny) alebo je zapnutá voľba 'Použiť cenu projektu'.",
     html: `${tok("FLOOR(","fn")} ${tok("prodejni_cena","var")} × ${tok("eur_czk","var")} × ( 1 - ${tok("marze","var")} ) × ${tok("production_pct","var")} ÷ ${tok("hourly_rate","var")} )`,
+    modules: ["Analytics", "Plán Výroby"],
   },
   hodiny_plan_tpv: {
     label: "Hodiny projektu — z TPV",
     subtitle: "(hodiny_plan zo zdroja TPV / tpv_items)",
     description: "Celkový počet plánovaných hodín projektu vypočítaný zo súčtu všetkých TPV položiek. Toto je primárny zdroj — používa sa pokiaľ TPV pokrýva aspoň 60 % predajnej ceny. Výsledok sa ukladá do project_plan_hours.hodiny_plan.",
     html: `${tok("SUM(","fn")} ${tok("FLOOR(","fn")} ${tok("tpv_cena","var")} × ${tok("pocet","var")} × ${tok("eur_czk","var")} × ( 1 - ${tok("marze","var")} ) × ${tok("production_pct","var")} ÷ ${tok("hourly_rate","var")} ) )`,
+    modules: ["Analytics", "Plán Výroby"],
   },
   production_pct: {
     label: "Production PCT",
     subtitle: "(production_pct — podiel výroby bez normalizácie)",
     description: "Podiel výrobných nákladov z predajnej ceny. Berie sa priamo z cost_breakdown_presets a delí sa 100. Keďže všetky kategórie v presete (materiál + výroba + réžia + montáž + ...) spolu vždy dávajú 100 %, normalizácia sa NEROBÍ — číslo sa použije priamo.",
     html: `${tok("production_pct","var")} = ${tok("preset_production_pct","var")} ÷ 100`,
+    modules: ["Analytics", "Plán Výroby", "Detail Projektu"],
   },
   weekly_goal_pct: {
     label: "Týdenní cíl %",
     subtitle: "(weekly_goal_pct — očakávané % hotovosti k dnešku)",
     description: "Kde by mal byť projekt k dnešnému dňu v týždni. Počíta kumulatívne: hodiny z minulých týždňov sa berú 100%, z aktuálneho týždňa len pomerná časť podľa dňa (pondelok = 1/5, piatok = 5/5). Výsledok je cappovaný na maximum 100%.",
     html: `${tok("MIN(","fn")} ${tok("FLOOR(","fn")} ( ${tok("past_hours","var")} + ${tok("current_hours","var")} × ( ${tok("day_idx","var")} + 1 ) ÷ 5 ) ÷ ${tok("hodiny_plan","var")} × 100 ) , 100 )`,
+    modules: ["Výroba", "Slack Report"],
   },
   is_on_track: {
     label: "On track?",
     subtitle: "(is_on_track — je projekt na správnej ceste?)",
     description: "Porovnáva aktuálne % hotovosti (zadané vedúcim výroby v dennom logu) s očakávaným % k dnešnému dňu. Ak je skutočný stav rovnaký alebo vyšší ako cieľ → projekt je on track (zelená). Používa sa v module Výroba aj v dennom Slack reporte.",
     html: `${tok("percent","var")} ≥ ${tok("weekly_goal_pct","var")}`,
+    modules: ["Výroba", "Slack Report"],
   },
 };
 
@@ -305,6 +316,7 @@ type ConfirmAction = "close" | "switch-tab" | "restore-default";
 export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   const { toast } = useToast();
 
+  const [activeModules, setActiveModules] = useState<Set<string>>(new Set());
   const [activePreset, setActivePreset] = useState("scheduled_czk_hist");
   
   const [varValues, setVarValues] = useState<Record<string, number>>({ ...DEFAULT_VALUES });
@@ -796,18 +808,68 @@ export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
             {/* Preset selector */}
             <div>
               <Label className="text-xs text-muted-foreground mb-2 block">Vzorec</Label>
+
+              {/* Module filter chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <button
+                  onClick={() => setActiveModules(new Set())}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border",
+                    activeModules.size === 0
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  Všechny
+                </button>
+                {ALL_MODULES.map((mod) => (
+                  <button
+                    key={mod}
+                    onClick={() => {
+                      setActiveModules((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(mod)) next.delete(mod);
+                        else next.add(mod);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border",
+                      activeModules.has(mod)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    {mod}
+                  </button>
+                ))}
+              </div>
+
               <Select value={activePreset} onValueChange={(v) => tryLoadPreset(v)}>
-                <SelectTrigger className="w-full max-w-[320px] h-9 text-sm">
+                <SelectTrigger className="w-full max-w-[420px] h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(PRESETS).map(([key, p]) => (
-                    <SelectItem key={key} value={key} className="text-sm">
-                      {p.label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(PRESETS)
+                    .filter(([_, p]) =>
+                      activeModules.size === 0 || p.modules.some((m) => activeModules.has(m))
+                    )
+                    .map(([key, p]) => (
+                      <SelectItem key={key} value={key} className="text-sm">
+                        <span className="flex items-center gap-2">
+                          {p.label}
+                          <span className="flex gap-1 ml-1">
+                            {p.modules.map((m) => (
+                              <span key={m} className="inline-block px-1.5 py-0.5 rounded text-[9px] bg-muted text-muted-foreground leading-none">
+                                {m}
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
-            </Select>
+              </Select>
               {PRESETS[activePreset] && (
                 <>
                   <p className="text-[11px] font-mono text-muted-foreground mt-1">{PRESETS[activePreset].subtitle}</p>
