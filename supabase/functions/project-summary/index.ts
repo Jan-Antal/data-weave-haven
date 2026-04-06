@@ -18,14 +18,15 @@ OUTPUT FORMAT — always exactly this structure:
 [emoji] [project_id] · [project_name]
 PM: [name] · Termín: [date] · [days] dní [do termínu / PO TERMÍNE X dní]
 
-📋 TPV: [count] položiek · [value] Kč
+📋 TPV: [count] položek · [value] Kč
 ⏱ Odpracované: [worked]h z [planned]h ([pct]%)
-[if tempo known]: 📉 Tempo: [h/week]h/týždeň · [weeks_remaining] týždňov práce zostáva
+[if tempo known AND weeks_active >= 4]: 📉 Tempo: [h/week]h/týden · [weeks_remaining] týdnů práce zbývá
+[if schedule_total_hours < plan_hours * 0.8]: 📦 Naplánováno ve výrobě: [schedule_total_hours]h z [plan_hours]h ([schedule_pct]%)
 
 [blank line]
 [ONE sentence: plain assessment of situation. No fluff.]
 [if WARNING or CRITICAL: "Riziko: [specific risk in one sentence.]"]
-[if WARNING or CRITICAL: "Akcia: [one concrete action.]"]
+[if WARNING or CRITICAL: "Akce: [one concrete action.]"]
 
 EMOJI for first line:
 ✅ = OK
@@ -36,16 +37,29 @@ Rules:
 - Czech language throughout
 - Dates format: D.M.YYYY
 - Numbers: use spaces as thousands separator (2 800 000)
-- If TPV 100% covered: "TPV kompletné" not the percentage
+- If TPV 100% covered: "TPV kompletní" not the percentage
 - If worked = 0: "výroba nezačala"
-- tempo = worked_hours / weeks_since_start (if > 0)
+- tempo = worked_hours / weeks_since_first_work (use first_work_date, NOT schedule start)
 - weeks_remaining = (planned - worked) / tempo
+- If weeks_active < 4: do NOT show tempo or linear projection — say "příliš brzy na odhad tempa"
+- If schedule_total_hours is much less than plan_hours, mention that production covers only a fraction
 - Never mention "Alfred" or "AI" in the output
 - Maximum 8 lines total`;
 
+function parseCzechDate(raw: string | null): Date | null {
+  if (!raw) return null;
+  // Try ISO first
+  const iso = new Date(raw);
+  if (!isNaN(iso.getTime())) return iso;
+  // Czech format: "15. 5. 2026" or "15.5.2026"
+  const m = raw.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return null;
+}
+
 async function buildProjectData(supabase: ReturnType<typeof createClient>, projectId: string): Promise<string | null> {
   // Find project by partial match
-  const { data: projects } = await supabase
+  let { data: projects } = await supabase
     .from("projects")
     .select("project_id, project_name, status, pm, konstrukter, datum_smluvni, prodejni_cena, klient, hodiny_tpv, percent_tpv, currency")
     .is("deleted_at", null)
@@ -54,7 +68,6 @@ async function buildProjectData(supabase: ReturnType<typeof createClient>, proje
     .limit(5);
 
   if (!projects || projects.length === 0) {
-    // Try by project_id
     const { data: byId } = await supabase
       .from("projects")
       .select("project_id, project_name, status, pm, konstrukter, datum_smluvni, prodejni_cena, klient, hodiny_tpv, percent_tpv, currency")
@@ -64,7 +77,7 @@ async function buildProjectData(supabase: ReturnType<typeof createClient>, proje
       .limit(5);
     
     if (!byId || byId.length === 0) return null;
-    projects?.push(...byId);
+    projects = byId;
   }
 
   const p = projects![0];
@@ -83,32 +96,40 @@ async function buildProjectData(supabase: ReturnType<typeof createClient>, proje
 
   const schedItems = schedRes.data || [];
   const schedByStatus: Record<string, number> = {};
+  let scheduleTotalHours = 0;
+  let scheduleCompletedHours = 0;
   for (const s of schedItems) {
     schedByStatus[s.status] = (schedByStatus[s.status] || 0) + 1;
+    scheduleTotalHours += Number(s.scheduled_hours || 0);
+    if (s.status === "completed" || s.completed_at) {
+      scheduleCompletedHours += Number(s.scheduled_hours || 0);
+    }
   }
 
   const planH = planRes.data?.hodiny_plan || 0;
-  const actualAll = (actualRes.data || []) as { ami_project_id: string; total_hodiny: number }[];
-  const actualH = Number(actualAll.find(a => a.ami_project_id === p.project_id)?.total_hodiny || 0);
+  const actualAll = (actualRes.data || []) as { ami_project_id: string; total_hodiny: number; min_datum: string; max_datum: string }[];
+  const projectActual = actualAll.find(a => a.ami_project_id === p.project_id);
+  const actualH = Number(projectActual?.total_hodiny || 0);
+  const firstWorkDate = projectActual?.min_datum || null;
 
-  // Find earliest scheduled week for tempo calc
-  const weeks = schedItems.map(s => s.scheduled_week).filter(Boolean).sort();
-  const earliestWeek = weeks[0];
-  let weeksElapsed = 0;
-  if (earliestWeek) {
-    const start = new Date(earliestWeek);
+  // Tempo from real work start
+  let weeksActive = 0;
+  if (firstWorkDate) {
+    const start = new Date(firstWorkDate);
     const now = new Date();
-    weeksElapsed = Math.max(1, Math.round((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)));
+    weeksActive = Math.max(1, Math.round((now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)));
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const overdue = p.datum_smluvni && p.datum_smluvni < today && p.status !== "Dokončeno" && p.status !== "Fakturace";
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const deadlineDate = parseCzechDate(p.datum_smluvni);
+  const overdue = deadlineDate && deadlineDate < today && p.status !== "Dokončeno" && p.status !== "Fakturace";
   let daysToDeadline: number | null = null;
-  if (p.datum_smluvni) {
-    daysToDeadline = Math.round((new Date(p.datum_smluvni).getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000));
+  if (deadlineDate) {
+    daysToDeadline = Math.round((deadlineDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
   }
 
-  const data = `PROJECT DATA:
+  return `PROJECT DATA:
 project_id: ${p.project_id}
 project_name: ${p.project_name}
 status: ${p.status || "–"}
@@ -125,15 +146,16 @@ percent_tpv: ${p.percent_tpv ?? 0}%
 plan_hours: ${planH}
 actual_hours: ${Math.round(actualH)}
 progress_pct: ${planH > 0 ? Math.round((actualH / planH) * 100) : 0}%
-weeks_elapsed: ${weeksElapsed}
-tempo_h_per_week: ${weeksElapsed > 0 && actualH > 0 ? Math.round(actualH / weeksElapsed) : 0}
+first_work_date: ${firstWorkDate || "none"}
+weeks_active: ${weeksActive}
+tempo_h_per_week: ${weeksActive >= 4 && actualH > 0 ? Math.round(actualH / weeksActive) : "too_early"}
+schedule_total_hours: ${Math.round(scheduleTotalHours)}
+schedule_completed_hours: ${Math.round(scheduleCompletedHours)}
 schedule_completed: ${schedByStatus.completed || 0}
 schedule_in_progress: ${schedByStatus.in_progress || 0}
 schedule_scheduled: ${schedByStatus.scheduled || 0}
 schedule_paused: ${schedByStatus.paused || 0}
-today: ${today}`;
-
-  return data;
+today: ${todayStr}`;
 }
 
 serve(async (req) => {
