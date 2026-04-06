@@ -253,6 +253,7 @@ function buildFormState(p: Project | null) {
     cost_subcontractors_pct: p.cost_subcontractors_pct ?? null,
     cost_montaz_pct: p.cost_montaz_pct ?? null,
     cost_is_custom: p.cost_is_custom ?? false,
+    plan_use_project_price: (p as any).plan_use_project_price ?? false,
   };
 }
 
@@ -271,6 +272,7 @@ function defaultForm() {
     cost_subcontractors_pct: null as number | null,
     cost_montaz_pct: null as number | null,
     cost_is_custom: false,
+    plan_use_project_price: false,
   };
 }
 
