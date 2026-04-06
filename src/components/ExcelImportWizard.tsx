@@ -882,13 +882,35 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                   <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-foreground bg-card">
                     {stats.total} položek celkem
                   </div>
-                  <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-green-700 bg-green-50 border-green-200">
-                    {stats.selected} k importu
-                  </div>
-                  {stats.warnings > 0 && (
-                    <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-orange-700 bg-orange-50 border-orange-200">
-                      {stats.warnings} varování (duplicity)
-                    </div>
+                  {importMode === "update" ? (
+                    <>
+                      {stats.updates > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-orange-700 bg-orange-50 border-orange-200">
+                          {stats.updates} ke změně
+                        </div>
+                      )}
+                      {stats.unchanged > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-muted-foreground bg-muted/30">
+                          {stats.unchanged} beze změny
+                        </div>
+                      )}
+                      {stats.newItems > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-green-700 bg-green-50 border-green-200">
+                          {stats.newItems} nových
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-green-700 bg-green-50 border-green-200">
+                        {stats.selected} k importu
+                      </div>
+                      {stats.warnings > 0 && (
+                        <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-orange-700 bg-orange-50 border-orange-200">
+                          {stats.warnings} varování (duplicity)
+                        </div>
+                      )}
+                    </>
                   )}
                   {stats.errors > 0 && (
                     <div className="px-3 py-1.5 rounded-md border text-xs font-medium text-red-700 bg-red-50 border-red-200">
@@ -897,7 +919,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                   )}
                 </div>
                 <div className="flex gap-2 items-center">
-                  {stats.warnings > 0 && (
+                  {importMode === "new" && stats.warnings > 0 && (
                     <Select value={duplicateMode} onValueChange={v => setDuplicateMode(v as "skip" | "overwrite")}>
                       <SelectTrigger className="h-8 text-xs w-[180px]">
                         <SelectValue />
@@ -914,7 +936,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                   <Button variant="outline" size="sm" onClick={handleCancel}>Zrušit</Button>
                   <Button size="sm" onClick={doImport} disabled={importing || stats.selected === 0} className="bg-green-600 hover:bg-green-700 text-white">
                     {importing ? (
-                      <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Importuji...</>
+                      <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Zpracovávám...</>
+                    ) : importMode === "update" ? (
+                      <>Aktualizovat {stats.selected} položek</>
                     ) : (
                       <>Importovat {stats.selected} položek</>
                     )}
@@ -928,7 +952,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-10 sticky top-0 bg-card z-10">
-                      <Checkbox checked={rows.filter(r => r.status !== "error").every(r => r.selected)} onCheckedChange={(v) => selectAll(!!v)} />
+                      <Checkbox checked={rows.filter(r => r.status !== "error" && r.status !== "unchanged").every(r => r.selected)} onCheckedChange={(v) => selectAll(!!v)} />
                     </TableHead>
                     <TableHead className="w-10 sticky top-0 bg-card z-10">#</TableHead>
                     <TableHead className="w-10 sticky top-0 bg-card z-10"></TableHead>
@@ -948,15 +972,29 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                           isExcluded && "bg-muted/30",
                           !isExcluded && row.status === "warning" && "bg-amber-50",
                           !isExcluded && row.status === "error" && "bg-red-50/30",
+                          !isExcluded && row.status === "update" && "bg-orange-50/50",
+                          row.status === "unchanged" && "bg-muted/20",
                         )}
-                        style={isExcluded ? { opacity: 0.55 } : undefined}
+                        style={isExcluded && row.status !== "unchanged" ? { opacity: 0.55 } : row.status === "unchanged" ? { opacity: 0.45 } : undefined}
                       >
                         <TableCell>
-                          <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(idx)} disabled={row.status === "error"} />
+                          <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(idx)} disabled={row.status === "error" || row.status === "unchanged"} />
                         </TableCell>
                         <TableCell className="text-muted-foreground">{row.rawIdx + 1}</TableCell>
                         <TableCell>
                           {row.status === "valid" && row.selected && <Check className="h-3.5 w-3.5 text-green-600" />}
+                          {row.status === "update" && (
+                            <Tooltip>
+                              <TooltipTrigger><AlertTriangle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger>
+                              <TooltipContent>{row.changedFields?.size || 0} polí se změní</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {row.status === "unchanged" && (
+                            <Tooltip>
+                              <TooltipTrigger><Check className="h-3.5 w-3.5 text-muted-foreground/50" /></TooltipTrigger>
+                              <TooltipContent>Beze změny</TooltipContent>
+                            </Tooltip>
+                          )}
                           {row.status === "warning" && (
                             <Tooltip>
                               <TooltipTrigger><AlertTriangle className="h-3.5 w-3.5 text-amber-500" /></TooltipTrigger>
@@ -966,18 +1004,30 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
                           {row.status === "error" && (
                             <Tooltip>
                               <TooltipTrigger><X className="h-3.5 w-3.5 text-red-500" style={{ opacity: 1 }} /></TooltipTrigger>
-                              <TooltipContent>Chybí povinné pole (Kód Prvku nebo Název Prvku)</TooltipContent>
+                              <TooltipContent>Chybí povinné pole</TooltipContent>
                             </Tooltip>
                           )}
                         </TableCell>
-                        {TARGET_FIELDS.map(f => (
-                          <TableCell key={f.key} className={cn(
-                            (f.key === "popis" || f.key === "item_code") && "font-semibold",
-                            f.key === "notes" && "max-w-[300px] truncate font-normal",
-                          )}>
-                            {row.values[f.key] ?? ""}
-                          </TableCell>
-                        ))}
+                        {TARGET_FIELDS.map(f => {
+                          const isChanged = row.changedFields?.has(f.key);
+                          const oldVal = row.dbValues?.[f.key];
+                          return (
+                            <TableCell key={f.key} className={cn(
+                              (f.key === "popis" || f.key === "item_code") && "font-semibold",
+                              f.key === "notes" && "max-w-[300px] truncate font-normal",
+                              isChanged && "bg-orange-100/80 font-medium",
+                            )}>
+                              {isChanged ? (
+                                <span>
+                                  <span className="line-through text-muted-foreground/60 mr-1">{oldVal || "—"}</span>
+                                  <span className="text-orange-800">{row.values[f.key] || "—"}</span>
+                                </span>
+                              ) : (
+                                row.values[f.key] ?? ""
+                              )}
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     );
                   })}
