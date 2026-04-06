@@ -108,8 +108,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
-        nazev: item.nazev || item.nazev || item.item_name || "",
-        popis: item.popis || item.popis || item.popis_full || "",
+        nazev: item.nazev || item.item_name || "",
+        popis: item.popis || item.popis_full || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -176,8 +176,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
-        nazev: item.nazev || item.nazev || item.item_name || "",
-        popis: item.popis || item.popis || item.popis_full || "",
+        nazev: item.nazev || item.item_name || "",
+        popis: item.popis || item.popis_full || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
