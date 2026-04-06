@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { ExcelImportWizard } from "./ExcelImportWizard";
 import { formatCurrency } from "@/lib/currency";
 import { useExportContext } from "./ExportContext";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { useProductionStatuses } from "@/hooks/useProductionStatuses";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
