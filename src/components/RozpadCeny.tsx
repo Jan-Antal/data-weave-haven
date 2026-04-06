@@ -232,7 +232,7 @@ export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChang
               <div className="flex items-center gap-2 mt-1">
                 <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                 <span className="text-[10px] italic text-muted-foreground">Marže</span>
-                <span className="text-[10px] italic text-muted-foreground ml-auto">{marzeNum || 0} %</span>
+                <span className="text-[10px] italic text-muted-foreground ml-auto">{marzeDisplay || 0} %</span>
                 <span className="text-[9px] text-muted-foreground/50">z Finance</span>
               </div>
             </>
