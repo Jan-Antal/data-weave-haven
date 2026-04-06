@@ -379,8 +379,8 @@ function TPVTabContent({ items, currency }: { items: any[]; currency: string }) 
         >
            <div className="min-w-0 flex-1 flex items-baseline gap-1.5">
             <span className="text-[12px] font-bold font-sans text-foreground shrink-0">{item.item_name}</span>
-             {item.item_type && (
-               <span className="text-[12px] text-muted-foreground truncate">{item.item_type}</span>
+             {item.nazev && (
+               <span className="text-[12px] text-muted-foreground truncate">{item.nazev}</span>
              )}
           </div>
           <div className="flex items-center shrink-0 ml-auto">

@@ -124,7 +124,7 @@ function RecordRow({
     displayName = (
       <>
         <span className="font-bold">{record.item_name}</span>
-        {record.item_type && <span className="text-muted-foreground"> — {record.item_type}</span>}
+        {record.nazev && <span className="text-muted-foreground"> — {record.nazev}</span>}
       </>
     );
   } else {

@@ -485,7 +485,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         // Check if this item exists in production_inbox or production_schedule
         const item = items.find((i) => i.id === itemId);
         const itemCode = item?.item_name || "";
-        const itemName = item?.item_type || item?.item_name || "";
+        const itemName = item?.nazev || item?.item_name || "";
 
         const { data: inboxHits } = await supabase
           .from("production_inbox")

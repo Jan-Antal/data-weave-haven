@@ -62,7 +62,7 @@ export async function recalculateProductionHours(
     // Get TPV items for this project
     const { data: tpvItems } = await supabaseClient
       .from("tpv_items")
-      .select("id, item_name, item_type, cena, pocet, status")
+      .select("id, item_name, nazev, cena, pocet, status")
       .eq("project_id", proj.project_id)
       .is("deleted_at", null);
 
