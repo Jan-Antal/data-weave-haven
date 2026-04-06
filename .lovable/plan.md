@@ -1,53 +1,60 @@
 
 
-# Zjednodušení tlačítek v TPV List
+# Oprava CN kontroly — trigger jen po uploadu + lepší warning banner
 
-## Současný stav
+## Problémy
 
-V TPV List header je 3 relevantních tlačítek:
-1. **"Import z Excelu"** — wizard pro manuální import z libovolného XLSX/TSV
-2. **"Nahrát cenovou nabídku"** — AI extrakce z CN dokumentu (SharePoint/upload)
-3. **"Kontrola CN"** — manuální spuštění porovnání CN vs. aktuální TPV
+1. **Auto-check běží vždy** — `useEffect` spouští `checkCN()` při každém otevření TPV Listu. Má běžet **jen po nahrání souboru do složky "Cenová nabídka"**.
+2. **Warning badge je malý** — jen číslo vedle názvu projektu. Má být větší banner s popisem, umístěný vlevo vedle tlačítek (Import/Načíst z CN).
+3. **Warning zmizí po zavření dialogu** — `onClose` volá `clearCNDiff()`, takže po zavření bez aplikování změn se warning smaže. Má zůstat dokud uživatel nepotvrdí změny nebo neklikne "Ignorovat".
 
-Problém: "Kontrola CN" je zbytečný manuální button — porovnání má běžet automaticky na pozadí. A název "Nahrát cenovou nabídku" neodpovídá přesně tomu, co tlačítko dělá.
+## Změny
 
-## Plán změn
+### 1. `src/components/TPVList.tsx`
 
-### 1. Přejmenovat "Nahrát cenovou nabídku" → "Načíst z CN"
-Kratší, výstižnější — tlačítko extrahuje položky z cenové nabídky do TPV seznamu.
+**Odstranit auto-check `useEffect`** (řádky 125-131) — žádné automatické spuštění na mount.
 
-### 2. Odstranit tlačítko "Kontrola CN"
-Nahradit automatickým porovnáním na pozadí:
-- Přidat `useEffect` v `TPVList.tsx`, který zavolá `checkCN()` automaticky při otevření TPV Listu (po načtení items)
-- Pokud jsou nalezeny rozdíly, zobrazí se **warning badge** (ikona `AlertTriangle` s počtem) vedle názvu projektu v headeru — bez tlačítka
-- Klik na badge otevře stávající `CNDiffDialog`
+**Trigger CN check jen po uploadu do "cenová nabídka"**:
+- Po úspěšné extrakci přes TPVExtractor (řádek 1274) — zachovat stávající `setTimeout(() => checkCN(), 1500)`
+- Přidat nový trigger: poslouchat custom event `cn-file-uploaded` (dispatch z ProjectDetailDialog po uploadu do `cenova_nabidka`)
+- `useEffect` s event listener na `cn-file-uploaded` → zavolá `checkCN()`
 
-### 3. Warning badge místo tlačítka
-Když `hasDifferences === true`:
-- Zobrazit malý `AlertTriangle` badge s číslem (např. "3") vedle project name v headeru
-- Tooltip: "CN byla změněna — kliknutím zobrazíte rozdíly"
-- Klik → otevře `CNDiffDialog`
+**Warning banner místo malého badge** (řádky 725-741):
+- Nahradit malý `button` za plný řádek warning banner pod toolbarem
+- Žluto-oranžový pruh s ikonou `AlertTriangle`, textem "Cenová nabídka byla změněna — nalezeno X rozdílů oproti TPV seznamu", a dvěma tlačítky: "Zobrazit změny" (otevře dialog) + "Ignorovat" (clearCNDiff)
+- Banner se zobrazuje jen když `cnHasDiff === true`
 
-Když probíhá kontrola (`isChecking`): malý spinner vedle názvu (nenápadný).
+**Fix zavření dialogu** (řádky 1283-1285):
+- `onClose` pouze zavře dialog (`setCnDiffOpen(false)`) — **nemazat** diff data
+- Diff data se smažou jen po:
+  - Úspěšném aplikování změn (v `CNDiffDialog` po apply)
+  - Kliknutí na "Ignorovat" v warning banneru
 
-Když žádné rozdíly: nic se nezobrazuje.
+### 2. `src/components/ProjectDetailDialog.tsx`
 
-## Soubory k úpravě
+**Dispatch event po uploadu do cenová nabídka**:
+- Po úspěšném `uploadFile` kde `categoryKey === "cenova_nabidka"`:
+  ```typescript
+  window.dispatchEvent(new CustomEvent("cn-file-uploaded", { detail: { projectId } }));
+  ```
+- Přidat na oba upload paths (normal + chunked, řádky ~464 a ~474)
 
-1. **`src/components/TPVList.tsx`**
-   - Přejmenovat button text "Nahrát cenovou nabídku" → "Načíst z CN"
-   - Odstranit celý block "Kontrola CN" buttonu (řádky 748-775)
-   - Přidat `useEffect` pro auto-`checkCN()` po načtení items
-   - Přidat warning badge vedle project name v headeru
+### 3. `src/components/mobile/MobileDetailProjektSheet.tsx`
 
-2. **`src/hooks/useCNDiff.ts`** — beze změn (logika zůstává)
+**Stejný dispatch** pro upload do `cenova_nabidka` v mobilním detail sheetu (řádek ~559).
 
-3. **`src/components/CNDiffDialog.tsx`** — beze změn
+### 4. `src/components/CNDiffDialog.tsx`
 
-## Výsledek
+**Přidat `onApplied` callback**:
+- Po úspěšném apply (řádek ~95 po `onClose()`), zavolat nový prop `onApplied?.()` který vyčistí diff data v rodiči
 
-Místo 3 tlačítek budou **2 tlačítka** + **automatický warning**:
-- "Import z Excelu" (zachováno)
-- "Načíst z CN" (přejmenováno)
-- Warning badge se zobrazí automaticky pokud CN nesedí s TPV
+## Výsledný UX
+
+- Otevřu TPV List → žádná automatická kontrola, žádný spinner
+- Nahraju CN soubor v detailu projektu → na pozadí se spustí porovnání
+- Pokud jsou rozdíly → pod toolbarem se zobrazí oranžový banner: "⚠ Cenová nabídka byla změněna — nalezeno 5 rozdílů | [Zobrazit změny] [Ignorovat]"
+- Kliknu "Zobrazit změny" → otevře se CNDiffDialog
+- Zavřu dialog bez akce → banner zůstává
+- Aplikuji změny → banner zmizí
+- Kliknu "Ignorovat" → banner zmizí
 
