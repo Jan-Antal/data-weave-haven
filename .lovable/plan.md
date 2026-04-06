@@ -1,72 +1,53 @@
 
 
-# Etapy: "+" tlačítko, data migrace, multi-status/sum zobrazení
+# Etapy — vizuální a funkční vylepšení
 
-## Přehled
+## Přehled změn
 
-3 věci k implementaci:
-1. **ExpandArrow → "+" tlačítko** pro přidání etapy (single-stage i multi-stage)
-2. **Migrace dat**: u projektů které mají etapy → zkopírovat project-level data do nové "nulté" etapy
-3. **Summary zobrazení**: multi-stage projekty zobrazují agregovaná data v řádku
+1. **Σ znak v tabulkách** — u multi-stage projektů přidat "Σ" prefix před cenu
+2. **Project Detail — auto-suma + přepínač** — finance sekce u multi-stage projektů zobrazí automatický součet cen etap (read-only), s možností přepnout na manuální cenu; stejně tak marže = vážený průměr z etap
+3. **Architekt + Klient** — vždy na úrovni projektu, nepřenáší se do etap (zůstává jak je, jen ověřit)
+4. **Celková marže = vážený průměr** z etap (na 1 desetinné místo)
+5. **Smazání etapy** — přidat delete tlačítko do `StagesCostSection` (v rozbalené etapě)
+6. **Vizuální odlišení summary řádku** — multi-stage projekt v tabulce dostane jemný vizuální styl (např. subtle left border nebo background tint) a read-only pole budou mít jasnou vizuální indikaci
 
----
+## Soubory a detaily
 
-## 1. ExpandArrow — vždy zobrazit "+" místo prázdného slotu
+### `src/components/CrossTabColumns.tsx`
+- V `case "prodejni_cena"`: detekovat, že projekt má multi-stage (přidat prop `isMultiStage` nebo kontrolovat přítomnost "(+" v status stringu jako proxy) — jednodušší: přidat `isSummaryRow` boolean do `CellProps`
+- Alternativně: v `projectStageDisplay.ts` přidat prefix "Σ " do `totalPrice` renderingu — ale lepší je v CrossTabColumns přidat Σ prefix v renderingu ceny, protože formátování patří do UI
+- Řešení: rozšířit `CellProps` interface o `isSummaryRow?: boolean`, a v renderCell u `prodejni_cena` pokud `isSummaryRow` → zobrazit "Σ " prefix
 
-Všechny 3 tabulky (`ProjectInfoTable`, `PMStatusTable`, `TPVStatusTable`):
+### `src/components/ProjectInfoTable.tsx` + `PMStatusTable.tsx` + `TPVStatusTable.tsx`
+- V `renderColumnCell` volání předat `isSummaryRow: stageCount > 1`
+- Multi-stage řádek projektu: přidat jemný vizuální odlišení — `className` s `border-l-2 border-primary/20` nebo `bg-muted/30`
 
-- **Single-stage (≤1)**: zobrazit `+` ikonu → klik vytvoří novou etapu (pomocí `handleInlineAdd` logiky) a rozbalí řádek
-- **Multi-stage (≥2)**: zobrazit chevron jako dosud, ale přidat malé `+` tlačítko vedle (nebo v rozbalené `StagesSection`)
+### `src/components/StagesCostSection.tsx`
+- **Auto-suma**: zobrazit celkovou cenu jako auto-sumu (Σ) z etap + toggle na manuální zadání (pomocí `plan_use_project_price` pole na projektu)
+- **Vážený průměr marže**: spočítat z etap — `Σ(cena_i × marže_i) / Σ(cena_i)` — zobrazit jako read-only info
+- **Delete etapy**: v rozbalené `StageCostRow` přidat Trash ikonu s confirm dialogem, volat `useDeleteStage`
+- Props rozšířit o `project` objekt (potřeba pro `plan_use_project_price` a pro uložení celkové ceny)
 
-Technicky: `ExpandArrow` dostane nový prop `onAddStage`, místo `<span className="w-5 h-5" />` renderuje `<Plus>` ikonu.
+### `src/components/ProjectDetailDialog.tsx`
+- Finance sekce: pokud multi-stage → prodejní cena a marže zobrazit jako **read-only computed** (suma / vážený průměr), s indikací "Σ dopočítáno z etap"
+- Pokud `plan_use_project_price` = true → editovatelná manuální cena (stávající chování)
+- Toggle přepínač (Switch) vedle ceny: "Auto Σ" / "Manuální"
+- Předat `project` do `StagesCostSection`
 
-## 2. Data migrace — zkopírovat project data do nulté etapy
+### `src/lib/projectStageDisplay.ts`
+- Přidat `weightedMarze: number | null` — vážený průměr marže z etap (zaokrouhlený na 1 des. místo)
+- Přidat do `ProjectDisplayOverrides` interface
 
-SQL migrace která:
-1. Najde projekty s existujícími etapami (`project_stages`)
-2. Pro každý takový projekt vytvoří novou etapu s `stage_order = -1` (nebo přečísluje)
-3. Do nové etapy zkopíruje: `status`, `datum_smluvni`, `pm`, `konstrukter`, `kalkulant`, `prodejni_cena`, `currency`, `marze`, `cost_*` pole
-4. Stage name = `{project_id}-0` nebo `{project_id}-BASE`
+### `src/hooks/useProjectStages.ts`
+- `useDeleteStage` už existuje — jen ho importovat v `StagesCostSection`
 
-```sql
-INSERT INTO project_stages (id, project_id, stage_name, stage_order, status, datum_smluvni, pm, konstrukter, prodejni_cena, currency, marze, ...)
-SELECT gen_random_uuid(), p.project_id, p.project_id || '-A', 0, p.status, p.datum_smluvni, p.pm, ...
-FROM projects p
-WHERE EXISTS (SELECT 1 FROM project_stages ps WHERE ps.project_id = p.project_id AND ps.deleted_at IS NULL)
-AND NOT EXISTS (... already has stage_order 0 ...)
-```
+## Vizuální odlišení summary řádku
 
-Existující etapy dostanou `stage_order += 1`.
+Multi-stage projekt řádek v tabulce:
+- Jemný `bg-blue-50/50 dark:bg-blue-950/20` background
+- Cena a marže: italic + `text-muted-foreground` protože jsou computed
+- Status badge s "(+N)" suffix
 
-## 3. Summary zobrazení v řádku projektu
-
-V renderovací smyčce (`visible.map(...)`) v každé tabulce:
-- Načíst stages z `stagesByProject`
-- Zavolat `getProjectDisplayOverrides(stages)` z `projectStageDisplay.ts`
-- Vytvořit "merged" project objekt kde multi-stage projekt zobrazuje:
-  - **Status**: summary badge (všechny stejné → ten status; různé → "Status (+N)")
-  - **Cena**: součet `prodejni_cena` ze stages
-  - **Datum smluvní**: nejpozdější datum
-  - **PM**: summary ("3 PM" nebo jméno pokud jeden)
-- Single-stage: zobrazit data z jediné etapy
-
-Pro `CrossTabColumns.tsx`: rozpoznat summary status string (obsahuje "(+") a renderovat jako badge.
-
-## 4. StagesCostSection — přidat "Přidat etapu" tlačítko
-
-V `StagesCostSection.tsx` přidat tlačítko pod seznam etap pro přidání nové etapy přímo z Project Detail.
-
----
-
-## Soubory
-
-| Soubor | Změna |
-|--------|-------|
-| **Migrace SQL** | Zkopírovat project data do nulté etapy pro projekty s existujícími etapami |
-| `src/components/ProjectInfoTable.tsx` | ExpandArrow: "+" pro single-stage; merged project data v renderovací smyčce |
-| `src/components/PMStatusTable.tsx` | Stejné změny jako ProjectInfoTable |
-| `src/components/TPVStatusTable.tsx` | Stejné změny jako ProjectInfoTable |
-| `src/components/CrossTabColumns.tsx` | Status summary badge rendering |
-| `src/components/StagesCostSection.tsx` | Tlačítko přidat etapu |
-| `src/lib/projectStageDisplay.ts` | Případné doplnění helper funkcí |
+Read-only pole (computed z etap) v Project Detail:
+- Disabled input s textem "Σ z etap" nebo malý label pod inputem
 
