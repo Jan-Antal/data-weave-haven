@@ -1,56 +1,33 @@
 
 
-# Oprava pádu preview + cache extrahovaných položek
+# Vylepšení project-summary: lepší tempo + enriched data
 
-## Problémy
+Přepočet hodin se řeší systémově mimo asistenta — tady jen vylepšíme data a prompt.
 
-1. **Preview pad při přepnutí sheetu** — DocumentPreviewModal používá SharePoint iframe (`previewUrl`). Při interakci uvnitř iframe (přepnutí sheetu) může dojít k chybě, která zavře celý dialog včetně extrahovaných položek.
+## Změny
 
-2. **Extrahované položky se ztrácejí** — useEffect na `open` resetuje vše (`setItems([])`) → pokud dialog spadne nebo se zavře, musím extrahovat znovu = zbytečný AI request.
+### 1. Lepší tempo — z reálné práce, ne z plánu
 
-## Řešení
+Aktuálně: `tempo = actual_hours / weeks_from_earliest_scheduled_week` — nepřesné.
 
-### 1. Oddělení preview od hlavního dialogu (oprava pádu)
+Oprava: Použít `min_datum` z `get_hours_by_project()` RPC (která už vrací `min_datum`) jako začátek reálné práce. Pokud `min_datum` neexistuje (0h odpracováno), tempo se nepočítá.
 
-Preview (DocumentPreviewModal) se už renderuje mimo hlavní Dialog, ale problém je, že při chybě v preview se propaguje chyba a může resetovat stav. Řešení:
-- Obalit DocumentPreviewModal do **Error Boundary** — pokud iframe spadne, chytíme to a zobrazíme fallback místo pádu celé komponenty
-- Při zavření preview se nic neresetuje (už teď by nemělo, ale ověříme)
+### 2. Enriched data pro AI
 
-### 2. In-memory cache extrahovaných položek (15 min TTL)
+Do project data bloku přidat:
+- `first_work_date` — z RPC `min_datum`
+- `schedule_total_hours` — součet `scheduled_hours` ze schedule
+- `schedule_completed_hours` — součet hodin dokončených položek
+- Poznámku pokud schedule pokrývá jen část TPV
 
-Přidat **module-level cache** (mimo komponentu) indexovanou podle `projectId`:
+### 3. Prompt vylepšení
 
-```text
-extractionCache: Map<string, {
-  items: ExtractedItem[],
-  fileName: string,
-  sourceDoc: {...},
-  timestamp: number
-}>
-```
+- Tempo počítej od `first_work_date`, ne od plánování
+- Pokud velká část TPV ještě není naplánovaná, zmiň to
+- Pokud `schedule_total_hours` je výrazně menší než `plan_hours`, upozorni že výroba pokrývá jen část
+- Přidat pravidlo: "Nepoužívej lineární projekci pokud projekt běží méně než 4 týdny"
 
-**Logika:**
-- Po úspěšné extrakci → uložit do cache
-- Při otevření dialogu → zkontrolovat cache:
-  - Pokud existuje záznam pro `projectId` a je < 15 min starý → načíst z cache, přeskočit na "done"
-  - Pokud je starší nebo neexistuje → normální flow (search → extract)
-- Při extrakci nového dokumentu → přepsat cache
-- Cache se **nevymaže** při zavření dialogu
+## Soubor
 
-**Reset cache:**
-- Po úspěšném uložení (handleSave) → smazat cache pro projekt
-- Po 15 minutách automaticky (kontrola při otevření)
-
-### 3. Úprava useEffect reset logiky
-
-Při zavření dialogu (`open = false`) **neresetovat items a sourceDoc** — ty zůstanou v module-level cache. Resetovat pouze UI stav (selection, preview, saving).
-
-## Soubory
-
-1. **`src/components/assistant/TPVExtractor.tsx`**
-   - Přidat `extractionCache` (Map) na úrovni modulu
-   - Upravit useEffect: při open zkontrolovat cache → pokud platný, rovnou `setItems` + `setPhase("done")`
-   - Po extrakci uložit do cache
-   - Po handleSave smazat cache
-   - Obalit DocumentPreviewModal do try/catch error boundary
+**`supabase/functions/project-summary/index.ts`** — úprava `buildProjectData` + SYSTEM_PROMPT
 
