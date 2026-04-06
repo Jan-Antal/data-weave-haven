@@ -28,6 +28,8 @@ export interface ProjectDisplayOverrides {
   konstrukterSummary: string | null;
   /** Weighted average margin across stages in STORAGE format (decimal, e.g. 0.25 = 25%) */
   weightedMarze: number | null;
+  /** Average percent_tpv across stages (for multi-stage projects) */
+  percentTpvAvg: number | null;
 }
 
 /**
@@ -50,6 +52,7 @@ export function getProjectDisplayOverrides(
       kalkulantSummary: null,
       konstrukterSummary: null,
       weightedMarze: null,
+      percentTpvAvg: null,
     };
   }
 
@@ -108,6 +111,12 @@ export function getProjectDisplayOverrides(
     weightedMarze = Math.round((weightedSum / totalWeight) * 1000) / 1000;
   }
 
+  // Average percent_tpv across stages
+  const stagesWithPct = stageList.filter(s => s.percent_tpv != null && s.percent_tpv > 0);
+  const percentTpvAvg = stagesWithPct.length > 0
+    ? Math.round(stagesWithPct.reduce((sum, s) => sum + (s.percent_tpv ?? 0), 0) / stagesWithPct.length)
+    : null;
+
   return {
     isSingleStage: false,
     singleStage: null,
@@ -119,5 +128,6 @@ export function getProjectDisplayOverrides(
     kalkulantSummary,
     konstrukterSummary,
     weightedMarze,
+    percentTpvAvg,
   };
 }
