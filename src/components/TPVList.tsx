@@ -714,6 +714,23 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         >
           {projectId} — {projectName}
         </button>
+        {cnChecking && (
+          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin" />
+        )}
+        {cnHasDiff && !cnChecking && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setCnDiffOpen(true)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors cursor-pointer"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {cnDiff!.entries.length}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>CN byla změněna — kliknutím zobrazíte rozdíly</TooltipContent>
+          </Tooltip>
+        )}
         <button
           onClick={() => setDetailOpen(true)}
           className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -729,7 +746,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         )}
         {canManageTPV && (
           <Button size="sm" variant="outline" onClick={() => setExtractorOpen(true)}>
-            <FileText className="h-3 w-3 mr-1" /> Nahrát cenovou nabídku
+            <FileText className="h-3 w-3 mr-1" /> Načíst z CN
           </Button>
         )}
         {canManageTPV && (
@@ -745,34 +762,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           <Printer className="h-4 w-4" />
           <span className="hidden sm:inline">Průvodka</span>
         </button>
-        {/* CN diff check */}
-        {canManageTPV && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant={cnHasDiff ? "destructive" : "outline"}
-                onClick={() => cnHasDiff ? setCnDiffOpen(true) : checkCN()}
-                disabled={cnChecking}
-                className="relative"
-              >
-                {cnChecking ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : cnHasDiff ? (
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                ) : (
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                )}
-                {cnHasDiff ? `CN rozdíly (${cnDiff!.entries.length})` : "Kontrola CN"}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {cnHasDiff
-                ? "CN byla změněna — kliknutím zobrazíte rozdíly"
-                : "Porovnat cenovou nabídku s aktuálním TPV seznamem"}
-            </TooltipContent>
-          </Tooltip>
-        )}
         {selected.size > 0 && canManageTPV && (
           <div className="flex items-center gap-2 ml-4 border-l pl-4">
             <span className="text-sm text-muted-foreground">{selected.size} vybráno</span>
