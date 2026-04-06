@@ -20,6 +20,8 @@ export interface ProjectDisplayOverrides {
   latestDatumSmluvni: string | null;
   /** PM summary for multi-stage */
   pmSummary: string | null;
+  /** Weighted average margin across stages (1 decimal) */
+  weightedMarze: number | null;
 }
 
 /**
