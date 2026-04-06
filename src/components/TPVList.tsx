@@ -1272,6 +1272,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
       <TPVExtractor
         projectId={projectId}
+        existingItems={items || []}
         open={extractorOpen}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["tpv_items", projectId] });
