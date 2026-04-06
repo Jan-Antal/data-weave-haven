@@ -192,16 +192,12 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
 
   useEffect(() => {
     if (!open) {
-      setPhase("searching");
-      setMatches([]);
-      setFoundFileName("");
-      setItems([]);
+      // Only reset UI state, NOT items/sourceDoc — those live in module cache
       setSpUploaded(false);
       setErrorMsg("");
       autoExtractTriggered.current = false;
       setManualFile(null);
       setManualLoading(false);
-      setSourceDoc(null);
       setPreviewOpen(false);
       setPreviewLoading(false);
       setPreviewData({ previewUrl: null, webUrl: null, downloadUrl: null });
@@ -209,6 +205,23 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
       setLastClickedIdx(null);
       return;
     }
+
+    // Check module-level cache first
+    const cached = getCachedExtraction(projectId);
+    if (cached) {
+      // Re-apply diff against current existingItems (may have changed)
+      setItems(applyDiff(cached.items.map(i => ({ ...i, _diffStatus: undefined, _dbId: undefined, _dbValues: undefined }))));
+      setFoundFileName(cached.fileName);
+      setSourceDoc(cached.sourceDoc);
+      setPhase("done");
+      return;
+    }
+
+    // Reset extraction state for fresh run
+    setMatches([]);
+    setFoundFileName("");
+    setItems([]);
+    setSourceDoc(null);
 
     // If existing items, ask confirmation first
     if (hasExisting) {
