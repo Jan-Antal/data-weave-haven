@@ -291,6 +291,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const { data: detailStages = [] } = useProjectStages(project?.project_id ?? "");
   const isMultiStage = detailStages.length >= 2;
   const stageOverrides = useMemo(() => getProjectDisplayOverrides(detailStages), [detailStages]);
+  // TPV items for auto percent_tpv
+  const { data: detailTpvItems = [] } = useTPVItems(project?.project_id ?? "");
+  const computedPercentTpv = useMemo(() => computeTPVProgress(detailTpvItems), [detailTpvItems]);
+  const hasAutoPercent = computedPercentTpv != null;
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
