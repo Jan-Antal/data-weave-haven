@@ -351,6 +351,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
 }
 
 function ExpandArrow({ projectId, isExpanded, stageCount }: { projectId: string; isExpanded: boolean; stageCount: number }) {
+  if (stageCount <= 1) return <span className="w-5 h-5" />;
   const hasStages = stageCount > 0;
   if (isExpanded) {
     return <ChevronDown className={`h-5 w-5 stroke-[3] ${hasStages ? "text-accent" : "text-muted-foreground"}`} />;
@@ -418,7 +419,7 @@ const PMProjectRow = memo(function PMProjectRow({
         </button>
       </TableCell>
       {/* Col 2 — Chevron slot */}
-      <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => onToggleExpand(p.project_id)}>
+      <TableCell style={COL_CHEVRON_STYLE} className="px-0 cursor-pointer" onClick={() => stageCount > 1 ? onToggleExpand(p.project_id) : undefined}>
         <ExpandArrow projectId={p.project_id} isExpanded={isExpanded} stageCount={stageCount} />
       </TableCell>
       {v("project_id") && <TableCell className="font-sans font-semibold text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
@@ -741,7 +742,7 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
                     onEditProject={(p) => setEditProject(p)}
                     onOpenTPVList={handleOpenTPVList}
                   />
-                  {expanded.has(p.project_id) && (
+                  {expanded.has(p.project_id) && (stagesByProject.get(p.project_id)?.length ?? 0) > 1 && (
                     <StagesSection
                       projectId={p.project_id}
                       project={p}
