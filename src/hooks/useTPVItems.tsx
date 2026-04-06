@@ -5,6 +5,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useAuth } from "@/hooks/useAuth";
 import { createNotification, createOrUpdateBatchNotification, resolvePersonToUserId, getUserIdsByRole } from "@/lib/createNotification";
+import { computeTPVProgress } from "@/lib/tpvProgress";
 
 export type TPVItem = Tables<"tpv_items"> & { konstrukter?: string | null; popis?: string | null };
 
