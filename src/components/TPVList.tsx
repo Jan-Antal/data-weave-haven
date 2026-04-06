@@ -773,6 +773,22 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </div>
       )}
 
+      {/* CN diff warning banner */}
+      {cnDiff && cnDiff.entries.length > 0 && (
+        <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 text-orange-800 text-sm px-4 py-2.5 rounded-lg mb-2">
+          <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0" />
+          <span className="flex-1">
+            Cenová nabídka byla změněna — nalezeno <strong>{cnDiff.entries.length}</strong> rozdílů oproti TPV seznamu
+          </span>
+          <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-100" onClick={() => setCnDiffOpen(true)}>
+            Zobrazit změny
+          </Button>
+          <Button size="sm" variant="ghost" className="text-orange-600 hover:bg-orange-100" onClick={clearCNDiff}>
+            Ignorovat
+          </Button>
+        </div>
+      )}
+
       <div
         className={cn(
           "rounded-lg border bg-card flex flex-col flex-1 min-h-0",
