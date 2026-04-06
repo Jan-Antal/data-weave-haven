@@ -465,14 +465,14 @@ export function ForecastSafetyNet({ projects, onRestoreToForecast, onViewDetail,
       if (source === "unplanned") {
         const { data } = await supabase
           .from("tpv_items")
-          .select("id, item_name, nazev, status")
+          .select("id, item_code, nazev, status")
           .eq("project_id", projectId)
           .is("deleted_at", null)
           .limit(50);
         if (data) {
           items = data.map(d => ({
             id: d.id,
-            item_name: d.item_name,
+            item_name: d.item_code,
             item_code: d.nazev,
             status: d.status,
           }));

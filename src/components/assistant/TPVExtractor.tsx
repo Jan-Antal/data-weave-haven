@@ -268,7 +268,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const { error } = await supabase.from("tpv_items").insert(
         valid.map((item) => ({
           project_id: projectId,
-          item_name: item.kod_prvku,
+          item_code: item.kod_prvku,
           nazev: item.nazev,
           popis: item.popis || null,
           cena: item.cena,

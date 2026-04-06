@@ -62,7 +62,7 @@ export async function recalculateProductionHours(
     // Get TPV items for this project
     const { data: tpvItems } = await supabaseClient
       .from("tpv_items")
-      .select("id, item_name, nazev, cena, pocet, status")
+      .select("id, item_code, nazev, cena, pocet, status")
       .eq("project_id", proj.project_id)
       .is("deleted_at", null);
 
@@ -131,7 +131,7 @@ export async function recalculateProductionHours(
         }
         continue;
       }
-      const tpv = (tpvItems || []).find((t: any) => t.item_name === item.item_code);
+      const tpv = (tpvItems || []).find((t: any) => t.item_code === item.item_code);
       if (!tpv) continue;
 
       const rawCena = Number(tpv.cena) || 0;
@@ -186,7 +186,7 @@ export async function recalculateProductionHours(
 
     for (const item of inboxItems || []) {
       if (item.item_code?.startsWith('HIST_')) continue;
-      const tpv = (tpvItems || []).find((t: any) => t.item_name === item.item_code);
+      const tpv = (tpvItems || []).find((t: any) => t.item_code === item.item_code);
       if (!tpv) continue;
 
       const rawCena = Number(tpv.cena) || 0;

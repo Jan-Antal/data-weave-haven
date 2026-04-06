@@ -90,7 +90,7 @@ export function useCNDiff(projectId: string, currentItems: TPVItem[]) {
       // Build lookup by item_name (= kod_prvku)
       const currentByCode = new Map<string, TPVItem>();
       for (const item of activeItems) {
-        if (item.item_name) currentByCode.set(item.item_name, item);
+        if (item.item_code) currentByCode.set(item.item_code, item);
       }
 
       const matchedCodes = new Set<string>();
@@ -123,9 +123,9 @@ export function useCNDiff(projectId: string, currentItems: TPVItem[]) {
 
       // Removed: items in TPV but not in CN
       for (const item of activeItems) {
-        if (item.item_name && !matchedCodes.has(item.item_name)) {
+        if (item.item_code && !matchedCodes.has(item.item_code)) {
           // Check if not in extracted at all
-          const inExtracted = extracted.some((e) => e.kod_prvku === item.item_name);
+          const inExtracted = extracted.some((e) => e.kod_prvku === item.item_code);
           if (!inExtracted) {
             entries.push({ type: "removed", current: item });
           }
