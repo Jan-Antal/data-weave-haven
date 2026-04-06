@@ -12,7 +12,7 @@ import { useSharePointDocs } from "@/hooks/useSharePointDocs";
 
 
 interface ExtractedItem {
-  item_name: string;
+  kod_prvku: string;
   nazev: string;
   popis: string;
   cena: number;
@@ -121,8 +121,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       if (data?.error) throw new Error(data.error);
 
       const extracted = (data.items || []).map((item: any) => ({
-        item_name: item.item_name || "",
-        nazev: item.nazev || item.item_name || "",
+        kod_prvku: item.kod_prvku || item.item_name || "",
+        nazev: item.nazev || item.kod_prvku || item.item_name || "",
         popis: item.popis || item.popis_full || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
@@ -190,8 +190,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       if (data?.error) throw new Error(data.error);
 
       const extracted = (data.items || []).map((item: any) => ({
-        item_name: item.item_name || "",
-        nazev: item.nazev || item.item_name || "",
+        kod_prvku: item.kod_prvku || item.item_name || "",
+        nazev: item.nazev || item.kod_prvku || item.item_name || "",
         popis: item.popis || item.popis_full || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
@@ -224,7 +224,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { item_name: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { kod_prvku: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -258,7 +258,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   }, [sourceDoc, sp]);
 
   const handleSave = async () => {
-    const valid = items.filter((i) => i.item_name.trim());
+    const valid = items.filter((i) => i.kod_prvku.trim());
     if (valid.length === 0) {
       toast({ title: "Žádné položky k uložení", variant: "destructive" });
       return;
@@ -268,7 +268,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       const { error } = await supabase.from("tpv_items").insert(
         valid.map((item) => ({
           project_id: projectId,
-          item_name: item.item_name,
+          item_name: item.kod_prvku,
           nazev: item.nazev,
           popis: item.popis || null,
           cena: item.cena,
@@ -489,8 +489,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                     <TableRow key={i}>
                       <TableCell>
                         <Input
-                          value={item.item_name}
-                          onChange={(e) => updateItem(i, "item_name", e.target.value)}
+                          value={item.kod_prvku}
+                          onChange={(e) => updateItem(i, "kod_prvku", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>
@@ -573,7 +573,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-                  Uložit do TPV ({items.filter((i) => i.item_name.trim()).length})
+                  Uložit do TPV ({items.filter((i) => i.kod_prvku.trim()).length})
                 </Button>
               </div>
             </DialogFooter>
