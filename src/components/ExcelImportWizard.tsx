@@ -1041,11 +1041,15 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
         {step === 4 && importResult && (
           <div className="max-w-xl mx-auto mt-8 space-y-6">
             <div className="grid grid-cols-3 gap-4">
-              {[
+              {(importMode === "update" ? [
+                { label: "Nových", value: importResult.imported, color: "border-green-300 bg-green-50 text-green-800" },
+                { label: "Aktualizováno", value: importResult.warnings, color: "border-orange-300 bg-orange-50 text-orange-800" },
+                { label: "Přeskočeno", value: importResult.skipped, color: "border-muted bg-muted/30 text-muted-foreground" },
+              ] : [
                 { label: "Importováno", value: importResult.imported, color: "border-green-300 bg-green-50 text-green-800" },
                 { label: "Varování", value: importResult.warnings, color: "border-orange-300 bg-orange-50 text-orange-800" },
                 { label: "Přeskočeno", value: importResult.skipped, color: "border-muted bg-muted/30 text-muted-foreground" },
-              ].map(c => (
+              ]).map(c => (
                 <Card key={c.label} className={cn("border", c.color)}>
                   <CardContent className="p-4 text-center">
                     <p className="text-2xl font-bold">{c.value}</p>
@@ -1056,7 +1060,9 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
             </div>
 
             <div className="text-center p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-800">
-              ✓ Import dokončen — {importResult.imported} položek úspěšně importováno
+              {importMode === "update"
+                ? `✓ Aktualizace dokončena — ${importResult.warnings} položek aktualizováno${importResult.imported > 0 ? `, ${importResult.imported} nových přidáno` : ""}`
+                : `✓ Import dokončen — ${importResult.imported} položek úspěšně importováno`}
             </div>
 
             <div className="flex justify-center gap-3">
