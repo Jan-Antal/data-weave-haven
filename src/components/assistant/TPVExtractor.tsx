@@ -387,7 +387,6 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
     return item._diffStatus === "changed" && !!item._dbValues && field in item._dbValues;
   };
 
-  const activeItems = hasExisting ? items.filter(i => i._diffStatus !== "unchanged") : items;
   const saveLabel = diffStats
     ? (() => {
         const parts: string[] = [];
@@ -597,7 +596,6 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
                 <TableBody>
                   {items.map((item, i) => {
                     const isUnchanged = item._diffStatus === "unchanged";
-                    const isChanged = item._diffStatus === "changed";
                     const isNew = item._diffStatus === "new";
                     const rowClass = isUnchanged ? "opacity-40" : isNew && hasExisting ? "bg-green-50/40" : "";
 
