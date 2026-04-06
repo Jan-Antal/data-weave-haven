@@ -389,7 +389,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
   };
 
   const selectAll = (val: boolean) => {
-    setRows(prev => prev.map(r => r.status !== "error" ? { ...r, selected: val } : r));
+    setRows(prev => prev.map(r => (r.status !== "error" && r.status !== "unchanged") ? { ...r, selected: val } : r));
   };
 
   // ── Step 3 → 4: Import ────────────────────────────────────
