@@ -742,6 +742,32 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     setEditProject(p);
   }, []);
 
+  const handleAddStage = useCallback(async (projectId: string) => {
+    const project = projects.find(pr => pr.project_id === projectId);
+    if (!project) return;
+    const existingStages = stagesByProject.get(projectId) ?? [];
+    const letters = existingStages.map(s => {
+      const match = s.stage_name.match(/-([A-Z])$/);
+      return match ? match[1] : null;
+    }).filter(Boolean) as string[];
+    const lastChar = letters.sort().pop();
+    const suffix = lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
+    const stageName = `${projectId}-${suffix}`;
+    const inheritedData = buildInheritedStageData(project);
+    const newStage = { project_id: projectId, stage_name: stageName, stage_order: existingStages.length, ...inheritedData, manually_edited_fields: [] };
+    const { error } = await supabase.from("project_stages").insert(newStage as any);
+    if (error) {
+      toast({ title: "Chyba", description: "Nepodařilo se vytvořit etapu", variant: "destructive" });
+      return;
+    }
+    logActivity({ projectId, actionType: "stage_created", detail: stageName });
+    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+    // Expand the project row
+    setExpanded(prev => new Set(prev).add(projectId));
+    setShowAddButton(prev => new Set(prev).add(projectId));
+  }, [projects, stagesByProject, qc]);
+
   const handleAddProject = async () => {
     if (!newProj.project_id || !newProj.project_name) return;
     if (!newProj.datum_smluvni && !datumWarning) {
