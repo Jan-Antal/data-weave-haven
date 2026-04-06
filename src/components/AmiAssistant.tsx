@@ -85,6 +85,7 @@ export function AmiAssistant() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedbackMode, setFeedbackMode] = useState(false);
+  const [summaryMode, setSummaryMode] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
