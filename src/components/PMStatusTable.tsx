@@ -40,6 +40,7 @@ import { getProjectCellValue } from "@/lib/exportExcel";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { matchesStatusFilter, normalizedIncludes, normalizeSearch } from "@/lib/statusFilter";
+import { getProjectDisplayOverrides } from "@/lib/projectStageDisplay";
 
 const NATIVE_KEYS = ["project_id", "project_name", ...PM_NATIVE];
 const ALL_KEYS = ALL_COLUMNS.map((c) => c.key);
