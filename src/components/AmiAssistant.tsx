@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, X, Send } from "lucide-react";
+import { MessageCircle, X, Send, Copy, Check } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,10 +8,13 @@ type Msg = { role: "user" | "assistant"; content: string };
 const QUICK_CHIPS = [
   { emoji: "📊", label: "Jak jsme na tom s projekty?" },
   { emoji: "🔥", label: "Které projekty hoří?" },
-  { emoji: "💬", label: "Napsat zprávu adminovi" },
+  { emoji: "📋", label: "Vytvořit summary projektu" },
 ];
 
 const FEEDBACK_TRIGGERS = ["napsat zprávu", "chci napsat", "mám problém", "feedback", "zprávu adminovi"];
+const SUMMARY_TRIGGERS = ["summary projektu", "vytvořit summary", "shrnutí projektu"];
+
+const SUMMARY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-summary`;
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ami-assistant`;
 
@@ -74,6 +77,25 @@ async function streamChat({
   onDone();
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute -bottom-5 right-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+      title="Kopírovat"
+    >
+      {copied ? <><Check className="h-3 w-3" /> Zkopírováno</> : <><Copy className="h-3 w-3" /> Kopírovat</>}
+    </button>
+  );
+}
+
 export function AmiAssistant() {
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
@@ -82,6 +104,7 @@ export function AmiAssistant() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedbackMode, setFeedbackMode] = useState(false);
+  const [summaryMode, setSummaryMode] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +153,42 @@ export function AmiAssistant() {
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: Msg = { role: "user", content: text.trim() };
+
+    // Check if entering summary mode
+    if (SUMMARY_TRIGGERS.some(t => text.toLowerCase().includes(t)) && !summaryMode && !feedbackMode) {
+      setMessages(prev => [...prev, userMsg, { role: "assistant", content: "Zadej název nebo ID projektu a já ti vygeneruji summary. 📋" }]);
+      setSummaryMode(true);
+      setInput("");
+      return;
+    }
+
+    // Handle summary generation
+    if (summaryMode) {
+      setMessages(prev => [...prev, userMsg]);
+      setLoading(true);
+      setInput("");
+      try {
+        const resp = await fetch(SUMMARY_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ projectQuery: text.trim() }),
+        });
+        const data = await resp.json();
+        if (resp.ok && data.summary) {
+          setMessages(prev => [...prev, { role: "assistant", content: data.summary }]);
+        } else {
+          setMessages(prev => [...prev, { role: "assistant", content: data.error || "Nepodařilo se vygenerovat summary." }]);
+        }
+      } catch {
+        setMessages(prev => [...prev, { role: "assistant", content: "Chyba při generování summary." }]);
+      }
+      setSummaryMode(false);
+      setLoading(false);
+      return;
+    }
 
     // Check if entering feedback mode
     if (FEEDBACK_TRIGGERS.some(t => text.toLowerCase().includes(t)) && !feedbackMode) {
@@ -198,7 +257,7 @@ export function AmiAssistant() {
         setLoading(false);
       },
     });
-  }, [messages, loading, feedbackMode, user, profile]);
+  }, [messages, loading, feedbackMode, summaryMode, user, profile]);
 
   const handleChip = (chip: typeof QUICK_CHIPS[0]) => {
     sendMessage(`${chip.emoji} ${chip.label}`);
@@ -269,14 +328,17 @@ export function AmiAssistant() {
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
+                  className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-line ${
                     msg.role === "user"
                       ? "text-white rounded-br-sm"
                       : "bg-muted text-foreground rounded-bl-sm"
-                  }`}
+                  } ${msg.role === "assistant" ? "group relative" : ""}`}
                   style={msg.role === "user" ? { background: "#223937" } : undefined}
                 >
                   {msg.content}
+                  {msg.role === "assistant" && msg.content.length > 50 && (
+                    <CopyButton text={msg.content} />
+                  )}
                 </div>
               </div>
             ))}
@@ -304,7 +366,7 @@ export function AmiAssistant() {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={feedbackMode ? "Napiš zprávu pro admina..." : "Napiš dotaz..."}
+                placeholder={summaryMode ? "Název projektu..." : feedbackMode ? "Napiš zprávu pro admina..." : "Napiš dotaz..."}
                 className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
                 disabled={loading}
               />
