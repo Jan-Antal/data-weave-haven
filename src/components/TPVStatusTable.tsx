@@ -1,4 +1,6 @@
 import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef, type MutableRefObject } from "react";
+import { computeTPVProgress } from "@/lib/tpvProgress";
+import type { TPVItem } from "@/hooks/useTPVItems";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
@@ -375,6 +377,7 @@ interface TPVProjectRowProps {
   isExpanded: boolean;
   stageCount: number;
   tpvItemCount: number;
+  tpvItems?: TPVItem[];
   onToggleExpand: (pid: string) => void;
   onAddStage?: (pid: string) => void;
   onOpenTPVList: (projectId: string, projectName: string) => void;
@@ -396,6 +399,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
   isExpanded,
   stageCount,
   tpvItemCount,
+  tpvItems,
   onToggleExpand,
   onAddStage,
   onOpenTPVList,
@@ -410,17 +414,21 @@ const TPVProjectRow = memo(function TPVProjectRow({
   isFieldReadOnly,
   onEditProject,
 }: TPVProjectRowProps) {
+  const computedPct = useMemo(() => tpvItems ? computeTPVProgress(tpvItems) : null, [tpvItems]);
   const displayProject = useMemo(() => {
     const overrides = getProjectDisplayOverrides(stagesRaw);
+    let base: Project;
     if (overrides.isSingleStage && overrides.singleStage) {
       const s = overrides.singleStage;
-      return { ...p, status: s.status ?? p.status, datum_smluvni: s.datum_smluvni ?? p.datum_smluvni, pm: s.pm ?? p.pm, konstrukter: s.konstrukter ?? p.konstrukter, prodejni_cena: s.prodejni_cena ?? p.prodejni_cena, marze: s.marze ?? p.marze } as Project;
+      base = { ...p, status: s.status ?? p.status, datum_smluvni: s.datum_smluvni ?? p.datum_smluvni, pm: s.pm ?? p.pm, konstrukter: s.konstrukter ?? p.konstrukter, prodejni_cena: s.prodejni_cena ?? p.prodejni_cena, marze: s.marze ?? p.marze } as Project;
+    } else if (!overrides.isSingleStage) {
+      base = { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, kalkulant: overrides.kalkulantSummary ?? p.kalkulant, konstrukter: overrides.konstrukterSummary ?? p.konstrukter, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena, marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze } as Project;
+    } else {
+      base = p;
     }
-    if (!overrides.isSingleStage) {
-      return { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, kalkulant: overrides.kalkulantSummary ?? p.kalkulant, konstrukter: overrides.konstrukterSummary ?? p.konstrukter, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena, marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze } as Project;
-    }
-    return p;
-  }, [p, stagesRaw]);
+    if (computedPct != null) return { ...base, percent_tpv: computedPct } as Project;
+    return base;
+  }, [p, stagesRaw, computedPct]);
 
   const isSummary = stageCount > 1;
 
@@ -446,7 +454,7 @@ const TPVProjectRow = memo(function TPVProjectRow({
       </TableCell>
       {v("project_id") && <TableCell className="font-sans font-semibold text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" : isFieldReadOnly, isSummaryRow: isSummary }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" && !(field === "percent_tpv" && computedPct != null) : (field) => (field === "percent_tpv" && computedPct != null) ? true : isFieldReadOnly(field), isSummaryRow: isSummary }))}
     </TableRow>
   );
 });
@@ -744,6 +752,7 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                     tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
+                    tpvItems={tpvItemsByProject.get(p.project_id)}
                     onToggleExpand={toggleExpand}
                     onAddStage={handleAddStage}
                     onOpenTPVList={handleOpenTPVList}

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo, Fragment, useRef, MutableRefObject } from "react";
+import { computeTPVProgress } from "@/lib/tpvProgress";
+import type { TPVItem } from "@/hooks/useTPVItems";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { createNotification, getUserIdsByRole } from "@/lib/createNotification";
@@ -398,6 +400,7 @@ interface ProjectRowProps {
   isExpanded: boolean;
   stageCount: number;
   tpvCount: number;
+  tpvItems?: TPVItem[];
   onToggleExpand: (pid: string) => void;
   onAddStage?: (pid: string) => void;
   onOpenTPVList: (projectId: string, projectName: string) => void;
@@ -422,6 +425,7 @@ const ProjectRow = memo(function ProjectRow({
   isExpanded,
   stageCount,
   tpvCount,
+  tpvItems,
   onToggleExpand,
   onAddStage,
   onOpenTPVList,
@@ -438,12 +442,13 @@ const ProjectRow = memo(function ProjectRow({
   isFieldReadOnly,
 }: ProjectRowProps) {
   // Merge stage data into project display for multi-stage summary
+  const computedPct = useMemo(() => tpvItems ? computeTPVProgress(tpvItems) : null, [tpvItems]);
   const displayProject = useMemo(() => {
     const overrides = getProjectDisplayOverrides(stagesRaw);
+    let base: Project;
     if (overrides.isSingleStage && overrides.singleStage) {
-      // Single stage: show stage data directly on project row
       const s = overrides.singleStage;
-      return {
+      base = {
         ...p,
         status: s.status ?? p.status,
         datum_smluvni: s.datum_smluvni ?? p.datum_smluvni,
@@ -452,10 +457,8 @@ const ProjectRow = memo(function ProjectRow({
         prodejni_cena: s.prodejni_cena ?? p.prodejni_cena,
         marze: s.marze ?? p.marze,
       } as Project;
-    }
-    if (!overrides.isSingleStage) {
-      // Multi-stage: show summary with weighted margin
-      return {
+    } else if (!overrides.isSingleStage) {
+      base = {
         ...p,
         status: overrides.statusSummary ?? p.status,
         datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni,
@@ -465,9 +468,15 @@ const ProjectRow = memo(function ProjectRow({
         prodejni_cena: overrides.totalPrice ?? p.prodejni_cena,
         marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze,
       } as Project;
+    } else {
+      base = p;
     }
-    return p;
-  }, [p, stagesRaw]);
+    // Override percent_tpv with computed value from TPV items
+    if (computedPct != null) {
+      return { ...base, percent_tpv: computedPct } as Project;
+    }
+    return base;
+  }, [p, stagesRaw, computedPct]);
 
   const isSummary = stageCount > 1;
 
@@ -502,7 +511,7 @@ const ProjectRow = memo(function ProjectRow({
         </TableCell>
       )}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" : isFieldReadOnly, isSummaryRow: isSummary }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" && !(field === "percent_tpv" && computedPct != null) : (field) => (field === "percent_tpv" && computedPct != null) ? true : isFieldReadOnly(field), isSummaryRow: isSummary }))}
     </TableRow>
   );
 });
@@ -921,6 +930,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                     tpvCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
+                    tpvItems={tpvItemsByProject.get(p.project_id)}
                     onToggleExpand={toggleExpand}
                     onAddStage={handleAddStage}
                     onOpenTPVList={handleOpenTPVList}
