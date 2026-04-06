@@ -416,10 +416,12 @@ const PMProjectRow = memo(function PMProjectRow({
       return { ...p, status: s.status ?? p.status, datum_smluvni: s.datum_smluvni ?? p.datum_smluvni, pm: s.pm ?? p.pm, konstrukter: s.konstrukter ?? p.konstrukter, prodejni_cena: s.prodejni_cena ?? p.prodejni_cena, marze: s.marze ?? p.marze } as Project;
     }
     if (!overrides.isSingleStage) {
-      return { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena } as Project;
+      return { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena, marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze } as Project;
     }
     return p;
   }, [p, stagesRaw]);
+
+  const isSummary = stageCount > 1;
 
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -427,7 +429,7 @@ const PMProjectRow = memo(function PMProjectRow({
   }, [p.risk, p.datum_smluvni, riskHighlight]);
 
   return (
-    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
+    <TableRow className={cn("hover:bg-muted/50 transition-colors h-9", isSummary && "border-l-2 border-primary/20")} style={bgStyle} data-project-id={p.project_id}>
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         <button className="transition-colors cursor-pointer hover:text-[#e87c3e] inline-flex items-center gap-0.5" style={{ color: tpvCount > 0 ? "#223937" : "#99a5a3" }} title={`TPV seznam (${tpvCount})`} onClick={(e) => { e.stopPropagation(); onOpenTPVList(p.project_id, p.project_name); }}>
           <List className="h-4 w-4" />
@@ -439,7 +441,7 @@ const PMProjectRow = memo(function PMProjectRow({
       </TableCell>
       {v("project_id") && <TableCell className="font-sans font-semibold text-xs truncate cursor-pointer hover:underline text-primary" title={p.project_id} onClick={() => onEditProject(p)}>{p.project_id}</TableCell>}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name} className="truncate"><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && stageCount <= 1, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && stageCount <= 1, statusLabels, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly, isSummaryRow: isSummary }))}
     </TableRow>
   );
 });
