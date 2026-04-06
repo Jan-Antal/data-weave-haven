@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -48,6 +48,62 @@ const APPLIANCE_RE = /^(vestavná?\s+)?(chladni[čc]ka|lednice|myčka|my[čc]ka\
 
 function isApplianceOnly(item: { nazev: string; popis: string }): boolean {
   return APPLIANCE_RE.test(item.nazev.trim());
+}
+
+// ─── Module-level extraction cache (15 min TTL) ──────────────────────────────
+const CACHE_TTL_MS = 15 * 60 * 1000;
+
+interface ExtractionCacheEntry {
+  items: ExtractedItem[];
+  fileName: string;
+  sourceDoc: { itemId?: string; fileName: string; blobUrl?: string };
+  timestamp: number;
+}
+
+const extractionCache = new Map<string, ExtractionCacheEntry>();
+
+function getCachedExtraction(projectId: string): ExtractionCacheEntry | null {
+  const entry = extractionCache.get(projectId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    extractionCache.delete(projectId);
+    return null;
+  }
+  return entry;
+}
+
+// ─── Error Boundary for DocumentPreviewModal ─────────────────────────────────
+class PreviewErrorBoundary extends Component<
+  { children: ReactNode; onError?: () => void },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Preview iframe error caught:", error, info);
+    this.props.onError?.();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/60">
+          <div className="bg-background rounded-lg p-6 shadow-xl text-center space-y-3 max-w-sm">
+            <AlertCircle className="h-8 w-8 text-destructive mx-auto" />
+            <p className="text-sm">Náhled dokumentu selhal.</p>
+            <Button size="sm" variant="outline" onClick={() => this.setState({ hasError: false })}>
+              Zavřít
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose, open }: TPVExtractorProps) {
@@ -136,16 +192,12 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
 
   useEffect(() => {
     if (!open) {
-      setPhase("searching");
-      setMatches([]);
-      setFoundFileName("");
-      setItems([]);
+      // Only reset UI state, NOT items/sourceDoc — those live in module cache
       setSpUploaded(false);
       setErrorMsg("");
       autoExtractTriggered.current = false;
       setManualFile(null);
       setManualLoading(false);
-      setSourceDoc(null);
       setPreviewOpen(false);
       setPreviewLoading(false);
       setPreviewData({ previewUrl: null, webUrl: null, downloadUrl: null });
@@ -153,6 +205,23 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
       setLastClickedIdx(null);
       return;
     }
+
+    // Check module-level cache first
+    const cached = getCachedExtraction(projectId);
+    if (cached) {
+      // Re-apply diff against current existingItems (may have changed)
+      setItems(applyDiff(cached.items.map(i => ({ ...i, _diffStatus: undefined, _dbId: undefined, _dbValues: undefined }))));
+      setFoundFileName(cached.fileName);
+      setSourceDoc(cached.sourceDoc);
+      setPhase("done");
+      return;
+    }
+
+    // Reset extraction state for fresh run
+    setMatches([]);
+    setFoundFileName("");
+    setItems([]);
+    setSourceDoc(null);
 
     // If existing items, ask confirmation first
     if (hasExisting) {
@@ -211,8 +280,12 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(applyDiff(postFilter(extracted)));
-      setSourceDoc({ itemId: fileItemId, fileName });
+      const filtered = postFilter(extracted);
+      const srcDoc = { itemId: fileItemId, fileName };
+      // Cache raw extracted items (before diff) for reuse
+      extractionCache.set(projectId, { items: filtered, fileName, sourceDoc: srcDoc, timestamp: Date.now() });
+      setItems(applyDiff(filtered));
+      setSourceDoc(srcDoc);
       setPhase("done");
     } catch (err: any) {
       console.error("Extract error:", err);
@@ -268,9 +341,12 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(applyDiff(postFilter(extracted)));
+      const filtered = postFilter(extracted);
+      const srcDoc = { fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) };
+      extractionCache.set(projectId, { items: filtered, fileName: manualFile.name, sourceDoc: srcDoc, timestamp: Date.now() });
+      setItems(applyDiff(filtered));
       setFoundFileName(manualFile.name);
-      setSourceDoc({ fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) });
+      setSourceDoc(srcDoc);
       setPhase("done");
     } catch (err: any) {
       console.error("Manual extract error:", err);
@@ -425,6 +501,8 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         title: "Položky uloženy",
         description: parts.join(", ") || `${valid.length} položek přidáno do TPV`,
       });
+      // Clear cache after successful save
+      extractionCache.delete(projectId);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -790,15 +868,17 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         )}
       </DialogContent>
 
-      <DocumentPreviewModal
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        fileName={sourceDoc?.fileName || ""}
-        previewUrl={previewData.previewUrl}
-        webUrl={previewData.webUrl}
-        downloadUrl={previewData.downloadUrl}
-        loading={previewLoading}
-      />
+      <PreviewErrorBoundary onError={() => setPreviewOpen(false)}>
+        <DocumentPreviewModal
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          fileName={sourceDoc?.fileName || ""}
+          previewUrl={previewData.previewUrl}
+          webUrl={previewData.webUrl}
+          downloadUrl={previewData.downloadUrl}
+          loading={previewLoading}
+        />
+      </PreviewErrorBoundary>
     </Dialog>
   );
 }
