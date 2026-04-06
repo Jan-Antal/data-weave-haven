@@ -124,9 +124,12 @@ type Mapping = Record<TargetKey, number | null>;
 interface RowData {
   values: Record<TargetKey, string>;
   selected: boolean;
-  status: "valid" | "warning" | "error";
+  status: "valid" | "warning" | "error" | "update" | "unchanged";
   rawIdx: number;
   duplicateCode?: boolean;
+  dbId?: string;
+  changedFields?: Set<string>;
+  dbValues?: Record<string, string>;
 }
 
 // ── Example data for format guide ─────────────────────────────────
