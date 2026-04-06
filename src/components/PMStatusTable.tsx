@@ -421,7 +421,7 @@ const PMProjectRow = memo(function PMProjectRow({
       const s = overrides.singleStage;
       base = { ...p, status: s.status ?? p.status, datum_smluvni: s.datum_smluvni ?? p.datum_smluvni, pm: s.pm ?? p.pm, konstrukter: s.konstrukter ?? p.konstrukter, prodejni_cena: s.prodejni_cena ?? p.prodejni_cena, marze: s.marze ?? p.marze } as Project;
     } else if (!overrides.isSingleStage) {
-      base = { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, kalkulant: overrides.kalkulantSummary ?? p.kalkulant, konstrukter: overrides.konstrukterSummary ?? p.konstrukter, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena, marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze } as Project;
+      base = { ...p, status: overrides.statusSummary ?? p.status, datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni, pm: overrides.pmSummary ?? p.pm, kalkulant: overrides.kalkulantSummary ?? p.kalkulant, konstrukter: overrides.konstrukterSummary ?? p.konstrukter, prodejni_cena: overrides.totalPrice ?? p.prodejni_cena, marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze, percent_tpv: overrides.percentTpvAvg ?? p.percent_tpv } as Project;
     } else {
       base = p;
     }
