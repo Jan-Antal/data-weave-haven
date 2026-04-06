@@ -280,8 +280,12 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(applyDiff(postFilter(extracted)));
-      setSourceDoc({ itemId: fileItemId, fileName });
+      const filtered = postFilter(extracted);
+      const srcDoc = { itemId: fileItemId, fileName };
+      // Cache raw extracted items (before diff) for reuse
+      extractionCache.set(projectId, { items: filtered, fileName, sourceDoc: srcDoc, timestamp: Date.now() });
+      setItems(applyDiff(filtered));
+      setSourceDoc(srcDoc);
       setPhase("done");
     } catch (err: any) {
       console.error("Extract error:", err);
@@ -337,9 +341,12 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(applyDiff(postFilter(extracted)));
+      const filtered = postFilter(extracted);
+      const srcDoc = { fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) };
+      extractionCache.set(projectId, { items: filtered, fileName: manualFile.name, sourceDoc: srcDoc, timestamp: Date.now() });
+      setItems(applyDiff(filtered));
       setFoundFileName(manualFile.name);
-      setSourceDoc({ fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) });
+      setSourceDoc(srcDoc);
       setPhase("done");
     } catch (err: any) {
       console.error("Manual extract error:", err);
@@ -494,6 +501,8 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         title: "Položky uloženy",
         description: parts.join(", ") || `${valid.length} položek přidáno do TPV`,
       });
+      // Clear cache after successful save
+      extractionCache.delete(projectId);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -859,15 +868,17 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         )}
       </DialogContent>
 
-      <DocumentPreviewModal
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        fileName={sourceDoc?.fileName || ""}
-        previewUrl={previewData.previewUrl}
-        webUrl={previewData.webUrl}
-        downloadUrl={previewData.downloadUrl}
-        loading={previewLoading}
-      />
+      <PreviewErrorBoundary onError={() => setPreviewOpen(false)}>
+        <DocumentPreviewModal
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          fileName={sourceDoc?.fileName || ""}
+          previewUrl={previewData.previewUrl}
+          webUrl={previewData.webUrl}
+          downloadUrl={previewData.downloadUrl}
+          loading={previewLoading}
+        />
+      </PreviewErrorBoundary>
     </Dialog>
   );
 }
