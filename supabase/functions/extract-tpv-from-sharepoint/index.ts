@@ -22,7 +22,7 @@ Vstup je tabulka (buď text z Excelu, nebo PDF). Extrahuj VŠECHNY řádkové po
 Pro každou položku vrať:
 - item_name: kód prvku přesně jak je v dokumentu (např. T01, K01, D-01, SK01, S1 atd.)
 - nazev: krátký název prvku (max 40 znaků, BEZ rozměrů a materiálů)
-- popis: KOMPLETNÍ technický popis — materiály, kování, povrchové úpravy, rozměry, barvy, typ dřeva, ABS hrany, úchytky, mechanismy. Spoj VŠECHNY řádky popisu které k položce patří do jednoho textu.
+- popis: KOMPLETNÍ technický popis — materiály, kování, povrchové úpravy, barvy, typ dřeva, ABS hrany, úchytky, mechanismy. BEZ rozměrů (šířka, výška, hloubka, mm, cm). Spoj VŠECHNY řádky popisu které k položce patří do jednoho textu.
 - cena: jednotková cena v CZK (pouze číslo)
 - pocet: počet kusů (výchozí 1)
 
