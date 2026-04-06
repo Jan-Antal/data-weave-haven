@@ -62,6 +62,12 @@ function parseWorksheetCells(xml: string, ss: string[]): (string | null)[][] {
       if (val && t === 's') {
         const i = parseInt(val);
         val = (i >= 0 && i < ss.length) ? ss[i] : val;
+      } else if (val && t === '' && /^\d+$/.test(val)) {
+        // Some Excel cells store shared string refs without t="s" attribute
+        const i = parseInt(val);
+        if (i >= 0 && i < ss.length && ss[i] && /[a-zA-ZáčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(ss[i])) {
+          val = ss[i];
+        }
       }
       while (cells.length <= colIdx) cells.push(null);
       cells[colIdx] = val?.trim() || null;
