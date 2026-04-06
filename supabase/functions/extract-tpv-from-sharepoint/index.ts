@@ -113,14 +113,15 @@ async function parseXlsxItems(buffer: ArrayBuffer): Promise<ParsedItem[]> {
   let collecting = true;
 
   for (const row of rows) {
-    const col0 = row[0]?.trim() ?? '';
-    const col1 = row[1]?.trim() ?? '';
+    const col0 = (row[0] ?? '').trim();
+    const col1 = (row[1] ?? '').trim();
     const col3 = row[3];
     const col4 = row[4];
 
     if (ITEM_CODE_RE.test(col0)) {
-      const hasCena = col4 !== null && col4 !== '';
-      if (current && !hasCena && !col3) {
+      const hasCena = col4 !== null && col4 !== undefined && col4 !== '';
+      const hasPocet = col3 !== null && col3 !== undefined && col3 !== '';
+      if (current && !hasCena && !hasPocet) {
         if (col1) current.popis += (current.popis ? ' ' : '') + col1;
         continue;
       }
@@ -134,7 +135,7 @@ async function parseXlsxItems(buffer: ArrayBuffer): Promise<ParsedItem[]> {
       };
       collecting = true;
     } else if (current && collecting) {
-      if (!col0 && col1) {
+      if (col0 === '' && col1 !== '') {
         if (isStopText(col1)) { collecting = false; continue; }
         current.popis += (current.popis ? ' ' : '') + col1;
       }
