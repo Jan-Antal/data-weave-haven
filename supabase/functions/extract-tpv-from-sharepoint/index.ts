@@ -137,63 +137,19 @@ async function parseXlsxItems(buffer: ArrayBuffer): Promise<ParsedItem[]> {
   return items.filter(i => i.cena !== null);
 }
 
-// ─── Excel extraction (XLSX → pre-parsed items → Claude for cleanup) ──────────
+// ─── Excel extraction (XLSX → direct mapping, no AI needed) ──────────────────
 
 async function extractFromExcel(fileBuffer: ArrayBuffer, fileName: string): Promise<any[]> {
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
-
   const parsedItems = await parseXlsxItems(fileBuffer);
   console.log(`Pre-parsed ${parsedItems.length} items from ${fileName}`);
 
-  if (parsedItems.length === 0) return [];
-
-  const structuredText = parsedItems.map(i =>
-    `${i.kod} | ${i.nazev} | počet: ${i.pocet ?? 1} | cena: ${i.cena} Kč | popis: ${i.popis || '–'}`
-  ).join('\n');
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8192,
-      system: `You clean and structure pre-parsed furniture line items from a Czech cenová nabídka.
-Return ONLY a valid JSON array, no markdown, no explanation.
-
-Fields:
-- item_name: the code exactly as given (T01, K01, etc.)
-- nazev: short item name, max 40 chars, no dimensions or materials
-- popis: the full popis text exactly as given, do not shorten or summarize
-- cena: unit price as number (CZK)
-- pocet: quantity as number
-
-Do not skip any items. Do not add items not in the input.`,
-      messages: [{
-        role: "user",
-        content: `Clean these pre-parsed items into JSON:\n\n${structuredText}`,
-      }],
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Claude API error [${response.status}]: ${err}`);
-  }
-
-  const data = await response.json();
-  const text = data.content?.[0]?.text ?? "";
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\[[\s\S]*\]/);
-    return match ? JSON.parse(match[0]) : [];
-  }
+  return parsedItems.map(i => ({
+    item_name: i.kod,
+    nazev: i.nazev,
+    popis: i.popis,
+    cena: i.cena,
+    pocet: i.pocet ?? 1,
+  }));
 }
 
 // ─── PDF extraction (Files API) ──────────────────────────────────────────────
