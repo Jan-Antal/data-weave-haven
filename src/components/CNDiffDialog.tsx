@@ -20,7 +20,7 @@ interface Props {
   currency?: string;
 }
 
-export function CNDiffDialog({ open, onClose, diff, projectId, currency = "CZK" }: Props) {
+export function CNDiffDialog({ open, onClose, onApplied, diff, projectId, currency = "CZK" }: Props) {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Set<number>>(() => new Set(diff.entries.map((_, i) => i)));
   const [applying, setApplying] = useState(false);
@@ -100,6 +100,7 @@ export function CNDiffDialog({ open, onClose, diff, projectId, currency = "CZK" 
         title: "Změny aplikovány",
         description: `${toInsert.length} přidáno, ${toUpdate.length} aktualizováno, ${toRemove.length} odstraněno`,
       });
+      onApplied?.();
       onClose();
     } catch (err: any) {
       toast({ title: "Chyba při aplikaci změn", description: err.message, variant: "destructive" });

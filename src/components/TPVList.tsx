@@ -43,8 +43,6 @@ import { logActivity } from "@/lib/activityLog";
 import { TPVExtractor } from "./assistant/TPVExtractor";
 import { useCNDiff } from "@/hooks/useCNDiff";
 import { CNDiffDialog } from "./CNDiffDialog";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { TooltipProvider } from "@/components/ui/tooltip";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_code", label: "Kód prvku" },
