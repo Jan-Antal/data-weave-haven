@@ -29,6 +29,7 @@ Pro každou položku vrať:
 PRAVIDLA:
 - Pokud má položka kód ale NEMÁ cenu, je to pravděpodobně pokračování popisu předchozí položky — přidej text do popis předchozí.
 - PŘESKOČ: součty, mezisoučty, DPH, dopravu, montáž, manipulaci, odvoz, záhlaví místností (Ložnice, Koupelna atd.), záhlaví sekcí bez ceny.
+- PŘESKOČ spotřebiče — pokud název položky obsahuje pouze typ spotřebiče (chladnička, lednice, myčka, trouba, varná deska, digestoř, pračka, sušička, mikrovlnka, sporák, vinotéka, mrazák) bez atypické nábytkové výroby, položku vynech.
 - Pole popis je NEJDŮLEŽITĚJŠÍ — musí obsahovat všechny technické specifikace. Nikdy ho nevynechej ani nezkracuj.
 - Vrať POUZE platný JSON pole, bez markdownu, bez vysvětlení.`;
 

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle, Eye, AlertTriangle } from "lucide-react";
@@ -42,6 +43,13 @@ interface TPVExtractorProps {
   open: boolean;
 }
 
+// ─── Appliance post-filter (safety net) ───────────────────────────────────────
+const APPLIANCE_RE = /^(vestavná?\s+)?(chladni[čc]ka|lednice|myčka|my[čc]ka\s+n[áa]dob[ií]|trouba|varná\s+deska|digestoř|pra[čc]ka|su[šs]i[čc]ka|mikrovlnka|spor[áa]k|vinotéka|mraz[áa]k)\s*$/i;
+
+function isApplianceOnly(item: { nazev: string; popis: string }): boolean {
+  return APPLIANCE_RE.test(item.nazev.trim());
+}
+
 export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose, open }: TPVExtractorProps) {
   const [phase, setPhase] = useState<Phase>("searching");
   const [matches, setMatches] = useState<SPMatch[]>([]);
@@ -60,6 +68,10 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState<{ previewUrl: string | null; webUrl: string | null; downloadUrl: string | null }>({ previewUrl: null, webUrl: null, downloadUrl: null });
+
+  // ─── Multi-select state ─────────────────────────────────────────────
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null);
 
   const sp = useSharePointDocs(projectId);
 
@@ -117,6 +129,11 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
     });
   }, [existingByCode, hasExisting]);
 
+  /** Post-process extracted items — filter appliances */
+  const postFilter = useCallback((extracted: ExtractedItem[]): ExtractedItem[] => {
+    return extracted.filter(item => !isApplianceOnly(item));
+  }, []);
+
   useEffect(() => {
     if (!open) {
       setPhase("searching");
@@ -132,6 +149,8 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
       setPreviewOpen(false);
       setPreviewLoading(false);
       setPreviewData({ previewUrl: null, webUrl: null, downloadUrl: null });
+      setSelectedIndices(new Set());
+      setLastClickedIdx(null);
       return;
     }
 
@@ -192,7 +211,7 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(applyDiff(extracted));
+      setItems(applyDiff(postFilter(extracted)));
       setSourceDoc({ itemId: fileItemId, fileName });
       setPhase("done");
     } catch (err: any) {
@@ -249,7 +268,7 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(applyDiff(extracted));
+      setItems(applyDiff(postFilter(extracted)));
       setFoundFileName(manualFile.name);
       setSourceDoc({ fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) });
       setPhase("done");
@@ -261,7 +280,7 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
     } finally {
       setManualLoading(false);
     }
-  }, [manualFile, projectId, applyDiff]);
+  }, [manualFile, projectId, applyDiff, postFilter]);
 
   const updateItem = (index: number, field: keyof ExtractedItem, value: string | number) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
@@ -269,10 +288,48 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
 
   const removeItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
+    setSelectedIndices((prev) => {
+      const next = new Set<number>();
+      for (const idx of prev) {
+        if (idx < index) next.add(idx);
+        else if (idx > index) next.add(idx - 1);
+      }
+      return next;
+    });
+  };
+
+  const removeSelected = () => {
+    setItems((prev) => prev.filter((_, i) => !selectedIndices.has(i)));
+    setSelectedIndices(new Set());
+    setLastClickedIdx(null);
   };
 
   const addRow = () => {
     setItems((prev) => [...prev, { kod_prvku: "", nazev: "", popis: "", cena: 0, pocet: 1, _diffStatus: "new" }]);
+  };
+
+  // ─── Checkbox handlers ──────────────────────────────────────────────
+  const handleCheckboxClick = (index: number, shiftKey: boolean) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && lastClickedIdx !== null) {
+        const [from, to] = lastClickedIdx < index ? [lastClickedIdx, index] : [index, lastClickedIdx];
+        for (let i = from; i <= to; i++) next.add(i);
+      } else {
+        if (next.has(index)) next.delete(index);
+        else next.add(index);
+      }
+      return next;
+    });
+    setLastClickedIdx(index);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIndices.size === items.length) {
+      setSelectedIndices(new Set());
+    } else {
+      setSelectedIndices(new Set(items.map((_, i) => i)));
+    }
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -580,10 +637,29 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
                 </span>
               )}
             </div>
+
+            {/* Bulk actions bar */}
+            {selectedIndices.size > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border bg-muted/40">
+                <span className="text-xs text-muted-foreground">{selectedIndices.size} vybráno</span>
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={removeSelected}>
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Odebrat vybrané
+                </Button>
+              </div>
+            )}
+
             <div className="flex-1 overflow-auto border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[40px] px-2">
+                      <Checkbox
+                        checked={items.length > 0 && selectedIndices.size === items.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Vybrat vše"
+                      />
+                    </TableHead>
                     <TableHead className="w-[100px]">Kód</TableHead>
                     <TableHead className="w-[160px]">Název</TableHead>
                     <TableHead>Popis</TableHead>
@@ -600,7 +676,15 @@ export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose
                     const rowClass = isUnchanged ? "opacity-40" : isNew && hasExisting ? "bg-green-50/40" : "";
 
                     return (
-                      <TableRow key={i} className={rowClass}>
+                      <TableRow key={i} className={`${rowClass} ${selectedIndices.has(i) ? "bg-accent/50" : ""}`}>
+                        <TableCell className="px-2">
+                          <Checkbox
+                            checked={selectedIndices.has(i)}
+                            onCheckedChange={() => {}}
+                            onClick={(e) => handleCheckboxClick(i, (e as React.MouseEvent).shiftKey)}
+                            aria-label={`Vybrat řádek ${i + 1}`}
+                          />
+                        </TableCell>
                         <TableCell>
                           <Input
                             value={item.kod_prvku}
