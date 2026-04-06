@@ -135,6 +135,42 @@ export function AmiAssistant() {
     if (!text.trim() || loading) return;
     const userMsg: Msg = { role: "user", content: text.trim() };
 
+    // Check if entering summary mode
+    if (SUMMARY_TRIGGERS.some(t => text.toLowerCase().includes(t)) && !summaryMode && !feedbackMode) {
+      setMessages(prev => [...prev, userMsg, { role: "assistant", content: "Zadej název nebo ID projektu a já ti vygeneruji summary. 📋" }]);
+      setSummaryMode(true);
+      setInput("");
+      return;
+    }
+
+    // Handle summary generation
+    if (summaryMode) {
+      setMessages(prev => [...prev, userMsg]);
+      setLoading(true);
+      setInput("");
+      try {
+        const resp = await fetch(SUMMARY_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ projectQuery: text.trim() }),
+        });
+        const data = await resp.json();
+        if (resp.ok && data.summary) {
+          setMessages(prev => [...prev, { role: "assistant", content: data.summary }]);
+        } else {
+          setMessages(prev => [...prev, { role: "assistant", content: data.error || "Nepodařilo se vygenerovat summary." }]);
+        }
+      } catch {
+        setMessages(prev => [...prev, { role: "assistant", content: "Chyba při generování summary." }]);
+      }
+      setSummaryMode(false);
+      setLoading(false);
+      return;
+    }
+
     // Check if entering feedback mode
     if (FEEDBACK_TRIGGERS.some(t => text.toLowerCase().includes(t)) && !feedbackMode) {
       setMessages(prev => [...prev, userMsg, { role: "assistant", content: "Jasně! Napiš svou zprávu a já ji předám adminovi. ✉️" }]);
@@ -202,7 +238,7 @@ export function AmiAssistant() {
         setLoading(false);
       },
     });
-  }, [messages, loading, feedbackMode, user, profile]);
+  }, [messages, loading, feedbackMode, summaryMode, user, profile]);
 
   const handleChip = (chip: typeof QUICK_CHIPS[0]) => {
     sendMessage(`${chip.emoji} ${chip.label}`);
