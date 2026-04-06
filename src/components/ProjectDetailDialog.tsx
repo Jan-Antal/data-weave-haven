@@ -296,7 +296,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   // TPV items for auto percent_tpv
   const { data: detailTpvItems = [] } = useTPVItems(project?.project_id ?? "");
   const computedPercentTpv = useMemo(() => computeTPVProgress(detailTpvItems), [detailTpvItems]);
-  const hasAutoPercent = computedPercentTpv != null;
+  // Effective auto percent: TPV items > stage average > null
+  const effectiveAutoPercent = computedPercentTpv ?? stageOverrides.percentTpvAvg;
+  const hasAutoPercent = effectiveAutoPercent != null;
+  const autoPercentLabel = computedPercentTpv != null ? "(auto z položek)" : stageOverrides.percentTpvAvg != null ? "(průměr z etap)" : "";
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
