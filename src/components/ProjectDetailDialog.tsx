@@ -1200,6 +1200,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         <StagesCostSection
           projectId={project.project_id}
           readOnly={isSectionReadOnly("finance")}
+          useProjectPrice={form.plan_use_project_price}
+          onToggleProjectPrice={(val) => setForm(s => ({ ...s, plan_use_project_price: val }))}
         />
       )}
 
