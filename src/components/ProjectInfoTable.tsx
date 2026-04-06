@@ -930,6 +930,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                     tpvCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
+                    tpvItems={tpvItemsByProject.get(p.project_id)}
                     onToggleExpand={toggleExpand}
                     onAddStage={handleAddStage}
                     onOpenTPVList={handleOpenTPVList}

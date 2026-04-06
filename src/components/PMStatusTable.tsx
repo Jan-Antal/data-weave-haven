@@ -372,6 +372,7 @@ interface PMProjectRowProps {
   project: Project;
   stages?: ProjectStage[];
   tpvCount: number;
+  tpvItems?: TPVItem[];
   isExpanded: boolean;
   stageCount: number;
   onToggleExpand: (pid: string) => void;
