@@ -2,24 +2,30 @@
  * Etapy section for ProjectDetailDialog — shows per-stage cost breakdown.
  * Only rendered when project has 2+ stages.
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { RozpadCeny, type CostValues } from "./RozpadCeny";
-import { useProjectStages, useUpdateStage, useAddStage } from "@/hooks/useProjectStages";
+import { useProjectStages, useUpdateStage, useAddStage, useDeleteStage } from "@/hooks/useProjectStages";
 import { formatCurrency, marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type { ProjectStage } from "@/hooks/useProjectStages";
 
 interface StagesCostSectionProps {
   projectId: string;
   readOnly?: boolean;
+  /** Current plan_use_project_price value from project */
+  useProjectPrice?: boolean;
+  /** Callback to toggle plan_use_project_price */
+  onToggleProjectPrice?: (value: boolean) => void;
 }
 
-function StageCostRow({ stage, readOnly }: { stage: ProjectStage; readOnly: boolean }) {
+function StageCostRow({ stage, readOnly, onRequestDelete }: { stage: ProjectStage; readOnly: boolean; onRequestDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const updateStage = useUpdateStage();
   const [localPrice, setLocalPrice] = useState(String(stage.prodejni_cena ?? ""));
@@ -36,7 +42,6 @@ function StageCostRow({ stage, readOnly }: { stage: ProjectStage; readOnly: bool
   }, [stage.id, stage.project_id, updateStage]);
 
   const handleCostChange = useCallback((updates: Partial<CostValues>) => {
-    // Save each changed field to the stage
     for (const [key, value] of Object.entries(updates)) {
       save(key, value);
     }
@@ -52,8 +57,6 @@ function StageCostRow({ stage, readOnly }: { stage: ProjectStage; readOnly: bool
     cost_montaz_pct: (stage as any).cost_montaz_pct ?? null,
     cost_is_custom: (stage as any).cost_is_custom ?? false,
   };
-
-  const hasCostData = costValues.cost_material_pct != null;
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
@@ -138,19 +141,49 @@ function StageCostRow({ stage, readOnly }: { stage: ProjectStage; readOnly: bool
             onChange={handleCostChange}
             readOnly={readOnly}
           />
+
+          {!readOnly && (
+            <div className="flex justify-end pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={(e) => { e.stopPropagation(); onRequestDelete(stage.id); }}
+              >
+                <Trash2 className="h-3 w-3 mr-1" /> Smazat etapu
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export function StagesCostSection({ projectId, readOnly = false }: StagesCostSectionProps) {
+export function StagesCostSection({ projectId, readOnly = false, useProjectPrice = false, onToggleProjectPrice }: StagesCostSectionProps) {
   const { data: stages = [] } = useProjectStages(projectId);
   const addStage = useAddStage();
+  const deleteStage = useDeleteStage();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   if (stages.length < 2) return null;
 
+  const isAutoSum = !useProjectPrice;
+
   const totalPrice = stages.reduce((sum, s) => sum + (s.prodejni_cena ?? 0), 0);
+
+  // Weighted average margin
+  const weightedMarze = useMemo(() => {
+    const totalWeight = stages.reduce((acc, s) => acc + (s.prodejni_cena ?? 0), 0);
+    if (totalWeight <= 0) return null;
+    const weightedSum = stages.reduce((acc, s) => {
+      const price = s.prodejni_cena ?? 0;
+      const marze = s.marze ? parseFloat(String(s.marze).replace(",", ".")) : 0;
+      const normalizedMarze = marze > 1 ? marze : marze * 100;
+      return acc + price * normalizedMarze;
+    }, 0);
+    return Math.round((weightedSum / totalWeight) * 10) / 10;
+  }, [stages]);
 
   const handleAddStage = () => {
     const letters = stages.map(s => {
@@ -173,15 +206,36 @@ export function StagesCostSection({ projectId, readOnly = false }: StagesCostSec
         </span>
       </div>
 
+      {/* Auto-sum toggle */}
+      {onToggleProjectPrice && (
+        <div className="flex items-center justify-between gap-2 py-1 px-1">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={isAutoSum}
+              onCheckedChange={(checked) => onToggleProjectPrice(!checked)}
+              className="h-4 w-8 [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-4"
+            />
+            <span className="text-[10px] font-medium text-muted-foreground">
+              {isAutoSum ? "Σ Auto-suma z etap" : "Manuální cena projektu"}
+            </span>
+          </div>
+          {isAutoSum && weightedMarze != null && (
+            <span className="text-[10px] text-muted-foreground">
+              Ø marže: {weightedMarze} %
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {stages.map((stage) => (
-          <StageCostRow key={stage.id} stage={stage} readOnly={readOnly} />
+          <StageCostRow key={stage.id} stage={stage} readOnly={readOnly} onRequestDelete={setDeleteId} />
         ))}
       </div>
 
-      {totalPrice > 0 && (
+      {isAutoSum && totalPrice > 0 && (
         <div className="flex justify-between items-center pt-2 border-t border-border">
-          <span className="text-xs text-muted-foreground">Součet etap:</span>
+          <span className="text-xs text-muted-foreground">Σ Součet etap:</span>
           <span className="text-xs font-semibold">
             {Math.round(totalPrice).toLocaleString("cs-CZ")} Kč
           </span>
@@ -193,6 +247,18 @@ export function StagesCostSection({ projectId, readOnly = false }: StagesCostSec
           <Plus className="h-3 w-3 mr-1" /> Přidat etapu
         </Button>
       )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onConfirm={() => {
+          if (deleteId) {
+            const s = stages.find(st => st.id === deleteId);
+            deleteStage.mutate({ id: deleteId, projectId, stageName: s?.stage_name });
+            setDeleteId(null);
+          }
+        }}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }
