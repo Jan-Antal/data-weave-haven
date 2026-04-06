@@ -115,14 +115,14 @@ function ExpandArrow({ isExpanded, stageCount, onAddStage }: { isExpanded: boole
         title="Přidat etapu"
         onClick={(e) => { e.stopPropagation(); onAddStage?.(); }}
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
       </button>
     );
   }
   if (isExpanded) {
-    return <ChevronDown className="h-5 w-5 stroke-[3] text-accent" />;
+    return <ChevronDown className="h-5 w-5 stroke-[2.5] text-accent" />;
   }
-  return <ChevronRight className="h-5 w-5 stroke-[3] text-accent" />;
+  return <ChevronRight className="h-5 w-5 stroke-[2.5] text-accent" />;
 }
 
 // ── Stage row ───────────────────────────────────────────────────────
