@@ -375,8 +375,11 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     const skipped = rows.length - selected.length;
     const warnings = rows.filter(r => r.status === "warning").length;
     const errors = rows.filter(r => r.status === "error").length;
-    return { selected: selected.length, skipped, warnings, errors, total: rows.length };
-  }, [rows]);
+    const updates = rows.filter(r => r.status === "update").length;
+    const unchanged = rows.filter(r => r.status === "unchanged").length;
+    const newItems = importMode === "update" ? rows.filter(r => r.status === "valid").length : 0;
+    return { selected: selected.length, skipped, warnings, errors, total: rows.length, updates, unchanged, newItems };
+  }, [rows, importMode]);
 
   const toggleRow = (idx: number) => {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, selected: !r.selected } : r));
