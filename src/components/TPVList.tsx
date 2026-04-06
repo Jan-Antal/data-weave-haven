@@ -19,7 +19,7 @@ import {
   useBulkInsertTPVItems,
 } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { buildPruvodkaHtml } from "@/lib/exportPdf";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
@@ -41,6 +41,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logActivity } from "@/lib/activityLog";
 import { TPVExtractor } from "./assistant/TPVExtractor";
+import { useCNDiff } from "@/hooks/useCNDiff";
+import { CNDiffDialog } from "./CNDiffDialog";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Kód prvku" },
