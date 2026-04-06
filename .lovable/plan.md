@@ -1,30 +1,38 @@
 
 
-# Remove Dimensions from popis in CN Extraction Prompt
+# Document Preview in TPV Extractor
 
 ## What
+Add a "Zobrazit dokument" button in the bottom-left of the TPVExtractor dialog (in the "done" phase) that opens the source CN document in `DocumentPreviewModal`. This lets users cross-reference extracted data against the original file before saving.
 
-Update the `CN_SYSTEM_PROMPT` in both edge functions to instruct the AI to **exclude dimensions (rozměry)** from the `popis` field. Dimensions are unnecessary information that clutters the description.
+## How
 
-## Changes
+### File: `src/components/assistant/TPVExtractor.tsx`
 
-### Files: `supabase/functions/extract-tpv/index.ts` and `supabase/functions/extract-tpv-from-sharepoint/index.ts`
+1. **Track source document metadata** — store `fileItemId` when extraction succeeds (from SharePoint path) or the manual file's blob URL (for uploaded files):
+   - Add state: `sourceDoc: { itemId?: string; fileName: string; blobUrl?: string } | null`
+   - In `extractFromSharePoint`: save `{ itemId: fileItemId, fileName }`
+   - In `handleManualExtract`: create a blob URL from `manualFile` and save `{ fileName, blobUrl: URL.createObjectURL(manualFile) }`
 
-In both files, update line 18 (the `popis` field description) from:
+2. **Add preview state** — `previewOpen`, `previewLoading`, `previewUrl`, `webUrl`, `downloadUrl`
 
-```
-- popis: KOMPLETNÍ technický popis — materiály, kování, povrchové úpravy, rozměry, barvy, typ dřeva, ABS hrany, úchytky, mechanismy. Spoj VŠECHNY řádky popisu které k položce patří do jednoho textu.
-```
+3. **Import and use `useSharePointDocs`** to call `getPreview(itemId)` for SharePoint files. For manual uploads, use the blob URL directly (PDF renders in iframe, Excel shows a "download" fallback).
 
-To:
+4. **Add preview button** in the `DialogFooter` (left side, before Zrušit):
+   ```
+   <Button variant="ghost" size="sm" onClick={openSourcePreview}>
+     <Eye className="h-4 w-4 mr-1" /> Zobrazit dokument
+   </Button>
+   ```
 
-```
-- popis: KOMPLETNÍ technický popis — materiály, kování, povrchové úpravy, barvy, typ dřeva, ABS hrany, úchytky, mechanismy. BEZ rozměrů (šířka, výška, hloubka, mm, cm). Spoj VŠECHNY řádky popisu které k položce patří do jednoho textu.
-```
+5. **Render `DocumentPreviewModal`** at the bottom of the component, using the tracked preview URLs.
 
-This removes "rozměry" from the included list and adds an explicit exclusion instruction.
+### File: `src/components/DocumentPreviewModal.tsx`
+No changes needed — it already supports all required props.
 
-### Deployment
-
-Redeploy both `extract-tpv` and `extract-tpv-from-sharepoint` edge functions.
+### Logic flow
+- User clicks "Zobrazit dokument" → if SharePoint file, call `getPreview(itemId)` to get `previewUrl` → open `DocumentPreviewModal`
+- If manual upload (PDF), use blob URL directly as `previewUrl`
+- If manual upload (XLSX), show download-only fallback (no iframe preview for Excel blobs)
+- Modal opens as a portal overlay on top of the dialog — user reviews, closes, continues editing/saving
 
