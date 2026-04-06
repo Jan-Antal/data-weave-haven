@@ -11,8 +11,8 @@ import { formatCurrency } from "@/lib/currency";
 
 interface ExtractedItem {
   item_name: string;
-  item_type: string;
-  nazev_prvku: string;
+  nazev: string;
+  popis: string;
   cena: number;
   pocet: number;
 }
@@ -108,8 +108,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
-        item_type: item.item_type || item.nazev || item.item_name || "",
-        nazev_prvku: item.nazev_prvku || item.popis || item.popis_full || "",
+        nazev: item.nazev || item.nazev || item.item_name || "",
+        popis: item.popis || item.popis || item.popis_full || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -176,8 +176,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
       const extracted = (data.items || []).map((item: any) => ({
         item_name: item.item_name || "",
-        item_type: item.item_type || item.nazev || item.item_name || "",
-        nazev_prvku: item.nazev_prvku || item.popis || item.popis_full || "",
+        nazev: item.nazev || item.nazev || item.item_name || "",
+        popis: item.popis || item.popis || item.popis_full || "",
         cena: Number(item.cena) || 0,
         pocet: Number(item.pocet) || 1,
       }));
@@ -208,7 +208,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { item_name: "", item_type: "", nazev_prvku: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { item_name: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
@@ -225,8 +225,8 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         valid.map((item) => ({
           project_id: projectId,
           item_name: item.item_name,
-          item_type: item.item_type,
-          nazev_prvku: item.nazev_prvku || null,
+          nazev: item.nazev,
+          popis: item.popis || null,
           cena: item.cena,
           pocet: item.pocet,
           status: "Ke zpracování",
@@ -452,15 +452,15 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                       </TableCell>
                       <TableCell>
                         <Input
-                          value={item.item_type}
-                          onChange={(e) => updateItem(i, "item_type", e.target.value)}
+                          value={item.nazev}
+                          onChange={(e) => updateItem(i, "nazev", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>
                       <TableCell>
                         <Input
-                          value={item.nazev_prvku}
-                          onChange={(e) => updateItem(i, "nazev_prvku", e.target.value)}
+                          value={item.popis}
+                          onChange={(e) => updateItem(i, "popis", e.target.value)}
                           className="h-7 text-xs"
                         />
                       </TableCell>

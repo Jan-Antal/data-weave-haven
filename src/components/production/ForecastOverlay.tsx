@@ -276,14 +276,14 @@ function ForecastCard({
       if (block.source === "project_estimate" || items.length === 0) {
         const { data } = await supabase.
         from("tpv_items").
-        select("id, item_name, item_type, cena").
+        select("id, item_name, nazev, cena").
         eq("project_id", block.project_id).
         is("deleted_at", null);
         if (data && data.length > 0 && items.length === 0) {
           for (const row of data) {
             items.push({
               id: row.id,
-              item_name: row.item_type || row.item_name,
+              item_name: row.nazev || row.item_name,
               item_code: row.item_name,
               hours: row.cena ? Math.round(row.cena / (hourlyRate || 550)) : 0,
               source: "tpv"

@@ -44,8 +44,8 @@ import { TPVExtractor } from "./assistant/TPVExtractor";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_name", label: "Kód prvku" },
-  { key: "item_type", label: "Název prvku" },
-  { key: "nazev_prvku", label: "Popis prvku" },
+  { key: "nazev", label: "Název prvku" },
+  { key: "popis", label: "Popis prvku" },
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
   { key: "vyroba_status", label: "Výroba" },
@@ -67,9 +67,9 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
       return { width: 100, minWidth: 100, maxWidth: 100 };
     case "item_name":
       return { minWidth: 100, maxWidth: 140 };
-    case "item_type":
+    case "nazev":
       return { minWidth: 180 };
-    case "nazev_prvku":
+    case "popis":
       return { minWidth: 200 };
     case "notes":
       return { minWidth: 200 };
@@ -242,7 +242,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     const rows = itemsToPrint.map((item, idx) => ({
       rowNum: idx + 1,
       kodPrvku: item.item_name || "",
-      nazevPrvku: item.item_type || item.item_name || "",
+      nazevPrvku: item.nazev || item.item_name || "",
       konstrukter: item.konstrukter || "",
       pocet: item.pocet ?? "",
       notes: item.notes || "",
@@ -363,7 +363,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           // Insert into production_inbox
           const { error } = await supabase.from("production_inbox").insert({
             project_id: projectId,
-            item_name: item.item_type || item.item_name,
+            item_name: item.nazev || item.item_name,
             item_code: item.item_name,
             estimated_hours: estimatedHours,
             estimated_czk: itemCenaConverted,
@@ -621,7 +621,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         const rows = sortedItems.map((item) =>
           visKeys.map((k) => {
             if (k === "vyroba_status") {
-              const itemKey = (item as any).item_name || (item as any).item_type;
+              const itemKey = (item as any).item_name || (item as any).nazev;
               const statuses = productionStatusMap.get(itemKey);
               if (!statuses || statuses.length === 0) return "Neodesláno";
               return statuses.map((s: any) => s.label).join(", ");
@@ -820,34 +820,34 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                             />
                           </TableCell>
                         );
-                      if (key === "item_type")
+                      if (key === "nazev")
                         return (
                           <TableCell key={key} style={cellStyle}>
                             <InlineEditableCell
-                              value={item.item_type || ""}
-                              onSave={(v) => saveField(item.id, "item_type", v, item.item_type || "")}
+                              value={item.nazev || ""}
+                              onSave={(v) => saveField(item.id, "nazev", v, item.nazev || "")}
                               className="font-semibold"
                               readOnly={!canManageTPV}
                             />
                           </TableCell>
                         );
-                      if (key === "nazev_prvku")
+                      if (key === "popis")
                         return (
                           <TableCell key={key} style={cellStyle}>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <div className="max-w-[300px] truncate">
                                   <InlineEditableCell
-                                    value={(item as any).nazev_prvku || ""}
+                                    value={(item as any).popis || ""}
                                     onSave={(v) =>
-                                      saveField(item.id, "nazev_prvku", v, (item as any).nazev_prvku || "")
+                                      saveField(item.id, "popis", v, (item as any).popis || "")
                                     }
                                     readOnly={!canManageTPV}
                                   />
                                 </div>
                               </TooltipTrigger>
-                              {(item as any).nazev_prvku && (item as any).nazev_prvku.length > 40 && (
-                                <TooltipContent className="max-w-[400px]">{(item as any).nazev_prvku}</TooltipContent>
+                              {(item as any).popis && (item as any).popis.length > 40 && (
+                                <TooltipContent className="max-w-[400px]">{(item as any).popis}</TooltipContent>
                               )}
                             </Tooltip>
                           </TableCell>
@@ -894,7 +894,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                         );
                       }
                       if (key === "vyroba_status") {
-                        const itemKey = item.item_name || item.item_type;
+                        const itemKey = item.item_name || item.nazev;
                         const statuses = productionStatusMap.get(itemKey);
                         if (!statuses || statuses.length === 0) {
                           return (
@@ -1123,7 +1123,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             {notReadyItems.map((item) => (
               <div key={item.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded bg-destructive/5">
                 <span className="font-sans text-xs font-semibold">{item.item_name}</span>
-                <span className="text-muted-foreground truncate flex-1">{item.item_type || ""}</span>
+                <span className="text-muted-foreground truncate flex-1">{item.nazev || ""}</span>
                 <span className="text-xs text-destructive font-medium shrink-0">{item.status || "Bez statusu"}</span>
               </div>
             ))}
@@ -1208,7 +1208,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                   {pruvodkaWarning?.items.map((item) => (
                     <TableRow key={item.id} className="bg-amber-50/50">
                       <TableCell className="font-semibold text-xs">{item.item_name}</TableCell>
-                      <TableCell className="text-xs">{item.item_type || ""}</TableCell>
+                      <TableCell className="text-xs">{item.nazev || ""}</TableCell>
                       <TableCell className="text-xs text-amber-600 font-medium">{item.status || "Bez statusu"}</TableCell>
                     </TableRow>
                   ))}
