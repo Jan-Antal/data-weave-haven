@@ -155,7 +155,7 @@ schedule_completed: ${schedByStatus.completed || 0}
 schedule_in_progress: ${schedByStatus.in_progress || 0}
 schedule_scheduled: ${schedByStatus.scheduled || 0}
 schedule_paused: ${schedByStatus.paused || 0}
-today: ${today}`;
+today: ${todayStr}`;
 }
 
 serve(async (req) => {
