@@ -77,6 +77,25 @@ async function streamChat({
   onDone();
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute -bottom-5 right-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+      title="Kopírovat"
+    >
+      {copied ? <><Check className="h-3 w-3" /> Zkopírováno</> : <><Copy className="h-3 w-3" /> Kopírovat</>}
+    </button>
+  );
+}
+
 export function AmiAssistant() {
   const { user, profile } = useAuth();
   const [open, setOpen] = useState(false);
