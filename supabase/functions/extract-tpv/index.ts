@@ -6,21 +6,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Claude prompt — only used for PDF files
-const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers (cenová nabídka).
-Return ONLY a valid JSON array, no markdown, no explanation.
+// ─── Unified CN extraction prompt ─────────────────────────────────────────────
 
-Field definitions:
-- item_name = short code exactly as in the document (T01, K01, D-01, etc.)
-- nazev = SHORT item name (max 40 chars, no dimensions/materials)
-- popis = complete TECHNICAL description with materials, hardware, finishes, dimensions
-- cena = unit price in CZK (number only)
-- pocet = quantity, default 1
+const CN_SYSTEM_PROMPT = `Jsi expert na extrakci dat z českých cenových nabídek (CN) na nábytek.
 
-SKIP: totals, subtotals, section headers, transport, montáž.
-Return ONLY valid JSON array.`;
+Vstup je tabulka (buď text z Excelu, nebo PDF). Extrahuj VŠECHNY řádkové položky nábytku.
 
-// ─── SHARED STRINGS ───────────────────────────────────────────────────────────
+Pro každou položku vrať:
+- item_name: kód prvku přesně jak je v dokumentu (např. T01, K01, D-01, SK01, S1 atd.)
+- nazev: krátký název prvku (max 40 znaků, BEZ rozměrů a materiálů)
+- popis: KOMPLETNÍ technický popis — materiály, kování, povrchové úpravy, rozměry, barvy, typ dřeva, ABS hrany, úchytky, mechanismy. Spoj VŠECHNY řádky popisu které k položce patří do jednoho textu.
+- cena: jednotková cena v CZK (pouze číslo)
+- pocet: počet kusů (výchozí 1)
+
+PRAVIDLA:
+- Pokud má položka kód ale NEMÁ cenu, je to pravděpodobně pokračování popisu předchozí položky — přidej text do popis předchozí.
+- PŘESKOČ: součty, mezisoučty, DPH, dopravu, montáž, manipulaci, odvoz, záhlaví místností (Ložnice, Koupelna atd.), záhlaví sekcí bez ceny.
+- Pole popis je NEJDŮLEŽITĚJŠÍ — musí obsahovat všechny technické specifikace. Nikdy ho nevynechej ani nezkracuj.
+- Vrať POUZE platný JSON pole, bez markdownu, bez vysvětlení.`;
+
+// ─── XLSX helpers ─────────────────────────────────────────────────────────────
 
 function parseSharedStrings(xml: string): string[] {
   const strings: string[] = [];
@@ -33,8 +38,6 @@ function parseSharedStrings(xml: string): string[] {
   }
   return strings;
 }
-
-// ─── WORKSHEET CELLS ──────────────────────────────────────────────────────────
 
 function parseWorksheetCells(xml: string, ss: string[]): (string | null)[][] {
   function colToIdx(col: string): number {
@@ -58,6 +61,11 @@ function parseWorksheetCells(xml: string, ss: string[]): (string | null)[][] {
       if (val && t === 's') {
         const i = parseInt(val);
         val = (i >= 0 && i < ss.length) ? ss[i] : val;
+      } else if (val && t === '' && /^\d+$/.test(val)) {
+        const i = parseInt(val);
+        if (i >= 0 && i < ss.length && ss[i] && /[a-zA-ZáčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(ss[i])) {
+          val = ss[i];
+        }
       }
       while (cells.length <= colIdx) cells.push(null);
       cells[colIdx] = val?.trim() || null;
@@ -68,72 +76,96 @@ function parseWorksheetCells(xml: string, ss: string[]): (string | null)[][] {
   return rows;
 }
 
-// ─── CN PARSER ────────────────────────────────────────────────────────────────
-
-const ITEM_CODE_RE = /^[A-Z]\d{2}$/;
-
-const STOP_TEXTS = [
-  'celkem součet', 'celkem bez dph', 'cena celkem včetně dph', 'dph',
-  'doprava - nákladní', 'doprava', 'montáž a přesun', 'montáž',
-  'manipulace', 'odvoz a likvidace', 'odvoz',
-  'jiné náklady', 'cenová nabídka platí',
-  'platební podmínky', 'technologická doba', 'součástí cenové nabídky nejsou'
-];
-
-const ROOM_LABELS = new Set([
-  'Dětský pokoj 1', 'Dětský pokoj 2', 'Dětský pokoj 3',
-  'Ložnice', 'Chodba', 'Koupelna', 'Kuchyň', 'Obývací pokoj',
-  'Pracovna', 'Předsíň', 'Jídelna', 'Šatna', 'Technická místnost',
-]);
-
-function parseCN(rows: (string | null)[][]): any[] {
-  const items: any[] = [];
-  let cur: any = null;
-  let collecting = true;
-
-  for (const cells of rows) {
-    const kod = cells[0]?.trim() ?? '';
-    const nazev_popis = cells[1]?.trim() ?? '';
-    const rozmer = cells[2]?.trim() ?? '';
-    const pocet = cells[3] ? parseFloat(cells[3].replace(/\s/g, '').replace(',', '.')) || null : null;
-    const jcena = cells[4] ? parseFloat(cells[4].replace(/\s/g, '').replace(',', '.')) || null : null;
-    const ccena = cells[5] ? parseFloat(cells[5].replace(/\s/g, '').replace(',', '.')) || null : null;
-
-    if (ITEM_CODE_RE.test(kod)) {
-      // Code exists but no price AND no count = continuation description (e.g. K02 = material note for K01)
-      if (cur && !jcena && pocet === null) {
-        if (nazev_popis) cur._popis.push(nazev_popis);
-        continue;
-      }
-      if (cur) items.push(finalize(cur));
-      cur = { kod_prvku: kod, nazev: nazev_popis, rozmer, pocet, jcena, ccena, _popis: [] };
-      collecting = true;
-    } else if (cur && collecting && !kod && nazev_popis) {
-      const t = nazev_popis.toLowerCase();
-      if (STOP_TEXTS.some(s => t.includes(s))) {
-        collecting = false;
-      } else if (!ROOM_LABELS.has(nazev_popis)) {
-        cur._popis.push(nazev_popis);
-      }
-    }
+function cellsToTSV(rows: (string | null)[][]): string {
+  const lines: string[] = [];
+  for (const row of rows) {
+    if (!row || row.every(c => !c)) continue;
+    const cols = row.map(c => c ?? '');
+    lines.push(cols.join('\t'));
   }
-  if (cur) items.push(finalize(cur));
-  return items;
+  return lines.join('\n');
 }
 
-function finalize(cur: any) {
-  const popis = cur._popis.join(' ');
-  return {
-    item_name: cur.kod_prvku,
-    nazev: cur.nazev,
-    popis: [cur.rozmer, popis].filter(Boolean).join(' '),
-    cena: cur.jcena ?? 0,
-    pocet: cur.pocet ?? 1,
-    jednotka: 'ks',
+// ─── AI extraction via Lovable AI Gateway ─────────────────────────────────────
+
+async function extractViaAI(text: string): Promise<any[]> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+  const toolDef = {
+    type: "function",
+    function: {
+      name: "extract_cn_items",
+      description: "Extract all furniture line items from a Czech price offer (cenová nabídka).",
+      parameters: {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                item_name: { type: "string", description: "Item code (e.g. T01, K01, D-01)" },
+                nazev: { type: "string", description: "Short item name, max 40 chars" },
+                popis: { type: "string", description: "Complete technical description with materials, hardware, finishes, dimensions" },
+                cena: { type: "number", description: "Unit price in CZK" },
+                pocet: { type: "number", description: "Quantity, default 1" },
+              },
+              required: ["item_name", "nazev", "popis", "cena", "pocet"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["items"],
+        additionalProperties: false,
+      },
+    },
   };
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: CN_SYSTEM_PROMPT },
+        { role: "user", content: `Zde je obsah cenové nabídky:\n\n${text}` },
+      ],
+      tools: [toolDef],
+      tool_choice: { type: "function", function: { name: "extract_cn_items" } },
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.error("Lovable AI error:", response.status, err);
+    if (response.status === 429) throw new Error("AI rate limit exceeded, try again later");
+    if (response.status === 402) throw new Error("AI credits exhausted");
+    throw new Error(`AI extraction error [${response.status}]`);
+  }
+
+  const data = await response.json();
+  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+  if (toolCall?.function?.arguments) {
+    const parsed = JSON.parse(toolCall.function.arguments);
+    return parsed.items || [];
+  }
+
+  // Fallback: try parsing content as JSON
+  const content = data.choices?.[0]?.message?.content ?? "";
+  try {
+    const items = JSON.parse(content);
+    return Array.isArray(items) ? items : items.items || [];
+  } catch {
+    const match = content.match(/\[[\s\S]*\]/);
+    return match ? JSON.parse(match[0]) : [];
+  }
 }
 
-// ─── MAIN XLSX EXTRACTION (deterministic, no Claude) ──────────────────────────
+// ─── XLSX extraction (AI-powered) ─────────────────────────────────────────────
 
 async function extractFromXLSX(buffer: ArrayBuffer): Promise<any[]> {
   const zipReader = new ZipReader(new BlobReader(new Blob([buffer])));
@@ -146,10 +178,14 @@ async function extractFromXLSX(buffer: ArrayBuffer): Promise<any[]> {
   await zipReader.close();
   const ss = parseSharedStrings(ssXml);
   const rows = parseWorksheetCells(wsXml, ss);
-  return parseCN(rows);
+  const tsv = cellsToTSV(rows);
+
+  console.log(`XLSX parsed: ${rows.length} rows, TSV length: ${tsv.length} chars`);
+
+  return await extractViaAI(tsv);
 }
 
-// ─── PDF EXTRACTION (Claude API) ──────────────────────────────────────────────
+// ─── PDF extraction (Claude — best for visual documents) ──────────────────────
 
 async function extractFromPDF(fileBase64: string): Promise<any[]> {
   const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
@@ -166,12 +202,12 @@ async function extractFromPDF(fileBase64: string): Promise<any[]> {
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 8192,
-      system: SYSTEM_PROMPT,
+      system: CN_SYSTEM_PROMPT,
       messages: [{
         role: "user",
         content: [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } },
-          { type: "text", text: "Extract all priced line items. For each item combine the main row (Kód, Název, Rozměr, Cena) with ALL following specification rows into popis. Skip group headers without prices." },
+          { type: "text", text: "Extrahuj všechny oceněné položky nábytku. Pro každou položku spoj hlavní řádek (Kód, Název, Rozměr, Cena) se VŠEMI následujícími řádky specifikací do pole popis. Přeskoč záhlaví sekcí bez cen." },
         ],
       }],
     }),
@@ -216,7 +252,7 @@ serve(async (req) => {
       console.log("Extracting from PDF via Claude API");
       items = await extractFromPDF(fileBase64);
     } else {
-      console.log("Extracting from XLSX deterministically");
+      console.log("Extracting from XLSX via Lovable AI (Gemini)");
       const bytes = Uint8Array.from(atob(fileBase64), (char) => char.charCodeAt(0));
       items = await extractFromXLSX(bytes.buffer);
     }
