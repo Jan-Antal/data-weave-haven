@@ -31,6 +31,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
 import { StagesCostSection } from "./StagesCostSection";
 import { useProjectStages } from "@/hooks/useProjectStages";
+import { useTPVItems } from "@/hooks/useTPVItems";
+import { computeTPVProgress } from "@/lib/tpvProgress";
 import { getProjectDisplayOverrides } from "@/lib/projectStageDisplay";
 import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
 import { useFileSelection } from "@/hooks/useFileSelection";
