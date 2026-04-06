@@ -1,86 +1,72 @@
 
-# Projekty a etapy — single-row / summary logika + Stage detail v Project Detail
 
-## Kontext
+# Etapy: "+" tlačítko, data migrace, multi-status/sum zobrazení
 
-Aktuálně projekt v tabulce **vždy** zobrazuje expand šipku a etapy pod sebou, bez ohledu na počet etap. Při 1 etapě je to zbytečný level — data se duplikují. Uživatel chce:
+## Přehled
 
-1. **1 etapa = 1 řádek** — projekt se chová jako single row, data etapy se zobrazují přímo na úrovni projektu
-2. **2+ etap = projekt je summary** — projekt řádek ukazuje agregované info (počet statusů, součet cen), etapy jsou sub-rows
-3. **Project Detail** — přidat sekci "Etapy" s cenou a rozpadem ceny per etapa (viditelné jen při 2+ etapách)
+3 věci k implementaci:
+1. **ExpandArrow → "+" tlačítko** pro přidání etapy (single-stage i multi-stage)
+2. **Migrace dat**: u projektů které mají etapy → zkopírovat project-level data do nové "nulté" etapy
+3. **Summary zobrazení**: multi-stage projekty zobrazují agregovaná data v řádku
 
-## Rozsah změn
+---
 
-### 1. Tabulky (ProjectInfoTable, PMStatusTable, TPVStatusTable)
+## 1. ExpandArrow — vždy zobrazit "+" místo prázdného slotu
 
-**Single-stage projekty (stageCount ≤ 1):**
-- Skrýt expand šipku (nebo ji zobrazit jen jako "+" pro přidání)
-- Projekt řádek zobrazuje data z jediné etapy přímo (status etapy, datum_smluvni etapy, PM etapy atd.)
-- Editace na řádku projektu zapisuje přímo do etapy (ne do projektu)
+Všechny 3 tabulky (`ProjectInfoTable`, `PMStatusTable`, `TPVStatusTable`):
 
-**Multi-stage projekty (stageCount ≥ 2):**
-- Projekt řádek = summary:
-  - Status: zobrazit počet různých statusů jako badge (např. "3 statusy") nebo nejnižší status
-  - Cena: součet `prodejni_cena` ze všech etap
-  - PM: pokud různí → zobrazit "Více PM" nebo počet
-  - Datum smluvní: nejpozdější datum
-- Sub-rows = jednotlivé etapy (stávající logika)
+- **Single-stage (≤1)**: zobrazit `+` ikonu → klik vytvoří novou etapu (pomocí `handleInlineAdd` logiky) a rozbalí řádek
+- **Multi-stage (≥2)**: zobrazit chevron jako dosud, ale přidat malé `+` tlačítko vedle (nebo v rozbalené `StagesSection`)
 
-**Implementace:**
-- Nový helper `useProjectDisplayData(project, stages)` — vrací "merged" data pro zobrazení v řádku
-- V `ProjectRow` rozlišit `isSingleStage` → přímo renderovat stage data
-- V `ExpandArrow` skrýt šipku pokud `stageCount <= 1`
+Technicky: `ExpandArrow` dostane nový prop `onAddStage`, místo `<span className="w-5 h-5" />` renderuje `<Plus>` ikonu.
 
-### 2. Project Detail Dialog — sekce Etapy
+## 2. Data migrace — zkopírovat project data do nulté etapy
 
-**Viditelná jen při 2+ etapách** — pod sekci Finance přidat:
+SQL migrace která:
+1. Najde projekty s existujícími etapami (`project_stages`)
+2. Pro každý takový projekt vytvoří novou etapu s `stage_order = -1` (nebo přečísluje)
+3. Do nové etapy zkopíruje: `status`, `datum_smluvni`, `pm`, `konstrukter`, `kalkulant`, `prodejni_cena`, `currency`, `marze`, `cost_*` pole
+4. Stage name = `{project_id}-0` nebo `{project_id}-BASE`
 
-```text
-📐 ETAPY (3)
-┌─────────────────────────────────────────┐
-│ Z-2512-001-A  │ 850 000 CZK │ Marže 25% │
-│ [Rozpad ceny ▼]                         │
-├─────────────────────────────────────────│
-│ Z-2512-001-B  │ 420 000 CZK │ Marže 25% │
-│ [Rozpad ceny ▼]                         │
-├─────────────────────────────────────────│
-│ Z-2512-001-C  │ 267 829 CZK │ Marže 25% │
-│ [Rozpad ceny ▼]                         │
-└─────────────────────────────────────────┘
-Součet: 1 537 829 CZK
+```sql
+INSERT INTO project_stages (id, project_id, stage_name, stage_order, status, datum_smluvni, pm, konstrukter, prodejni_cena, currency, marze, ...)
+SELECT gen_random_uuid(), p.project_id, p.project_id || '-A', 0, p.status, p.datum_smluvni, p.pm, ...
+FROM projects p
+WHERE EXISTS (SELECT 1 FROM project_stages ps WHERE ps.project_id = p.project_id AND ps.deleted_at IS NULL)
+AND NOT EXISTS (... already has stage_order 0 ...)
 ```
 
-- Každá etapa: jméno, cena, měna, marže, collapsible `RozpadCeny`
-- Etapa dědí cost breakdown preset z projektu pokud nemá vlastní
-- Editace ceny/marže etapy se uloží do `project_stages` tabulky
-- Součet cen etap se zobrazí pod seznamem
+Existující etapy dostanou `stage_order += 1`.
 
-### 3. DB — rozšíření `project_stages` tabulky
+## 3. Summary zobrazení v řádku projektu
 
-Etapy už mají `prodejni_cena`, `currency`, `marze`. Chybí cost breakdown pole:
+V renderovací smyčce (`visible.map(...)`) v každé tabulce:
+- Načíst stages z `stagesByProject`
+- Zavolat `getProjectDisplayOverrides(stages)` z `projectStageDisplay.ts`
+- Vytvořit "merged" project objekt kde multi-stage projekt zobrazuje:
+  - **Status**: summary badge (všechny stejné → ten status; různé → "Status (+N)")
+  - **Cena**: součet `prodejni_cena` ze stages
+  - **Datum smluvní**: nejpozdější datum
+  - **PM**: summary ("3 PM" nebo jméno pokud jeden)
+- Single-stage: zobrazit data z jediné etapy
 
-**Nová migrace** — přidat do `project_stages`:
-- `cost_preset_id` (uuid, nullable)
-- `cost_material_pct` (numeric, nullable)  
-- `cost_production_pct` (numeric, nullable)
-- `cost_subcontractors_pct` (numeric, nullable)
-- `cost_overhead_pct` (numeric, nullable)
-- `cost_doprava_pct` (numeric, nullable)
-- `cost_montaz_pct` (numeric, nullable)
-- `cost_is_custom` (boolean, default false)
+Pro `CrossTabColumns.tsx`: rozpoznat summary status string (obsahuje "(+") a renderovat jako badge.
 
-### 4. Status summary logika
+## 4. StagesCostSection — přidat "Přidat etapu" tlačítko
 
-Pro multi-stage projekt:
-- Pokud všechny etapy mají stejný status → zobrazit ten status
-- Pokud různé → zobrazit badge s počtem unikátních statusů nebo nejnižší (nejméně pokročilý) status + "(+2)"
+V `StagesCostSection.tsx` přidat tlačítko pod seznam etap pro přidání nové etapy přímo z Project Detail.
+
+---
 
 ## Soubory
 
-1. **Migrace** — přidat cost breakdown sloupce do `project_stages`
-2. **`src/components/ProjectInfoTable.tsx`** — single-stage/multi-stage logika v `ProjectRow`, skrytí expand arrow
-3. **`src/components/PMStatusTable.tsx`** — stejná logika
-4. **`src/components/TPVStatusTable.tsx`** — stejná logika  
-5. **`src/components/ProjectDetailDialog.tsx`** — nová sekce "Etapy" s `RozpadCeny` per stage
-6. **`src/hooks/useProjectStages.ts`** — přidat mutaci pro update cost breakdown polí etapy
-7. **Nový helper** `src/lib/projectStageDisplay.ts` — helper pro merge/summary logiku (aby nebyl duplikovaný kód ve 3 tabulkách)
+| Soubor | Změna |
+|--------|-------|
+| **Migrace SQL** | Zkopírovat project data do nulté etapy pro projekty s existujícími etapami |
+| `src/components/ProjectInfoTable.tsx` | ExpandArrow: "+" pro single-stage; merged project data v renderovací smyčce |
+| `src/components/PMStatusTable.tsx` | Stejné změny jako ProjectInfoTable |
+| `src/components/TPVStatusTable.tsx` | Stejné změny jako ProjectInfoTable |
+| `src/components/CrossTabColumns.tsx` | Status summary badge rendering |
+| `src/components/StagesCostSection.tsx` | Tlačítko přidat etapu |
+| `src/lib/projectStageDisplay.ts` | Případné doplnění helper funkcí |
+
