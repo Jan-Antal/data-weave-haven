@@ -1336,17 +1336,17 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           </MobileTapField>
         </div>
         <div>
-          <Label className="text-xs">% Rozpracovanost</Label>
-          <MobileTapField displayValue={form.percent_tpv ? `${form.percent_tpv} %` : ""} disabled={isSectionReadOnly("tpv")}>
+          <Label className="text-xs">% Rozpracovanost {hasAutoPercent && <span className="text-muted-foreground font-normal ml-1">(auto z položek)</span>}</Label>
+          <MobileTapField displayValue={hasAutoPercent ? `${computedPercentTpv} %` : (form.percent_tpv ? `${form.percent_tpv} %` : "")} disabled={isSectionReadOnly("tpv") || hasAutoPercent}>
             {({ autoFocus }) => (
               <div className="relative">
                 <Input
-                  type={isSectionReadOnly("tpv") ? "text" : "number"}
-                  className={cn("no-spinners pr-8", isSectionReadOnly("tpv") && roClass)}
-                  value={isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv}
+                  type={isSectionReadOnly("tpv") || hasAutoPercent ? "text" : "number"}
+                  className={cn("no-spinners pr-8", (isSectionReadOnly("tpv") || hasAutoPercent) && roClass)}
+                  value={hasAutoPercent ? `${computedPercentTpv}` : (isSectionReadOnly("tpv") ? (form.percent_tpv ? `${form.percent_tpv}` : "—") : form.percent_tpv)}
                   onChange={(e) => setForm(s => ({ ...s, percent_tpv: e.target.value }))}
                   placeholder="0"
-                  disabled={isSectionReadOnly("tpv")}
+                  disabled={isSectionReadOnly("tpv") || hasAutoPercent}
                   autoFocus={autoFocus}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
