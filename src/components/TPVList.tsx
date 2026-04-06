@@ -119,7 +119,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   // CN diff detection
   const { diff: cnDiff, isChecking: cnChecking, hasDifferences: cnHasDiff, checkCN, clearDiff: clearCNDiff } = useCNDiff(projectId, items);
-  const queryClient = useQueryClient();
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
