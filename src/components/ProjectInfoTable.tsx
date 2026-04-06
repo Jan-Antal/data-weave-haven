@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo, Fragment, useRef, MutableRefObject } from "react";
+import { computeTPVProgress } from "@/lib/tpvProgress";
+import type { TPVItem } from "@/hooks/useTPVItems";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { createNotification, getUserIdsByRole } from "@/lib/createNotification";
@@ -398,6 +400,7 @@ interface ProjectRowProps {
   isExpanded: boolean;
   stageCount: number;
   tpvCount: number;
+  tpvItems?: TPVItem[];
   onToggleExpand: (pid: string) => void;
   onAddStage?: (pid: string) => void;
   onOpenTPVList: (projectId: string, projectName: string) => void;
@@ -422,6 +425,7 @@ const ProjectRow = memo(function ProjectRow({
   isExpanded,
   stageCount,
   tpvCount,
+  tpvItems,
   onToggleExpand,
   onAddStage,
   onOpenTPVList,
