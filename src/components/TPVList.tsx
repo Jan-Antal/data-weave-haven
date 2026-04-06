@@ -19,7 +19,7 @@ import {
   useBulkInsertTPVItems,
 } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer, AlertTriangle, Loader2 } from "lucide-react";
 import { buildPruvodkaHtml } from "@/lib/exportPdf";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
@@ -119,8 +119,16 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const currentProject = useMemo(() => allProjects.find((p) => p.project_id === projectId), [allProjects, projectId]);
   const queryClient = useQueryClient();
 
-  // CN diff detection
+  // CN diff detection — auto-check on mount
   const { diff: cnDiff, isChecking: cnChecking, hasDifferences: cnHasDiff, checkCN, clearDiff: clearCNDiff } = useCNDiff(projectId, items);
+
+  const cnAutoCheckedRef = useRef(false);
+  useEffect(() => {
+    if (items.length > 0 && !cnAutoCheckedRef.current) {
+      cnAutoCheckedRef.current = true;
+      checkCN();
+    }
+  }, [items.length, checkCN]);
 
   const updateItem = useUpdateTPVItem();
   const addItem = useAddTPVItem();
