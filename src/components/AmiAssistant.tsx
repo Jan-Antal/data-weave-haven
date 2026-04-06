@@ -366,7 +366,7 @@ export function AmiAssistant() {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={feedbackMode ? "Napiš zprávu pro admina..." : "Napiš dotaz..."}
+                placeholder={summaryMode ? "Název projektu..." : feedbackMode ? "Napiš zprávu pro admina..." : "Napiš dotaz..."}
                 className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
                 disabled={loading}
               />
