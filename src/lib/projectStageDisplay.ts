@@ -111,8 +111,8 @@ export function getProjectDisplayOverrides(
     weightedMarze = Math.round((weightedSum / totalWeight) * 1000) / 1000;
   }
 
-  // Average percent_tpv across stages
-  const stagesWithPct = stageList.filter(s => s.percent_tpv != null && s.percent_tpv > 0);
+  // Average percent_tpv across stages (include 0% stages, only skip null)
+  const stagesWithPct = stageList.filter(s => s.percent_tpv != null);
   const percentTpvAvg = stagesWithPct.length > 0
     ? Math.round(stagesWithPct.reduce((sum, s) => sum + (s.percent_tpv ?? 0), 0) / stagesWithPct.length)
     : null;
