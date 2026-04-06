@@ -1,14 +1,15 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle, Eye } from "lucide-react";
+import { Upload, Trash2, Plus, Loader2, FileText, CheckCircle2, Search, AlertCircle, Eye, AlertTriangle } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { useSharePointDocs } from "@/hooks/useSharePointDocs";
+import type { TPVItem } from "@/hooks/useTPVItems";
 
 
 interface ExtractedItem {
@@ -17,6 +18,12 @@ interface ExtractedItem {
   popis: string;
   cena: number;
   pocet: number;
+  /** Set after diff against existing items */
+  _diffStatus?: "new" | "changed" | "unchanged";
+  /** DB id if matched to existing item */
+  _dbId?: string;
+  /** Original DB values for changed fields */
+  _dbValues?: Partial<Record<string, string | number>>;
 }
 
 interface SPMatch {
@@ -25,16 +32,17 @@ interface SPMatch {
   size: number;
 }
 
-type Phase = "searching" | "found" | "multiple" | "not-found" | "extracting" | "done" | "error" | "pick-or-upload";
+type Phase = "confirm" | "searching" | "found" | "multiple" | "not-found" | "extracting" | "done" | "error" | "pick-or-upload";
 
 interface TPVExtractorProps {
   projectId: string;
+  existingItems?: TPVItem[];
   onSuccess: () => void;
   onClose: () => void;
   open: boolean;
 }
 
-export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtractorProps) {
+export function TPVExtractor({ projectId, existingItems = [], onSuccess, onClose, open }: TPVExtractorProps) {
   const [phase, setPhase] = useState<Phase>("searching");
   const [matches, setMatches] = useState<SPMatch[]>([]);
   const [allSpFiles, setAllSpFiles] = useState<SPMatch[]>([]);
@@ -45,11 +53,9 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   const [errorMsg, setErrorMsg] = useState("");
   const autoExtractTriggered = useRef(false);
 
-  // Manual upload fallback
   const [manualFile, setManualFile] = useState<File | null>(null);
   const [manualLoading, setManualLoading] = useState(false);
 
-  // Source document tracking for preview
   const [sourceDoc, setSourceDoc] = useState<{ itemId?: string; fileName: string; blobUrl?: string } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -57,7 +63,60 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
   const sp = useSharePointDocs(projectId);
 
-  // Search SharePoint on open
+  const hasExisting = existingItems.filter(i => !i.deleted_at).length > 0;
+
+  // Build lookup of existing items by item_code
+  const existingByCode = useMemo(() => {
+    const map = new Map<string, TPVItem>();
+    for (const item of existingItems) {
+      if (item.item_code && !item.deleted_at) {
+        map.set(item.item_code, item);
+      }
+    }
+    return map;
+  }, [existingItems]);
+
+  // Apply diff statuses to extracted items
+  const applyDiff = useCallback((extracted: ExtractedItem[]): ExtractedItem[] => {
+    if (!hasExisting) return extracted; // No existing items — all new, no diff needed
+
+    return extracted.map((item) => {
+      const code = item.kod_prvku?.trim();
+      if (!code) return { ...item, _diffStatus: "new" as const };
+
+      const existing = existingByCode.get(code);
+      if (!existing) return { ...item, _diffStatus: "new" as const };
+
+      // Compare fields
+      const dbValues: Partial<Record<string, string | number>> = {};
+      let hasChanges = false;
+
+      if ((existing.cena ?? 0) !== item.cena) {
+        dbValues.cena = existing.cena ?? 0;
+        hasChanges = true;
+      }
+      if ((existing.pocet ?? 1) !== item.pocet) {
+        dbValues.pocet = existing.pocet ?? 1;
+        hasChanges = true;
+      }
+      if ((existing.nazev || "") !== item.nazev) {
+        dbValues.nazev = existing.nazev || "";
+        hasChanges = true;
+      }
+      if ((existing.popis || "") !== item.popis) {
+        dbValues.popis = existing.popis || "";
+        hasChanges = true;
+      }
+
+      return {
+        ...item,
+        _diffStatus: hasChanges ? "changed" as const : "unchanged" as const,
+        _dbId: existing.id,
+        _dbValues: hasChanges ? dbValues : undefined,
+      };
+    });
+  }, [existingByCode, hasExisting]);
+
   useEffect(() => {
     if (!open) {
       setPhase("searching");
@@ -76,7 +135,12 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       return;
     }
 
-    searchSharePoint();
+    // If existing items, ask confirmation first
+    if (hasExisting) {
+      setPhase("confirm");
+    } else {
+      searchSharePoint();
+    }
   }, [open, projectId]);
 
   const searchSharePoint = async () => {
@@ -120,7 +184,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const extracted = (data.items || []).map((item: any) => ({
+      const extracted: ExtractedItem[] = (data.items || []).map((item: any) => ({
         kod_prvku: item.kod_prvku || item.item_name || "",
         nazev: item.nazev || item.kod_prvku || item.item_name || "",
         popis: item.popis || item.popis_full || "",
@@ -128,22 +192,17 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(extracted);
+      setItems(applyDiff(extracted));
       setSourceDoc({ itemId: fileItemId, fileName });
       setPhase("done");
     } catch (err: any) {
       console.error("Extract error:", err);
       setPhase("error");
       setErrorMsg(err.message || "Nepodařilo se extrahovat položky");
-      toast({
-        title: "Chyba extrakce",
-        description: err.message || "Nepodařilo se extrahovat položky",
-        variant: "destructive",
-      });
+      toast({ title: "Chyba extrakce", description: err.message, variant: "destructive" });
     }
   };
 
-  // Manual file upload fallback
   const fileToBase64 = (f: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -172,24 +231,17 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         body: { fileBase64: base64Content, mimeType },
       });
 
-      // Upload to SharePoint in background
       supabase.functions.invoke("upload-to-sharepoint", {
-        body: {
-          projectId,
-          fileBase64: base64Content,
-          fileName: manualFile.name,
-          mimeType: manualFile.type || "application/octet-stream",
-        },
+        body: { projectId, fileBase64: base64Content, fileName: manualFile.name, mimeType: manualFile.type || "application/octet-stream" },
       }).then((res) => {
         if (!res.error && res.data?.success) setSpUploaded(true);
-        else console.warn("SP upload failed:", res.error || res.data?.error);
-      }).catch((err) => console.warn("SP upload error:", err));
+      }).catch(() => {});
 
       const { data, error } = await extractionPromise;
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const extracted = (data.items || []).map((item: any) => ({
+      const extracted: ExtractedItem[] = (data.items || []).map((item: any) => ({
         kod_prvku: item.kod_prvku || item.item_name || "",
         nazev: item.nazev || item.kod_prvku || item.item_name || "",
         popis: item.popis || item.popis_full || "",
@@ -197,7 +249,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
         pocet: Number(item.pocet) || 1,
       }));
 
-      setItems(extracted);
+      setItems(applyDiff(extracted));
       setFoundFileName(manualFile.name);
       setSourceDoc({ fileName: manualFile.name, blobUrl: URL.createObjectURL(manualFile) });
       setPhase("done");
@@ -205,15 +257,11 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       console.error("Manual extract error:", err);
       setPhase("error");
       setErrorMsg(err.message || "Nepodařilo se extrahovat položky");
-      toast({
-        title: "Chyba extrakce",
-        description: err.message || "Nepodařilo se extrahovat položky",
-        variant: "destructive",
-      });
+      toast({ title: "Chyba extrakce", description: err.message, variant: "destructive" });
     } finally {
       setManualLoading(false);
     }
-  }, [manualFile, projectId]);
+  }, [manualFile, projectId, applyDiff]);
 
   const updateItem = (index: number, field: keyof ExtractedItem, value: string | number) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
@@ -224,10 +272,19 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
   };
 
   const addRow = () => {
-    setItems((prev) => [...prev, { kod_prvku: "", nazev: "", popis: "", cena: 0, pocet: 1 }]);
+    setItems((prev) => [...prev, { kod_prvku: "", nazev: "", popis: "", cena: 0, pocet: 1, _diffStatus: "new" }]);
   };
 
   const totalSum = items.reduce((sum, item) => sum + item.cena * item.pocet, 0);
+
+  // Diff stats
+  const diffStats = useMemo(() => {
+    if (!hasExisting) return null;
+    const newCount = items.filter(i => i._diffStatus === "new").length;
+    const changedCount = items.filter(i => i._diffStatus === "changed").length;
+    const unchangedCount = items.filter(i => i._diffStatus === "unchanged").length;
+    return { newCount, changedCount, unchangedCount };
+  }, [items, hasExisting]);
 
   const openSourcePreview = useCallback(async () => {
     if (!sourceDoc) return;
@@ -265,30 +322,56 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from("tpv_items").insert(
-        valid.map((item) => ({
-          project_id: projectId,
-          item_code: item.kod_prvku,
-          nazev: item.nazev,
-          popis: item.popis || null,
-          cena: item.cena,
-          pocet: item.pocet,
-          status: "Ke zpracování",
-        })),
-      );
-      if (error) throw error;
+      // Split by diff status
+      const toInsert = valid.filter(i => !i._diffStatus || i._diffStatus === "new");
+      const toUpdate = valid.filter(i => i._diffStatus === "changed" && i._dbId);
+      // unchanged are skipped
+
+      // INSERT new items
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("tpv_items").insert(
+          toInsert.map((item) => ({
+            project_id: projectId,
+            item_code: item.kod_prvku,
+            nazev: item.nazev,
+            popis: item.popis || null,
+            cena: item.cena,
+            pocet: item.pocet,
+            status: "Ke zpracování",
+          })),
+        );
+        if (error) throw error;
+      }
+
+      // UPDATE changed items (only changed fields)
+      for (const item of toUpdate) {
+        const updates: Record<string, any> = {};
+        const existing = existingByCode.get(item.kod_prvku);
+        if (!existing) continue;
+
+        if ((existing.cena ?? 0) !== item.cena) updates.cena = item.cena;
+        if ((existing.pocet ?? 1) !== item.pocet) updates.pocet = item.pocet;
+        if ((existing.nazev || "") !== item.nazev) updates.nazev = item.nazev;
+        if ((existing.popis || "") !== item.popis) updates.popis = item.popis || null;
+
+        if (Object.keys(updates).length > 0) {
+          const { error } = await supabase.from("tpv_items").update(updates).eq("id", item._dbId!);
+          if (error) throw error;
+        }
+      }
+
+      const parts: string[] = [];
+      if (toInsert.length > 0) parts.push(`${toInsert.length} nových`);
+      if (toUpdate.length > 0) parts.push(`${toUpdate.length} aktualizováno`);
+
       toast({
         title: "Položky uloženy",
-        description: `${valid.length} položek přidáno do TPV`,
+        description: parts.join(", ") || `${valid.length} položek přidáno do TPV`,
       });
       onSuccess();
       onClose();
     } catch (err: any) {
-      toast({
-        title: "Chyba při ukládání",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Chyba při ukládání", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -296,11 +379,23 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
 
   const handleManualFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) {
-      setManualFile(f);
-      setItems([]);
-    }
+    if (f) { setManualFile(f); setItems([]); }
   };
+
+  /** Check if a specific cell has changed from DB value */
+  const isCellChanged = (item: ExtractedItem, field: string): boolean => {
+    return item._diffStatus === "changed" && !!item._dbValues && field in item._dbValues;
+  };
+
+  const activeItems = hasExisting ? items.filter(i => i._diffStatus !== "unchanged") : items;
+  const saveLabel = diffStats
+    ? (() => {
+        const parts: string[] = [];
+        if (diffStats.newCount > 0) parts.push(`${diffStats.newCount} nových`);
+        if (diffStats.changedCount > 0) parts.push(`${diffStats.changedCount} aktualizací`);
+        return parts.length > 0 ? `Uložit (${parts.join(", ")})` : "Bez změn";
+      })()
+    : `Uložit do TPV (${items.filter(i => i.kod_prvku.trim()).length})`;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -311,6 +406,28 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
             Extrakce cenové nabídky
           </DialogTitle>
         </DialogHeader>
+
+        {/* Phase: Confirm — existing items warning */}
+        {phase === "confirm" && (
+          <div className="space-y-4 py-4">
+            <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50/50">
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  Projekt již obsahuje {existingItems.filter(i => !i.deleted_at).length} TPV položek
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Data z cenové nabídky budou porovnána s existujícími položkami. 
+                  Stávající status, konstruktér a poznámky zůstanou zachovány — aktualizují se pouze změněné hodnoty (cena, počet, název, popis).
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}>Zrušit</Button>
+              <Button size="sm" onClick={searchSharePoint}>Pokračovat</Button>
+            </div>
+          </div>
+        )}
 
         {/* Phase: Searching */}
         {phase === "searching" && (
@@ -354,9 +471,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                 >
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   {m.name}
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {(m.size / 1024).toFixed(0)} KB
-                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">{(m.size / 1024).toFixed(0)} KB</span>
                 </button>
               ))}
             </div>
@@ -379,9 +494,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                 >
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   {m.name}
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {(m.size / 1024).toFixed(0)} KB
-                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">{(m.size / 1024).toFixed(0)} KB</span>
                 </button>
               ))}
             </div>
@@ -401,7 +514,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           </div>
         )}
 
-        {/* Phase: Not found — manual upload only */}
+        {/* Phase: Not found */}
         {phase === "not-found" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -421,7 +534,7 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
           </div>
         )}
 
-        {/* Phase: Error — allow retry or manual */}
+        {/* Phase: Error */}
         {phase === "error" && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm text-destructive">
@@ -429,26 +542,14 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
               {errorMsg || "Nepodařilo se extrahovat položky"}
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" onClick={searchSharePoint}>
-                Zkusit znovu
-              </Button>
+              <Button variant="outline" size="sm" onClick={searchSharePoint}>Zkusit znovu</Button>
               <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent cursor-pointer text-sm transition-colors">
                 <Upload className="h-4 w-4" />
                 {manualFile ? manualFile.name : "Nahrát ručně"}
-                <input
-                  type="file"
-                  accept=".pdf,.xlsx,.xls"
-                  onChange={handleManualFileChange}
-                  className="hidden"
-                />
+                <input type="file" accept=".pdf,.xlsx,.xls" onChange={handleManualFileChange} className="hidden" />
               </label>
               {manualFile && (
-                <Button
-                  size="sm"
-                  onClick={handleManualExtract}
-                  disabled={manualLoading}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                >
+                <Button size="sm" onClick={handleManualExtract} disabled={manualLoading} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   Extrahovat
                 </Button>
               )}
@@ -470,6 +571,15 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
               <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
               Extrahováno z: <strong>{foundFileName}</strong>
+              {diffStats && (
+                <span className="ml-2">
+                  — {diffStats.newCount > 0 && <span className="text-green-700">{diffStats.newCount} nových</span>}
+                  {diffStats.newCount > 0 && diffStats.changedCount > 0 && ", "}
+                  {diffStats.changedCount > 0 && <span className="text-amber-700">{diffStats.changedCount} změněných</span>}
+                  {(diffStats.newCount > 0 || diffStats.changedCount > 0) && diffStats.unchangedCount > 0 && ", "}
+                  {diffStats.unchangedCount > 0 && <span>{diffStats.unchangedCount} beze změny</span>}
+                </span>
+              )}
             </div>
             <div className="flex-1 overflow-auto border rounded-lg">
               <Table>
@@ -485,58 +595,76 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        <Input
-                          value={item.kod_prvku}
-                          onChange={(e) => updateItem(i, "kod_prvku", e.target.value)}
-                          className="h-7 text-xs"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={item.nazev}
-                          onChange={(e) => updateItem(i, "nazev", e.target.value)}
-                          className="h-7 text-xs"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={item.popis}
-                          onChange={(e) => updateItem(i, "popis", e.target.value)}
-                          className="h-7 text-xs"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.cena}
-                          onChange={(e) => updateItem(i, "cena", Number(e.target.value))}
-                          className="h-7 text-xs text-right"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.pocet}
-                          onChange={(e) => updateItem(i, "pocet", Number(e.target.value))}
-                          className="h-7 text-xs text-right w-16"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-medium">
-                        {formatCurrency(item.cena * item.pocet)}
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          onClick={() => removeItem(i)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {items.map((item, i) => {
+                    const isUnchanged = item._diffStatus === "unchanged";
+                    const isChanged = item._diffStatus === "changed";
+                    const isNew = item._diffStatus === "new";
+                    const rowClass = isUnchanged ? "opacity-40" : isNew && hasExisting ? "bg-green-50/40" : "";
+
+                    return (
+                      <TableRow key={i} className={rowClass}>
+                        <TableCell>
+                          <Input
+                            value={item.kod_prvku}
+                            onChange={(e) => updateItem(i, "kod_prvku", e.target.value)}
+                            className="h-7 text-xs"
+                            disabled={isUnchanged}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.nazev}
+                            onChange={(e) => updateItem(i, "nazev", e.target.value)}
+                            className={`h-7 text-xs ${isCellChanged(item, "nazev") ? "border-amber-400 bg-amber-50" : ""}`}
+                            disabled={isUnchanged}
+                            title={isCellChanged(item, "nazev") ? `Původní: ${item._dbValues?.nazev}` : undefined}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.popis}
+                            onChange={(e) => updateItem(i, "popis", e.target.value)}
+                            className={`h-7 text-xs ${isCellChanged(item, "popis") ? "border-amber-400 bg-amber-50" : ""}`}
+                            disabled={isUnchanged}
+                            title={isCellChanged(item, "popis") ? `Původní: ${item._dbValues?.popis}` : undefined}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.cena}
+                            onChange={(e) => updateItem(i, "cena", Number(e.target.value))}
+                            className={`h-7 text-xs text-right ${isCellChanged(item, "cena") ? "border-amber-400 bg-amber-50" : ""}`}
+                            disabled={isUnchanged}
+                            title={isCellChanged(item, "cena") ? `Původní: ${item._dbValues?.cena}` : undefined}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.pocet}
+                            onChange={(e) => updateItem(i, "pocet", Number(e.target.value))}
+                            className={`h-7 text-xs text-right w-16 ${isCellChanged(item, "pocet") ? "border-amber-400 bg-amber-50" : ""}`}
+                            disabled={isUnchanged}
+                            title={isCellChanged(item, "pocet") ? `Původní: ${item._dbValues?.pocet}` : undefined}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-medium">
+                          {formatCurrency(item.cena * item.pocet)}
+                        </TableCell>
+                        <TableCell>
+                          {!isUnchanged && (
+                            <button
+                              onClick={() => removeItem(i)}
+                              className="text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               <div className="flex items-center justify-between px-3 py-2 border-t bg-muted/30">
@@ -552,28 +680,21 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
             <DialogFooter className="flex items-center justify-between sm:justify-between">
               <div>
                 {sourceDoc && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={openSourcePreview}
-                    disabled={previewLoading}
-                  >
+                  <Button variant="ghost" size="sm" onClick={openSourcePreview} disabled={previewLoading}>
                     {previewLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
                     Zobrazit dokument
                   </Button>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={onClose}>
-                  Zrušit
-                </Button>
+                <Button variant="outline" onClick={onClose}>Zrušit</Button>
                 <Button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving || (diffStats !== null && diffStats.newCount === 0 && diffStats.changedCount === 0)}
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-                  Uložit do TPV ({items.filter((i) => i.kod_prvku.trim()).length})
+                  {saveLabel}
                 </Button>
               </div>
             </DialogFooter>
