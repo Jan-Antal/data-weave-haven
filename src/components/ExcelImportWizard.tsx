@@ -396,57 +396,106 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     setImporting(true);
 
     try {
-      const duplicates = toImport.filter(r => r.duplicateCode);
-      const newItems = toImport.filter(r => !r.duplicateCode);
+      if (importMode === "update") {
+        // Update mode: update existing, insert new
+        const toUpdate = toImport.filter(r => r.status === "update" && r.dbId);
+        const toInsert = toImport.filter(r => r.status === "valid"); // new items
 
-      if (newItems.length > 0) {
-        const items = newItems.map(r => ({
-          project_id: projectId,
-          item_code: r.values.item_code || "Bez kódu",
-          nazev: r.values.nazev || null,
-          popis: r.values.popis || null,
-          konstrukter: r.values.konstrukter || null,
-          notes: r.values.notes || null,
-          pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
-          cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
-          status: r.values.status || null,
-          sent_date: r.values.sent_date || null,
-          accepted_date: r.values.accepted_date || null,
-          imported_at: new Date().toISOString(),
-          import_source: file?.name || null,
-        }));
-        const { error } = await supabase.from("tpv_items").insert(items as any);
-        if (error) throw error;
-      }
-
-      if (duplicates.length > 0 && duplicateMode === "overwrite") {
-        for (const r of duplicates) {
-          await supabase.from("tpv_items")
-            .update({
-              nazev: r.values.nazev || null,
-              popis: r.values.popis || null,
-              konstrukter: r.values.konstrukter || null,
-              notes: r.values.notes || null,
-              pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
-              cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
-              status: r.values.status || null,
-              sent_date: r.values.sent_date || null,
-              accepted_date: r.values.accepted_date || null,
-            } as any)
-            .eq("project_id", projectId)
-            .eq("item_code", r.values.item_code)
-            .is("deleted_at", null);
+        for (const r of toUpdate) {
+          const updateData: Record<string, any> = {};
+          for (const fieldKey of r.changedFields || []) {
+            const numericFields = ["pocet", "cena"];
+            if (numericFields.includes(fieldKey)) {
+              updateData[fieldKey] = r.values[fieldKey as TargetKey] ? parseNumericValue(r.values[fieldKey as TargetKey]) : null;
+            } else {
+              updateData[fieldKey] = r.values[fieldKey as TargetKey] || null;
+            }
+          }
+          if (Object.keys(updateData).length > 0) {
+            await supabase.from("tpv_items").update(updateData as any).eq("id", r.dbId!);
+          }
         }
+
+        if (toInsert.length > 0) {
+          const items = toInsert.map(r => ({
+            project_id: projectId,
+            item_code: r.values.item_code || "Bez kódu",
+            nazev: r.values.nazev || null,
+            popis: r.values.popis || null,
+            konstrukter: r.values.konstrukter || null,
+            notes: r.values.notes || null,
+            pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
+            cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+            status: r.values.status || null,
+            sent_date: r.values.sent_date || null,
+            accepted_date: r.values.accepted_date || null,
+            imported_at: new Date().toISOString(),
+            import_source: file?.name || null,
+          }));
+          const { error } = await supabase.from("tpv_items").insert(items as any);
+          if (error) throw error;
+        }
+
+        setImportResult({
+          imported: toInsert.length,
+          warnings: toUpdate.length, // repurpose as "updated"
+          skipped: rows.length - toImport.length,
+        });
+      } else {
+        // New import mode (existing logic)
+        const duplicates = toImport.filter(r => r.duplicateCode);
+        const newItems = toImport.filter(r => !r.duplicateCode);
+
+        if (newItems.length > 0) {
+          const items = newItems.map(r => ({
+            project_id: projectId,
+            item_code: r.values.item_code || "Bez kódu",
+            nazev: r.values.nazev || null,
+            popis: r.values.popis || null,
+            konstrukter: r.values.konstrukter || null,
+            notes: r.values.notes || null,
+            pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
+            cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+            status: r.values.status || null,
+            sent_date: r.values.sent_date || null,
+            accepted_date: r.values.accepted_date || null,
+            imported_at: new Date().toISOString(),
+            import_source: file?.name || null,
+          }));
+          const { error } = await supabase.from("tpv_items").insert(items as any);
+          if (error) throw error;
+        }
+
+        if (duplicates.length > 0 && duplicateMode === "overwrite") {
+          for (const r of duplicates) {
+            await supabase.from("tpv_items")
+              .update({
+                nazev: r.values.nazev || null,
+                popis: r.values.popis || null,
+                konstrukter: r.values.konstrukter || null,
+                notes: r.values.notes || null,
+                pocet: r.values.pocet ? parseNumericValue(r.values.pocet) : null,
+                cena: r.values.cena ? parseNumericValue(r.values.cena) : null,
+                status: r.values.status || null,
+                sent_date: r.values.sent_date || null,
+                accepted_date: r.values.accepted_date || null,
+              } as any)
+              .eq("project_id", projectId)
+              .eq("item_code", r.values.item_code)
+              .is("deleted_at", null);
+          }
+        }
+
+        const importedCount = newItems.length + (duplicateMode === "overwrite" ? duplicates.length : 0);
+        const skippedDups = duplicateMode === "skip" ? duplicates.length : 0;
+
+        setImportResult({
+          imported: importedCount,
+          warnings: duplicates.length,
+          skipped: rows.length - toImport.length + skippedDups,
+        });
       }
 
-      const importedCount = newItems.length + (duplicateMode === "overwrite" ? duplicates.length : 0);
-      const skippedDups = duplicateMode === "skip" ? duplicates.length : 0;
-
-      setImportResult({
-        imported: importedCount,
-        warnings: duplicates.length,
-        skipped: rows.length - toImport.length + skippedDups,
-      });
       qc.invalidateQueries({ queryKey: ["tpv_items", projectId] });
       setStep(4);
     } catch (err) {
@@ -466,6 +515,7 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     setImportResult(null);
     setUploadTime(null);
     setExistingCodes(new Set());
+    setImportMode("new");
   };
 
   if (!open) return null;
