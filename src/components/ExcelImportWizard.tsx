@@ -258,8 +258,10 @@ export function ExcelImportWizard({ projectId, projectName, open, onClose }: Pro
     });
   };
 
-  const usedColIndices = useMemo(() => new Set(Object.values(mapping).filter(v => v !== null) as number[]), [mapping]);
-  const requiredMapped = TARGET_FIELDS.filter(f => f.required).every(f => mapping[f.key] !== null && mapping[f.key] !== undefined);
+  const requiredFieldsForMode = importMode === "update"
+    ? TARGET_FIELDS.filter(f => f.key === "item_code")
+    : TARGET_FIELDS.filter(f => f.required);
+  const requiredMapped = requiredFieldsForMode.every(f => mapping[f.key] !== null && mapping[f.key] !== undefined);
 
   const handleSheetChange = (idx: number) => {
     setActiveSheet(idx);
