@@ -1,4 +1,6 @@
 import React, { useState, Fragment, useMemo, useEffect, useCallback, memo, useRef, type MutableRefObject } from "react";
+import { computeTPVProgress } from "@/lib/tpvProgress";
+import type { TPVItem } from "@/hooks/useTPVItems";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { logActivity } from "@/lib/activityLog";
 import { useDataLogRowHighlight } from "@/hooks/useDataLogRowHighlight";
