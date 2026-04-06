@@ -309,14 +309,17 @@ export function AmiAssistant() {
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed ${
+                  className={`max-w-[85%] px-3 py-2 rounded-xl text-sm leading-relaxed whitespace-pre-line ${
                     msg.role === "user"
                       ? "text-white rounded-br-sm"
                       : "bg-muted text-foreground rounded-bl-sm"
-                  }`}
+                  } ${msg.role === "assistant" ? "group relative" : ""}`}
                   style={msg.role === "user" ? { background: "#223937" } : undefined}
                 >
                   {msg.content}
+                  {msg.role === "assistant" && msg.content.length > 50 && (
+                    <CopyButton text={msg.content} />
+                  )}
                 </div>
               </div>
             ))}
