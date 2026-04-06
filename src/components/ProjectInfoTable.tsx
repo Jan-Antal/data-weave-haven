@@ -467,11 +467,12 @@ const ProjectRow = memo(function ProjectRow({
         konstrukter: overrides.konstrukterSummary ?? p.konstrukter,
         prodejni_cena: overrides.totalPrice ?? p.prodejni_cena,
         marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze,
+        percent_tpv: overrides.percentTpvAvg ?? p.percent_tpv,
       } as Project;
     } else {
       base = p;
     }
-    // Override percent_tpv with computed value from TPV items
+    // Override percent_tpv with computed value from TPV items (highest priority)
     if (computedPct != null) {
       return { ...base, percent_tpv: computedPct } as Project;
     }
