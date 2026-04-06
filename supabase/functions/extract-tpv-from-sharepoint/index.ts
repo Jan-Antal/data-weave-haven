@@ -226,7 +226,7 @@ async function extractFromPDF(fileBuffer: ArrayBuffer, fileName: string): Promis
         role: "user",
         content: [
           { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } },
-          { type: "text", text: "Extract all priced line items. For each item combine the main row (Kód, Název, Rozměr, Cena) with ALL following specification rows into nazev_prvku. Skip group headers without prices." },
+          { type: "text", text: "Extract all priced line items. For each item combine the main row (Kód, Název, Rozměr, Cena) with ALL following specification rows into popis. Skip group headers without prices." },
         ],
       }],
     }),
