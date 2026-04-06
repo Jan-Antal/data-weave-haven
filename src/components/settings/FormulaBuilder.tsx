@@ -316,6 +316,7 @@ type ConfirmAction = "close" | "switch-tab" | "restore-default";
 export function FormulaBuilder({ open, onOpenChange }: FormulaBuilderProps) {
   const { toast } = useToast();
 
+  const [activeModules, setActiveModules] = useState<Set<string>>(new Set());
   const [activePreset, setActivePreset] = useState("scheduled_czk_hist");
   
   const [varValues, setVarValues] = useState<Record<string, number>>({ ...DEFAULT_VALUES });
