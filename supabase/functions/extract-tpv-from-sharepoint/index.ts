@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { ZipReader, BlobReader, TextWriter } from "https://deno.land/x/zipjs@v2.7.34/index.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +12,6 @@ const LIB_ROOT = "AMI-Project-Info-App-Data";
 const SITE_HOST = "amincz.sharepoint.com";
 const SITE_PATH = "/sites/AMI-Project-Info";
 
-// Claude prompt — only used for PDF files now
 const SYSTEM_PROMPT = `You extract line items from Czech furniture price offers (cenová nabídka).
 Return ONLY a valid JSON array, no markdown, no explanation.
 
@@ -27,176 +25,108 @@ Field definitions:
 SKIP: totals, subtotals, section headers, transport, montáž.
 Return ONLY valid JSON array.`;
 
-// ─── SHARED STRINGS ───────────────────────────────────────────────────────────
+const ANTHROPIC_HEADERS = {
+  "x-api-key": "",
+  "anthropic-version": "2023-06-01",
+  "anthropic-beta": "files-api-2025-04-14",
+};
 
-function parseSharedStrings(xml: string): string[] {
-  const strings: string[] = [];
-  for (const m of xml.matchAll(/<si>([\s\S]*?)<\/si>/g)) {
-    const parts: string[] = [];
-    for (const t of m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)) {
-      parts.push(t[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#13;/g, ''));
-    }
-    strings.push(parts.join(''));
-  }
-  return strings;
+function getAnthropicHeaders(): Record<string, string> {
+  const key = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
+  return { ...ANTHROPIC_HEADERS, "x-api-key": key };
 }
 
-// ─── WORKSHEET CELLS ──────────────────────────────────────────────────────────
+// ─── Anthropic Files API extraction (works for PDF + XLSX) ────────────────────
 
-function parseWorksheetCells(xml: string, ss: string[]): (string | null)[][] {
-  function colToIdx(col: string): number {
-    let idx = 0;
-    for (let i = 0; i < col.length; i++) idx = idx * 26 + (col.charCodeAt(i) - 64);
-    return idx - 1;
-  }
+async function extractViaFilesAPI(fileBuffer: ArrayBuffer, fileName: string): Promise<any[]> {
+  const headers = getAnthropicHeaders();
+  const isPdf = fileName.toLowerCase().endsWith(".pdf");
+  const mimeType = isPdf
+    ? "application/pdf"
+    : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-  const rows: (string | null)[][] = [];
-  for (const rm of xml.matchAll(/<row[^>]*?r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)) {
-    const rowIdx = parseInt(rm[1]) - 1;
-    const cells: (string | null)[] = [];
-    for (const cm of rm[2].matchAll(/<c\s([^>]*)>([\s\S]*?)<\/c>/g)) {
-      const attrs = cm[1], body = cm[2];
-      const ref = attrs.match(/r="([A-Z]+)\d+"/);
-      if (!ref) continue;
-      const colIdx = colToIdx(ref[1]);
-      const t = (attrs.match(/t="([^"]*)"/)||[])[1] || '';
-      const v = (body.match(/<v>([\s\S]*?)<\/v>/)||[])[1] || null;
-      let val = v;
-      if (val && t === 's') {
-        const i = parseInt(val);
-        val = (i >= 0 && i < ss.length) ? ss[i] : val;
-      }
-      while (cells.length <= colIdx) cells.push(null);
-      cells[colIdx] = val?.trim() || null;
-    }
-    while (rows.length <= rowIdx) rows.push([]);
-    rows[rowIdx] = cells;
-  }
-  return rows;
-}
+  // Step 1: Upload file
+  const formData = new FormData();
+  formData.append("file", new Blob([fileBuffer], { type: mimeType }), fileName);
 
-// ─── CN PARSER ────────────────────────────────────────────────────────────────
-
-const ITEM_CODE_RE = /^[A-Z]\d{2}$/;
-
-const STOP_TEXTS = [
-  'celkem součet', 'celkem bez dph', 'cena celkem včetně dph', 'dph',
-  'doprava - nákladní', 'doprava', 'montáž a přesun', 'montáž',
-  'manipulace', 'odvoz a likvidace', 'odvoz',
-  'jiné náklady', 'cenová nabídka platí',
-  'platební podmínky', 'technologická doba', 'součástí cenové nabídky nejsou'
-];
-
-const ROOM_LABELS = new Set([
-  'Dětský pokoj 1', 'Dětský pokoj 2', 'Dětský pokoj 3',
-  'Ložnice', 'Chodba', 'Koupelna', 'Kuchyň', 'Obývací pokoj',
-  'Pracovna', 'Předsíň', 'Jídelna', 'Šatna', 'Technická místnost',
-]);
-
-function parseCN(rows: (string | null)[][]): any[] {
-  const items: any[] = [];
-  let cur: any = null;
-  let collecting = true;
-
-  for (const cells of rows) {
-    const kod = cells[0]?.trim() ?? '';
-    const nazev_popis = cells[1]?.trim() ?? '';
-    const rozmer = cells[2]?.trim() ?? '';
-    const pocet = cells[3] ? parseFloat(cells[3].replace(/\s/g, '').replace(',', '.')) || null : null;
-    const jcena = cells[4] ? parseFloat(cells[4].replace(/\s/g, '').replace(',', '.')) || null : null;
-    const ccena = cells[5] ? parseFloat(cells[5].replace(/\s/g, '').replace(',', '.')) || null : null;
-
-    if (ITEM_CODE_RE.test(kod)) {
-      if (cur && !jcena && pocet === null) {
-        if (nazev_popis) cur._popis.push(nazev_popis);
-        continue;
-      }
-      if (cur) items.push(finalize(cur));
-      cur = { kod_prvku: kod, nazev: nazev_popis, rozmer, pocet, jcena, ccena, _popis: [] };
-      collecting = true;
-    } else if (cur && collecting && !kod && nazev_popis) {
-      const t = nazev_popis.toLowerCase();
-      if (STOP_TEXTS.some(s => t.includes(s))) {
-        collecting = false;
-      } else if (!ROOM_LABELS.has(nazev_popis)) {
-        cur._popis.push(nazev_popis);
-      }
-    }
-  }
-  if (cur) items.push(finalize(cur));
-  return items;
-}
-
-function finalize(cur: any) {
-  const popis = cur._popis.join(' ');
-  return {
-    item_name: cur.kod_prvku,
-    nazev: cur.nazev,
-    popis: [cur.rozmer, popis].filter(Boolean).join(' '),
-    cena: cur.jcena ?? 0,
-    pocet: cur.pocet ?? 1,
-    jednotka: 'ks',
-  };
-}
-
-// ─── MAIN XLSX EXTRACTION (deterministic, no Claude) ──────────────────────────
-
-async function extractFromXLSX(buffer: ArrayBuffer): Promise<any[]> {
-  const zipReader = new ZipReader(new BlobReader(new Blob([buffer])));
-  const entries = await zipReader.getEntries();
-  let ssXml = '', wsXml = '';
-  for (const e of entries) {
-    if (e.filename === 'xl/sharedStrings.xml') ssXml = await e.getData!(new TextWriter());
-    if (e.filename === 'xl/worksheets/sheet1.xml') wsXml = await e.getData!(new TextWriter());
-  }
-  await zipReader.close();
-  const ss = parseSharedStrings(ssXml);
-  const rows = parseWorksheetCells(wsXml, ss);
-  return parseCN(rows);
-}
-
-// ─── PDF EXTRACTION (Claude API) ──────────────────────────────────────────────
-
-async function extractFromPDF(fileBase64: string): Promise<any[]> {
-  const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const uploadRes = await fetch("https://api.anthropic.com/v1/files", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-beta": "pdfs-2024-09-25",
+      "x-api-key": headers["x-api-key"],
+      "anthropic-version": headers["anthropic-version"],
+      "anthropic-beta": headers["anthropic-beta"],
     },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 8192,
-      system: SYSTEM_PROMPT,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } },
-          { type: "text", text: "Extract all priced line items. For each item combine the main row (Kód, Název, Rozměr, Cena) with ALL following specification rows into popis. Skip group headers without prices." },
-        ],
-      }],
-    }),
+    body: formData,
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    console.error("Claude API error:", response.status, err);
-    throw new Error(`Claude API error [${response.status}]: ${err}`);
+  if (!uploadRes.ok) {
+    const err = await uploadRes.text();
+    console.error("Anthropic Files upload error:", uploadRes.status, err);
+    throw new Error(`Anthropic Files upload error [${uploadRes.status}]: ${err}`);
   }
 
-  const data = await response.json();
-  const text = data.content?.[0]?.text ?? "";
+  const { id: fileId } = await uploadRes.json();
+  console.log(`Uploaded ${fileName} to Anthropic Files API, id=${fileId}`);
 
   try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\[[\s\S]*\]/);
-    return match ? JSON.parse(match[0]) : [];
+    // Step 2: Send to Claude messages API
+    const msgRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        ...headers,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 8192,
+        system: SYSTEM_PROMPT,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: { type: "file", file_id: fileId },
+            },
+            {
+              type: "text",
+              text: "Extract all priced line items from this price offer. For each item combine the main row (Kód, Název, Rozměr, Cena) with ALL following specification rows into popis. Skip group headers without prices. Return only the JSON array.",
+            },
+          ],
+        }],
+      }),
+    });
+
+    if (!msgRes.ok) {
+      const err = await msgRes.text();
+      console.error("Claude API error:", msgRes.status, err);
+      throw new Error(`Claude API error [${msgRes.status}]: ${err}`);
+    }
+
+    const data = await msgRes.json();
+    const text = data.content?.[0]?.text ?? "";
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      const match = text.match(/\[[\s\S]*\]/);
+      return match ? JSON.parse(match[0]) : [];
+    }
+  } finally {
+    // Step 3: Cleanup — delete file from Anthropic
+    try {
+      await fetch(`https://api.anthropic.com/v1/files/${fileId}`, {
+        method: "DELETE",
+        headers: {
+          "x-api-key": headers["x-api-key"],
+          "anthropic-version": headers["anthropic-version"],
+          "anthropic-beta": headers["anthropic-beta"],
+        },
+      });
+      console.log(`Deleted file ${fileId} from Anthropic`);
+    } catch (e) {
+      console.warn("Failed to delete Anthropic file:", e);
+    }
   }
 }
 
@@ -346,23 +276,8 @@ serve(async (req) => {
         fileBuffer = await contentRes.arrayBuffer();
       }
 
-      const isPdf = fileName.toLowerCase().endsWith(".pdf");
-      let items: any[];
-
-      if (isPdf) {
-        const bytes = new Uint8Array(fileBuffer);
-        let binary = "";
-        const chunkSize = 8192;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-        }
-        const fileBase64 = btoa(binary);
-        console.log(`Extracting PDF ${fileName} (${bytes.length} bytes) via Claude`);
-        items = await extractFromPDF(fileBase64);
-      } else {
-        console.log(`Extracting XLSX ${fileName} (${fileBuffer.byteLength} bytes) deterministically`);
-        items = await extractFromXLSX(fileBuffer);
-      }
+      console.log(`Extracting ${fileName} (${fileBuffer.byteLength} bytes) via Anthropic Files API`);
+      const items = await extractViaFilesAPI(fileBuffer, fileName);
 
       return new Response(JSON.stringify({ items, fileName }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
