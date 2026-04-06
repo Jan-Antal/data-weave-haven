@@ -377,6 +377,7 @@ interface TPVProjectRowProps {
   isExpanded: boolean;
   stageCount: number;
   tpvItemCount: number;
+  tpvItems?: TPVItem[];
   onToggleExpand: (pid: string) => void;
   onAddStage?: (pid: string) => void;
   onOpenTPVList: (projectId: string, projectName: string) => void;
