@@ -166,8 +166,6 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
   const deleteStage = useDeleteStage();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  if (stages.length < 2) return null;
-
   const isAutoSum = !useProjectPrice;
 
   const totalPrice = stages.reduce((sum, s) => sum + (s.prodejni_cena ?? 0), 0);
@@ -184,6 +182,8 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
     }, 0);
     return Math.round((weightedSum / totalWeight) * 10) / 10;
   }, [stages]);
+
+  if (stages.length < 2) return null;
 
   const handleAddStage = () => {
     const letters = stages.map(s => {
