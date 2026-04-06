@@ -30,6 +30,8 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { RozpadCeny } from "./RozpadCeny";
 import { StagesCostSection } from "./StagesCostSection";
+import { useProjectStages } from "@/hooks/useProjectStages";
+import { getProjectDisplayOverrides } from "@/lib/projectStageDisplay";
 import { PhotoLightbox, PhotoTimelineGrid, isImageFile, generatePhotoFilename } from "./PhotoLightbox";
 import { useFileSelection } from "@/hooks/useFileSelection";
 import { FileSelectionBar, FolderDropTarget, useFileDragVisuals, useDropFlash } from "./DocumentDragDrop";
@@ -251,6 +253,7 @@ function buildFormState(p: Project | null) {
     cost_subcontractors_pct: p.cost_subcontractors_pct ?? null,
     cost_montaz_pct: p.cost_montaz_pct ?? null,
     cost_is_custom: p.cost_is_custom ?? false,
+    plan_use_project_price: (p as any).plan_use_project_price ?? false,
   };
 }
 
@@ -269,6 +272,7 @@ function defaultForm() {
     cost_subcontractors_pct: null as number | null,
     cost_montaz_pct: null as number | null,
     cost_is_custom: false,
+    plan_use_project_price: false,
   };
 }
 
@@ -282,6 +286,11 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
 
   const [priceEditing, setPriceEditing] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
+
+  // Stage data for multi-stage finance logic
+  const { data: detailStages = [] } = useProjectStages(project?.project_id ?? "");
+  const isMultiStage = detailStages.length >= 2;
+  const stageOverrides = useMemo(() => getProjectDisplayOverrides(detailStages), [detailStages]);
   const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
 
@@ -651,6 +660,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       cost_subcontractors_pct: form.cost_subcontractors_pct,
       cost_montaz_pct: form.cost_montaz_pct,
       cost_is_custom: form.cost_is_custom,
+      plan_use_project_price: form.plan_use_project_price,
     };
 
     // If project ID changed, try to rename SharePoint folder (never blocks DB save)
@@ -1068,62 +1078,78 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       <SectionHeader icon="💰" label="FINANCE" />
       <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
         <div>
-          <Label className="text-xs">Prodejní cena</Label>
-          <MobileTapField
-            displayValue={form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : ""}
-            disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-          >
-            {({ autoFocus }) => (
-              <div className="flex items-center gap-1">
-                <Input
-                  type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
-                  className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
-                  value={isSectionReadOnly("finance")
-                    ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
-                    : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
-                  }
-                  onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
-                  onFocus={() => setPriceEditing(true)}
-                  onBlur={() => setPriceEditing(false)}
-                  disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                  autoFocus={autoFocus}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className={cn("h-10 px-3 font-sans shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
-                  onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
-                  disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
-                >
-                  {form.currency}
-                </Button>
-              </div>
-            )}
-          </MobileTapField>
+          <Label className="text-xs">Prodejní cena {isMultiStage && !form.plan_use_project_price ? <span className="text-muted-foreground">(Σ z etap)</span> : null}</Label>
+          {isMultiStage && !form.plan_use_project_price ? (
+            <Input
+              value={stageOverrides.totalPrice ? `Σ ${Number(stageOverrides.totalPrice).toLocaleString("cs-CZ")} ${form.currency}` : "Σ —"}
+              disabled
+              className="opacity-70 cursor-default bg-muted/50"
+            />
+          ) : (
+            <MobileTapField
+              displayValue={form.prodejni_cena ? `${Number(form.prodejni_cena).toLocaleString("cs-CZ")} ${form.currency}` : ""}
+              disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+            >
+              {({ autoFocus }) => (
+                <div className="flex items-center gap-1">
+                  <Input
+                    type={!isSectionReadOnly("finance") && priceEditing ? "number" : "text"}
+                    className={cn("no-spinners", (isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")) && roClass)}
+                    value={isSectionReadOnly("finance")
+                      ? (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : "—")
+                      : (priceEditing ? form.prodejni_cena : (form.prodejni_cena ? Number(form.prodejni_cena).toLocaleString("cs-CZ") : ""))
+                    }
+                    onChange={(e) => setForm(s => ({ ...s, prodejni_cena: e.target.value }))}
+                    onFocus={() => setPriceEditing(true)}
+                    onBlur={() => setPriceEditing(false)}
+                    disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                    autoFocus={autoFocus}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn("h-10 px-3 font-sans shrink-0", isSectionReadOnly("finance") && "opacity-70 cursor-not-allowed")}
+                    onClick={() => setForm(s => ({ ...s, currency: s.currency === "CZK" ? "EUR" : "CZK" }))}
+                    disabled={isSectionReadOnly("finance") || isFieldReadOnly("prodejni_cena")}
+                  >
+                    {form.currency}
+                  </Button>
+                </div>
+              )}
+            </MobileTapField>
+          )}
         </div>
         <div>
-          <Label className="text-xs">Marže</Label>
-          <MobileTapField
-            displayValue={form.marze ? `${form.marze} %` : ""}
-            disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
-          >
-            {({ autoFocus }) => (
-              <div className="relative">
-                <Input
-                  type={isSectionReadOnly("finance") ? "text" : "number"}
-                  className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
-                  value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
-                  onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
-                   placeholder="15"
-                  disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
-                  autoFocus={autoFocus}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
-              </div>
-            )}
-          </MobileTapField>
-          {!form.marze && (
+          <Label className="text-xs">Marže {isMultiStage && !form.plan_use_project_price ? <span className="text-muted-foreground">(Ø z etap)</span> : null}</Label>
+          {isMultiStage && !form.plan_use_project_price ? (
+            <Input
+              value={stageOverrides.weightedMarze != null ? `Ø ${stageOverrides.weightedMarze} %` : "Ø —"}
+              disabled
+              className="opacity-70 cursor-default bg-muted/50"
+            />
+          ) : (
+            <MobileTapField
+              displayValue={form.marze ? `${form.marze} %` : ""}
+              disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+            >
+              {({ autoFocus }) => (
+                <div className="relative">
+                  <Input
+                    type={isSectionReadOnly("finance") ? "text" : "number"}
+                    className={cn("no-spinners pr-8", (isSectionReadOnly("finance") || isFieldReadOnly("marze")) && roClass)}
+                    value={isSectionReadOnly("finance") ? (form.marze ? `${form.marze}` : "—") : form.marze}
+                    onChange={(e) => setForm(s => ({ ...s, marze: e.target.value }))}
+                     placeholder="15"
+                    disabled={isSectionReadOnly("finance") || isFieldReadOnly("marze")}
+                    autoFocus={autoFocus}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+                </div>
+              )}
+            </MobileTapField>
+          )}
+          {!form.marze && !isMultiStage && (
             <p className="text-[10px] text-muted-foreground mt-0.5">Výchozí marže: 15 %</p>
           )}
         </div>
@@ -1175,6 +1201,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         <StagesCostSection
           projectId={project.project_id}
           readOnly={isSectionReadOnly("finance")}
+          useProjectPrice={form.plan_use_project_price}
+          onToggleProjectPrice={(val) => setForm(s => ({ ...s, plan_use_project_price: val }))}
         />
       )}
 

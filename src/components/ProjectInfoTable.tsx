@@ -454,17 +454,20 @@ const ProjectRow = memo(function ProjectRow({
       } as Project;
     }
     if (!overrides.isSingleStage) {
-      // Multi-stage: show summary
+      // Multi-stage: show summary with weighted margin
       return {
         ...p,
         status: overrides.statusSummary ?? p.status,
         datum_smluvni: overrides.latestDatumSmluvni ?? p.datum_smluvni,
         pm: overrides.pmSummary ?? p.pm,
         prodejni_cena: overrides.totalPrice ?? p.prodejni_cena,
+        marze: overrides.weightedMarze != null ? String(overrides.weightedMarze) : p.marze,
       } as Project;
     }
     return p;
   }, [p, stagesRaw]);
+
+  const isSummary = stageCount > 1;
 
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -472,7 +475,7 @@ const ProjectRow = memo(function ProjectRow({
   }, [p.risk, p.datum_smluvni, riskHighlight]);
 
   return (
-    <TableRow className="hover:bg-muted/50 transition-colors h-9" style={bgStyle} data-project-id={p.project_id}>
+    <TableRow className={cn("hover:bg-muted/50 transition-colors h-9", isSummary && "border-l-2 border-primary/20")} style={bgStyle} data-project-id={p.project_id}>
       {/* Col 1 — Icon slot */}
       <TableCell style={COL_ICON_STYLE} className="text-center px-0">
         <button
@@ -497,7 +500,7 @@ const ProjectRow = memo(function ProjectRow({
         </TableCell>
       )}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && stageCount <= 1, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && stageCount <= 1, statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? () => true : isFieldReadOnly, isSummaryRow: isSummary }))}
     </TableRow>
   );
 });

@@ -132,11 +132,12 @@ interface CellProps {
   customColumns?: CustomColumnDef[];
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void;
   isFieldReadOnly?: (field: string, currentValue?: string | null) => boolean;
+  isSummaryRow?: boolean;
 }
 
 export function renderColumnCell(props: CellProps) {
-  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly } = props;
-  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly);
+  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly, isSummaryRow } = props;
+  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly, isSummaryRow);
 }
 
 function renderCell(
@@ -147,10 +148,12 @@ function renderCell(
   customColumns?: CustomColumnDef[],
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
   isFieldReadOnly?: (field: string, currentValue?: string | null) => boolean,
+  isSummaryRow?: boolean,
 ) {
   const s = (field: string, val: string, old: string) => save(p.id, field, val, old, p.project_id);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
   const ro = (field: string) => !canEdit || (isFieldReadOnly?.(field, (p as any)[field] ?? null) ?? false);
+  const summaryClass = isSummaryRow ? "italic text-muted-foreground" : "";
 
   switch (key) {
     case "klient":
@@ -169,8 +172,21 @@ function renderCell(
       if (saveCurrency && !ro("prodejni_cena")) {
         return <TableCell key={key} className="text-right"><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(a, c) => saveCurrency(p.id, a, c, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
       }
-      return <TableCell key={key} className="text-right"><span className="text-xs font-sans">{formatCurrency(p.prodejni_cena, p.currency || "CZK")}</span></TableCell>;
+      return (
+        <TableCell key={key} className="text-right">
+          <span className={`text-xs font-sans ${summaryClass}`}>
+            {isSummaryRow && p.prodejni_cena ? "Σ " : ""}{formatCurrency(p.prodejni_cena, p.currency || "CZK")}
+          </span>
+        </TableCell>
+      );
     case "marze":
+      if (isSummaryRow) {
+        return (
+          <TableCell key={key} className="text-right">
+            <span className={`text-xs font-sans ${summaryClass}`}>{formatMarze(p.marze)}</span>
+          </TableCell>
+        );
+      }
       return <TableCell key={key} className="text-right"><InlineEditableCell value={marzeStorageToInput(p.marze)} onSave={(x) => s("marze", marzeInputToStorage(x) || "", v("marze"))} readOnly={ro("marze")} displayValue={<span className="text-xs font-sans">{formatMarze(p.marze)}</span>} /></TableCell>;
     case "pm":
       return <TableCell key={key}><InlineEditableCell value={p.pm} type="people" peopleRole="PM" onSave={(x) => s("pm", x, v("pm"))} readOnly={ro("pm")} /></TableCell>;
