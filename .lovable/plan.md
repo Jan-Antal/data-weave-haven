@@ -1,45 +1,56 @@
 
 
-# Filtrování spotřebičů + multi-select v extrakci
+# Oprava pádu preview + cache extrahovaných položek
 
-## 1. Filtrování spotřebičů z výsledků AI extrakce
+## Problémy
 
-### Problém
-AI extrahuje i spotřebiče (vestavná chladnička, myčka, trouba…), které nejsou atypický nábytek.
+1. **Preview pad při přepnutí sheetu** — DocumentPreviewModal používá SharePoint iframe (`previewUrl`). Při interakci uvnitř iframe (přepnutí sheetu) může dojít k chybě, která zavře celý dialog včetně extrahovaných položek.
 
-### Řešení
-Dvě vrstvy:
+2. **Extrahované položky se ztrácejí** — useEffect na `open` resetuje vše (`setItems([])`) → pokud dialog spadne nebo se zavře, musím extrahovat znovu = zbytečný AI request.
 
-**A) Prompt update** — do `CN_SYSTEM_PROMPT` v obou edge funkcích (`extract-tpv/index.ts` i `extract-tpv-from-sharepoint/index.ts`) přidat pravidlo:
+## Řešení
+
+### 1. Oddělení preview od hlavního dialogu (oprava pádu)
+
+Preview (DocumentPreviewModal) se už renderuje mimo hlavní Dialog, ale problém je, že při chybě v preview se propaguje chyba a může resetovat stav. Řešení:
+- Obalit DocumentPreviewModal do **Error Boundary** — pokud iframe spadne, chytíme to a zobrazíme fallback místo pádu celé komponenty
+- Při zavření preview se nic neresetuje (už teď by nemělo, ale ověříme)
+
+### 2. In-memory cache extrahovaných položek (15 min TTL)
+
+Přidat **module-level cache** (mimo komponentu) indexovanou podle `projectId`:
+
+```text
+extractionCache: Map<string, {
+  items: ExtractedItem[],
+  fileName: string,
+  sourceDoc: {...},
+  timestamp: number
+}>
 ```
-- PŘESKOČ spotřebiče (vestavná chladnička, myčka, trouba, varná deska, digestoř, 
-  pračka, sušička, mikrovlnka, lednice apod.) — pokud název obsahuje pouze typ 
-  spotřebiče bez atypické nábytkové výroby, položku vynech.
-```
 
-**B) Frontend post-filter** — v `TPVExtractor.tsx` po extrakci odfiltrovat položky jejichž `nazev` matchuje regex spotřebičů a nemají v `popis` žádné nábytkové specifikace. Slouží jako safety net pro případ, že AI je přesto propustí.
+**Logika:**
+- Po úspěšné extrakci → uložit do cache
+- Při otevření dialogu → zkontrolovat cache:
+  - Pokud existuje záznam pro `projectId` a je < 15 min starý → načíst z cache, přeskočit na "done"
+  - Pokud je starší nebo neexistuje → normální flow (search → extract)
+- Při extrakci nového dokumentu → přepsat cache
+- Cache se **nevymaže** při zavření dialogu
 
-### Soubory
-- `supabase/functions/extract-tpv/index.ts` — prompt
-- `supabase/functions/extract-tpv-from-sharepoint/index.ts` — prompt
-- `src/components/assistant/TPVExtractor.tsx` — post-filter
+**Reset cache:**
+- Po úspěšném uložení (handleSave) → smazat cache pro projekt
+- Po 15 minutách automaticky (kontrola při otevření)
 
----
+### 3. Úprava useEffect reset logiky
 
-## 2. Multi-select s checkboxy + Shift-click v review tabulce
+Při zavření dialogu (`open = false`) **neresetovat items a sourceDoc** — ty zůstanou v module-level cache. Resetovat pouze UI stav (selection, preview, saving).
 
-### Problém
-Nelze hromadně vybrat/smazat položky v review tabulce extrakce.
+## Soubory
 
-### Řešení
-Přidat do review tabulky (fáze "done"):
-
-- **Checkbox sloupec** — nový `<TableHead>` s "select all" checkboxem, každý řádek má checkbox
-- **State**: `selectedIndices: Set<number>`, `lastClickedIndex: number | null`
-- **Shift-click**: klik na checkbox + Shift vybere rozsah od `lastClickedIndex` do aktuálního
-- **Hromadná akce**: toolbar nad tabulkou — "Odebrat vybrané (X)" tlačítko, viditelné jen při výběru
-- **handleSave**: ukládá jen položky které nejsou odebrané (výběr je pro mazání, ne pro "save only selected")
-
-### Soubory
-- `src/components/assistant/TPVExtractor.tsx` — checkbox column, selection state, shift-click logic, bulk remove button
+1. **`src/components/assistant/TPVExtractor.tsx`**
+   - Přidat `extractionCache` (Map) na úrovni modulu
+   - Upravit useEffect: při open zkontrolovat cache → pokud platný, rovnou `setItems` + `setPhase("done")`
+   - Po extrakci uložit do cache
+   - Po handleSave smazat cache
+   - Obalit DocumentPreviewModal do try/catch error boundary
 
