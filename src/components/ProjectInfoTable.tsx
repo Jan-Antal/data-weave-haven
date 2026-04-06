@@ -49,6 +49,7 @@ import { getColumnLabel } from "./CrossTabColumns";
 import { useAllTPVItems } from "@/hooks/useAllTPVItems";
 import { useStagesByProject } from "@/hooks/useAllProjectStages";
 import { matchesStatusFilter, normalizedIncludes, normalizeSearch } from "@/lib/statusFilter";
+import { getProjectDisplayOverrides } from "@/lib/projectStageDisplay";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
