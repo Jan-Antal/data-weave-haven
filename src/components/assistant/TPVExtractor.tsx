@@ -69,6 +69,10 @@ export function TPVExtractor({ projectId, onSuccess, onClose, open }: TPVExtract
       autoExtractTriggered.current = false;
       setManualFile(null);
       setManualLoading(false);
+      setSourceDoc(null);
+      setPreviewOpen(false);
+      setPreviewLoading(false);
+      setPreviewData({ previewUrl: null, webUrl: null, downloadUrl: null });
       return;
     }
 
