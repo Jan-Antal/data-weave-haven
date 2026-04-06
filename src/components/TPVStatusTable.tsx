@@ -640,6 +640,24 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
     });
   }, []);
 
+  const handleAddStage = useCallback(async (projectId: string) => {
+    const project = projects.find(pr => pr.project_id === projectId);
+    if (!project) return;
+    const existingStages = stagesByProject.get(projectId) ?? [];
+    const letters = existingStages.map(s => { const m = s.stage_name.match(/-([A-Z])$/); return m ? m[1] : null; }).filter(Boolean) as string[];
+    const lastChar = letters.sort().pop();
+    const suffix = lastChar ? String.fromCharCode(lastChar.charCodeAt(0) + 1) : "A";
+    const stageName = `${projectId}-${suffix}`;
+    const inheritedData = buildInheritedStageData(project);
+    const { error } = await supabase.from("project_stages").insert({ project_id: projectId, stage_name: stageName, stage_order: existingStages.length, ...inheritedData, manually_edited_fields: [] } as any);
+    if (error) { toast({ title: "Chyba", variant: "destructive" }); return; }
+    logActivity({ projectId, actionType: "stage_created", detail: stageName });
+    qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
+    qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+    setExpanded(prev => new Set(prev).add(projectId));
+    setShowAddButton(prev => new Set(prev).add(projectId));
+  }, [projects, stagesByProject, qc]);
+
   const save = useCallback((id: string, field: string, value: string, oldValue: string, projectId?: string) => {
     updateProject.mutate({ id, field, value, oldValue, projectId });
   }, [updateProject]);
@@ -720,10 +738,12 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
                 <Fragment key={p.id}>
                   <TPVProjectRow
                     project={p}
+                    stages={stagesByProject.get(p.project_id)}
                     isExpanded={expanded.has(p.project_id)}
                     stageCount={stagesByProject.get(p.project_id)?.length ?? 0}
                     tpvItemCount={tpvItemsByProject.get(p.project_id)?.length ?? 0}
                     onToggleExpand={toggleExpand}
+                    onAddStage={handleAddStage}
                     onOpenTPVList={handleOpenTPVList}
                     isVisible={v}
                     renderKeys={renderKeys}
