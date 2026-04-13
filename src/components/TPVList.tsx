@@ -107,6 +107,15 @@ interface Props {
 export function TPVList({ projectId, projectName, currency = "CZK", onBack, autoOpenImport }: Props) {
   const { canManageTPV, canEdit, canEditColumns, profile } = useAuth();
   const { data: items = [], isLoading } = useTPVItems(projectId);
+
+  // DEBUG: log first item fields to diagnose blank columns issue
+  useEffect(() => {
+    if (items.length > 0) {
+      const sample = items[0];
+      console.log("[TPVList DEBUG] items count:", items.length, "first item keys:", Object.keys(sample));
+      console.log("[TPVList DEBUG] sample item_code:", JSON.stringify(sample.item_code), "nazev:", JSON.stringify(sample.nazev), "popis:", JSON.stringify((sample as any).popis), "konstrukter:", JSON.stringify(sample.konstrukter));
+    }
+  }, [items]);
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map((o) => o.label);
   const { data: allProjects = [] } = useProjects();
