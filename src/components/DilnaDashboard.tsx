@@ -198,15 +198,9 @@ function getDailyDot(todayHours: number, dailyTarget: number) {
 
 export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
   const { data, isLoading } = useDilnaData(weekOffset);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [allExpanded, setAllExpanded] = useState(false);
 
-  const toggleExpand = (pid: string) => {
-    setExpandedProjects(prev => {
-      const next = new Set(prev);
-      if (next.has(pid)) next.delete(pid); else next.add(pid);
-      return next;
-    });
-  };
+  const toggleAllExpand = () => setAllExpanded(prev => !prev);
 
   if (isLoading || !data) {
     return (
