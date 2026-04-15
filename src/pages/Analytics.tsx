@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { StatusBadge } from "@/components/StatusBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAnalytics, type Balik, type AnalyticsRow } from "@/hooks/useAnalytics";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
