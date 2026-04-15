@@ -1195,6 +1195,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
 
   const leftBorderColor = color;
   const leftBorderWidth = 4;
+  const isSplitProject = project.items.some(i => (i as any).split_part && (i as any).split_total);
 
   // Resolve deadline for display
   const deadline = useMemo(() => {
