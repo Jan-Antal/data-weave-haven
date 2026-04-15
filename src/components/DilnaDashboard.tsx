@@ -196,8 +196,7 @@ function getDailyDot(todayHours: number, dailyTarget: number) {
 
 /* ── component ───────────────────────────────────────────────────── */
 
-export function DilnaDashboard() {
-  const [weekOffset, setWeekOffset] = useState(0);
+export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
   const { data, isLoading } = useDilnaData(weekOffset);
 
   if (isLoading || !data) {
@@ -217,31 +216,15 @@ export function DilnaDashboard() {
 
   const { weekInfo, weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
-  const isCurrentWeek = weekOffset === 0;
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden">
       {/* ── HEADER ─────────────────────────────────────────────── */}
       <div className="shrink-0 px-4 py-2.5 border-b bg-muted/30 flex items-center gap-6">
-        {/* Left: week picker */}
-        <div className="shrink-0 flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setWeekOffset(o => o - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <button
-            className={cn(
-              "text-sm font-bold tabular-nums px-1.5 py-0.5 rounded hover:bg-muted transition-colors",
-              !isCurrentWeek && "text-primary underline underline-offset-2 cursor-pointer"
-            )}
-            onClick={() => setWeekOffset(0)}
-            title="Zpět na aktuální týden"
-          >
-            T{weekInfo.week}
-          </button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setWeekOffset(o => o + 1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <span className="text-xs text-muted-foreground ml-1">
+        {/* Left: week label (navigation is in parent filter bar) */}
+        <div className="shrink-0">
+          <span className="text-sm font-bold tabular-nums">T{weekInfo.week}</span>
+          <span className="text-xs text-muted-foreground ml-1.5">
             {fmtDate(weekInfo.monday)} – {fmtDate(weekInfo.friday)}
           </span>
         </div>
