@@ -42,38 +42,48 @@ export function useProductionStatuses(projectId: string) {
     monday.setHours(0, 0, 0, 0);
     const currentWeekKey = monday.toISOString().split("T")[0];
 
-    const projectStatus = query.data.projectStatus;
+    // Collect raw per-item data
+    interface RawEntry {
+      type: "pending" | "ve_vyrobe" | "naplan" | "zpozdeni" | "expedice_wait" | "expedovano" | "paused" | "cancelled";
+      weekNum?: number;
+      label?: string;
+      color?: string;
+      splitPart?: number;
+      splitTotal?: number;
+    }
+    const rawMap = new Map<string, RawEntry[]>();
 
     for (const row of query.data.inbox) {
       const key = row.item_code || row.item_name;
-      if (!map.has(key)) map.set(key, []);
+      if (!rawMap.has(key)) rawMap.set(key, []);
       if (row.status === "pending") {
-        map.get(key)!.push({ label: "Čeká na plánování", color: "#6b7280" });
+        rawMap.get(key)!.push({ type: "pending" });
       }
     }
 
     for (const row of query.data.schedule) {
       const key = row.item_code || row.item_name;
-      if (!map.has(key)) map.set(key, []);
+      if (!rawMap.has(key)) rawMap.set(key, []);
 
-      let status: ProductionStatus;
       if (row.status === "expedice") {
-        status = { label: "Čeká na expedici", color: "#3a8a36" };
+        rawMap.get(key)!.push({ type: "expedice_wait" });
       } else if (row.status === "completed") {
-        status = { label: "Expedováno", color: "#223937" };
+        rawMap.get(key)!.push({ type: "expedovano" });
       } else if (row.status === "paused") {
         const pauseReason = (row as any).pause_reason || "Pozastaveno";
         const expDate = (row as any).pause_expected_date;
         const isOverdue = expDate && new Date(expDate) < new Date();
+        let label: string;
         if (isOverdue) {
-          status = { label: `⚠ ⏸ ${pauseReason} — po termínu`, color: "#dc3545" };
+          label = `⚠ ⏸ ${pauseReason} — po termínu`;
         } else {
           const expLabel = expDate ? ` · exp. ${new Date(expDate).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" })}` : "";
-          status = { label: `⏸ ${pauseReason}${expLabel}`, color: "#d97706" };
+          label = `⏸ ${pauseReason}${expLabel}`;
         }
+        rawMap.get(key)!.push({ type: "paused", label, color: isOverdue ? "#dc3545" : "#d97706" });
       } else if (row.status === "cancelled") {
         const cancelReason = (row as any).cancel_reason || "";
-        status = { label: `✕ Zrušeno${cancelReason ? ` · ${cancelReason}` : ""}`, color: "#6b7280" };
+        rawMap.get(key)!.push({ type: "cancelled", label: `✕ Zrušeno${cancelReason ? ` · ${cancelReason}` : ""}`, color: "#6b7280" });
       } else {
         const weekKey = row.scheduled_week;
         const weekDate = new Date(weekKey);
@@ -83,19 +93,56 @@ export function useProductionStatuses(projectId: string) {
         const weekNum = Math.ceil(((weekDate.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 
         if (weekKey === currentWeekKey) {
-          status = { label: "Ve výrobě", color: "#d97706" };
+          rawMap.get(key)!.push({ type: "ve_vyrobe", splitPart: row.split_part ?? undefined, splitTotal: row.split_total ?? undefined });
         } else if (weekKey > currentWeekKey) {
-          status = { label: `Naplánováno T${weekNum}`, color: "#3b82f6", weekLabel: `T${weekNum}` };
+          rawMap.get(key)!.push({ type: "naplan", weekNum, splitPart: row.split_part ?? undefined, splitTotal: row.split_total ?? undefined });
         } else {
-          status = { label: "△ Zpoždění ve výrobě", color: "#dc3545" };
+          rawMap.get(key)!.push({ type: "zpozdeni" });
         }
       }
+    }
 
-      if (row.split_part && row.split_total) {
-        status.splitPart = row.split_part;
-        status.splitTotal = row.split_total;
+    // Aggregate into summary badges
+    for (const [key, entries] of rawMap) {
+      const statuses: ProductionStatus[] = [];
+
+      const delayed = entries.filter(e => e.type === "zpozdeni");
+      if (delayed.length > 0) {
+        statuses.push({ label: delayed.length > 1 ? `△ Zpoždění (${delayed.length}×)` : "△ Zpoždění ve výrobě", color: "#dc3545" });
       }
-      map.get(key)!.push(status);
+
+      const veVyrobe = entries.filter(e => e.type === "ve_vyrobe");
+      if (veVyrobe.length > 0) {
+        statuses.push({ label: "Ve výrobě", color: "#d97706" });
+      }
+
+      const planned = entries.filter(e => e.type === "naplan");
+      if (planned.length > 0) {
+        const weeks = [...new Set(planned.map(e => e.weekNum!))].sort((a, b) => a - b);
+        statuses.push({ label: `Naplánováno ${formatWeekRanges(weeks)}`, color: "#3b82f6" });
+      }
+
+      const pending = entries.filter(e => e.type === "pending");
+      if (pending.length > 0) {
+        statuses.push({ label: pending.length > 1 ? `Čeká na plánování (${pending.length}×)` : "Čeká na plánování", color: "#6b7280" });
+      }
+
+      const expediceWait = entries.filter(e => e.type === "expedice_wait");
+      if (expediceWait.length > 0) {
+        statuses.push({ label: "Čeká na expedici", color: "#3a8a36" });
+      }
+
+      const expedovano = entries.filter(e => e.type === "expedovano");
+      if (expedovano.length > 0) {
+        statuses.push({ label: "Expedováno", color: "#223937" });
+      }
+
+      // Paused and cancelled keep individual labels (unique reasons)
+      for (const e of entries.filter(e => e.type === "paused" || e.type === "cancelled")) {
+        statuses.push({ label: e.label!, color: e.color! });
+      }
+
+      map.set(key, statuses);
     }
 
     return map;
