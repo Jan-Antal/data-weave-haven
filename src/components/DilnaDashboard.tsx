@@ -24,12 +24,14 @@ export function getISOWeekForOffset(offset: number): { year: number; week: numbe
   const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff + offset * 7);
   const friday = new Date(monday);
   friday.setDate(monday.getDate() + 4);
-  // ISO week number
-  const jan4 = new Date(monday.getFullYear(), 0, 4);
-  const daysSinceJan4 = Math.floor((monday.getTime() - jan4.getTime()) / 86400000);
-  const week = Math.ceil((daysSinceJan4 + jan4.getDay() + 1) / 7);
+  // Standard ISO 8601 week number: the week containing the year's first Thursday
+  const thu = new Date(monday);
+  thu.setDate(monday.getDate() + 3); // Thursday of this week
+  const yearStart = new Date(Date.UTC(thu.getFullYear(), 0, 1));
+  const thuUtc = Date.UTC(thu.getFullYear(), thu.getMonth(), thu.getDate());
+  const week = Math.ceil(((thuUtc - yearStart.getTime()) / 86400000 + 1) / 7);
   const weekKey = toLocalDateStr(monday);
-  return { year: monday.getFullYear(), week, monday, friday, weekKey };
+  return { year: thu.getFullYear(), week, monday, friday, weekKey };
 }
 
 function fmtDate(d: Date) {
