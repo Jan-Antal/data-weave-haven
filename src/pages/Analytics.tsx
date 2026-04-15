@@ -325,6 +325,16 @@ export default function Analytics() {
                 <span className="text-xs text-muted-foreground ml-1">
                   {wi.monday.getDate()}.{wi.monday.getMonth() + 1}. – {wi.friday.getDate()}.{wi.friday.getMonth() + 1}.
                 </span>
+                {!isCurrentWeek && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] ml-2"
+                    onClick={() => setDilnaWeekOffset(0)}
+                  >
+                    Dnes
+                  </Button>
+                )}
               </div>
             );
           })()
