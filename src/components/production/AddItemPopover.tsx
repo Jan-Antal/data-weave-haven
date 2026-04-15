@@ -188,5 +188,7 @@ export function getAdhocBadge(reason: string | null): { emoji: string; label: st
   if (reason === "oprava") return { emoji: "🔧", label: "Oprava" };
   if (reason === "dodatecna") return { emoji: "➕", label: "Dodatečná" };
   if (reason === "jine") return { emoji: "📝", label: "Ad-hoc" };
+  // Don't show badge for reconciliation markers (recon_scheduled, recon_reduced, midflight*)
+  if (reason.startsWith("recon_") || reason.startsWith("midflight")) return null;
   return { emoji: "📝", label: "Ad-hoc" };
 }

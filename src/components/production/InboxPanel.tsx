@@ -1361,12 +1361,15 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
 
   const showCheckbox = hovered || isChecked;
 
+  const isSplit = !!(item as any).split_part && !!(item as any).split_total;
+
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
       style={{
         backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : "#ffffff",
         border: isChecked ? "1px solid rgba(58,138,54,0.25)" : "1px solid #ece8e2",
+        borderLeft: isSplit ? "3px dashed #99a5a3" : undefined,
         opacity: isDragging ? 0.3 : 1,
       }}
       onMouseEnter={(e) => {
@@ -1407,6 +1410,9 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
       {(item as any).adhoc_reason && String((item as any).adhoc_reason).startsWith("midflight") && (
         <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
+      )}
+      {((item as any).split_part && (item as any).split_total) && (
+        <span className="text-[9px] font-sans shrink-0" style={{ color: "#99a5a3" }}>{(item as any).split_part}/{(item as any).split_total}</span>
       )}
       <span className="font-sans text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${item.estimated_hours}h`}</span>
     </div>

@@ -1623,7 +1623,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
 }
 
 function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContextMenu: (e: React.MouseEvent) => void }) {
-  const isSplit = !!item.split_group_id;
+  const isSplit = !!item.split_group_id || (!!item.split_part && !!item.split_total);
   return (
     <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
       style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined, backgroundColor: "#f8f7f4" }}
@@ -1647,7 +1647,7 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
 }
 
 function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContextMenu: (e: React.MouseEvent) => void }) {
-  const isSplit = !!item.split_group_id;
+  const isSplit = !!item.split_group_id || (!!item.split_part && !!item.split_total);
   const pauseReason = (item as any).pause_reason || "Pozastaveno";
   const pauseExpDate = (item as any).pause_expected_date;
   const isOverdue = pauseExpDate && new Date(pauseExpDate) < new Date();
@@ -1688,7 +1688,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
 function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = false }: {
   item: ScheduleItem; weekKey: string; showCzk: boolean; onContextMenu: (e: React.MouseEvent) => void; disabled?: boolean;
 }) {
-  const isSplit = !!item.split_group_id;
+  const isSplit = !!item.split_group_id || (!!item.split_part && !!item.split_total);
   const adhocReason = (item as any).adhoc_reason;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `silo-item-${item.id}`,
