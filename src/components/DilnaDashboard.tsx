@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
+import { getProjectColor } from "@/lib/projectColors";
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
@@ -172,13 +173,6 @@ function useDilnaData(weekOffset: number) {
 
 /* ── color helpers ───────────────────────────────────────────────── */
 
-function getBorderColor(pct: number, logged: number) {
-  if (logged === 0) return "hsl(var(--border))";
-  if (pct >= 80) return "#639922";
-  if (pct >= 50) return "#BA7517";
-  return "#E24B4A";
-}
-
 function getPillClasses(pct: number, logged: number) {
   if (logged === 0) return "bg-muted text-muted-foreground";
   if (pct >= 80) return "bg-[#639922]/15 text-[#639922]";
@@ -191,13 +185,6 @@ function getBarColor(pct: number, logged: number) {
   if (pct >= 80) return "bg-[#639922]";
   if (pct >= 50) return "bg-[#BA7517]";
   return "bg-[#E24B4A]";
-}
-
-function getBarBgColor(pct: number, logged: number) {
-  if (logged === 0) return "#a1a1aa";
-  if (pct >= 80) return "#639922";
-  if (pct >= 50) return "#BA7517";
-  return "#E24B4A";
 }
 
 function getDailyDot(todayHours: number, dailyTarget: number) {
@@ -285,13 +272,13 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
             {cards.map((card) => {
               const isExpanded = expandedProjects.has(card.projectId);
               const maxUsekHours = card.usekBreakdown.length > 0 ? card.usekBreakdown[0].hodiny : 1;
-              const barColorHex = getBarBgColor(card.pct, card.loggedHours);
+              const projectColor = getProjectColor(card.projectId);
 
               return (
                 <div
                   key={card.projectId}
                   className="bg-card rounded-lg border border-border/50 p-3 flex flex-col gap-1.5"
-                  style={{ borderLeftWidth: 3, borderLeftColor: getBorderColor(card.pct, card.loggedHours) }}
+                  style={{ borderLeftWidth: 3, borderLeftColor: projectColor }}
                 >
                   {/* Top row */}
                   <div className="flex items-start justify-between gap-2">
@@ -353,10 +340,10 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                           <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                             <div
                               className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
-                                backgroundColor: barColorHex,
-                              }}
+                            style={{
+                              width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
+                              backgroundColor: projectColor,
+                            }}
                             />
                           </div>
                           <span className="text-[11px] font-medium tabular-nums text-foreground w-10 text-right shrink-0">
