@@ -226,7 +226,7 @@ export async function midflightImportPlanVyroby(
   // ━━━ CREATE SPLIT BUNDLES from inbox items ━━━
   const scheduleInserts: any[] = [];
   const dailyLogInserts: any[] = [];
-  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string }> = [];
+  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string; split_group_id?: string; split_part?: number; split_total?: number }> = [];
 
   for (const [projectId, weeklyMap] of projectWeeklyHours) {
     const inboxItems = inboxByProject.get(projectId);
