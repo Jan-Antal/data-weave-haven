@@ -262,6 +262,17 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
             Žádné naplánované projekty tento týden
           </div>
         ) : (
+          <div className="flex flex-col gap-3">
+            {/* Global expand/collapse toggle */}
+            <div className="flex justify-end">
+              <button
+                onClick={toggleAllExpand}
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-muted"
+              >
+                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", allExpanded && "rotate-180")} />
+                {allExpanded ? "Sbalit vše" : "Rozbalit vše"}
+              </button>
+            </div>
           <div className="grid grid-cols-3 gap-3">
             {cards.map((card) => {
               const isExpanded = expandedProjects.has(card.projectId);
