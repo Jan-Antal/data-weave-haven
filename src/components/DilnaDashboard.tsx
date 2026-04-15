@@ -55,6 +55,17 @@ function fmtTime(iso: string | null) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+/* ── constants ───────────────────────────────────────────────────── */
+
+const USEK_ORDER: string[] = [
+  "REZ", "DYH", "OLE", "CNC", "VRT", "LAK", "KOM", "BAL",
+];
+
+function usekSortKey(kod: string): number {
+  const idx = USEK_ORDER.indexOf(kod);
+  return idx >= 0 ? idx : USEK_ORDER.length;
+}
+
 /* ── types ───────────────────────────────────────────────────────── */
 
 interface UsekRow { kod: string; nazov: string; hodiny: number }
@@ -125,14 +136,14 @@ function useDilnaData(weekOffset: number) {
         const pid = h.ami_project_id;
         hoursByProject.set(pid, (hoursByProject.get(pid) || 0) + Number(h.hodiny));
 
-        const kod = h.cinnost_kod || "???";
+        const kod = h.cinnost_kod || "NEZ";
         if (!usekByProject.has(pid)) usekByProject.set(pid, new Map());
         const pMap = usekByProject.get(pid)!;
         const existing = pMap.get(kod);
         if (existing) {
           existing.hodiny += Number(h.hodiny);
         } else {
-          pMap.set(kod, { kod, nazov: h.cinnost_nazov || kod, hodiny: Number(h.hodiny) });
+          pMap.set(kod, { kod, nazov: h.cinnost_nazov || (kod === "NEZ" ? "Nezařazeno" : kod), hodiny: Number(h.hodiny) });
         }
       }
 
@@ -157,7 +168,7 @@ function useDilnaData(weekOffset: number) {
 
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
-          ? Array.from(usekMap.values()).sort((a, b) => b.hodiny - a.hodiny)
+          ? Array.from(usekMap.values()).sort((a, b) => usekSortKey(a.kod) - usekSortKey(b.kod))
           : [];
 
         cards.push({ projectId: pid, projectName: proj?.project_name || pid, plannedHours, loggedHours, pct, valueCzk, usekBreakdown });
