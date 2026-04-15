@@ -1361,12 +1361,15 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
 
   const showCheckbox = hovered || isChecked;
 
+  const isSplit = !!(item as any).split_part && !!(item as any).split_total;
+
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
       style={{
         backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : "#ffffff",
         border: isChecked ? "1px solid rgba(58,138,54,0.25)" : "1px solid #ece8e2",
+        borderLeft: isSplit ? "3px dashed #99a5a3" : undefined,
         opacity: isDragging ? 0.3 : 1,
       }}
       onMouseEnter={(e) => {
