@@ -1,50 +1,77 @@
 
 
-# Midflight: "Manuálny split" prístup namiesto HIST_ bundles
+# Midflight: Inbox zostatok ako súčasť split skupiny
 
-## Aktuálny problém
-Terajší midflight vytvára separátne `HIST_` záznamy v schedule + redukuje inbox. To vyzerá neprehľadne — v jednom týždni vidíš aj HIST_ bundle aj inbox items pre ten istý projekt.
+## Problém
+Aktuálne sa vytvárajú split bundles v schedule (T13 1/3, T14 2/3, T15 3/3), ale inbox zostatok nie je súčasťou split skupiny. Správne by to malo byť: T13 = 1/4, T14 = 2/4, T15 = 3/4, a inbox zostatok = 4/4.
 
-## Nový prístup — "ako keby si to naplánoval ručne"
-Namiesto vytvárania umelých HIST_ záznamov, midflight **vezme existujúce inbox items** a rozdelí ich na split bundles podľa skutočných hodín z Alvena:
+## Riešenie
+V `src/lib/midflightImportPlanVyroby.ts`, zmeniť logiku tak, že:
 
-### Logika pre každý inbox projekt s historickými hodinami:
+1. **`totalParts` = počet hist týždňov + 1** (ak existuje inbox zostatok)
+2. **Schedule inserty**: `split_part: i + 1`, `split_total: totalParts` (vrátane inbox časti)
+3. **Inbox zostatok**: namiesto len redukcie hodín, aktualizovať aj `split_group_id`, `split_part`, `split_total` na poslednom inbox iteme — aby sa zobrazoval ako `4/4`
 
-1. **Zoskupiť hist hodiny podľa týždňov** (z `production_hours_log`, rovnako ako teraz)
+### Konkrétne zmeny (riadky 240-300):
 
-2. **Pre každý týždeň s hodinami**: vytvoriť riadok v `production_schedule` s:
-   - `project_id`, `item_code` = pôvodný inbox item_code (prvý pending item)
-   - `item_name` = pôvodný názov z inbox itemu
-   - `scheduled_week` = pondelok daného týždňa
-   - `scheduled_hours` = SUM hodín z Alvena pre ten týždeň
-   - `status: "scheduled"`, `is_midflight: true`
-   - `completed_at` = nastavený (bundle je "hotový")
-   - `split_group_id` = spoločné UUID pre celý split
+```typescript
+// Spočítaj či bude inbox zostatok
+const totalInboxHours = inboxItems 
+  ? inboxItems.reduce((s, i) => s + i.estimated_hours, 0) 
+  : 0;
+const remainderHours = Math.max(0, totalInboxHours - totalHistHours);
+const hasRemainder = remainderHours > 0.05 && inboxItems && inboxItems.length > 0;
 
-3. **Zvyšok hodín zostane v inbox-e** — inbox items sa zredukujú rovnako ako teraz (adhoc_reason markery pre rollback)
+// totalParts = hist weeks + 1 (inbox remainder)
+const totalParts = sortedWeeks.length + (hasRemainder ? 1 : 0);
 
-4. **Daily log s 100%** — pre každý vytvorený bundle vložiť `production_daily_logs` záznam s `percent: 100`, `phase: "Expedice"`, `day_index: 4` (piatok)
-   - `bundle_id` formát: `"projectId::weekMonday"`
+const firstBundleId = crypto.randomUUID();
 
-### Čo sa zmení oproti teraz:
+// Schedule inserts for hist weeks (1/4, 2/4, 3/4...)
+for (let i = 0; i < sortedWeeks.length; i++) {
+  // ... same as now but with updated totalParts
+}
 
-| Pred | Po |
-|------|-----|
-| HIST_ bundles (umelé, Legacy badge) | Split bundles z inbox items (reálne, dokončené) |
-| Inbox items redukované/scheduled | Rovnako — zvyšok zostáva v inbox-e |
-| Žiadne daily logy | 100% daily log pre každý hist bundle |
-| `is_historical` flag | Netreba — bundles sú normálne midflight splits |
+// Inbox reduction + mark last remaining item as split N/N
+if (inboxItems && inboxItems.length > 0) {
+  let remaining = totalHistHours;
+  for (const item of inboxItems) {
+    if (remaining <= 0) break;
+    if (item.estimated_hours <= remaining) {
+      remaining -= item.estimated_hours;
+      inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
+    } else {
+      // This item becomes the remainder — mark as last split part
+      inboxUpdates.push({
+        id: item.id,
+        estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
+        adhoc_reason: "recon_reduced",
+        // NEW: split group fields
+        split_group_id: firstBundleId,
+        split_part: totalParts,    // e.g. 4/4
+        split_total: totalParts,
+      });
+      remaining = 0;
+    }
+  }
+}
+```
 
-### Reset fáza
-- Stávajúci reset už maže `is_midflight = true` a revertuje adhoc_reason markery
-- Pridať: mazanie daily logov kde `bundle_id LIKE '%::HIST'` alebo pre midflight schedule IDs
-- HIST_ cleanup zostáva (fallback)
+4. **Inbox update logic** (riadky ~330-345): rozšíriť update query pre `recon_reduced` items o `split_group_id`, `split_part`, `split_total`
 
-## Súbory
+5. **Reset fáza**: pridať revert split fields na inbox items — `split_group_id: null, split_part: null, split_total: null` pre `recon_reduced` items
 
+## Výsledok
+- Byt Osadní v Inbox: **4/4** so zvyškovými hodinami
+- T13: **1/4** s 19h
+- T14: **2/4** s 60h  
+- T15: **3/4** s 44h
+- Vizuálne všetky bundles patria do jednej split skupiny
+
+## Súbor
 | Súbor | Zmena |
 |-------|-------|
-| `src/lib/midflightImportPlanVyroby.ts` | Nahradiť HIST_ insert blok novým split-bundle prístupom; pridať daily log inserty; reset: mazať daily logy |
+| `src/lib/midflightImportPlanVyroby.ts` | totalParts +1, inbox remainder split fields, reset revert |
 
-Žiadna DB migrácia nie je potrebná — používame existujúce stĺpce (`completed_at`, `split_group_id`, `is_midflight`, `production_daily_logs`).
+Žiadna DB migrácia — `production_inbox` už má `split_group_id`, `split_part`, `split_total` stĺpce.
 
