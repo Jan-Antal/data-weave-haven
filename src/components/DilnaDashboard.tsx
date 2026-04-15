@@ -292,7 +292,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                 <div
                   key={card.projectId}
                   className="bg-card rounded-lg border border-border/50 p-3 flex flex-col gap-1.5"
-                  style={{ borderLeftWidth: 3, borderLeftColor: getBorderColor(card.pct, card.loggedHours) }}
+                  style={{ borderLeftWidth: 3, borderLeftColor: projectColor }}
                 >
                   {/* Top row */}
                   <div className="flex items-start justify-between gap-2">
