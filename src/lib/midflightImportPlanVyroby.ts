@@ -280,20 +280,22 @@ export async function midflightImportPlanVyroby(
       });
     }
 
-    // Reduce inbox items by totalHistHours
-    let remaining = totalHistHours;
-    for (const item of inboxItems) {
-      if (remaining <= 0) break;
-      if (item.estimated_hours <= remaining) {
-        remaining -= item.estimated_hours;
-        inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
-      } else {
-        inboxUpdates.push({
-          id: item.id,
-          estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
-          adhoc_reason: "recon_reduced",
-        });
-        remaining = 0;
+    // Reduce inbox items by totalHistHours (only if inbox items exist)
+    if (inboxItems && inboxItems.length > 0) {
+      let remaining = totalHistHours;
+      for (const item of inboxItems) {
+        if (remaining <= 0) break;
+        if (item.estimated_hours <= remaining) {
+          remaining -= item.estimated_hours;
+          inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
+        } else {
+          inboxUpdates.push({
+            id: item.id,
+            estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
+            adhoc_reason: "recon_reduced",
+          });
+          remaining = 0;
+        }
       }
     }
 
