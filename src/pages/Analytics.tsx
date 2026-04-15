@@ -61,7 +61,7 @@ export default function Analytics() {
   const { data: projects = [] } = useProjects();
   type TimeRange = "week" | "month" | "3months" | "year" | "all";
   const [timeRange, setTimeRange] = useState<TimeRange>("3months");
-  const [statusFilters, setStatusFilters] = useState<Set<Balik>>(new Set(["IN_PROGRESS", "DONE", "OVER"]));
+  const [statusFilters, setStatusFilters] = useState<Set<"vyroba" | "done">>(new Set(["vyroba", "done"]));
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
