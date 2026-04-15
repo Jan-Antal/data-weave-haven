@@ -253,8 +253,8 @@ export async function midflightImportPlanVyroby(
       scheduleInserts.push({
         id: scheduleId,
         project_id: projectId,
-        item_code: templateItem.item_code || templateItem.item_name,
-        item_name: `${templateItem.item_name} — T${weekNum}`,
+        item_code: templateCode,
+        item_name: `${templateName} — T${weekNum}`,
         scheduled_week: monday,
         scheduled_hours: hours,
         scheduled_czk: 0,
@@ -265,7 +265,7 @@ export async function midflightImportPlanVyroby(
         split_group_id: i === 0 ? null : firstBundleId,
         split_part: i + 1,
         split_total: totalParts,
-        stage_id: templateItem.stage_id || null,
+        stage_id: templateStageId,
       });
 
       // Daily log with 100% completion
