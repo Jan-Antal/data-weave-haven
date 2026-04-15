@@ -286,7 +286,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
             </div>
           <div className="grid grid-cols-3 gap-3">
             {cards.map((card) => {
-              const maxUsekHours = card.usekBreakdown.length > 0 ? card.usekBreakdown[0].hodiny : 1;
+              const maxUsekHours = card.usekBreakdown.reduce((max, u) => Math.max(max, u.hodiny), 1);
               const projectColor = getProjectColor(card.projectId);
 
               return (
