@@ -49,7 +49,6 @@ export function useUpdateStage() {
     onSuccess: (_, { projectId }) => {
       qc.invalidateQueries({ queryKey: ["project_stages", projectId] });
       qc.invalidateQueries({ queryKey: ["all_project_stages"] });
-      toast({ title: "Uloženo" });
     },
     onError: () => {
       toast({ title: "Chyba", description: "Nepodařilo se uložit", variant: "destructive" });
