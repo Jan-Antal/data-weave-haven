@@ -10,6 +10,27 @@ export interface ProductionStatus {
   splitTotal?: number;
 }
 
+/** Format week numbers into compact ranges: [12,13,14,17] → "T12-14, T17" */
+function formatWeekRanges(weeks: number[]): string {
+  if (weeks.length === 0) return "";
+  if (weeks.length === 1) return `T${weeks[0]}`;
+
+  const ranges: string[] = [];
+  let start = weeks[0];
+  let end = weeks[0];
+
+  for (let i = 1; i < weeks.length; i++) {
+    if (weeks[i] === end + 1) {
+      end = weeks[i];
+    } else {
+      ranges.push(start === end ? `T${start}` : `T${start}-${end}`);
+      start = end = weeks[i];
+    }
+  }
+  ranges.push(start === end ? `T${start}` : `T${start}-${end}`);
+  return ranges.join(", ");
+}
+
 /** For a given project, compute production status per TPV nazev (code) */
 export function useProductionStatuses(projectId: string) {
   const query = useQuery({
