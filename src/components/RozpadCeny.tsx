@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useCostBreakdownPresets, type CostBreakdownPreset } from "@/hooks/useCostBreakdownPresets";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
+import { useExchangeRates, getExchangeRate } from "@/hooks/useExchangeRates";
 
 const SEGMENT_COLORS = [
   { key: "material_pct", label: "Mat.", color: "#f97316" },
@@ -34,6 +35,10 @@ interface RozpadCenyProps {
   onChange: (updates: Partial<CostValues>) => void;
   readOnly?: boolean;
   kalkulantSlot?: React.ReactNode;
+  /** Currency of the price (CZK or EUR). Defaults to CZK. */
+  currency?: string;
+  /** Project creation year for exchange rate lookup */
+  projectYear?: number;
 }
 
 function BreakdownBar({ values }: { values: Record<string, number> }) {
@@ -56,13 +61,17 @@ function BreakdownBar({ values }: { values: Record<string, number> }) {
   );
 }
 
-export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChange, readOnly, kalkulantSlot }: RozpadCenyProps) {
+export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChange, readOnly, kalkulantSlot, currency = "CZK", projectYear }: RozpadCenyProps) {
   const { data: presets = [] } = useCostBreakdownPresets();
   const { data: settings } = useProductionSettings();
+  const { data: exchangeRates = [] } = useExchangeRates();
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<Record<string, string>>({});
 
   const hasValues = costValues.cost_material_pct != null;
+  const isEur = currency === "EUR";
+  const eurRate = isEur ? getExchangeRate(exchangeRates, projectYear ?? new Date().getFullYear()) : 1;
+  const currencyLabel = isEur ? "€" : "Kč";
 
   const pctValues: Record<string, number> = {
     material_pct: costValues.cost_material_pct ?? 0,
@@ -80,14 +89,16 @@ export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChang
   // Normalize: values > 1 are percentages (e.g. 25 → 0.25), values ≤ 1 are already decimal
   const marzeDecimal = marzeRaw > 1 ? marzeRaw / 100 : marzeRaw;
   const marzeDisplay = Math.round(marzeDecimal * 100); // for UI display as whole %
+  // naklady in original currency (for display)
   const naklady = prodejniCena && prodejniCena > 0 && marzeDecimal >= 0
     ? prodejniCena * (1 - marzeDecimal)
     : null;
-  const marzeCzk = prodejniCena && naklady ? prodejniCena - naklady : null;
+  const marzeMoney = prodejniCena && naklady ? prodejniCena - naklady : null;
 
-  // Production summary
+  // Production summary — convert to CZK for hours calculation
   const productionPct = pctValues.production_pct || 0;
-  const productionCzk = naklady ? naklady * productionPct / 100 : 0;
+  const productionInCurrency = naklady ? naklady * productionPct / 100 : 0;
+  const productionCzk = productionInCurrency * eurRate;
   const hourlyRate = settings?.hourly_rate ?? 550;
   const productionHours = hourlyRate > 0 ? productionCzk / hourlyRate : 0;
 
@@ -190,7 +201,7 @@ export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChang
 
           {naklady != null && naklady > 0 && productionPct > 0 && (
             <p className="text-xs text-muted-foreground">
-              Výroba: <span className="font-medium text-foreground">{Math.round(naklady * productionPct / 100).toLocaleString("cs-CZ")} Kč</span>
+              Výroba: <span className="font-medium text-foreground">{Math.round(productionInCurrency).toLocaleString("cs-CZ")} {currencyLabel}</span>
               {" · "}
               <span className="font-medium text-foreground">{Math.round(productionHours).toLocaleString("cs-CZ")}h</span>
             </p>
@@ -250,13 +261,13 @@ export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChang
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Náklady:</span>
                 <span className="font-medium" style={{ color: "#1a1a1a" }}>
-                  {naklady ? `${Math.round(naklady).toLocaleString("cs-CZ")} Kč` : "—"}
+                  {naklady ? `${Math.round(naklady).toLocaleString("cs-CZ")} ${currencyLabel}` : "—"}
                 </span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Marže:</span>
                 <span className="font-medium" style={{ color: "#3a8a36" }}>
-                  {marzeCzk ? `${Math.round(marzeCzk).toLocaleString("cs-CZ")} Kč` : "—"}
+                  {marzeMoney ? `${Math.round(marzeMoney).toLocaleString("cs-CZ")} ${currencyLabel}` : "—"}
                 </span>
               </div>
             </div>
