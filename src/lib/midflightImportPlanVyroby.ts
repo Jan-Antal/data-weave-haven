@@ -59,7 +59,7 @@ export async function midflightImportPlanVyroby(
 
   const { error: errReconReduced } = await (supabaseClient as any)
     .from("production_inbox")
-    .update({ status: "pending", adhoc_reason: null })
+    .update({ status: "pending", adhoc_reason: null, split_group_id: null, split_part: null, split_total: null })
     .like("adhoc_reason", "recon_reduced%");
   if (errReconReduced) console.warn("Revert recon_reduced failed:", errReconReduced.message);
 
@@ -226,7 +226,7 @@ export async function midflightImportPlanVyroby(
   // ━━━ CREATE SPLIT BUNDLES from inbox items ━━━
   const scheduleInserts: any[] = [];
   const dailyLogInserts: any[] = [];
-  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string }> = [];
+  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string; split_group_id?: string; split_part?: number; split_total?: number }> = [];
 
   for (const [projectId, weeklyMap] of projectWeeklyHours) {
     const inboxItems = inboxByProject.get(projectId);
@@ -240,7 +240,16 @@ export async function midflightImportPlanVyroby(
     const totalHistHours = Math.round((projectTotalHist.get(projectId) || 0) * 10) / 10;
     // Sort weeks chronologically
     const sortedWeeks = [...weeklyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    const totalParts = sortedWeeks.length;
+
+    // Calculate inbox remainder to determine total split parts
+    const totalInboxHours = inboxItems
+      ? inboxItems.reduce((s, i) => s + i.estimated_hours, 0)
+      : 0;
+    const remainderHours = Math.max(0, totalInboxHours - totalHistHours);
+    const hasRemainder = remainderHours > 0.05 && inboxItems && inboxItems.length > 0;
+
+    // totalParts = hist weeks + 1 (inbox remainder as last part)
+    const totalParts = sortedWeeks.length + (hasRemainder ? 1 : 0);
 
     // First bundle's ID serves as split_group_id for the rest (FK constraint)
     const firstBundleId = crypto.randomUUID();
@@ -289,17 +298,21 @@ export async function midflightImportPlanVyroby(
           remaining -= item.estimated_hours;
           inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
         } else {
+          // This item becomes the remainder — mark as last split part
           inboxUpdates.push({
             id: item.id,
             estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
             adhoc_reason: "recon_reduced",
+            split_group_id: firstBundleId,
+            split_part: totalParts,
+            split_total: totalParts,
           });
           remaining = 0;
         }
       }
     }
 
-    onProgress?.(`[midflight] ${projectId}: ${totalHistHours}h → ${sortedWeeks.length} split bundles, ${inboxUpdates.filter(u => u.status === "scheduled").length} inbox scheduled`);
+    onProgress?.(`[midflight] ${projectId}: ${totalHistHours}h → ${sortedWeeks.length} split bundles (${totalParts} total parts), ${inboxUpdates.filter(u => u.status === "scheduled").length} inbox scheduled`);
   }
 
   // ━━━ Insert schedule bundles ━━━
@@ -341,9 +354,13 @@ export async function midflightImportPlanVyroby(
         .eq("id", upd.id);
       if (error) errors.push(`Inbox update error ${upd.id}: ${error.message}`);
     } else if (upd.estimated_hours !== undefined) {
+      const updatePayload: any = { estimated_hours: upd.estimated_hours, adhoc_reason: upd.adhoc_reason };
+      if (upd.split_group_id) updatePayload.split_group_id = upd.split_group_id;
+      if (upd.split_part) updatePayload.split_part = upd.split_part;
+      if (upd.split_total) updatePayload.split_total = upd.split_total;
       const { error } = await (supabaseClient as any)
         .from("production_inbox")
-        .update({ estimated_hours: upd.estimated_hours, adhoc_reason: upd.adhoc_reason })
+        .update(updatePayload)
         .eq("id", upd.id);
       if (error) errors.push(`Inbox reduce error ${upd.id}: ${error.message}`);
     }
