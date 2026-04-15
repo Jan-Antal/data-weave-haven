@@ -349,6 +349,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
             })}
           </div>
           </div>
+        )}
       </div>
 
       {/* ── FOOTER ─────────────────────────────────────────────── */}
