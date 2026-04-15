@@ -1,0 +1,1 @@
+ALTER TABLE public.production_schedule ADD COLUMN is_historical boolean DEFAULT false;
