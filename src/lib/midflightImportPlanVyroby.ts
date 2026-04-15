@@ -230,10 +230,8 @@ export async function midflightImportPlanVyroby(
 
   for (const [projectId, weeklyMap] of projectWeeklyHours) {
     const inboxItems = inboxByProject.get(projectId);
-    if (!inboxItems || inboxItems.length === 0) {
-      onProgress?.(`[midflight] ${projectId}: žiadne inbox items, preskakujem split bundles`);
-      continue;
-    }
+    const projectInfo = validProjectMap.get(projectId);
+    const projectName = projectInfo?.name || projectId;
 
     // Use first inbox item as template for code/name
     const templateItem = inboxItems[0];
