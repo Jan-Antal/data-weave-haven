@@ -55,6 +55,13 @@ export async function midflightImportPlanVyroby(
     .eq("is_midflight", true);
   if (err1) throw new Error("Reset schedule failed: " + err1.message);
 
+  // 1b. Delete ALL historical reconciliation entries
+  const { error: err1b } = await (supabaseClient as any)
+    .from("production_schedule")
+    .delete()
+    .eq("is_historical", true);
+  if (err1b) throw new Error("Reset historical failed: " + err1b.message);
+
   // 2. Delete ALL midflight entries from production_inbox
   const { error: err2 } = await (supabaseClient as any)
     .from("production_inbox")
