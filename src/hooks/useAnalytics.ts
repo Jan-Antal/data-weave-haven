@@ -60,6 +60,20 @@ export function useAnalytics() {
           .select("project_id, scheduled_week"),
       ]);
 
+      // Build schedule date range lookup
+      const scheduleMap = new Map<string, { min: string; max: string }>();
+      if (scheduleRes.data) {
+        for (const r of scheduleRes.data as Array<{ project_id: string; scheduled_week: string }>) {
+          const existing = scheduleMap.get(r.project_id);
+          if (!existing) {
+            scheduleMap.set(r.project_id, { min: r.scheduled_week, max: r.scheduled_week });
+          } else {
+            if (r.scheduled_week < existing.min) existing.min = r.scheduled_week;
+            if (r.scheduled_week > existing.max) existing.max = r.scheduled_week;
+          }
+        }
+      }
+
       const presets = presetsRes.data || [];
 
       // Build plan hours lookup
