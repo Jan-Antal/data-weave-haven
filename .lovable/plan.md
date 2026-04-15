@@ -1,77 +1,34 @@
 
 
-# Midflight: Inbox zostatok ako súčasť split skupiny
+# Expandable project cards with per-department (úsek) breakdown
 
-## Problém
-Aktuálne sa vytvárajú split bundles v schedule (T13 1/3, T14 2/3, T15 3/3), ale inbox zostatok nie je súčasťou split skupiny. Správne by to malo byť: T13 = 1/4, T14 = 2/4, T15 = 3/4, a inbox zostatok = 4/4.
+## What changes
+Add a collapsible expand/collapse to each project card in the Dílna dashboard. When expanded, it shows horizontal bars for each production department (cinnost_kod) that logged hours on that project during the selected week.
 
-## Riešenie
-V `src/lib/midflightImportPlanVyroby.ts`, zmeniť logiku tak, že:
+## Data changes
 
-1. **`totalParts` = počet hist týždňov + 1** (ak existuje inbox zostatok)
-2. **Schedule inserty**: `split_part: i + 1`, `split_total: totalParts` (vrátane inbox časti)
-3. **Inbox zostatok**: namiesto len redukcie hodín, aktualizovať aj `split_group_id`, `split_part`, `split_total` na poslednom inbox iteme — aby sa zobrazoval ako `4/4`
+**`useDilnaData` hook** — extend the hours query to also select `cinnost_kod` and `cinnost_nazov`. Build a per-project map of `{ kod, nazov, hodiny }[]` alongside the existing totals. Pass this as `usekBreakdown` on each card object.
 
-### Konkrétne zmeny (riadky 240-300):
+## UI changes
 
-```typescript
-// Spočítaj či bude inbox zostatok
-const totalInboxHours = inboxItems 
-  ? inboxItems.reduce((s, i) => s + i.estimated_hours, 0) 
-  : 0;
-const remainderHours = Math.max(0, totalInboxHours - totalHistHours);
-const hasRemainder = remainderHours > 0.05 && inboxItems && inboxItems.length > 0;
+**Project card** — add a clickable expand chevron (ChevronDown icon) to the card header. Track expanded state via `useState<Set<string>>`.
 
-// totalParts = hist weeks + 1 (inbox remainder)
-const totalParts = sortedWeeks.length + (hasRemainder ? 1 : 0);
+When expanded, render a list of departments sorted by hours descending. Each row:
+- Left: department label (e.g. "LAK · Lakovna") — 11px, muted
+- Center: horizontal bar (height 6px, rounded) proportional to max department hours for that project
+- Right: hours value (e.g. "24h") — 11px, tabular
 
-const firstBundleId = crypto.randomUUID();
+Bar color matches the project's overall border color (green/amber/red/gray).
 
-// Schedule inserts for hist weeks (1/4, 2/4, 3/4...)
-for (let i = 0; i < sortedWeeks.length; i++) {
-  // ... same as now but with updated totalParts
-}
+## Files to edit
+1. **`src/components/DilnaDashboard.tsx`** — only file needed
 
-// Inbox reduction + mark last remaining item as split N/N
-if (inboxItems && inboxItems.length > 0) {
-  let remaining = totalHistHours;
-  for (const item of inboxItems) {
-    if (remaining <= 0) break;
-    if (item.estimated_hours <= remaining) {
-      remaining -= item.estimated_hours;
-      inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
-    } else {
-      // This item becomes the remainder — mark as last split part
-      inboxUpdates.push({
-        id: item.id,
-        estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
-        adhoc_reason: "recon_reduced",
-        // NEW: split group fields
-        split_group_id: firstBundleId,
-        split_part: totalParts,    // e.g. 4/4
-        split_total: totalParts,
-      });
-      remaining = 0;
-    }
-  }
-}
-```
-
-4. **Inbox update logic** (riadky ~330-345): rozšíriť update query pre `recon_reduced` items o `split_group_id`, `split_part`, `split_total`
-
-5. **Reset fáza**: pridať revert split fields na inbox items — `split_group_id: null, split_part: null, split_total: null` pre `recon_reduced` items
-
-## Výsledok
-- Byt Osadní v Inbox: **4/4** so zvyškovými hodinami
-- T13: **1/4** s 19h
-- T14: **2/4** s 60h  
-- T15: **3/4** s 44h
-- Vizuálne všetky bundles patria do jednej split skupiny
-
-## Súbor
-| Súbor | Zmena |
-|-------|-------|
-| `src/lib/midflightImportPlanVyroby.ts` | totalParts +1, inbox remainder split fields, reset revert |
-
-Žiadna DB migrácia — `production_inbox` už má `split_group_id`, `split_part`, `split_total` stĺpce.
+## Technical details
+- Add `cinnost_kod, cinnost_nazov` to the `production_hours_log` select in `useDilnaData`
+- Aggregate hours by `(ami_project_id, cinnost_kod)` into a Map
+- Extend the `cards` type with `usekBreakdown: Array<{ kod: string; nazov: string; hodiny: number }>`
+- Filter out TPV/ENG/PRO codes (already excluded by query filter)
+- Add `expandedProjects: Set<string>` state in the component
+- On card click or chevron click, toggle project in/out of the set
+- Render breakdown rows inside the card when expanded, with `animate-accordion-down` for smooth open
 
