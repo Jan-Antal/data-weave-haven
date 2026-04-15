@@ -137,7 +137,7 @@ function StageCostRow({ stage, readOnly, onRequestDelete }: { stage: ProjectStag
             projectId={stage.project_id}
             prodejniCena={stage.prodejni_cena ?? null}
             marze={stage.marze ? parseFloat(String(stage.marze).replace(",", ".")) : null}
-            currency={(stage as any).currency || "CZK"}
+            currency={stage.currency || "CZK"}
             costValues={costValues}
             onChange={handleCostChange}
             readOnly={readOnly}
