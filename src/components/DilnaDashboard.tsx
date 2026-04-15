@@ -173,13 +173,6 @@ function useDilnaData(weekOffset: number) {
 
 /* ── color helpers ───────────────────────────────────────────────── */
 
-function getBorderColor(pct: number, logged: number) {
-  if (logged === 0) return "hsl(var(--border))";
-  if (pct >= 80) return "#639922";
-  if (pct >= 50) return "#BA7517";
-  return "#E24B4A";
-}
-
 function getPillClasses(pct: number, logged: number) {
   if (logged === 0) return "bg-muted text-muted-foreground";
   if (pct >= 80) return "bg-[#639922]/15 text-[#639922]";
@@ -192,13 +185,6 @@ function getBarColor(pct: number, logged: number) {
   if (pct >= 80) return "bg-[#639922]";
   if (pct >= 50) return "bg-[#BA7517]";
   return "bg-[#E24B4A]";
-}
-
-function getBarBgColor(pct: number, logged: number) {
-  if (logged === 0) return "#a1a1aa";
-  if (pct >= 80) return "#639922";
-  if (pct >= 50) return "#BA7517";
-  return "#E24B4A";
 }
 
 function getDailyDot(todayHours: number, dailyTarget: number) {
