@@ -61,7 +61,7 @@ export default function Analytics() {
   const { data: projects = [] } = useProjects();
   type TimeRange = "week" | "month" | "3months" | "year" | "all";
   const [timeRange, setTimeRange] = useState<TimeRange>("3months");
-  const [statusFilters, setStatusFilters] = useState<Set<Balik>>(new Set(["IN_PROGRESS", "DONE", "OVER"]));
+  const [statusFilters, setStatusFilters] = useState<Set<"vyroba" | "done">>(new Set(["vyroba", "done"]));
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -172,9 +172,13 @@ export default function Analytics() {
       });
     }
 
-    // Status (balik) filter
-    if (statusFilters.size < 3) {
-      filtered = filtered.filter((r) => statusFilters.has(r.balik));
+    // Status filter: "vyroba" includes IN_PROGRESS + OVER, "done" = DONE
+    if (statusFilters.size < 2) {
+      filtered = filtered.filter((r) => {
+        if (statusFilters.has("vyroba") && (r.balik === "IN_PROGRESS" || r.balik === "OVER")) return true;
+        if (statusFilters.has("done") && r.balik === "DONE") return true;
+        return false;
+      });
     }
 
     if (search) {
@@ -265,9 +269,8 @@ export default function Analytics() {
 
           <div className="flex items-center gap-1 ml-2">
             {([
-              { key: "IN_PROGRESS" as Balik, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
-              { key: "DONE" as Balik, label: "✅ Hotovo", activeClass: "bg-muted text-muted-foreground" },
-              { key: "OVER" as Balik, label: "⚠ Přesčas", activeClass: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
+              { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
+              { key: "done" as const, label: "✅ Hotovo", activeClass: "bg-muted text-muted-foreground" },
             ]).map((chip) => {
               const active = statusFilters.has(chip.key);
               return (
