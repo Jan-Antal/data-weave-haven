@@ -354,10 +354,10 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                           <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                             <div
                               className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
-                                backgroundColor: barColorHex,
-                              }}
+                            style={{
+                              width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
+                              backgroundColor: projectColor,
+                            }}
                             />
                           </div>
                           <span className="text-[11px] font-medium tabular-nums text-foreground w-10 text-right shrink-0">
