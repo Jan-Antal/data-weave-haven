@@ -233,8 +233,10 @@ export async function midflightImportPlanVyroby(
     const projectInfo = validProjectMap.get(projectId);
     const projectName = projectInfo?.name || projectId;
 
-    // Use first inbox item as template for code/name
-    const templateItem = inboxItems[0];
+    // Use inbox item as template if available, otherwise use project name
+    const templateCode = inboxItems?.[0]?.item_code || projectId;
+    const templateName = inboxItems?.[0]?.item_name || projectName;
+    const templateStageId = inboxItems?.[0]?.stage_id || null;
     const totalHistHours = Math.round((projectTotalHist.get(projectId) || 0) * 10) / 10;
     // Sort weeks chronologically
     const sortedWeeks = [...weeklyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
