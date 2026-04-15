@@ -1,17 +1,23 @@
 /**
  * Dílna — production floor dashboard showing current week's activity.
  */
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
-function getISOWeekForOffset(offset: number): { year: number; week: number; monday: Date; friday: Date; weekKey: string } {
+/** Format Date as YYYY-MM-DD using local timezone (avoids UTC shift). */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function getISOWeekForOffset(offset: number): { year: number; week: number; monday: Date; friday: Date; weekKey: string } {
   const now = new Date();
   const day = now.getDay();
   const diff = day === 0 ? -6 : 1 - day;
@@ -22,7 +28,7 @@ function getISOWeekForOffset(offset: number): { year: number; week: number; mond
   const jan4 = new Date(monday.getFullYear(), 0, 4);
   const daysSinceJan4 = Math.floor((monday.getTime() - jan4.getTime()) / 86400000);
   const week = Math.ceil((daysSinceJan4 + jan4.getDay() + 1) / 7);
-  const weekKey = monday.toISOString().slice(0, 10);
+  const weekKey = toLocalDateStr(monday);
   return { year: monday.getFullYear(), week, monday, friday, weekKey };
 }
 
@@ -53,7 +59,7 @@ function useDilnaData(weekOffset: number) {
   const sundayStr = useMemo(() => {
     const sun = new Date(weekInfo.friday);
     sun.setDate(sun.getDate() + 2);
-    return sun.toISOString().slice(0, 10);
+    return toLocalDateStr(sun);
   }, [weekInfo]);
 
   return useQuery({
