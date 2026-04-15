@@ -230,13 +230,13 @@ export async function midflightImportPlanVyroby(
 
   for (const [projectId, weeklyMap] of projectWeeklyHours) {
     const inboxItems = inboxByProject.get(projectId);
-    if (!inboxItems || inboxItems.length === 0) {
-      onProgress?.(`[midflight] ${projectId}: žiadne inbox items, preskakujem split bundles`);
-      continue;
-    }
+    const projectInfo = validProjectMap.get(projectId);
+    const projectName = projectInfo?.name || projectId;
 
-    // Use first inbox item as template for code/name
-    const templateItem = inboxItems[0];
+    // Use inbox item as template if available, otherwise use project name
+    const templateCode = inboxItems?.[0]?.item_code || projectId;
+    const templateName = inboxItems?.[0]?.item_name || projectName;
+    const templateStageId = inboxItems?.[0]?.stage_id || null;
     const totalHistHours = Math.round((projectTotalHist.get(projectId) || 0) * 10) / 10;
     // Sort weeks chronologically
     const sortedWeeks = [...weeklyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
@@ -253,8 +253,8 @@ export async function midflightImportPlanVyroby(
       scheduleInserts.push({
         id: scheduleId,
         project_id: projectId,
-        item_code: templateItem.item_code || templateItem.item_name,
-        item_name: `${templateItem.item_name} — T${weekNum}`,
+        item_code: templateCode,
+        item_name: `${templateName} — T${weekNum}`,
         scheduled_week: monday,
         scheduled_hours: hours,
         scheduled_czk: 0,
@@ -265,7 +265,7 @@ export async function midflightImportPlanVyroby(
         split_group_id: i === 0 ? null : firstBundleId,
         split_part: i + 1,
         split_total: totalParts,
-        stage_id: templateItem.stage_id || null,
+        stage_id: templateStageId,
       });
 
       // Daily log with 100% completion
@@ -280,20 +280,22 @@ export async function midflightImportPlanVyroby(
       });
     }
 
-    // Reduce inbox items by totalHistHours
-    let remaining = totalHistHours;
-    for (const item of inboxItems) {
-      if (remaining <= 0) break;
-      if (item.estimated_hours <= remaining) {
-        remaining -= item.estimated_hours;
-        inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
-      } else {
-        inboxUpdates.push({
-          id: item.id,
-          estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
-          adhoc_reason: "recon_reduced",
-        });
-        remaining = 0;
+    // Reduce inbox items by totalHistHours (only if inbox items exist)
+    if (inboxItems && inboxItems.length > 0) {
+      let remaining = totalHistHours;
+      for (const item of inboxItems) {
+        if (remaining <= 0) break;
+        if (item.estimated_hours <= remaining) {
+          remaining -= item.estimated_hours;
+          inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
+        } else {
+          inboxUpdates.push({
+            id: item.id,
+            estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
+            adhoc_reason: "recon_reduced",
+          });
+          remaining = 0;
+        }
       }
     }
 
