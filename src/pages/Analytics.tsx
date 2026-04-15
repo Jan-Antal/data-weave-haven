@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +24,7 @@ import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
+import { DilnaDashboard } from "@/components/DilnaDashboard";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
@@ -69,6 +70,7 @@ export default function Analytics() {
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
+  const [dilnaMode, setDilnaMode] = useState(false);
   const { canEditColumns } = useAuth();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
 
@@ -251,184 +253,206 @@ export default function Analytics() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
-      {/* Filter row */}
+      {/* Filter row — always visible for toggle + recalculate */}
       <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b">
-        <div className="flex items-center gap-2">
-          <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
-            <SelectTrigger className="h-7 w-[180px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
-              <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
-              <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
-              <SelectItem value="year" className="text-xs">Poslední rok</SelectItem>
-              <SelectItem value="all" className="text-xs">Vše</SelectItem>
-            </SelectContent>
-          </Select>
+        {!dilnaMode && (
+          <div className="flex items-center gap-2">
+            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
+              <SelectTrigger className="h-7 w-[180px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
+                <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
+                <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
+                <SelectItem value="year" className="text-xs">Poslední rok</SelectItem>
+                <SelectItem value="all" className="text-xs">Vše</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <div className="flex items-center gap-1 ml-2">
-            {([
-              { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
-              { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
-            ]).map((chip) => {
-              const active = statusFilters.has(chip.key);
-              return (
-                <button
-                  key={chip.key}
-                  onClick={() => {
-                    setStatusFilters((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(chip.key)) next.delete(chip.key);
-                      else next.add(chip.key);
-                      return next;
-                    });
-                  }}
-                  className={cn(
-                    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
-                    active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
-                  )}
-                >
-                  {chip.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs gap-1"
-                  disabled={recalculating}
-                  onClick={() => setRecalcDialogOpen(true)}
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", recalculating && "animate-spin")} />
-                  Přepočítat
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Přepočítá hodiny výroby a inboxu podle aktuálních TPV dat</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TableSearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Hledat projekt..."
-          />
-        </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="shrink-0 px-4 py-2 grid grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="pt-3 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Projekty</p>
-            <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-12" /> : summary.count}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Plán hodin</p>
-            <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : formatHours(summary.totalPlan)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Odpracováno</p>
-            <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : formatHours(summary.totalSkutocne)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-2 px-3">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Průměrné čerpání</p>
-            <p className={cn(
-              "text-lg font-bold tabular-nums",
-              summary.avgPct != null && summary.avgPct <= 80 && "text-green-600",
-              summary.avgPct != null && summary.avgPct > 80 && summary.avgPct <= 100 && "text-orange-500",
-              summary.avgPct != null && summary.avgPct > 100 && "text-red-500",
-            )}>
-              {isLoading ? <Skeleton className="h-6 w-12" /> : summary.avgPct != null ? `${summary.avgPct} %` : "—"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Table — same wrapper as PMStatusTable */}
-      <div className="flex-1 min-h-0 px-4 pb-4">
-        {editMode && (
-          <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg shrink-0">
-            Režim úpravy sloupců
+            <div className="flex items-center gap-1 ml-2">
+              {([
+                { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
+                { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
+              ]).map((chip) => {
+                const active = statusFilters.has(chip.key);
+                return (
+                  <button
+                    key={chip.key}
+                    onClick={() => {
+                      setStatusFilters((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(chip.key)) next.delete(chip.key);
+                        else next.add(chip.key);
+                        return next;
+                      });
+                    }}
+                    className={cn(
+                      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
+                      active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
+                    )}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
-        <div className={cn("rounded-lg border bg-card flex flex-col h-full", editMode && "rounded-t-none border-t-0")}>
-          <div className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-card">
-                <TableRow className="bg-primary/5">
-                  {visibleCols.map((col) => (
-                    <SortableHeader
-                      key={col.key}
-                      label={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
-                      column={col.key}
-                      sortCol={sortCol}
-                      sortDir={sortDir}
-                      onSort={toggleSort}
-                      editMode={editMode}
-                      customLabel={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
-                      onLabelChange={(newLabel) => updateLabel(col.key, newLabel)}
-                      onWidthChange={(newWidth) => updateWidth(col.key, newWidth)}
-                      existingLabels={allCurrentLabels}
-                      style={getWidth(col.key) ? { width: getWidth(col.key)! } : undefined}
-                    />
-                  ))}
-                  <ColumnVisibilityToggle
-                    standalone
-                    columns={ANALYTICS_COLUMNS.filter((c) => !c.locked)}
-                    groupLabel="Analytics"
-                    labelTab="analytics"
-                    isVisible={isVisible}
-                    toggleColumn={toggleColumn}
-                    editMode={editMode}
-                    onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
-                    onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
-                  />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {visibleCols.map((_, j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                      ))}
-                      <TableCell />
-                    </TableRow>
-                  ))
-                ) : rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={visibleCols.length + 1} className="text-center py-8 text-muted-foreground text-sm">
-                      Žádné projekty
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((r) => (
-                    <AnalyticsTableRow
-                      key={r.project_id}
-                      row={r}
-                      onOpenDetail={setDetailProjectId}
-                      isVisible={isVisible}
-                      onToggleForceProject={handleToggleForceProject}
-                    />
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+        {dilnaMode && <div />}
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant={dilnaMode ? "default" : "outline"}
+            size="sm"
+            className="h-7 px-2.5 text-xs gap-1.5"
+            onClick={() => setDilnaMode((v) => !v)}
+          >
+            <Factory className="h-3.5 w-3.5" />
+            Dílna
+          </Button>
+          {!dilnaMode && (
+            <>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs gap-1"
+                      disabled={recalculating}
+                      onClick={() => setRecalcDialogOpen(true)}
+                    >
+                      <RefreshCw className={cn("h-3.5 w-3.5", recalculating && "animate-spin")} />
+                      Přepočítat
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Přepočítá hodiny výroby a inboxu podle aktuálních TPV dat</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TableSearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder="Hledat projekt..."
+              />
+            </>
+          )}
         </div>
       </div>
+
+      {dilnaMode ? (
+        <DilnaDashboard />
+      ) : (
+        <>
+          {/* Summary cards */}
+          <div className="shrink-0 px-4 py-2 grid grid-cols-4 gap-3">
+            <Card>
+              <CardContent className="pt-3 pb-2 px-3">
+                <p className="text-[10px] text-muted-foreground mb-0.5">Projekty</p>
+                <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-12" /> : summary.count}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2 px-3">
+                <p className="text-[10px] text-muted-foreground mb-0.5">Plán hodin</p>
+                <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : formatHours(summary.totalPlan)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2 px-3">
+                <p className="text-[10px] text-muted-foreground mb-0.5">Odpracováno</p>
+                <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : formatHours(summary.totalSkutocne)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-3 pb-2 px-3">
+                <p className="text-[10px] text-muted-foreground mb-0.5">Průměrné čerpání</p>
+                <p className={cn(
+                  "text-lg font-bold tabular-nums",
+                  summary.avgPct != null && summary.avgPct <= 80 && "text-green-600",
+                  summary.avgPct != null && summary.avgPct > 80 && summary.avgPct <= 100 && "text-orange-500",
+                  summary.avgPct != null && summary.avgPct > 100 && "text-red-500",
+                )}>
+                  {isLoading ? <Skeleton className="h-6 w-12" /> : summary.avgPct != null ? `${summary.avgPct} %` : "—"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 min-h-0 px-4 pb-4">
+            {editMode && (
+              <div className="bg-accent/10 border border-accent/30 text-accent text-xs font-medium px-3 py-1.5 rounded-t-lg shrink-0">
+                Režim úpravy sloupců
+              </div>
+            )}
+            <div className={cn("rounded-lg border bg-card flex flex-col h-full", editMode && "rounded-t-none border-t-0")}>
+              <div className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-card">
+                    <TableRow className="bg-primary/5">
+                      {visibleCols.map((col) => (
+                        <SortableHeader
+                          key={col.key}
+                          label={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
+                          column={col.key}
+                          sortCol={sortCol}
+                          sortDir={sortDir}
+                          onSort={toggleSort}
+                          editMode={editMode}
+                          customLabel={getLabel(col.key, ANALYTICS_LABEL_MAP[col.key] || col.label)}
+                          onLabelChange={(newLabel) => updateLabel(col.key, newLabel)}
+                          onWidthChange={(newWidth) => updateWidth(col.key, newWidth)}
+                          existingLabels={allCurrentLabels}
+                          style={getWidth(col.key) ? { width: getWidth(col.key)! } : undefined}
+                        />
+                      ))}
+                      <ColumnVisibilityToggle
+                        standalone
+                        columns={ANALYTICS_COLUMNS.filter((c) => !c.locked)}
+                        groupLabel="Analytics"
+                        labelTab="analytics"
+                        isVisible={isVisible}
+                        toggleColumn={toggleColumn}
+                        editMode={editMode}
+                        onToggleEditMode={canEditColumns ? handleToggleEditMode : undefined}
+                        onCancelEditMode={canEditColumns ? handleCancelEditMode : undefined}
+                      />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      Array.from({ length: 8 }).map((_, i) => (
+                        <TableRow key={i}>
+                          {visibleCols.map((_, j) => (
+                            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                          ))}
+                          <TableCell />
+                        </TableRow>
+                      ))
+                    ) : rows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={visibleCols.length + 1} className="text-center py-8 text-muted-foreground text-sm">
+                          Žádné projekty
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      rows.map((r) => (
+                        <AnalyticsTableRow
+                          key={r.project_id}
+                          row={r}
+                          onOpenDetail={setDetailProjectId}
+                          isVisible={isVisible}
+                          onToggleForceProject={handleToggleForceProject}
+                        />
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <ProjectDetailDialog
         project={detailProject}
