@@ -273,75 +273,36 @@ export async function midflightImportPlanVyroby(
     inboxByProjectRecon.get(item.project_id)!.push(item);
   }
 
-  const reconInserts: any[] = [];
+  // No separate HIST_RECON_ inserts needed — HIST_ bundles already cover the historical work.
+  // We only reduce inbox items based on the computed hours.
   const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string }> = [];
 
   for (const [projectId, inboxItems] of inboxByProjectRecon) {
-    // Get hours from allHours for this project
-    const projectHoursByWeek = new Map<string, number>();
+    // Sum hours from allHours for this project
+    let totalHistHours = 0;
     for (const row of allHours) {
       const normalizedId = normalizeProjectId(row.ami_project_id);
       if (normalizedId !== projectId) continue;
-      const monday = getMondayOfWeek(row.datum_sync);
-      projectHoursByWeek.set(monday, (projectHoursByWeek.get(monday) || 0) + row.hodiny);
+      totalHistHours += row.hodiny;
     }
 
-    if (projectHoursByWeek.size === 0) continue;
-
-    const projectName = validProjectMap.get(projectId)?.name || projectId;
-
-    // Create HIST_RECON_ schedule entries per week
-    let totalHistHours = 0;
-    for (const [monday, hours] of projectHoursByWeek) {
-      if (hours < 0.05) continue;
-      const roundedHours = Math.round(hours * 10) / 10;
-      totalHistHours += roundedHours;
-
-      reconInserts.push({
-        project_id: projectId,
-        item_code: `HIST_RECON_${monday.replace(/-/g, "")}`,
-        item_name: `Hist. výroba – ${projectName}`,
-        scheduled_week: monday,
-        scheduled_hours: roundedHours,
-        scheduled_czk: 0,
-        status: "scheduled",
-        is_midflight: true,
-        is_historical: true,
-      });
-    }
+    if (totalHistHours < 0.05) continue;
+    totalHistHours = Math.round(totalHistHours * 10) / 10;
 
     // Reduce inbox items by totalHistHours
     let remaining = totalHistHours;
     for (const item of inboxItems) {
       if (remaining <= 0) break;
       if (item.estimated_hours <= remaining) {
-        // Fully covered — mark with adhoc_reason for rollback
         remaining -= item.estimated_hours;
         inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
       } else {
-        // Partially covered — mark with adhoc_reason for rollback
         inboxUpdates.push({ id: item.id, estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10, adhoc_reason: "recon_reduced" });
         remaining = 0;
       }
     }
 
     onProgress?.(`[recon] ${projectId}: ${totalHistHours}h hist → ${inboxUpdates.filter(u => u.status === "scheduled").length} inbox items marked scheduled`);
-  }
-
-  // Insert HIST_RECON_ bundles
-  if (reconInserts.length > 0) {
-    onProgress?.(`Vkládám ${reconInserts.length} HIST_RECON_ položek...`);
-    for (let i = 0; i < reconInserts.length; i += 200) {
-      const chunk = reconInserts.slice(i, i + 200);
-      const { error: insErr } = await (supabaseClient as any)
-        .from("production_schedule")
-        .insert(chunk);
-      if (insErr) {
-        errors.push(`HIST_RECON insert error (batch ${i}): ${insErr.message}`);
-      } else {
-        created += chunk.length;
-      }
-    }
   }
 
   // Apply inbox updates (with adhoc_reason markers for rollback)
@@ -360,7 +321,6 @@ export async function midflightImportPlanVyroby(
       if (error) errors.push(`Inbox reduce error ${upd.id}: ${error.message}`);
     }
   }
-  // ━━━ END RECONCILIATION ━━━
 
   // ━━━ Insert Expedice/Dokončeno markers to production_expedice ━━━
   const expediceMarkerStatuses = new Set(["expedice", "montáž", "dokončeno", "fakturace"]);
