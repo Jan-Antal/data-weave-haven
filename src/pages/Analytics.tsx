@@ -132,10 +132,51 @@ export default function Analytics() {
     return projects.find((p: any) => p.project_id === detailProjectId) || null;
   }, [detailProjectId, projects]);
 
+  const getTimeRangeStart = useCallback((range: typeof timeRange): string | null => {
+    if (range === "all") return null;
+    const now = new Date();
+    let start: Date;
+    switch (range) {
+      case "week": {
+        const day = now.getDay();
+        const diff = day === 0 ? 6 : day - 1;
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+        break;
+      }
+      case "month":
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case "3months":
+        start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      case "year":
+        start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      default:
+        return null;
+    }
+    return start.toISOString().slice(0, 10);
+  }, [timeRange]);
+
   const rows = useMemo(() => {
     if (!data) return [];
     let filtered = data.rows;
-    if (filter !== "ALL") filtered = filtered.filter((r) => r.balik === filter);
+
+    // Time range filter — project is "active" if hours or schedule overlap
+    const rangeStart = getTimeRangeStart(timeRange);
+    if (rangeStart) {
+      filtered = filtered.filter((r) => {
+        const hoursOverlap = r.tracking_do && r.tracking_do >= rangeStart;
+        const schedOverlap = r.schedule_do && r.schedule_do >= rangeStart;
+        return hoursOverlap || schedOverlap;
+      });
+    }
+
+    // Status (balik) filter
+    if (statusFilters.size < 3) {
+      filtered = filtered.filter((r) => statusFilters.has(r.balik));
+    }
+
     if (search) {
       const q = normalizeSearch(search);
       filtered = filtered.filter(
@@ -182,7 +223,7 @@ export default function Analytics() {
       });
     }
     return sorted;
-  }, [data, filter, search, sortCol, sortDir]);
+  }, [data, timeRange, statusFilters, search, sortCol, sortDir, getTimeRangeStart]);
 
   const summary = useMemo(() => {
     const src = rows;
