@@ -273,8 +273,8 @@ export async function midflightImportPlanVyroby(
     inboxByProjectRecon.get(item.project_id)!.push(item);
   }
 
-  const reconInserts: any[] = [];
-  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string }> = [];
+  // No separate HIST_RECON_ inserts needed — HIST_ bundles already cover the historical work.
+  // We only need to reduce inbox items based on the computed hours.
 
   for (const [projectId, inboxItems] of inboxByProjectRecon) {
     // Get hours from allHours for this project
