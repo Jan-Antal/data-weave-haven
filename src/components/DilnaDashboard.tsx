@@ -97,7 +97,7 @@ function useDilnaData(weekOffset: number) {
       const totalHoursWeek = hours.reduce((s, h) => s + Number(h.hodiny), 0);
 
       // Today's hours
-      const today = new Date().toISOString().slice(0, 10);
+      const today = toLocalDateStr(new Date());
       const todayHours = hours.filter(h => h.datum_sync === today).reduce((s, h) => s + Number(h.hodiny), 0);
 
       // Last sync
