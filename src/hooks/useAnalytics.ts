@@ -187,6 +187,8 @@ export function useAnalytics() {
             preset_label = defaultPreset ? defaultPreset.name : "Default";
           }
 
+          const sched = scheduleMap.get(pid);
+
           rows.push({
             project_id: pid,
             project_name: name,
@@ -200,6 +202,8 @@ export function useAnalytics() {
             trend,
             tracking_od: h?.tracking_od ?? null,
             tracking_do: h?.tracking_do ?? null,
+            schedule_od: sched?.min ?? null,
+            schedule_do: sched?.max ?? null,
             plan_source,
             preset_label,
             warning_low_tpv,
