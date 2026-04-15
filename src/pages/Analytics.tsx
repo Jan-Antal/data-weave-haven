@@ -59,7 +59,9 @@ const ANALYTICS_LABEL_MAP: Record<string, string> = Object.fromEntries(ANALYTICS
 export default function Analytics() {
   const { data, isLoading } = useAnalytics();
   const { data: projects = [] } = useProjects();
-  const [filter, setFilter] = useState<Balik | "ALL">("ALL");
+  type TimeRange = "week" | "month" | "3months" | "year" | "all";
+  const [timeRange, setTimeRange] = useState<TimeRange>("3months");
+  const [statusFilters, setStatusFilters] = useState<Set<Balik>>(new Set(["IN_PROGRESS", "DONE", "OVER"]));
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
