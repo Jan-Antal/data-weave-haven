@@ -274,7 +274,7 @@ export async function midflightImportPlanVyroby(
   }
 
   const reconInserts: any[] = [];
-  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string }> = [];
+  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string }> = [];
 
   for (const [projectId, inboxItems] of inboxByProjectRecon) {
     // Get hours from allHours for this project
