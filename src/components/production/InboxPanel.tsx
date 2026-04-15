@@ -1218,7 +1218,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
       borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
       borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
       borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderLeft: `${leftBorderWidth}px ${isSplitProject ? 'dashed' : 'solid'} ${leftBorderColor}`,
+      borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
       boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
       transition: "border-color 150ms, box-shadow 150ms",
     }}>
