@@ -1333,6 +1333,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const color = getProjectColor(bundle.project_id);
   const project = projectLookup.get(bundle.project_id);
   const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
+  const isSplitBundle = bundle.items.some(i => (i.split_part && i.split_total) || i.split_group_id);
   const isProjectDone = terminalStatuses.has(project?.status ?? "");
   const completedCount = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").length;
   const totalCount = bundle.items.length;
