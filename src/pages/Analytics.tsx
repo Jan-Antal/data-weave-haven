@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/StatusBadge";
-import { StatusBadge } from "@/components/StatusBadge";
 import { useAnalytics, type Balik, type AnalyticsRow } from "@/hooks/useAnalytics";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { useProjects } from "@/hooks/useProjects";
