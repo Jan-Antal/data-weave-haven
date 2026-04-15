@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAnalytics, type Balik, type AnalyticsRow } from "@/hooks/useAnalytics";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
@@ -59,7 +59,9 @@ const ANALYTICS_LABEL_MAP: Record<string, string> = Object.fromEntries(ANALYTICS
 export default function Analytics() {
   const { data, isLoading } = useAnalytics();
   const { data: projects = [] } = useProjects();
-  const [filter, setFilter] = useState<Balik | "ALL">("ALL");
+  type TimeRange = "week" | "month" | "3months" | "year" | "all";
+  const [timeRange, setTimeRange] = useState<TimeRange>("3months");
+  const [statusFilters, setStatusFilters] = useState<Set<Balik>>(new Set(["IN_PROGRESS", "DONE", "OVER"]));
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -130,10 +132,51 @@ export default function Analytics() {
     return projects.find((p: any) => p.project_id === detailProjectId) || null;
   }, [detailProjectId, projects]);
 
+  const getTimeRangeStart = useCallback((range: string): string | null => {
+    if (range === "all") return null;
+    const now = new Date();
+    let start: Date;
+    switch (range) {
+      case "week": {
+        const day = now.getDay();
+        const diff = day === 0 ? 6 : day - 1;
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+        break;
+      }
+      case "month":
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case "3months":
+        start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+        break;
+      case "year":
+        start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+        break;
+      default:
+        return null;
+    }
+    return start.toISOString().slice(0, 10);
+  }, []);
+
   const rows = useMemo(() => {
     if (!data) return [];
     let filtered = data.rows;
-    if (filter !== "ALL") filtered = filtered.filter((r) => r.balik === filter);
+
+    // Time range filter — project is "active" if hours or schedule overlap
+    const rangeStart = getTimeRangeStart(timeRange);
+    if (rangeStart) {
+      filtered = filtered.filter((r) => {
+        const hoursOverlap = r.tracking_do && r.tracking_do >= rangeStart;
+        const schedOverlap = r.schedule_do && r.schedule_do >= rangeStart;
+        return hoursOverlap || schedOverlap;
+      });
+    }
+
+    // Status (balik) filter
+    if (statusFilters.size < 3) {
+      filtered = filtered.filter((r) => statusFilters.has(r.balik));
+    }
+
     if (search) {
       const q = normalizeSearch(search);
       filtered = filtered.filter(
@@ -180,7 +223,7 @@ export default function Analytics() {
       });
     }
     return sorted;
-  }, [data, filter, search, sortCol, sortDir]);
+  }, [data, timeRange, statusFilters, search, sortCol, sortDir, getTimeRangeStart]);
 
   const summary = useMemo(() => {
     const src = rows;
@@ -205,13 +248,50 @@ export default function Analytics() {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Filter row */}
-      <div className="shrink-0 px-4 py-2 flex items-center gap-3 border-b">
-        <ToggleGroup type="single" value={filter} onValueChange={(v) => v && setFilter(v as typeof filter)}>
-          <ToggleGroupItem value="ALL" className="text-xs h-7 px-2.5">Všechny</ToggleGroupItem>
-          <ToggleGroupItem value="IN_PROGRESS" className="text-xs h-7 px-2.5">🔄 Výroba</ToggleGroupItem>
-          <ToggleGroupItem value="DONE" className="text-xs h-7 px-2.5">✅ Hotovo</ToggleGroupItem>
-          <ToggleGroupItem value="OVER" className="text-xs h-7 px-2.5">⚠ Přesčas</ToggleGroupItem>
-        </ToggleGroup>
+      <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b">
+        <div className="flex items-center gap-2">
+          <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
+            <SelectTrigger className="h-7 w-[180px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
+              <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
+              <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
+              <SelectItem value="year" className="text-xs">Poslední rok</SelectItem>
+              <SelectItem value="all" className="text-xs">Vše</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1 ml-2">
+            {([
+              { key: "IN_PROGRESS" as Balik, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
+              { key: "DONE" as Balik, label: "✅ Hotovo", activeClass: "bg-muted text-muted-foreground" },
+              { key: "OVER" as Balik, label: "⚠ Přesčas", activeClass: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
+            ]).map((chip) => {
+              const active = statusFilters.has(chip.key);
+              return (
+                <button
+                  key={chip.key}
+                  onClick={() => {
+                    setStatusFilters((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(chip.key)) next.delete(chip.key);
+                      else next.add(chip.key);
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
+                    active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
+                  )}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <TooltipProvider>
             <Tooltip>

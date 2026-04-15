@@ -19,6 +19,8 @@ export interface AnalyticsRow {
   trend: Trend | null;
   tracking_od: string | null;
   tracking_do: string | null;
+  schedule_od: string | null;
+  schedule_do: string | null;
   plan_source: PlanSource;
   preset_label: string;
   warning_low_tpv: boolean;
@@ -41,7 +43,7 @@ export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics"],
     queryFn: async () => {
-      const [hoursRes, projectsRes, planHoursRes, presetsRes] = await Promise.all([
+      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes] = await Promise.all([
         (supabase.rpc as any)("get_hours_by_project"),
         supabase
           .from("projects")
@@ -53,7 +55,24 @@ export function useAnalytics() {
         supabase
           .from("cost_breakdown_presets")
           .select("id, name, is_default"),
+        supabase
+          .from("production_schedule")
+          .select("project_id, scheduled_week"),
       ]);
+
+      // Build schedule date range lookup
+      const scheduleMap = new Map<string, { min: string; max: string }>();
+      if (scheduleRes.data) {
+        for (const r of scheduleRes.data as Array<{ project_id: string; scheduled_week: string }>) {
+          const existing = scheduleMap.get(r.project_id);
+          if (!existing) {
+            scheduleMap.set(r.project_id, { min: r.scheduled_week, max: r.scheduled_week });
+          } else {
+            if (r.scheduled_week < existing.min) existing.min = r.scheduled_week;
+            if (r.scheduled_week > existing.max) existing.max = r.scheduled_week;
+          }
+        }
+      }
 
       const presets = presetsRes.data || [];
 
@@ -168,6 +187,8 @@ export function useAnalytics() {
             preset_label = defaultPreset ? defaultPreset.name : "Default";
           }
 
+          const sched = scheduleMap.get(pid);
+
           rows.push({
             project_id: pid,
             project_name: name,
@@ -181,6 +202,8 @@ export function useAnalytics() {
             trend,
             tracking_od: h?.tracking_od ?? null,
             tracking_do: h?.tracking_do ?? null,
+            schedule_od: sched?.min ?? null,
+            schedule_do: sched?.max ?? null,
             plan_source,
             preset_label,
             warning_low_tpv,
