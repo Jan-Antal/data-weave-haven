@@ -137,6 +137,7 @@ function StageCostRow({ stage, readOnly, onRequestDelete }: { stage: ProjectStag
             projectId={stage.project_id}
             prodejniCena={stage.prodejni_cena ?? null}
             marze={stage.marze ? parseFloat(String(stage.marze).replace(",", ".")) : null}
+            currency={(stage as any).currency || "CZK"}
             costValues={costValues}
             onChange={handleCostChange}
             readOnly={readOnly}
@@ -239,7 +240,7 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
         <div className="flex justify-between items-center pt-2 border-t border-border">
           <span className="text-xs text-muted-foreground">Σ Součet etap:</span>
           <span className="text-xs font-semibold">
-            {Math.round(totalPrice).toLocaleString("cs-CZ")} Kč
+            {Math.round(totalPrice).toLocaleString("cs-CZ")} {stageCurrency === "EUR" ? "€" : "Kč"}
           </span>
         </div>
       )}
