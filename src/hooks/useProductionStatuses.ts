@@ -129,7 +129,7 @@ export function useProductionStatuses(projectId: string) {
 
       const delayed = entries.filter(e => e.type === "zpozdeni");
       if (delayed.length > 0) {
-        statuses.push({ label: delayed.length > 1 ? `△ Zpoždění (${delayed.length}×)` : "△ Zpoždění ve výrobě", color: "#dc3545" });
+        statuses.push({ label: "△ Zpoždění ve výrobě", color: "#dc3545" });
       }
 
       const veVyrobe = entries.filter(e => e.type === "ve_vyrobe");
@@ -145,7 +145,7 @@ export function useProductionStatuses(projectId: string) {
 
       const pending = entries.filter(e => e.type === "pending");
       if (pending.length > 0) {
-        statuses.push({ label: pending.length > 1 ? `Čeká na plánování (${pending.length}×)` : "Čeká na plánování", color: "#6b7280" });
+        statuses.push({ label: "Čeká na plánování", color: "#6b7280" });
       }
 
       const expediceWait = entries.filter(e => e.type === "expedice_wait");
