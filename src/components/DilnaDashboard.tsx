@@ -198,15 +198,9 @@ function getDailyDot(todayHours: number, dailyTarget: number) {
 
 export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
   const { data, isLoading } = useDilnaData(weekOffset);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [allExpanded, setAllExpanded] = useState(false);
 
-  const toggleExpand = (pid: string) => {
-    setExpandedProjects(prev => {
-      const next = new Set(prev);
-      if (next.has(pid)) next.delete(pid); else next.add(pid);
-      return next;
-    });
-  };
+  const toggleAllExpand = () => setAllExpanded(prev => !prev);
 
   if (isLoading || !data) {
     return (
@@ -268,9 +262,19 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
             Žádné naplánované projekty tento týden
           </div>
         ) : (
+          <div className="flex flex-col gap-3">
+            {/* Global expand/collapse toggle */}
+            <div className="flex justify-end">
+              <button
+                onClick={toggleAllExpand}
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-muted"
+              >
+                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", allExpanded && "rotate-180")} />
+                {allExpanded ? "Sbalit vše" : "Rozbalit vše"}
+              </button>
+            </div>
           <div className="grid grid-cols-3 gap-3">
             {cards.map((card) => {
-              const isExpanded = expandedProjects.has(card.projectId);
               const maxUsekHours = card.usekBreakdown.length > 0 ? card.usekBreakdown[0].hodiny : 1;
               const projectColor = getProjectColor(card.projectId);
 
@@ -286,25 +290,12 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                       <p className="text-[15px] font-medium leading-tight truncate">{card.projectName}</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{card.projectId}</p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className={cn(
-                        "text-[11px] font-semibold px-2 py-0.5 rounded-full tabular-nums",
-                        getPillClasses(card.pct, card.loggedHours)
-                      )}>
-                        {card.pct} %
-                      </span>
-                      {card.usekBreakdown.length > 0 && (
-                        <button
-                          onClick={() => toggleExpand(card.projectId)}
-                          className="p-0.5 rounded hover:bg-muted transition-colors"
-                        >
-                          <ChevronDown className={cn(
-                            "w-3.5 h-3.5 text-muted-foreground transition-transform duration-200",
-                            isExpanded && "rotate-180"
-                          )} />
-                        </button>
-                      )}
-                    </div>
+                    <span className={cn(
+                      "shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full tabular-nums",
+                      getPillClasses(card.pct, card.loggedHours)
+                    )}>
+                      {card.pct} %
+                    </span>
                   </div>
 
                   {/* Progress bar */}
@@ -330,7 +321,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                   </div>
 
                   {/* ── Úsek breakdown (expandable) ── */}
-                  {isExpanded && card.usekBreakdown.length > 0 && (
+                  {allExpanded && card.usekBreakdown.length > 0 && (
                     <div className="mt-1 pt-1.5 border-t border-border/40 flex flex-col gap-1 animate-accordion-down">
                       {card.usekBreakdown.map((u) => (
                         <div key={u.kod} className="flex items-center gap-2">
@@ -340,10 +331,10 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                           <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                             <div
                               className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
-                              backgroundColor: projectColor,
-                            }}
+                              style={{
+                                width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
+                                backgroundColor: projectColor,
+                              }}
                             />
                           </div>
                           <span className="text-[11px] font-medium tabular-nums text-foreground w-10 text-right shrink-0">
@@ -356,6 +347,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                 </div>
               );
             })}
+          </div>
           </div>
         )}
       </div>
