@@ -132,7 +132,7 @@ export default function Analytics() {
     return projects.find((p: any) => p.project_id === detailProjectId) || null;
   }, [detailProjectId, projects]);
 
-  const getTimeRangeStart = useCallback((range: typeof timeRange): string | null => {
+  const getTimeRangeStart = useCallback((range: string): string | null => {
     if (range === "all") return null;
     const now = new Date();
     let start: Date;
@@ -156,7 +156,7 @@ export default function Analytics() {
         return null;
     }
     return start.toISOString().slice(0, 10);
-  }, [timeRange]);
+  }, []);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -248,13 +248,50 @@ export default function Analytics() {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Filter row */}
-      <div className="shrink-0 px-4 py-2 flex items-center gap-3 border-b">
-        <ToggleGroup type="single" value={filter} onValueChange={(v) => v && setFilter(v as typeof filter)}>
-          <ToggleGroupItem value="ALL" className="text-xs h-7 px-2.5">Všechny</ToggleGroupItem>
-          <ToggleGroupItem value="IN_PROGRESS" className="text-xs h-7 px-2.5">🔄 Výroba</ToggleGroupItem>
-          <ToggleGroupItem value="DONE" className="text-xs h-7 px-2.5">✅ Hotovo</ToggleGroupItem>
-          <ToggleGroupItem value="OVER" className="text-xs h-7 px-2.5">⚠ Přesčas</ToggleGroupItem>
-        </ToggleGroup>
+      <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b">
+        <div className="flex items-center gap-2">
+          <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
+            <SelectTrigger className="h-7 w-[180px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
+              <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
+              <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
+              <SelectItem value="year" className="text-xs">Poslední rok</SelectItem>
+              <SelectItem value="all" className="text-xs">Vše</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1 ml-2">
+            {([
+              { key: "IN_PROGRESS" as Balik, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
+              { key: "DONE" as Balik, label: "✅ Hotovo", activeClass: "bg-muted text-muted-foreground" },
+              { key: "OVER" as Balik, label: "⚠ Přesčas", activeClass: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
+            ]).map((chip) => {
+              const active = statusFilters.has(chip.key);
+              return (
+                <button
+                  key={chip.key}
+                  onClick={() => {
+                    setStatusFilters((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(chip.key)) next.delete(chip.key);
+                      else next.add(chip.key);
+                      return next;
+                    });
+                  }}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
+                    active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
+                  )}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <TooltipProvider>
             <Tooltip>
