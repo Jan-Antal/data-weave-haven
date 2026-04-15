@@ -1,55 +1,45 @@
 
 
-# Midflight: Reconciliation inbox projektů s historickými hodinami
+# Midflight opakovateľnosť bez extra DB stĺpca
 
-## Problém
-Projekty v inbox-u (pending) nemají propojení s reálnými hodinami z Alvena. Midflight vytváří HIST_ záznamy, ale neredukuje inbox o již odpracované hodiny.
+## Prístup
+Namiesto `original_estimated_hours` stĺpca využijeme existujúci `adhoc_reason` field na inbox items ako marker + po resete zavoláme `recalculateProductionHours` na prepočet hodin z cien/vzorcov.
 
-## Důležité technické omezení
-- `scheduled_week` je typ `date` (pondělí, formát `YYYY-MM-DD`), **ne** string `2026-T14`
-- Status trigger povoluje pouze `scheduled | in_progress | paused | cancelled` — nelze použít `"historical"`
-- Řešení: použijeme existující `status: "scheduled"` + `is_midflight: true` + item_code prefix `HIST_` (stejně jako stávající HIST_ bundles)
+## Zmeny v `src/lib/midflightImportPlanVyroby.ts`
 
-## Řešení
-Po existujícím HIST_ insertu přidat **reconciliation krok** pro inbox projekty:
+### Reset fáza — pridať obnovu inbox items
+Pred existujúcim resetom:
+1. Nájsť inbox items kde `adhoc_reason = 'recon_scheduled'` → update `status: "pending"`, `adhoc_reason: null`
+2. Nájsť inbox items kde `adhoc_reason LIKE 'recon_reduced%'` → update `status: "pending"`, `adhoc_reason: null`
+3. Po obnove zavolať `recalculateProductionHours(supabaseClient, "all", undefined, true)` — toto prepočíta `estimated_hours` a `estimated_czk` na všetkých inbox items z TPV cien/vzorcov (existujúca logika v riadkoch 172-225 recalculateProductionHours.ts)
 
-### 1. DB migrace
-- Přidat sloupec `is_historical boolean DEFAULT false` na `production_schedule` (pro explicitní rozlišení reconciliation záznamů od běžných HIST_ midflight)
+### Reconciliation fáza — označiť zmenené items
+Pri redukcii inbox items:
+- Plne pokryté (status → "scheduled"): nastaviť `adhoc_reason: "recon_scheduled"`
+- Čiastočne pokryté (redukované hodiny): nastaviť `adhoc_reason: "recon_reduced"`
 
-### 2. Logika v `midflightImportPlanVyroby.ts` (nový blok za HIST_ insert)
+## Tok pri opakovanom spustení
 
-**Krok A**: Identifikovat inbox projekty — projekty s pending items v `production_inbox`
+```text
+1. RESET
+   - Vráť "recon_scheduled" items → pending, clear adhoc_reason
+   - Vráť "recon_reduced" items → pending, clear adhoc_reason  
+   - Zavolaj recalculateProductionHours("all") → prepočíta hodiny z cien
+   - Zmaž HIST_, HIST_RECON_, midflight schedule/inbox/expedice
 
-**Krok B**: Pro každý inbox projekt, z již načtených `allHours` (filtr: `normalizedId` odpovídá `project_id`):
-- Seskupit hodiny dle ISO týdne (getMondayOfWeek z `datum_sync`)
-- Pro každý týden s hodinami vytvořit `production_schedule` řádek:
-  - `item_code: "HIST_RECON_YYYYMMDD"` 
-  - `item_name: "Hist. výroba – [project_name]"`
-  - `scheduled_week: monday` (date)
-  - `scheduled_hours: SUM(hodiny)` zaokrouhleno na 0.1
-  - `status: "scheduled"`, `is_midflight: true`, `is_historical: true`
+2. IMPORT (beze zmeny)
+   - Vytvor HIST_ bundles
 
-**Krok C**: Spočítat `totalHistHours` pro daný projekt. Iterovat inbox items (ordered by `sent_at` ASC):
-- Plně pokryté → `status = "scheduled"` 
-- Částečně pokryté → `estimated_hours = zbytek`
-- Nedotčené → ponechat
+3. RECONCILIATION
+   - Vytvor HIST_RECON_ bundles  
+   - Redukuj inbox s adhoc_reason markermi
+```
 
-**Krok D**: Reset — na začátku smazat `production_schedule WHERE is_historical = true` (v rámci stávajícího hard resetu)
+## Súbory
 
-### 3. Interakce s existujícím kódem
-- Stávající HIST_ flow (pro všechny projekty) zůstává beze změny
-- Reconciliation HIST_RECON_ se vytváří **navíc** pouze pro inbox projekty
-- Pozor na duplicity: reconciliation záznamy mají jiný prefix (`HIST_RECON_`) než běžné (`HIST_`)
+| Súbor | Zmena |
+|-------|-------|
+| `src/lib/midflightImportPlanVyroby.ts` | Reset: revert recon items + recalculate; Reconciliation: adhoc_reason markers |
 
-## Soubory
-
-| Soubor | Změna |
-|--------|-------|
-| Migrace | `ALTER TABLE production_schedule ADD COLUMN is_historical boolean DEFAULT false` |
-| `src/lib/midflightImportPlanVyroby.ts` | Reset: smazat `is_historical = true`; nový blok: reconciliation inbox projektů |
-
-## Data příklad (Z-2605-001 Insia)
-- Inbox: 8 items, 624h
-- Hist hodiny: 22.64h
-- → Vytvoří HIST_RECON_ záznamy dle týdnů, odečte 22.64h z inbox items (první items budou marked scheduled, poslední zůstane s redukovanými hodinami)
+Žiadna DB migrácia nie je potrebná.
 
