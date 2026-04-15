@@ -71,6 +71,13 @@ export async function midflightImportPlanVyroby(
     console.warn("Recalculate failed:", e.message);
   }
 
+  // 0c. Delete daily logs created by midflight (bundle_id contains "::MF_")
+  const { error: errDL } = await (supabaseClient as any)
+    .from("production_daily_logs")
+    .delete()
+    .like("bundle_id", "%::MF_%");
+  if (errDL) console.warn("Delete midflight daily logs failed:", errDL.message);
+
   // 1. Delete ALL midflight entries from production_schedule
   const { error: err1 } = await (supabaseClient as any)
     .from("production_schedule")
@@ -150,12 +157,13 @@ export async function midflightImportPlanVyroby(
     });
   }
 
-  // Group by normalized project + monday
+  // Group by normalized project + monday (only past/current weeks)
   const byProjectMonday = new Map<string, number>();
   for (const row of allHours) {
     const normalizedId = normalizeProjectId(row.ami_project_id);
     if (!validProjectMap.has(normalizedId)) continue;
     const monday = getMondayOfWeek(row.datum_sync);
+    if (monday > currentMonday) continue; // skip future
     const key = `${normalizedId}||${monday}`;
     byProjectMonday.set(key, (byProjectMonday.get(key) || 0) + row.hodiny);
   }
@@ -171,13 +179,26 @@ export async function midflightImportPlanVyroby(
     onProgress?.(`Preskočený neznámy projekt: ${uid}`);
   }
 
-  // Fetch inbox items for current week logic
-  const { data: inboxItems } = await (supabaseClient as any)
+  // Build per-project weekly breakdown
+  const projectWeeklyHours = new Map<string, Map<string, number>>();
+  const projectTotalHist = new Map<string, number>();
+  for (const [key, hours] of byProjectMonday) {
+    if (hours < 0.05) continue;
+    const [projectId, monday] = key.split("||");
+    if (!projectWeeklyHours.has(projectId)) projectWeeklyHours.set(projectId, new Map());
+    projectWeeklyHours.get(projectId)!.set(monday, Math.round(hours * 10) / 10);
+    projectTotalHist.set(projectId, (projectTotalHist.get(projectId) || 0) + hours);
+  }
+
+  // Fetch pending inbox items for reconciliation
+  const { data: pendingInbox } = await (supabaseClient as any)
     .from("production_inbox")
-    .select("id, project_id, estimated_hours")
-    .eq("status", "pending");
-  const inboxByProject = new Map<string, Array<{ id: string; estimated_hours: number }>>();
-  for (const item of inboxItems || []) {
+    .select("id, project_id, item_code, item_name, estimated_hours, estimated_czk, stage_id")
+    .eq("status", "pending")
+    .order("sent_at", { ascending: true });
+
+  const inboxByProject = new Map<string, Array<{ id: string; project_id: string; item_code: string; item_name: string; estimated_hours: number; estimated_czk: number; stage_id: string | null }>>();
+  for (const item of pendingInbox || []) {
     if (!inboxByProject.has(item.project_id)) inboxByProject.set(item.project_id, []);
     inboxByProject.get(item.project_id)!.push(item);
   }
@@ -193,13 +214,8 @@ export async function midflightImportPlanVyroby(
     projectsWithFutureWork.add(s.project_id);
   }
 
-  // Track which projects we've seen, total hours, latest monday, and latest datum_sync
-  const projectsInHours = new Set<string>();
-  const projectTotalHours = new Map<string, number>();
-  const projectLatestMonday = new Map<string, string>();
-  const projectLatestDatum = new Map<string, string>();
-
   // Track latest datum_sync per normalized project from raw hours
+  const projectLatestDatum = new Map<string, string>();
   for (const row of allHours) {
     const normalizedId = normalizeProjectId(row.ami_project_id);
     if (!validProjectMap.has(normalizedId)) continue;
@@ -207,87 +223,61 @@ export async function midflightImportPlanVyroby(
     if (!prev || row.datum_sync > prev) projectLatestDatum.set(normalizedId, row.datum_sync);
   }
 
-  // Schedule inserts only (no inbox inserts for expedice)
+  // ━━━ CREATE SPLIT BUNDLES from inbox items ━━━
   const scheduleInserts: any[] = [];
+  const dailyLogInserts: any[] = [];
+  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string }> = [];
 
-  for (const [key, totalHours] of byProjectMonday) {
-    const [projectId, monday] = key.split("||");
-    const projectName = validProjectMap.get(projectId)?.name || projectId;
-    projectsInHours.add(projectId);
+  for (const [projectId, weeklyMap] of projectWeeklyHours) {
+    const inboxItems = inboxByProject.get(projectId);
+    if (!inboxItems || inboxItems.length === 0) {
+      onProgress?.(`[midflight] ${projectId}: žiadne inbox items, preskakujem split bundles`);
+      continue;
+    }
 
-    // Track total hours and latest monday per project
-    projectTotalHours.set(projectId, (projectTotalHours.get(projectId) || 0) + totalHours);
-    const prev = projectLatestMonday.get(projectId);
-    if (!prev || monday > prev) projectLatestMonday.set(projectId, monday);
+    // Use first inbox item as template for code/name
+    const templateItem = inboxItems[0];
+    const totalHistHours = Math.round((projectTotalHist.get(projectId) || 0) * 10) / 10;
+    const splitGroupId = crypto.randomUUID();
 
-    if (monday <= currentMonday) {
-      // Skip weeks with negligible hours (< 0.05h)
-      if (totalHours < 0.05) continue;
+    // Sort weeks chronologically
+    const sortedWeeks = [...weeklyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const totalParts = sortedWeeks.length;
 
-      const itemCode = `HIST_${monday.replace(/-/g, "")}`;
+    for (let i = 0; i < sortedWeeks.length; i++) {
+      const [monday, hours] = sortedWeeks[i];
+      const scheduleId = crypto.randomUUID();
+      const weekNum = getISOWeekNumber(monday);
 
       scheduleInserts.push({
+        id: scheduleId,
         project_id: projectId,
-        item_code: itemCode,
-        item_name: `${projectName} — história ${monday}`,
+        item_code: templateItem.item_code || templateItem.item_name,
+        item_name: `${templateItem.item_name} — T${weekNum}`,
         scheduled_week: monday,
-        scheduled_hours: Math.round(totalHours * 10) / 10,
+        scheduled_hours: hours,
         scheduled_czk: 0,
         status: "scheduled",
         is_midflight: true,
+        completed_at: new Date().toISOString(),
+        completed_by: userId,
+        split_group_id: splitGroupId,
+        split_part: i + 1,
+        split_total: totalParts,
+        stage_id: templateItem.stage_id || null,
+      });
+
+      // Daily log with 100% completion
+      const bundleId = `${projectId}::MF_${monday}`;
+      dailyLogInserts.push({
+        bundle_id: bundleId,
+        week_key: monday,
+        day_index: 4, // Friday
+        percent: 100,
+        phase: "Expedice",
+        logged_by: userId,
       });
     }
-    // future weeks: skip
-  }
-
-  // ━━━ Insert HIST_ bundles to production_schedule ━━━
-  if (scheduleInserts.length > 0) {
-    onProgress?.(`Vkládám ${scheduleInserts.length} HIST_ položek do plánu...`);
-    for (let i = 0; i < scheduleInserts.length; i += 200) {
-      const chunk = scheduleInserts.slice(i, i + 200);
-      const { error: insErr } = await (supabaseClient as any)
-        .from("production_schedule")
-        .upsert(chunk, { onConflict: "project_id,item_code,scheduled_week", ignoreDuplicates: true });
-      if (insErr) {
-        errors.push(`Schedule insert error (batch ${i}): ${insErr.message}`);
-      } else {
-        created += chunk.length;
-      }
-    }
-  }
-
-  // ━━━ RECONCILIATION: Inbox projects vs historical hours ━━━
-  onProgress?.("[midflight] Spúšťam reconciliation inbox projektov...");
-
-  // Fetch current pending inbox items (after reset, only non-midflight remain)
-  const { data: pendingInbox } = await (supabaseClient as any)
-    .from("production_inbox")
-    .select("id, project_id, item_name, estimated_hours, estimated_czk, sent_at, status")
-    .eq("status", "pending")
-    .order("sent_at", { ascending: true });
-
-  // Group pending inbox by project
-  const inboxByProjectRecon = new Map<string, Array<{ id: string; project_id: string; item_name: string; estimated_hours: number; estimated_czk: number; sent_at: string }>>();
-  for (const item of pendingInbox || []) {
-    if (!inboxByProjectRecon.has(item.project_id)) inboxByProjectRecon.set(item.project_id, []);
-    inboxByProjectRecon.get(item.project_id)!.push(item);
-  }
-
-  // No separate HIST_RECON_ inserts needed — HIST_ bundles already cover the historical work.
-  // We only reduce inbox items based on the computed hours.
-  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string; adhoc_reason?: string }> = [];
-
-  for (const [projectId, inboxItems] of inboxByProjectRecon) {
-    // Sum hours from allHours for this project
-    let totalHistHours = 0;
-    for (const row of allHours) {
-      const normalizedId = normalizeProjectId(row.ami_project_id);
-      if (normalizedId !== projectId) continue;
-      totalHistHours += row.hodiny;
-    }
-
-    if (totalHistHours < 0.05) continue;
-    totalHistHours = Math.round(totalHistHours * 10) / 10;
 
     // Reduce inbox items by totalHistHours
     let remaining = totalHistHours;
@@ -297,15 +287,49 @@ export async function midflightImportPlanVyroby(
         remaining -= item.estimated_hours;
         inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
       } else {
-        inboxUpdates.push({ id: item.id, estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10, adhoc_reason: "recon_reduced" });
+        inboxUpdates.push({
+          id: item.id,
+          estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
+          adhoc_reason: "recon_reduced",
+        });
         remaining = 0;
       }
     }
 
-    onProgress?.(`[recon] ${projectId}: ${totalHistHours}h hist → ${inboxUpdates.filter(u => u.status === "scheduled").length} inbox items marked scheduled`);
+    onProgress?.(`[midflight] ${projectId}: ${totalHistHours}h → ${sortedWeeks.length} split bundles, ${inboxUpdates.filter(u => u.status === "scheduled").length} inbox scheduled`);
   }
 
-  // Apply inbox updates (with adhoc_reason markers for rollback)
+  // ━━━ Insert schedule bundles ━━━
+  if (scheduleInserts.length > 0) {
+    onProgress?.(`Vkládám ${scheduleInserts.length} split bundles do plánu...`);
+    for (let i = 0; i < scheduleInserts.length; i += 200) {
+      const chunk = scheduleInserts.slice(i, i + 200);
+      const { error: insErr } = await (supabaseClient as any)
+        .from("production_schedule")
+        .insert(chunk);
+      if (insErr) {
+        errors.push(`Schedule insert error (batch ${i}): ${insErr.message}`);
+      } else {
+        created += chunk.length;
+      }
+    }
+  }
+
+  // ━━━ Insert daily logs ━━━
+  if (dailyLogInserts.length > 0) {
+    onProgress?.(`Vkládám ${dailyLogInserts.length} daily logov (100%)...`);
+    for (let i = 0; i < dailyLogInserts.length; i += 200) {
+      const chunk = dailyLogInserts.slice(i, i + 200);
+      const { error: insErr } = await (supabaseClient as any)
+        .from("production_daily_logs")
+        .insert(chunk);
+      if (insErr) {
+        errors.push(`Daily log insert error (batch ${i}): ${insErr.message}`);
+      }
+    }
+  }
+
+  // ━━━ Apply inbox updates ━━━
   for (const upd of inboxUpdates) {
     if (upd.status === "scheduled") {
       const { error } = await (supabaseClient as any)
@@ -382,4 +406,18 @@ export async function midflightImportPlanVyroby(
 
   onProgress?.(`Hotovo. Vytvořeno: ${created}, Přeskočeno: ${skipped}`);
   return { created, skipped, errors };
+}
+
+/** Get ISO week number from a Monday date string */
+function getISOWeekNumber(dateStr: string): number {
+  const d = new Date(dateStr);
+  const dayOfYear = Math.floor((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000) + 1;
+  const weekNum = Math.ceil((dayOfYear + new Date(d.getFullYear(), 0, 1).getDay() - 1) / 7);
+  // Use proper ISO calculation
+  const jan4 = new Date(d.getFullYear(), 0, 4);
+  const jan4Day = jan4.getDay() || 7;
+  const isoStart = new Date(jan4);
+  isoStart.setDate(jan4.getDate() - jan4Day + 1);
+  const diff = d.getTime() - isoStart.getTime();
+  return Math.floor(diff / (7 * 86400000)) + 1;
 }
