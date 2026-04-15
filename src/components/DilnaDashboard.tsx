@@ -286,7 +286,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
             {cards.map((card) => {
               const isExpanded = expandedProjects.has(card.projectId);
               const maxUsekHours = card.usekBreakdown.length > 0 ? card.usekBreakdown[0].hodiny : 1;
-              const barColorHex = getBarBgColor(card.pct, card.loggedHours);
+              const projectColor = getProjectColor(card.projectId);
 
               return (
                 <div
