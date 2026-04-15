@@ -1250,6 +1250,16 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
               <span style={{ fontSize: 11, color: deadlineDisplay.color }}>· {deadlineDisplay.label}: {deadlineDisplay.dateStr}</span>
             )}
           </div>
+          {(() => {
+            const splitItem = project.items.find(i => (i as any).split_part && (i as any).split_total);
+            if (!splitItem) return null;
+            return (
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Split</span>
+                <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{(splitItem as any).split_part}/{(splitItem as any).split_total}</span>
+              </div>
+            );
+          })()}
           {progress && <div className="mt-1"><ProjectProgressBar progress={progress} compact /></div>}
         </div>
         <div className="text-right shrink-0">

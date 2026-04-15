@@ -1556,8 +1556,13 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               )}
             </div>
             {isMidflightBundle ? (
-              <div style={{ fontSize: 10, marginTop: 1 }}>
+              <div className="flex items-center gap-1" style={{ fontSize: 10, marginTop: 1 }}>
                 <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Legacy</span>
+                {(() => {
+                  const splitItem = bundle.items.find(i => i.split_part && i.split_total);
+                  if (!splitItem) return null;
+                  return <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{splitItem.split_part}/{splitItem.split_total}</span>;
+                })()}
               </div>
             ) : (
               <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
