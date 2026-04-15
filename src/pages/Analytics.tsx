@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,6 +24,7 @@ import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
+import { DilnaDashboard } from "@/components/DilnaDashboard";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
