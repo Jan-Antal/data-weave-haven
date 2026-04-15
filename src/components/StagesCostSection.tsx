@@ -137,6 +137,7 @@ function StageCostRow({ stage, readOnly, onRequestDelete }: { stage: ProjectStag
             projectId={stage.project_id}
             prodejniCena={stage.prodejni_cena ?? null}
             marze={stage.marze ? parseFloat(String(stage.marze).replace(",", ".")) : null}
+            currency={stage.currency || "CZK"}
             costValues={costValues}
             onChange={handleCostChange}
             readOnly={readOnly}
@@ -167,6 +168,7 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const isAutoSum = !useProjectPrice;
+  const stageCurrency = stages[0]?.currency || "CZK";
 
   const totalPrice = stages.reduce((sum, s) => sum + (s.prodejni_cena ?? 0), 0);
 
@@ -239,7 +241,7 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
         <div className="flex justify-between items-center pt-2 border-t border-border">
           <span className="text-xs text-muted-foreground">Σ Součet etap:</span>
           <span className="text-xs font-semibold">
-            {Math.round(totalPrice).toLocaleString("cs-CZ")} Kč
+            {Math.round(totalPrice).toLocaleString("cs-CZ")} {stageCurrency === "EUR" ? "€" : "Kč"}
           </span>
         </div>
       )}

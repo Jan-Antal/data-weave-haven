@@ -1169,6 +1169,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
             projectId={project.project_id}
             prodejniCena={form.prodejni_cena ? Number(form.prodejni_cena) : null}
             marze={form.marze ? parseFloat(String(form.marze).replace(",", ".")) : null}
+            currency={form.currency || "CZK"}
+            projectYear={project.created_at ? new Date(project.created_at).getFullYear() : undefined}
             costValues={{
               cost_preset_id: form.cost_preset_id,
               cost_material_pct: form.cost_material_pct,
