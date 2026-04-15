@@ -1133,7 +1133,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           <Label className="text-xs">Marže {isMultiStage && !form.plan_use_project_price ? <span className="text-muted-foreground">(Ø z etap)</span> : null}</Label>
           {isMultiStage && !form.plan_use_project_price ? (
             <Input
-              value={stageOverrides.weightedMarze != null ? `Ø ${stageOverrides.weightedMarze} %` : "Ø —"}
+              value={stageOverrides.weightedMarze != null ? `Ø ${Math.round(stageOverrides.weightedMarze * 1000) / 10} %` : "Ø —"}
               disabled
               className="opacity-70 cursor-default bg-muted/50"
             />
