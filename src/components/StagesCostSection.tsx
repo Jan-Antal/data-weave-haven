@@ -168,6 +168,7 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const isAutoSum = !useProjectPrice;
+  const stageCurrency = stages[0]?.currency || "CZK";
 
   const totalPrice = stages.reduce((sum, s) => sum + (s.prodejni_cena ?? 0), 0);
 
