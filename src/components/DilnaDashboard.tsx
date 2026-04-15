@@ -1,17 +1,23 @@
 /**
  * Dílna — production floor dashboard showing current week's activity.
  */
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
-function getISOWeekForOffset(offset: number): { year: number; week: number; monday: Date; friday: Date; weekKey: string } {
+/** Format Date as YYYY-MM-DD using local timezone (avoids UTC shift). */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function getISOWeekForOffset(offset: number): { year: number; week: number; monday: Date; friday: Date; weekKey: string } {
   const now = new Date();
   const day = now.getDay();
   const diff = day === 0 ? -6 : 1 - day;
@@ -22,7 +28,7 @@ function getISOWeekForOffset(offset: number): { year: number; week: number; mond
   const jan4 = new Date(monday.getFullYear(), 0, 4);
   const daysSinceJan4 = Math.floor((monday.getTime() - jan4.getTime()) / 86400000);
   const week = Math.ceil((daysSinceJan4 + jan4.getDay() + 1) / 7);
-  const weekKey = monday.toISOString().slice(0, 10);
+  const weekKey = toLocalDateStr(monday);
   return { year: monday.getFullYear(), week, monday, friday, weekKey };
 }
 
@@ -53,7 +59,7 @@ function useDilnaData(weekOffset: number) {
   const sundayStr = useMemo(() => {
     const sun = new Date(weekInfo.friday);
     sun.setDate(sun.getDate() + 2);
-    return sun.toISOString().slice(0, 10);
+    return toLocalDateStr(sun);
   }, [weekInfo]);
 
   return useQuery({
@@ -91,7 +97,7 @@ function useDilnaData(weekOffset: number) {
       const totalHoursWeek = hours.reduce((s, h) => s + Number(h.hodiny), 0);
 
       // Today's hours
-      const today = new Date().toISOString().slice(0, 10);
+      const today = toLocalDateStr(new Date());
       const todayHours = hours.filter(h => h.datum_sync === today).reduce((s, h) => s + Number(h.hodiny), 0);
 
       // Last sync
@@ -190,8 +196,7 @@ function getDailyDot(todayHours: number, dailyTarget: number) {
 
 /* ── component ───────────────────────────────────────────────────── */
 
-export function DilnaDashboard() {
-  const [weekOffset, setWeekOffset] = useState(0);
+export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
   const { data, isLoading } = useDilnaData(weekOffset);
 
   if (isLoading || !data) {
@@ -211,31 +216,15 @@ export function DilnaDashboard() {
 
   const { weekInfo, weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
-  const isCurrentWeek = weekOffset === 0;
 
   return (
     <div className="h-full flex flex-col bg-background overflow-hidden">
       {/* ── HEADER ─────────────────────────────────────────────── */}
       <div className="shrink-0 px-4 py-2.5 border-b bg-muted/30 flex items-center gap-6">
-        {/* Left: week picker */}
-        <div className="shrink-0 flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setWeekOffset(o => o - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <button
-            className={cn(
-              "text-sm font-bold tabular-nums px-1.5 py-0.5 rounded hover:bg-muted transition-colors",
-              !isCurrentWeek && "text-primary underline underline-offset-2 cursor-pointer"
-            )}
-            onClick={() => setWeekOffset(0)}
-            title="Zpět na aktuální týden"
-          >
-            T{weekInfo.week}
-          </button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setWeekOffset(o => o + 1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <span className="text-xs text-muted-foreground ml-1">
+        {/* Left: week label (navigation is in parent filter bar) */}
+        <div className="shrink-0">
+          <span className="text-sm font-bold tabular-nums">T{weekInfo.week}</span>
+          <span className="text-xs text-muted-foreground ml-1.5">
             {fmtDate(weekInfo.monday)} – {fmtDate(weekInfo.friday)}
           </span>
         </div>

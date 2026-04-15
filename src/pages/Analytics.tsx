@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory } from "lucide-react";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,7 +24,7 @@ import { recalculateProductionHours } from "@/lib/recalculateProductionHours";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
-import { DilnaDashboard } from "@/components/DilnaDashboard";
+import { DilnaDashboard, getISOWeekForOffset } from "@/components/DilnaDashboard";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
@@ -71,6 +71,7 @@ export default function Analytics() {
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
   const [dilnaMode, setDilnaMode] = useState(false);
+  const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
 
@@ -299,7 +300,35 @@ export default function Analytics() {
             </div>
           </div>
         )}
-        {dilnaMode && <div />}
+        {dilnaMode && (
+          (() => {
+            const wi = getISOWeekForOffset(dilnaWeekOffset);
+            const isCurrentWeek = dilnaWeekOffset === 0;
+            return (
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDilnaWeekOffset(o => o - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <button
+                  className={cn(
+                    "text-sm font-bold tabular-nums px-1.5 py-0.5 rounded hover:bg-muted transition-colors",
+                    !isCurrentWeek && "text-primary underline underline-offset-2 cursor-pointer"
+                  )}
+                  onClick={() => setDilnaWeekOffset(0)}
+                  title="Zpět na aktuální týden"
+                >
+                  T{wi.week}
+                </button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDilnaWeekOffset(o => o + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground ml-1">
+                  {wi.monday.getDate()}.{wi.monday.getMonth() + 1}. – {wi.friday.getDate()}.{wi.friday.getMonth() + 1}.
+                </span>
+              </div>
+            );
+          })()
+        )}
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant={dilnaMode ? "default" : "outline"}
@@ -340,7 +369,7 @@ export default function Analytics() {
       </div>
 
       {dilnaMode ? (
-        <DilnaDashboard />
+        <DilnaDashboard weekOffset={dilnaWeekOffset} />
       ) : (
         <>
           {/* Summary cards */}
