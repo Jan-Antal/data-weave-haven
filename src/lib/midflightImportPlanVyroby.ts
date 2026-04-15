@@ -238,15 +238,16 @@ export async function midflightImportPlanVyroby(
     // Use first inbox item as template for code/name
     const templateItem = inboxItems[0];
     const totalHistHours = Math.round((projectTotalHist.get(projectId) || 0) * 10) / 10;
-    const splitGroupId = crypto.randomUUID();
-
     // Sort weeks chronologically
     const sortedWeeks = [...weeklyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
     const totalParts = sortedWeeks.length;
 
+    // First bundle's ID serves as split_group_id for the rest (FK constraint)
+    const firstBundleId = crypto.randomUUID();
+
     for (let i = 0; i < sortedWeeks.length; i++) {
       const [monday, hours] = sortedWeeks[i];
-      const scheduleId = crypto.randomUUID();
+      const scheduleId = i === 0 ? firstBundleId : crypto.randomUUID();
       const weekNum = getISOWeekNumber(monday);
 
       scheduleInserts.push({
@@ -261,7 +262,7 @@ export async function midflightImportPlanVyroby(
         is_midflight: true,
         completed_at: new Date().toISOString(),
         completed_by: userId,
-        split_group_id: splitGroupId,
+        split_group_id: i === 0 ? null : firstBundleId,
         split_part: i + 1,
         split_total: totalParts,
         stage_id: templateItem.stage_id || null,
