@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { recalculateProductionHours } from "./recalculateProductionHours";
 
 /**
  * Normalize project IDs: "Z-2501-002R" → "Z-2501-002-R"
@@ -47,6 +48,28 @@ export async function midflightImportPlanVyroby(
 
   // ━━━ HARD RESET ━━━
   onProgress?.("[midflight] Resetujem všetky midflight dáta...");
+
+  // 0a. Revert inbox items marked by previous reconciliation
+  onProgress?.("[midflight] Obnovujem inbox items z predchádzajúcej reconciliation...");
+  const { error: errReconSched } = await (supabaseClient as any)
+    .from("production_inbox")
+    .update({ status: "pending", adhoc_reason: null })
+    .eq("adhoc_reason", "recon_scheduled");
+  if (errReconSched) console.warn("Revert recon_scheduled failed:", errReconSched.message);
+
+  const { error: errReconReduced } = await (supabaseClient as any)
+    .from("production_inbox")
+    .update({ status: "pending", adhoc_reason: null })
+    .like("adhoc_reason", "recon_reduced%");
+  if (errReconReduced) console.warn("Revert recon_reduced failed:", errReconReduced.message);
+
+  // 0b. Recalculate all inbox hours from prices/formulas to restore original values
+  onProgress?.("[midflight] Prepočítavam hodiny inboxu z cien...");
+  try {
+    await recalculateProductionHours(supabaseClient, "all", undefined, true);
+  } catch (e: any) {
+    console.warn("Recalculate failed:", e.message);
+  }
 
   // 1. Delete ALL midflight entries from production_schedule
   const { error: err1 } = await (supabaseClient as any)
@@ -292,12 +315,12 @@ export async function midflightImportPlanVyroby(
     for (const item of inboxItems) {
       if (remaining <= 0) break;
       if (item.estimated_hours <= remaining) {
-        // Fully covered
+        // Fully covered — mark with adhoc_reason for rollback
         remaining -= item.estimated_hours;
-        inboxUpdates.push({ id: item.id, status: "scheduled" });
+        inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
       } else {
-        // Partially covered
-        inboxUpdates.push({ id: item.id, estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10 });
+        // Partially covered — mark with adhoc_reason for rollback
+        inboxUpdates.push({ id: item.id, estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10, adhoc_reason: "recon_reduced" });
         remaining = 0;
       }
     }
@@ -321,18 +344,18 @@ export async function midflightImportPlanVyroby(
     }
   }
 
-  // Apply inbox updates
+  // Apply inbox updates (with adhoc_reason markers for rollback)
   for (const upd of inboxUpdates) {
     if (upd.status === "scheduled") {
       const { error } = await (supabaseClient as any)
         .from("production_inbox")
-        .update({ status: "scheduled" })
+        .update({ status: "scheduled", adhoc_reason: upd.adhoc_reason })
         .eq("id", upd.id);
       if (error) errors.push(`Inbox update error ${upd.id}: ${error.message}`);
     } else if (upd.estimated_hours !== undefined) {
       const { error } = await (supabaseClient as any)
         .from("production_inbox")
-        .update({ estimated_hours: upd.estimated_hours })
+        .update({ estimated_hours: upd.estimated_hours, adhoc_reason: upd.adhoc_reason })
         .eq("id", upd.id);
       if (error) errors.push(`Inbox reduce error ${upd.id}: ${error.message}`);
     }
