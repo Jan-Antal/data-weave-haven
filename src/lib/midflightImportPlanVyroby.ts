@@ -233,6 +233,112 @@ export async function midflightImportPlanVyroby(
     }
   }
 
+  // ━━━ RECONCILIATION: Inbox projects vs historical hours ━━━
+  onProgress?.("[midflight] Spúšťam reconciliation inbox projektov...");
+
+  // Fetch current pending inbox items (after reset, only non-midflight remain)
+  const { data: pendingInbox } = await (supabaseClient as any)
+    .from("production_inbox")
+    .select("id, project_id, item_name, estimated_hours, estimated_czk, sent_at, status")
+    .eq("status", "pending")
+    .order("sent_at", { ascending: true });
+
+  // Group pending inbox by project
+  const inboxByProjectRecon = new Map<string, Array<{ id: string; project_id: string; item_name: string; estimated_hours: number; estimated_czk: number; sent_at: string }>>();
+  for (const item of pendingInbox || []) {
+    if (!inboxByProjectRecon.has(item.project_id)) inboxByProjectRecon.set(item.project_id, []);
+    inboxByProjectRecon.get(item.project_id)!.push(item);
+  }
+
+  const reconInserts: any[] = [];
+  const inboxUpdates: Array<{ id: string; estimated_hours?: number; status?: string }> = [];
+
+  for (const [projectId, inboxItems] of inboxByProjectRecon) {
+    // Get hours from allHours for this project
+    const projectHoursByWeek = new Map<string, number>();
+    for (const row of allHours) {
+      const normalizedId = normalizeProjectId(row.ami_project_id);
+      if (normalizedId !== projectId) continue;
+      const monday = getMondayOfWeek(row.datum_sync);
+      projectHoursByWeek.set(monday, (projectHoursByWeek.get(monday) || 0) + row.hodiny);
+    }
+
+    if (projectHoursByWeek.size === 0) continue;
+
+    const projectName = validProjectMap.get(projectId)?.name || projectId;
+
+    // Create HIST_RECON_ schedule entries per week
+    let totalHistHours = 0;
+    for (const [monday, hours] of projectHoursByWeek) {
+      if (hours < 0.05) continue;
+      const roundedHours = Math.round(hours * 10) / 10;
+      totalHistHours += roundedHours;
+
+      reconInserts.push({
+        project_id: projectId,
+        item_code: `HIST_RECON_${monday.replace(/-/g, "")}`,
+        item_name: `Hist. výroba – ${projectName}`,
+        scheduled_week: monday,
+        scheduled_hours: roundedHours,
+        scheduled_czk: 0,
+        status: "scheduled",
+        is_midflight: true,
+        is_historical: true,
+      });
+    }
+
+    // Reduce inbox items by totalHistHours
+    let remaining = totalHistHours;
+    for (const item of inboxItems) {
+      if (remaining <= 0) break;
+      if (item.estimated_hours <= remaining) {
+        // Fully covered
+        remaining -= item.estimated_hours;
+        inboxUpdates.push({ id: item.id, status: "scheduled" });
+      } else {
+        // Partially covered
+        inboxUpdates.push({ id: item.id, estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10 });
+        remaining = 0;
+      }
+    }
+
+    onProgress?.(`[recon] ${projectId}: ${totalHistHours}h hist → ${inboxUpdates.filter(u => u.status === "scheduled").length} inbox items marked scheduled`);
+  }
+
+  // Insert HIST_RECON_ bundles
+  if (reconInserts.length > 0) {
+    onProgress?.(`Vkládám ${reconInserts.length} HIST_RECON_ položek...`);
+    for (let i = 0; i < reconInserts.length; i += 200) {
+      const chunk = reconInserts.slice(i, i + 200);
+      const { error: insErr } = await (supabaseClient as any)
+        .from("production_schedule")
+        .insert(chunk);
+      if (insErr) {
+        errors.push(`HIST_RECON insert error (batch ${i}): ${insErr.message}`);
+      } else {
+        created += chunk.length;
+      }
+    }
+  }
+
+  // Apply inbox updates
+  for (const upd of inboxUpdates) {
+    if (upd.status === "scheduled") {
+      const { error } = await (supabaseClient as any)
+        .from("production_inbox")
+        .update({ status: "scheduled" })
+        .eq("id", upd.id);
+      if (error) errors.push(`Inbox update error ${upd.id}: ${error.message}`);
+    } else if (upd.estimated_hours !== undefined) {
+      const { error } = await (supabaseClient as any)
+        .from("production_inbox")
+        .update({ estimated_hours: upd.estimated_hours })
+        .eq("id", upd.id);
+      if (error) errors.push(`Inbox reduce error ${upd.id}: ${error.message}`);
+    }
+  }
+  // ━━━ END RECONCILIATION ━━━
+
   // ━━━ Insert Expedice/Dokončeno markers to production_expedice ━━━
   const expediceMarkerStatuses = new Set(["expedice", "montáž", "dokončeno", "fakturace"]);
   const activeExpediceStatuses = new Set(["expedice", "montáž"]);
@@ -250,11 +356,9 @@ export async function midflightImportPlanVyroby(
     let expExpedicedAt: string | null = null;
 
     if (activeExpediceStatuses.has(projectInfo.status)) {
-      // Expedice/Montáž → active (not yet expediced)
       manufacturedAt = latestDatum || new Date().toISOString().split("T")[0];
       expExpedicedAt = null;
     } else {
-      // Dokončeno/Fakturace → archived
       if (latestDatum) {
         const nextDay = new Date(latestDatum);
         nextDay.setDate(nextDay.getDate() + 1);
