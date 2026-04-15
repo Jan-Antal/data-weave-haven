@@ -270,7 +270,7 @@ export default function Analytics() {
           <div className="flex items-center gap-1 ml-2">
             {([
               { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
-              { key: "done" as const, label: "✅ Hotovo", activeClass: "bg-muted text-muted-foreground" },
+              { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
             ]).map((chip) => {
               const active = statusFilters.has(chip.key);
               return (
