@@ -289,30 +289,39 @@ export async function midflightImportPlanVyroby(
       });
     }
 
-    // Reduce inbox items by totalHistHours (only if inbox items exist)
-    if (inboxItems && inboxItems.length > 0) {
-      let remaining = totalHistHours;
+    // Reduce inbox items proportionally by totalHistHours (apply split metadata to ALL items)
+    if (inboxItems && inboxItems.length > 0 && totalInboxHours > 0) {
+      const reductionRatio = Math.min(1, totalHistHours / totalInboxHours);
+
       for (const item of inboxItems) {
-        if (remaining <= 0) break;
-        if (item.estimated_hours <= remaining) {
-          remaining -= item.estimated_hours;
-          inboxUpdates.push({ id: item.id, status: "scheduled", adhoc_reason: "recon_scheduled" });
-        } else {
-          // This item becomes the remainder — mark as last split part
+        const reducedBy = item.estimated_hours * reductionRatio;
+        const newHours = Math.max(0, Math.round((item.estimated_hours - reducedBy) * 10) / 10);
+
+        if (newHours < 0.05) {
+          // Fully consumed by history → mark as scheduled (legacy completed)
           inboxUpdates.push({
             id: item.id,
-            estimated_hours: Math.round((item.estimated_hours - remaining) * 10) / 10,
+            status: "scheduled",
+            adhoc_reason: "recon_scheduled",
+            split_group_id: firstBundleId,
+            split_part: totalParts,
+            split_total: totalParts,
+          });
+        } else {
+          // Partially consumed → keep in inbox as remainder, attach to split group
+          inboxUpdates.push({
+            id: item.id,
+            estimated_hours: newHours,
             adhoc_reason: "recon_reduced",
             split_group_id: firstBundleId,
             split_part: totalParts,
             split_total: totalParts,
           });
-          remaining = 0;
         }
       }
     }
 
-    onProgress?.(`[midflight] ${projectId}: ${totalHistHours}h → ${sortedWeeks.length} split bundles (${totalParts} total parts), ${inboxUpdates.filter(u => u.status === "scheduled").length} inbox scheduled`);
+    onProgress?.(`[midflight] ${projectId}: ${totalHistHours}h → ${sortedWeeks.length} split bundles (${totalParts} total parts), ${inboxItems?.length ?? 0} inbox items reconciled`);
   }
 
   // ━━━ Insert schedule bundles ━━━
@@ -347,23 +356,19 @@ export async function midflightImportPlanVyroby(
 
   // ━━━ Apply inbox updates ━━━
   for (const upd of inboxUpdates) {
-    if (upd.status === "scheduled") {
-      const { error } = await (supabaseClient as any)
-        .from("production_inbox")
-        .update({ status: "scheduled", adhoc_reason: upd.adhoc_reason })
-        .eq("id", upd.id);
-      if (error) errors.push(`Inbox update error ${upd.id}: ${error.message}`);
-    } else if (upd.estimated_hours !== undefined) {
-      const updatePayload: any = { estimated_hours: upd.estimated_hours, adhoc_reason: upd.adhoc_reason };
-      if (upd.split_group_id) updatePayload.split_group_id = upd.split_group_id;
-      if (upd.split_part) updatePayload.split_part = upd.split_part;
-      if (upd.split_total) updatePayload.split_total = upd.split_total;
-      const { error } = await (supabaseClient as any)
-        .from("production_inbox")
-        .update(updatePayload)
-        .eq("id", upd.id);
-      if (error) errors.push(`Inbox reduce error ${upd.id}: ${error.message}`);
-    }
+    const updatePayload: any = {};
+    if (upd.status) updatePayload.status = upd.status;
+    if (upd.adhoc_reason !== undefined) updatePayload.adhoc_reason = upd.adhoc_reason;
+    if (upd.estimated_hours !== undefined) updatePayload.estimated_hours = upd.estimated_hours;
+    if (upd.split_group_id) updatePayload.split_group_id = upd.split_group_id;
+    if (upd.split_part) updatePayload.split_part = upd.split_part;
+    if (upd.split_total) updatePayload.split_total = upd.split_total;
+
+    const { error } = await (supabaseClient as any)
+      .from("production_inbox")
+      .update(updatePayload)
+      .eq("id", upd.id);
+    if (error) errors.push(`Inbox update error ${upd.id}: ${error.message}`);
   }
 
   // ━━━ Insert Expedice/Dokončeno markers to production_expedice ━━━
