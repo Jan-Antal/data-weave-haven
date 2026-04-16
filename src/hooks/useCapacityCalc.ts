@@ -235,7 +235,7 @@ export function useWeekComposition(year: number, weekNumber: number) {
 
       if (error) throw error;
 
-      const rows = (data ?? []) as Array<{ employee_id: string; is_included: boolean }>;
+      const rows = ((data ?? []) as unknown) as Array<{ employee_id: string; is_included: boolean }>;
       const excluded = new Set<string>();
       for (const r of rows) {
         if (r.is_included === false) excluded.add(r.employee_id);
