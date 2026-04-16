@@ -71,6 +71,15 @@ export async function midflightImportPlanVyroby(
     console.warn("Recalculate failed:", e.message);
   }
 
+  // 0b2. Delete duplicate inbox items with split-suffix names "(N/M)" — orphans from prior returnBundleToInbox
+  // These are leftovers when midflight schedule bundles get reverted; original inbox items remain and get re-reduced fresh.
+  onProgress?.("[midflight] Mažem duplicitné inbox položky so split-suffix...");
+  const { error: errDupInbox } = await (supabaseClient as any)
+    .from("production_inbox")
+    .delete()
+    .filter("item_name", "~", " \\([0-9]+/[0-9]+\\)$");
+  if (errDupInbox) console.warn("Delete duplicate inbox items failed:", errDupInbox.message);
+
   // 0c. Delete daily logs created by midflight (bundle_id contains "::MF_")
   const { error: errDL } = await (supabaseClient as any)
     .from("production_daily_logs")

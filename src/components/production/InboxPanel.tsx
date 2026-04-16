@@ -1418,6 +1418,9 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
         <span className="text-[8px] shrink-0" title={adhocBadge.label}>{adhocBadge.emoji}</span>
       )}
       {item.item_code && <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#223937", fontWeight: 500 }}>{item.item_code}</span>}
+      {item.pocet != null && item.pocet > 0 && (
+        <span className="font-sans shrink-0 px-1 rounded" style={{ fontSize: 9, color: "#3a8a36", backgroundColor: "rgba(58,138,54,0.08)", border: "1px solid rgba(58,138,54,0.2)", fontWeight: 600 }} title={`Počet kusů: ${item.pocet}`}>×{item.pocet}</span>
+      )}
       <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
       {(item as any).adhoc_reason && String((item as any).adhoc_reason).startsWith("midflight") && (
         <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
