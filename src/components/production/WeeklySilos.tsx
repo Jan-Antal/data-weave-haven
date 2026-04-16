@@ -413,6 +413,32 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
   const currentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
 
+  // Compute spilled bundles for the current week T:
+  // bundles from past weeks (< currentWeekKey) that still have active (scheduled/in_progress) items.
+  // These are rendered visually in the T silo as a read-only section. They are NOT added to capacity.
+  const spilledBundlesForCurrent = useMemo(() => {
+    if (!scheduleData) return [] as Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
+    const result: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }> = [];
+    for (const [wk, silo] of scheduleData) {
+      if (wk >= currentWeekKey) continue;
+      for (const b of silo.bundles) {
+        const activeItems = b.items.filter(i => i.status === "scheduled" || i.status === "in_progress");
+        if (activeItems.length === 0) continue;
+        // Build a derived bundle containing only the active (uncompleted) items
+        const activeHours = activeItems.reduce((s, i) => s + (Number(i.scheduled_hours) || 0), 0);
+        result.push({
+          project_id: b.project_id,
+          project_name: b.project_name,
+          items: activeItems,
+          total_hours: activeHours,
+          __spilledFromWeekKey: wk,
+          __spilledFromWeekNum: silo.week_number,
+        });
+      }
+    }
+    return result;
+  }, [scheduleData, currentWeekKey]);
+
   const weekOptions = useMemo(() => {
     return weeks.map(w => {
       const siloData = scheduleData?.get(w.key);
