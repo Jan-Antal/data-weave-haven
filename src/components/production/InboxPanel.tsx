@@ -1195,7 +1195,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
 
   const leftBorderColor = color;
   const leftBorderWidth = 4;
-  const isSplitProject = project.items.some(i => (i as any).split_part && (i as any).split_total);
+  const isSplitProject = project.items.some(i => i.split_part && i.split_total);
 
   // Resolve deadline for display
   const deadline = useMemo(() => {
@@ -1252,12 +1252,12 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
             )}
           </div>
           {(() => {
-            const splitItem = project.items.find(i => (i as any).split_part && (i as any).split_total);
+            const splitItem = project.items.find(i => i.split_part && i.split_total);
             if (!splitItem) return null;
             return (
               <div className="flex items-center gap-1 mt-0.5">
                 <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Split</span>
-                <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{(splitItem as any).split_part}/{(splitItem as any).split_total}</span>
+                <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{splitItem.split_part}/{splitItem.split_total}</span>
               </div>
             );
           })()}
