@@ -1372,7 +1372,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
 
   const showCheckbox = hovered || isChecked;
 
-  const isSplit = !!(item as any).split_part && !!(item as any).split_total;
+  const isSplit = !!item.split_part && !!item.split_total;
 
   return (
     <div ref={setNodeRef} {...attributes} {...listeners}
@@ -1422,8 +1422,8 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       {(item as any).adhoc_reason && String((item as any).adhoc_reason).startsWith("midflight") && (
         <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
       )}
-      {((item as any).split_part && (item as any).split_total) && (
-        <span className="text-[9px] font-sans shrink-0" style={{ color: "#99a5a3" }}>{(item as any).split_part}/{(item as any).split_total}</span>
+      {(item.split_part && item.split_total) && (
+        <span className="text-[9px] font-sans shrink-0 px-1 rounded" style={{ color: "#6b7280", backgroundColor: "#f3f4f6", border: "1px solid #e5e7eb" }}>{item.split_part}/{item.split_total}</span>
       )}
       <span className="font-sans text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${item.estimated_hours}h`}</span>
     </div>
