@@ -788,7 +788,27 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
           return (
             <div className="border border-border rounded-lg p-4 space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">Složení výrobní kapacity</h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  Složení výrobní kapacity
+                  <span className="text-xs font-normal text-muted-foreground">· Týden T{compositionWeekNumber} {selectedYear}</span>
+                  {compositionIsHistorical && (
+                    <Badge variant="secondary" className="text-[10px] font-normal">
+                      historický snapshot — read-only
+                    </Badge>
+                  )}
+                  {!compositionIsHistorical && composition && !composition.hasSnapshot && (
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      výchozí stav
+                    </Badge>
+                  )}
+                </h3>
+                {!compositionIsHistorical && (
+                  <span className="text-[10px] text-muted-foreground italic">
+                    Změna se uloží pro T{compositionWeekNumber}–T52
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 📊 Výrobní zaměstnanci: {totalCount} celkem · Brutto fond: {totalWeekly} h/týden · Měsíčně: {totalMonthly} h
               </p>
