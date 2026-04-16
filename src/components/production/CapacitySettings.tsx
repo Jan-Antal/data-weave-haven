@@ -817,16 +817,20 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                               <input
                                 type="checkbox"
                                 checked={!isUsekDisabled}
+                                disabled={!compositionIsEditable}
                                 onChange={(e) => {
                                   e.stopPropagation();
-                                  setDisabledUseky(prev => {
-                                    const next = new Set(prev);
-                                    if (next.has(key)) next.delete(key); else next.add(key);
-                                    return next;
-                                  });
+                                  if (!compositionIsEditable) return;
+                                  // Toggle ALL employees of this úsek for current composition week..52
+                                  const empIds = g.employees.map(emp => emp.id);
+                                  // If currently enabled (checkbox checked) → exclude (set is_included=false)
+                                  // If currently disabled → include (set is_included=true)
+                                  const shouldInclude = isUsekDisabled;
+                                  handleToggleEmployees(empIds, shouldInclude);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="rounded"
+                                className={cn("rounded", !compositionIsEditable && "cursor-not-allowed opacity-50")}
+                                title={!compositionIsEditable ? "Minulý týden — historický snapshot, nelze upravit" : undefined}
                               />
                             </td>
                             <td className={cn("px-3 py-1 flex items-center gap-1", isUsekDisabled && "text-muted-foreground line-through")}>
@@ -846,15 +850,14 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                                   <input
                                     type="checkbox"
                                     checked={!disabledEmployees.has(emp.id) && !isUsekDisabled}
-                                    disabled={isUsekDisabled}
+                                    disabled={isUsekDisabled || !compositionIsEditable}
                                     onChange={() => {
-                                      setDisabledEmployees(prev => {
-                                        const next = new Set(prev);
-                                        if (next.has(emp.id)) next.delete(emp.id); else next.add(emp.id);
-                                        return next;
-                                      });
+                                      if (!compositionIsEditable) return;
+                                      const isCurrentlyExcluded = disabledEmployees.has(emp.id);
+                                      handleToggleEmployees([emp.id], isCurrentlyExcluded);
                                     }}
-                                    className="rounded"
+                                    className={cn("rounded", !compositionIsEditable && "cursor-not-allowed opacity-50")}
+                                    title={!compositionIsEditable ? "Minulý týden — historický snapshot, nelze upravit" : undefined}
                                   />
                                 </td>
                                 <td className={cn("pl-8 pr-3 py-0.5", isEmpDisabled ? "text-muted-foreground line-through" : "text-muted-foreground")}>
