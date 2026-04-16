@@ -368,16 +368,24 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         const skipped: string[] = [];
 
         for (const item of itemsToSend) {
-          // Check if already in inbox
-          const { data: existing } = await supabase
-            .from("production_inbox")
-            .select("id")
-            .eq("project_id", projectId)
-            .eq("item_code", item.item_code)
-            .eq("status", "pending")
-            .limit(1);
+          // Check if already in inbox (any status) or schedule (active statuses)
+          const [inboxCheck, schedCheck] = await Promise.all([
+            supabase
+              .from("production_inbox")
+              .select("id")
+              .eq("project_id", projectId)
+              .eq("item_code", item.item_code)
+              .limit(1),
+            supabase
+              .from("production_schedule")
+              .select("id")
+              .eq("project_id", projectId)
+              .eq("item_code", item.item_code)
+              .in("status", ["scheduled", "in_progress", "completed", "expedice", "paused"])
+              .limit(1),
+          ]);
 
-          if (existing && existing.length > 0) {
+          if ((inboxCheck.data && inboxCheck.data.length > 0) || (schedCheck.data && schedCheck.data.length > 0)) {
             skipped.push(item.item_code);
             continue;
           }
@@ -947,6 +955,8 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                             </TableCell>
                           );
                         }
+                        const pocet = Number(item.pocet) || 0;
+                        const pocetLabel = pocet > 1 ? ` · ${pocet} ks` : "";
                         return (
                           <TableCell key={key} style={cellStyle}>
                             <div className="flex flex-wrap gap-0.5">
@@ -964,6 +974,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                                   {s.label}
                                 </span>
                               ))}
+                              {pocetLabel && (
+                                <span
+                                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                                  style={{ backgroundColor: "#f0eee9", color: "#6b7a78", borderColor: "#e2ddd6" }}
+                                >
+                                  {pocetLabel.trim().replace("· ", "")}
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                         );

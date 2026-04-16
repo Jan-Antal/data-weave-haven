@@ -40,6 +40,17 @@ export function AddItemPopover({ open, onOpenChange, projectId, projectName, all
       const h = parseFloat(hours);
       if (isNaN(h) || h <= 0) throw new Error("Neplatné hodiny");
 
+      // Check for duplicate item_code in inbox or schedule
+      if (code) {
+        const [inboxCheck, schedCheck] = await Promise.all([
+          supabase.from("production_inbox").select("id").eq("project_id", effectiveProjectId).eq("item_code", code).limit(1),
+          supabase.from("production_schedule").select("id").eq("project_id", effectiveProjectId).eq("item_code", code).in("status", ["scheduled", "in_progress", "completed", "expedice", "paused"]).limit(1),
+        ]);
+        if ((inboxCheck.data && inboxCheck.data.length > 0) || (schedCheck.data && schedCheck.data.length > 0)) {
+          throw new Error(`Položka ${code} již existuje v plánu výroby`);
+        }
+      }
+
       // Get hourly rate
       const { data: settings } = await supabase.from("production_settings").select("hourly_rate").limit(1).single();
       const rate = settings?.hourly_rate ?? 550;
