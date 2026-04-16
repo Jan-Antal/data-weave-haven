@@ -659,8 +659,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const isPastWeek = (wn: number) => selectedYear < currentYear || (selectedYear === currentYear && wn < currentWeek);
 
   const handleBarClick = useCallback((wn: number, e: React.MouseEvent) => {
+    // Always update the composition week so "Složení" reflects the clicked week
+    setCompositionWeekNumber(wn);
     if (e.ctrlKey || e.metaKey) {
-      // Toggle individual week
       setSelectedWeeks(prev => {
         const next = new Set(prev);
         if (next.has(wn)) next.delete(wn); else next.add(wn);
@@ -668,7 +669,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       });
       setLastClickedWeek(wn);
     } else if (e.shiftKey && lastClickedWeek !== null) {
-      // Range select
       const from = Math.min(lastClickedWeek, wn);
       const to = Math.max(lastClickedWeek, wn);
       setSelectedWeeks(prev => {
@@ -677,7 +677,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         return next;
       });
     } else {
-      // Single select / toggle
       setSelectedWeeks(prev => prev.size === 1 && prev.has(wn) ? new Set() : new Set([wn]));
       setLastClickedWeek(wn);
     }
