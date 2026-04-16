@@ -414,25 +414,35 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
   const currentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
 
   // Compute spilled bundles for the current week T — mirrors logic from src/pages/Vyroba.tsx:
-  // ONLY look at the immediately preceding week (T-1), and only include bundles whose project is
-  // NOT already scheduled in the current week T (dedup). Items must be active (scheduled/in_progress).
-  // These are rendered visually in the T silo as a read-only section. They are NOT added to capacity.
+  // ONLY look at the immediately preceding week (T-1), skip projects already re-planned in T,
+  // and exclude items that are effectively done (including legacy midflight items).
   const spilledBundlesForCurrent = useMemo(() => {
     if (!scheduleData) return [] as Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
-    // T-1 week key
+
+    const isItemDoneLocal = (item: ScheduleItem) => {
+      if (item.is_midflight) return true;
+      return item.status === "completed" || item.status === "expedice";
+    };
+
     const prevMonday = new Date(currentWeekKey + "T00:00:00");
     prevMonday.setDate(prevMonday.getDate() - 7);
     const prevWeekKey = toLocalDateStr(prevMonday);
     const prevSilo = scheduleData.get(prevWeekKey);
     if (!prevSilo) return [];
-    // Project IDs already present in current week T — skip them (they're not spilled, they're re-planned)
+
     const currentSilo = scheduleData.get(currentWeekKey);
-    const currentProjectIds = new Set<string>(currentSilo?.bundles.map(b => b.project_id) || []);
+    const currentProjectIds = new Set<string>(currentSilo?.bundles.map((b) => b.project_id) || []);
     const result: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }> = [];
+
     for (const b of prevSilo.bundles) {
       if (currentProjectIds.has(b.project_id)) continue;
-      const activeItems = b.items.filter(i => i.status === "scheduled" || i.status === "in_progress");
+
+      const activeItems = b.items.filter(
+        (i) => (i.status === "scheduled" || i.status === "in_progress") && !isItemDoneLocal(i),
+      );
+
       if (activeItems.length === 0) continue;
+
       const activeHours = activeItems.reduce((s, i) => s + (Number(i.scheduled_hours) || 0), 0);
       result.push({
         project_id: b.project_id,
@@ -443,6 +453,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         __spilledFromWeekNum: prevSilo.week_number,
       });
     }
+
     return result;
   }, [scheduleData, currentWeekKey]);
 
