@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { autoUpdateProjectPercents } from "@/lib/autoProjectPercent";
 
 function weekLabel(weekDate: string): string {
   try {
