@@ -132,7 +132,10 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const { data: yearComposition } = useYearComposition(selectedYear);
   const compositionIsHistorical = composition?.isHistorical ?? false;
   const compositionIsEditable = composition?.isEditable ?? true;
-  const excludedForCompositionWeek = composition?.excludedEmployeeIds ?? new Set<string>();
+  const excludedForCompositionWeek = useMemo(
+    () => composition?.excludedEmployeeIds ?? new Set<string>(),
+    [composition?.excludedEmployeeIds],
+  );
 
   // Derive disabledUseky for the displayed composition week (all employees of úsek excluded → úsek is "off")
   const disabledUseky = useMemo(() => {
