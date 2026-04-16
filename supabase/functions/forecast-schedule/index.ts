@@ -86,7 +86,7 @@ function montazWeeks(count: number): number {
 function estimateHours(proj: any, tpvItems: any[], hourlyRate: number, vyrobaPct: number, eurRate: number, plannedItemCodes: Set<string>) {
   const marze = normalizeMarze(proj.marze);
   const active = tpvItems.filter((t) => t.status !== "Zrušeno");
-  const withPrice = active.filter((t) => t.cena && Number(t.cena) > 0 && !plannedItemCodes.has(t.item_name));
+  const withPrice = active.filter((t) => t.cena && Number(t.cena) > 0 && !plannedItemCodes.has(t.item_code));
   if (active.length > 0 && withPrice.length === 0) return { hours: 0, badge: "Vše naplánováno", base: "none" };
   if (withPrice.length > 0) {
     let tpvSum = withPrice.reduce((s, t) => s + Number(t.cena) * (Number(t.pocet) || 1), 0);
@@ -149,7 +149,7 @@ serve(async (req) => {
         .select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,tpv_date,expedice,montaz,predani,datum_smluvni,currency")
         .in("status", ["Příprava", "Engineering", "TPV", "Výroba IN", "Výroba"])
         .is("deleted_at", null).eq("is_test", false),
-      sb.from("tpv_items").select("project_id,item_name,cena,pocet,status").is("deleted_at", null),
+      sb.from("tpv_items").select("project_id,item_code,cena,pocet,status").is("deleted_at", null),
       sb.from("production_settings").select("hourly_rate").limit(1).single(),
       sb.from("cost_breakdown_presets").select("id,name,is_default,production_pct").order("sort_order"),
       sb.from("production_capacity").select("week_number,week_year,capacity_hours"),
