@@ -149,6 +149,22 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   }, [vyrobniEmployees, excludedForCompositionWeek]);
   const disabledEmployees = excludedForCompositionWeek;
 
+  // Persist toggle for current composition week and all forward weeks (..52)
+  // For past weeks (read-only) this is a no-op.
+  const handleToggleEmployees = useCallback(async (employeeIds: string[], shouldInclude: boolean) => {
+    if (!compositionIsEditable || employeeIds.length === 0) return;
+    try {
+      await toggleEmployeeForWeekRange(selectedYear, compositionWeekNumber, 52, employeeIds, shouldInclude);
+      await queryClient.invalidateQueries({ queryKey: ["week-composition", selectedYear] });
+      await queryClient.invalidateQueries({ queryKey: ["year-composition", selectedYear] });
+      // Trigger capacity recalc (debounced via existing effect for filteredEmployees changes)
+      setTimeout(() => triggerAutoRecalcRef.current?.(), 100);
+    } catch (e: any) {
+      toast({ title: "Chyba při ukládání složení", description: e.message, variant: "destructive" });
+    }
+  }, [compositionIsEditable, selectedYear, compositionWeekNumber, queryClient]);
+  const triggerAutoRecalcRef = useRef<(() => Promise<void>) | null>(null);
+
   const totalBruttoDaily = useMemo(() =>
     vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0),
     [vyrobniEmployees]);
