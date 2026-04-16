@@ -499,6 +499,44 @@ export type Database = {
         }
         Relationships: []
       }
+      production_capacity_employees: {
+        Row: {
+          created_at: string
+          employee_id: string
+          id: string
+          is_included: boolean
+          updated_at: string
+          week_number: number
+          week_year: number
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          id?: string
+          is_included?: boolean
+          updated_at?: string
+          week_number: number
+          week_year: number
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_included?: boolean
+          updated_at?: string
+          week_number?: number
+          week_year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_capacity_employees_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "ami_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_daily_logs: {
         Row: {
           bundle_id: string
