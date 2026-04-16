@@ -356,23 +356,19 @@ export async function midflightImportPlanVyroby(
 
   // ━━━ Apply inbox updates ━━━
   for (const upd of inboxUpdates) {
-    if (upd.status === "scheduled") {
-      const { error } = await (supabaseClient as any)
-        .from("production_inbox")
-        .update({ status: "scheduled", adhoc_reason: upd.adhoc_reason })
-        .eq("id", upd.id);
-      if (error) errors.push(`Inbox update error ${upd.id}: ${error.message}`);
-    } else if (upd.estimated_hours !== undefined) {
-      const updatePayload: any = { estimated_hours: upd.estimated_hours, adhoc_reason: upd.adhoc_reason };
-      if (upd.split_group_id) updatePayload.split_group_id = upd.split_group_id;
-      if (upd.split_part) updatePayload.split_part = upd.split_part;
-      if (upd.split_total) updatePayload.split_total = upd.split_total;
-      const { error } = await (supabaseClient as any)
-        .from("production_inbox")
-        .update(updatePayload)
-        .eq("id", upd.id);
-      if (error) errors.push(`Inbox reduce error ${upd.id}: ${error.message}`);
-    }
+    const updatePayload: any = {};
+    if (upd.status) updatePayload.status = upd.status;
+    if (upd.adhoc_reason !== undefined) updatePayload.adhoc_reason = upd.adhoc_reason;
+    if (upd.estimated_hours !== undefined) updatePayload.estimated_hours = upd.estimated_hours;
+    if (upd.split_group_id) updatePayload.split_group_id = upd.split_group_id;
+    if (upd.split_part) updatePayload.split_part = upd.split_part;
+    if (upd.split_total) updatePayload.split_total = upd.split_total;
+
+    const { error } = await (supabaseClient as any)
+      .from("production_inbox")
+      .update(updatePayload)
+      .eq("id", upd.id);
+    if (error) errors.push(`Inbox update error ${upd.id}: ${error.message}`);
   }
 
   // ━━━ Insert Expedice/Dokončeno markers to production_expedice ━━━
