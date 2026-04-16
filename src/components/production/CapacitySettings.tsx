@@ -24,7 +24,8 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { useVyrobniEmployees, useAbsencesForYear, computeWeekCapacity, getWeekStartFromNumber, normalizeUsek, getActiveWorkingDays } from "@/hooks/useCapacityCalc";
+import { useVyrobniEmployees, useAbsencesForYear, computeWeekCapacity, getWeekStartFromNumber, normalizeUsek, getActiveWorkingDays, useWeekComposition, useYearComposition, toggleEmployeeForWeekRange } from "@/hooks/useCapacityCalc";
+import { Badge } from "@/components/ui/badge";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -93,8 +94,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [expandedUsek, setExpandedUsek] = useState<string | null>(null);
-  const [disabledUseky, setDisabledUseky] = useState<Set<string>>(new Set());
-  const [disabledEmployees, setDisabledEmployees] = useState<Set<string>>(new Set());
+  // Composition week (for the "Složení kapacity výroby" section).
+  // Defaults to current week, changes when user clicks a bar.
+  const [compositionWeekNumber, setCompositionWeekNumber] = useState<number>(currentWeek);
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
   const VISIBLE_WEEKS = 12;
@@ -124,6 +126,47 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const bulkUpdate = useBulkUpdateFutureCapacity();
   const queryClient = useQueryClient();
   const { data: vyrobniEmployees = [] } = useVyrobniEmployees();
+
+  // Per-week composition snapshot (DB-persisted exclusion set)
+  const { data: composition } = useWeekComposition(selectedYear, compositionWeekNumber);
+  const { data: yearComposition } = useYearComposition(selectedYear);
+  const compositionIsHistorical = composition?.isHistorical ?? false;
+  const compositionIsEditable = composition?.isEditable ?? true;
+  const excludedForCompositionWeek = useMemo(
+    () => composition?.excludedEmployeeIds ?? new Set<string>(),
+    [composition?.excludedEmployeeIds],
+  );
+
+  // Derive disabledUseky for the displayed composition week (all employees of úsek excluded → úsek is "off")
+  const disabledUseky = useMemo(() => {
+    const result = new Set<string>();
+    const usekEmployees: Record<string, string[]> = { dilna1: [], dilna2: [], dilna3: [], sklad: [] };
+    for (const emp of vyrobniEmployees) {
+      const key = normalizeUsek(emp.usek);
+      if (key) usekEmployees[key].push(emp.id);
+    }
+    for (const [key, ids] of Object.entries(usekEmployees)) {
+      if (ids.length > 0 && ids.every(id => excludedForCompositionWeek.has(id))) result.add(key);
+    }
+    return result;
+  }, [vyrobniEmployees, excludedForCompositionWeek]);
+  const disabledEmployees = excludedForCompositionWeek;
+
+  // Persist toggle for current composition week and all forward weeks (..52)
+  // For past weeks (read-only) this is a no-op.
+  const handleToggleEmployees = useCallback(async (employeeIds: string[], shouldInclude: boolean) => {
+    if (!compositionIsEditable || employeeIds.length === 0) return;
+    try {
+      await toggleEmployeeForWeekRange(selectedYear, compositionWeekNumber, 52, employeeIds, shouldInclude);
+      await queryClient.invalidateQueries({ queryKey: ["week-composition", selectedYear] });
+      await queryClient.invalidateQueries({ queryKey: ["year-composition", selectedYear] });
+      // Trigger capacity recalc (debounced via existing effect for filteredEmployees changes)
+      setTimeout(() => triggerAutoRecalcRef.current?.(), 100);
+    } catch (e: any) {
+      toast({ title: "Chyba při ukládání složení", description: e.message, variant: "destructive" });
+    }
+  }, [compositionIsEditable, selectedYear, compositionWeekNumber, queryClient]);
+  const triggerAutoRecalcRef = useRef<(() => Promise<void>) | null>(null);
 
   const totalBruttoDaily = useMemo(() =>
     vyrobniEmployees.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0),
@@ -219,6 +262,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
     } catch { /* silent */ }
   }, [vyrobniEmployees, filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek, absMap]);
+
+  // Expose triggerAutoRecalc through ref so handleToggleEmployees can call it without circular deps
+  useEffect(() => { triggerAutoRecalcRef.current = triggerAutoRecalc; }, [triggerAutoRecalc]);
 
   // Reset flag when dialog closes
   const hasAutoRecalced = useRef(false);
@@ -616,8 +662,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const isPastWeek = (wn: number) => selectedYear < currentYear || (selectedYear === currentYear && wn < currentWeek);
 
   const handleBarClick = useCallback((wn: number, e: React.MouseEvent) => {
+    // Always update the composition week so "Složení" reflects the clicked week
+    setCompositionWeekNumber(wn);
     if (e.ctrlKey || e.metaKey) {
-      // Toggle individual week
       setSelectedWeeks(prev => {
         const next = new Set(prev);
         if (next.has(wn)) next.delete(wn); else next.add(wn);
@@ -625,7 +672,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
       });
       setLastClickedWeek(wn);
     } else if (e.shiftKey && lastClickedWeek !== null) {
-      // Range select
       const from = Math.min(lastClickedWeek, wn);
       const to = Math.max(lastClickedWeek, wn);
       setSelectedWeeks(prev => {
@@ -634,7 +680,6 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
         return next;
       });
     } else {
-      // Single select / toggle
       setSelectedWeeks(prev => prev.size === 1 && prev.has(wn) ? new Set() : new Set([wn]));
       setLastClickedWeek(wn);
     }
@@ -743,7 +788,27 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
           const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
           return (
             <div className="border border-border rounded-lg p-4 space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">Složení výrobní kapacity</h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  Složení výrobní kapacity
+                  <span className="text-xs font-normal text-muted-foreground">· Týden T{compositionWeekNumber} {selectedYear}</span>
+                  {compositionIsHistorical && (
+                    <Badge variant="secondary" className="text-[10px] font-normal">
+                      historický snapshot — read-only
+                    </Badge>
+                  )}
+                  {!compositionIsHistorical && composition && !composition.hasSnapshot && (
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      výchozí stav
+                    </Badge>
+                  )}
+                </h3>
+                {!compositionIsHistorical && (
+                  <span className="text-[10px] text-muted-foreground italic">
+                    Změna se uloží pro T{compositionWeekNumber}–T52
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 📊 Výrobní zaměstnanci: {totalCount} celkem · Brutto fond: {totalWeekly} h/týden · Měsíčně: {totalMonthly} h
               </p>
@@ -777,16 +842,20 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                               <input
                                 type="checkbox"
                                 checked={!isUsekDisabled}
+                                disabled={!compositionIsEditable}
                                 onChange={(e) => {
                                   e.stopPropagation();
-                                  setDisabledUseky(prev => {
-                                    const next = new Set(prev);
-                                    if (next.has(key)) next.delete(key); else next.add(key);
-                                    return next;
-                                  });
+                                  if (!compositionIsEditable) return;
+                                  // Toggle ALL employees of this úsek for current composition week..52
+                                  const empIds = g.employees.map(emp => emp.id);
+                                  // If currently enabled (checkbox checked) → exclude (set is_included=false)
+                                  // If currently disabled → include (set is_included=true)
+                                  const shouldInclude = isUsekDisabled;
+                                  handleToggleEmployees(empIds, shouldInclude);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="rounded"
+                                className={cn("rounded", !compositionIsEditable && "cursor-not-allowed opacity-50")}
+                                title={!compositionIsEditable ? "Minulý týden — historický snapshot, nelze upravit" : undefined}
                               />
                             </td>
                             <td className={cn("px-3 py-1 flex items-center gap-1", isUsekDisabled && "text-muted-foreground line-through")}>
@@ -806,15 +875,14 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
                                   <input
                                     type="checkbox"
                                     checked={!disabledEmployees.has(emp.id) && !isUsekDisabled}
-                                    disabled={isUsekDisabled}
+                                    disabled={isUsekDisabled || !compositionIsEditable}
                                     onChange={() => {
-                                      setDisabledEmployees(prev => {
-                                        const next = new Set(prev);
-                                        if (next.has(emp.id)) next.delete(emp.id); else next.add(emp.id);
-                                        return next;
-                                      });
+                                      if (!compositionIsEditable) return;
+                                      const isCurrentlyExcluded = disabledEmployees.has(emp.id);
+                                      handleToggleEmployees([emp.id], isCurrentlyExcluded);
                                     }}
-                                    className="rounded"
+                                    className={cn("rounded", !compositionIsEditable && "cursor-not-allowed opacity-50")}
+                                    title={!compositionIsEditable ? "Minulý týden — historický snapshot, nelze upravit" : undefined}
                                   />
                                 </td>
                                 <td className={cn("pl-8 pr-3 py-0.5", isEmpDisabled ? "text-muted-foreground line-through" : "text-muted-foreground")}>
