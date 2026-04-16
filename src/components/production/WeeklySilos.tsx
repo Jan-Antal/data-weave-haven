@@ -1619,6 +1619,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="truncate" style={{ fontSize: 14, color: forecastDarkMode ? (allCompleted ? "#5a6480" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#c8d0e0") : (allCompleted ? "#9ca3af" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 500 }}>{highlightMatch(bundle.project_name, searchQuery)}</span>
+              {isSpilled && spilledFromWeekNum !== undefined && (
+                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.15)", color: "#d97706", border: "1px solid rgba(217,119,6,0.35)" }}>
+                  Z T{spilledFromWeekNum}
+                </span>
+              )}
               {urgencyInfo?.type === "overdue" && (
                 <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: forecastDarkMode ? "rgba(220,38,38,0.2)" : "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                   PO TERMÍNU
