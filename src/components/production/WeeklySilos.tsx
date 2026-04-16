@@ -1069,7 +1069,9 @@ interface SiloProps {
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock, spilledBundles }: SiloProps) {
+  const spilledHours = useMemo(() => (spilledBundles || []).reduce((s, b) => s + b.total_hours, 0), [spilledBundles]);
+  const spilledPct = weeklyCapacity > 0 ? (spilledHours / weeklyCapacity) * 100 : 0;
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
   const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
