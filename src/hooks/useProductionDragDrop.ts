@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { autoUpdateProjectPercents } from "@/lib/autoProjectPercent";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -765,6 +766,10 @@ export function useProductionDragDrop() {
         });
       }
 
+      // Auto-recalc project completion % per unique project
+      const affectedProjectIds = new Set((oldItems || []).map((o: any) => o.project_id).filter(Boolean));
+      await autoUpdateProjectPercents(affectedProjectIds);
+
       invalidateAll();
 
       pushUndo({
@@ -778,6 +783,7 @@ export function useProductionDragDrop() {
               .update({ status: old.status, completed_at: old.completed_at, completed_by: old.completed_by })
               .eq("id", old.id);
           }
+          await autoUpdateProjectPercents(affectedProjectIds);
           invalidateAll();
         },
         redo: async () => {
@@ -785,6 +791,7 @@ export function useProductionDragDrop() {
           await supabase.from("production_schedule")
             .update({ status: "expedice", completed_at: new Date().toISOString(), completed_by: u?.id })
             .in("id", itemIds);
+          await autoUpdateProjectPercents(affectedProjectIds);
           invalidateAll();
         },
       });
