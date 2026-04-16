@@ -15,6 +15,9 @@ export interface InboxItem {
   sent_at: string;
   status: string;
   adhoc_reason: string | null;
+  split_part: number | null;
+  split_total: number | null;
+  split_group_id: string | null;
 }
 
 export interface InboxProject {
@@ -61,6 +64,9 @@ export function useProductionInbox() {
           sent_at: row.sent_at,
           status: row.status,
           adhoc_reason: row.adhoc_reason ?? null,
+          split_part: row.split_part ?? null,
+          split_total: row.split_total ?? null,
+          split_group_id: row.split_group_id ?? null,
         });
         g.total_hours += row.estimated_hours;
       }
