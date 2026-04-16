@@ -94,8 +94,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [expandedUsek, setExpandedUsek] = useState<string | null>(null);
-  const [disabledUseky, setDisabledUseky] = useState<Set<string>>(new Set());
-  const [disabledEmployees, setDisabledEmployees] = useState<Set<string>>(new Set());
+  // Composition week (for the "Složení kapacity výroby" section).
+  // Defaults to current week, changes when user clicks a bar.
+  const [compositionWeekNumber, setCompositionWeekNumber] = useState<number>(currentWeek);
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
   const VISIBLE_WEEKS = 12;
