@@ -368,16 +368,24 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         const skipped: string[] = [];
 
         for (const item of itemsToSend) {
-          // Check if already in inbox
-          const { data: existing } = await supabase
-            .from("production_inbox")
-            .select("id")
-            .eq("project_id", projectId)
-            .eq("item_code", item.item_code)
-            .eq("status", "pending")
-            .limit(1);
+          // Check if already in inbox (any status) or schedule (active statuses)
+          const [inboxCheck, schedCheck] = await Promise.all([
+            supabase
+              .from("production_inbox")
+              .select("id")
+              .eq("project_id", projectId)
+              .eq("item_code", item.item_code)
+              .limit(1),
+            supabase
+              .from("production_schedule")
+              .select("id")
+              .eq("project_id", projectId)
+              .eq("item_code", item.item_code)
+              .in("status", ["scheduled", "in_progress", "completed", "expedice", "paused"])
+              .limit(1),
+          ]);
 
-          if (existing && existing.length > 0) {
+          if ((inboxCheck.data && inboxCheck.data.length > 0) || (schedCheck.data && schedCheck.data.length > 0)) {
             skipped.push(item.item_code);
             continue;
           }
