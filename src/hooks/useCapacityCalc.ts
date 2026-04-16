@@ -197,3 +197,108 @@ export function getWeekStartFromNumber(year: number, weekNum: number): string {
   result.setDate(startOfWeek1.getDate() + (weekNum - 1) * 7);
   return toLocalDateStr(result);
 }
+
+// =====================================================================
+// Per-week employee composition snapshot (production_capacity_employees)
+// =====================================================================
+
+export interface WeekCompositionResult {
+  /** Set of employee_ids that are explicitly EXCLUDED for this week. */
+  excludedEmployeeIds: Set<string>;
+  /** True if a snapshot exists in DB for this week. */
+  hasSnapshot: boolean;
+  /** True for past weeks — read-only. */
+  isHistorical: boolean;
+  /** True for current/future — editable. */
+  isEditable: boolean;
+}
+
+/**
+ * Hook returning the per-week composition snapshot.
+ * For past weeks: only the DB snapshot is the source of truth (read-only).
+ * For current/future: DB snapshot if present; otherwise empty exclusion set (all active employees included).
+ */
+export function useWeekComposition(year: number, weekNumber: number) {
+  return useQuery<WeekCompositionResult>({
+    queryKey: ["week-composition", year, weekNumber],
+    queryFn: async () => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentWeek = getISOWeekNumber(today);
+      const isHistorical = year < currentYear || (year === currentYear && weekNumber < currentWeek);
+
+      const { data, error } = await supabase
+        .from("production_capacity_employees" as any)
+        .select("employee_id, is_included")
+        .eq("week_year", year)
+        .eq("week_number", weekNumber);
+
+      if (error) throw error;
+
+      const rows = (data ?? []) as Array<{ employee_id: string; is_included: boolean }>;
+      const excluded = new Set<string>();
+      for (const r of rows) {
+        if (r.is_included === false) excluded.add(r.employee_id);
+      }
+      return {
+        excludedEmployeeIds: excluded,
+        hasSnapshot: rows.length > 0,
+        isHistorical,
+        isEditable: !isHistorical,
+      };
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Fetch all composition snapshots for a year. Returns Map<weekNumber, Set<excludedEmployeeId>>.
+ */
+export function useYearComposition(year: number) {
+  return useQuery({
+    queryKey: ["year-composition", year],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_capacity_employees" as any)
+        .select("week_number, employee_id, is_included")
+        .eq("week_year", year);
+      if (error) throw error;
+      const result = new Map<number, Set<string>>();
+      for (const row of ((data ?? []) as Array<{ week_number: number; employee_id: string; is_included: boolean }>)) {
+        if (!result.has(row.week_number)) result.set(row.week_number, new Set());
+        if (row.is_included === false) result.get(row.week_number)!.add(row.employee_id);
+      }
+      return result;
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Toggle inclusion of one or more employees for a range of weeks in the given year.
+ * Upserts rows in production_capacity_employees.
+ */
+export async function toggleEmployeeForWeekRange(
+  year: number,
+  fromWeek: number,
+  toWeek: number,
+  employeeIds: string[],
+  isIncluded: boolean,
+): Promise<void> {
+  if (employeeIds.length === 0) return;
+  const rows: Array<{ week_year: number; week_number: number; employee_id: string; is_included: boolean }> = [];
+  for (let wn = fromWeek; wn <= toWeek; wn++) {
+    for (const empId of employeeIds) {
+      rows.push({ week_year: year, week_number: wn, employee_id: empId, is_included: isIncluded });
+    }
+  }
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const { error } = await supabase
+      .from("production_capacity_employees" as any)
+      .upsert(chunk as any, { onConflict: "week_year,week_number,employee_id" });
+    if (error) throw error;
+  }
+}
+
