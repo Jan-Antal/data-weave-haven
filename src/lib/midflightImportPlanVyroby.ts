@@ -233,9 +233,9 @@ export async function midflightImportPlanVyroby(
     const projectInfo = validProjectMap.get(projectId);
     const projectName = projectInfo?.name || projectId;
 
-    // Use inbox item as template if available, otherwise use project name
-    const templateCode = inboxItems?.[0]?.item_code || projectId;
-    const templateName = inboxItems?.[0]?.item_name || projectName;
+    // Use project-level info for midflight bundles (not individual items)
+    const templateCode = projectId;
+    const templateName = projectName;
     const templateStageId = inboxItems?.[0]?.stage_id || null;
     const totalHistHours = Math.round((projectTotalHist.get(projectId) || 0) * 10) / 10;
     // Sort weeks chronologically
