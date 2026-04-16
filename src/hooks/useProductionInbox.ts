@@ -18,6 +18,7 @@ export interface InboxItem {
   split_part: number | null;
   split_total: number | null;
   split_group_id: string | null;
+  pocet: number | null;
 }
 
 export interface InboxProject {
