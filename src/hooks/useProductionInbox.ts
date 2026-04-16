@@ -41,6 +41,20 @@ export function useProductionInbox() {
         .order("sent_at", { ascending: true });
       if (error) throw error;
 
+      // Fetch pocet from tpv_items for all (project_id, item_code) pairs in one batch
+      const projectIds = Array.from(new Set((data || []).map((r: any) => r.project_id)));
+      const pocetMap = new Map<string, number>();
+      if (projectIds.length > 0) {
+        const { data: tpvRows } = await supabase
+          .from("tpv_items")
+          .select("project_id, item_code, pocet")
+          .in("project_id", projectIds)
+          .is("deleted_at", null);
+        for (const t of tpvRows || []) {
+          if (t.item_code) pocetMap.set(`${t.project_id}||${t.item_code}`, Number(t.pocet) || 0);
+        }
+      }
+
       const grouped = new Map<string, InboxProject>();
       for (const row of data || []) {
         const pid = row.project_id;
@@ -68,6 +82,7 @@ export function useProductionInbox() {
           split_part: row.split_part ?? null,
           split_total: row.split_total ?? null,
           split_group_id: row.split_group_id ?? null,
+          pocet: row.item_code ? (pocetMap.get(`${row.project_id}||${row.item_code}`) ?? null) : null,
         });
         g.total_hours += row.estimated_hours;
       }
