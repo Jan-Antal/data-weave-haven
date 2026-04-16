@@ -930,6 +930,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
                   searchActive={searchActive}
                   isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
                   onToggleLock={() => toggleWeekLock(week.key)}
+                  spilledBundles={week.key === currentWeekKey ? spilledBundlesForCurrent : undefined}
                 />
               </div>
             );
@@ -1064,6 +1065,7 @@ interface SiloProps {
   searchActive?: boolean;
   isWeekLocked?: boolean;
   onToggleLock?: () => void;
+  spilledBundles?: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
