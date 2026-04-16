@@ -413,6 +413,32 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
   const currentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
 
+  // Compute spilled bundles for the current week T:
+  // bundles from past weeks (< currentWeekKey) that still have active (scheduled/in_progress) items.
+  // These are rendered visually in the T silo as a read-only section. They are NOT added to capacity.
+  const spilledBundlesForCurrent = useMemo(() => {
+    if (!scheduleData) return [] as Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
+    const result: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }> = [];
+    for (const [wk, silo] of scheduleData) {
+      if (wk >= currentWeekKey) continue;
+      for (const b of silo.bundles) {
+        const activeItems = b.items.filter(i => i.status === "scheduled" || i.status === "in_progress");
+        if (activeItems.length === 0) continue;
+        // Build a derived bundle containing only the active (uncompleted) items
+        const activeHours = activeItems.reduce((s, i) => s + (Number(i.scheduled_hours) || 0), 0);
+        result.push({
+          project_id: b.project_id,
+          project_name: b.project_name,
+          items: activeItems,
+          total_hours: activeHours,
+          __spilledFromWeekKey: wk,
+          __spilledFromWeekNum: silo.week_number,
+        });
+      }
+    }
+    return result;
+  }, [scheduleData, currentWeekKey]);
+
   const weekOptions = useMemo(() => {
     return weeks.map(w => {
       const siloData = scheduleData?.get(w.key);
@@ -904,6 +930,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
                   searchActive={searchActive}
                   isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
                   onToggleLock={() => toggleWeekLock(week.key)}
+                  spilledBundles={week.key === currentWeekKey ? spilledBundlesForCurrent : undefined}
                 />
               </div>
             );
@@ -1038,10 +1065,13 @@ interface SiloProps {
   searchActive?: boolean;
   isWeekLocked?: boolean;
   onToggleLock?: () => void;
+  spilledBundles?: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock, spilledBundles }: SiloProps) {
+  const spilledHours = useMemo(() => (spilledBundles || []).reduce((s, b) => s + b.total_hours, 0), [spilledBundles]);
+  const spilledPct = weeklyCapacity > 0 ? (spilledHours / weeklyCapacity) * 100 : 0;
   // Capacity calculation: exclude paused items
   // Active hours (excl. paused), split into blocker and non-blocker
   const { activeHours, blockerHours, activeSellingCzk, blockerSellingCzk } = useMemo(() => {
@@ -1191,6 +1221,11 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               </>
             )}
           </div>
+          {isCurrent && spilledHours > 0 && (
+            <div className="mt-[3px] text-[9px] font-medium text-center" style={{ color: "#d97706" }}>
+              + {Math.round(spilledHours)}h přelité (mimo plán)
+            </div>
+          )}
         </div>
       </div>
 
@@ -1204,6 +1239,65 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
         {(realBundles.length === 0 && blockerBundles.length === 0) && isPast && weekForecastBlocks.length === 0 && (
           <div className="flex-1 flex items-center justify-center px-2 py-[14px]">
             <span className="text-[9px] text-center" style={{ color: forecastDarkMode ? "#4a5a58" : "#c4ccc9" }}>Prázdný týden</span>
+          </div>
+        )}
+
+        {/* Spilled section — read-only bundles from previous weeks (only in current week T) */}
+        {spilledBundles && spilledBundles.length > 0 && (
+          <div
+            className="rounded-[6px] p-1.5 mb-1"
+            style={{
+              backgroundColor: "rgba(217, 119, 6, 0.06)",
+              border: "1px solid rgba(217, 119, 6, 0.25)",
+              borderTop: "3px solid #d97706",
+            }}
+          >
+            <div className="flex items-center justify-between mb-1 px-0.5">
+              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#d97706" }}>
+                ⚠ Přelité z předchozích T
+              </span>
+              <span className="text-[9px] font-bold" style={{ color: "#d97706" }}>
+                {Math.round(spilledHours)}h
+              </span>
+            </div>
+            {/* Mini-bar for spilled vs capacity (informative only) */}
+            <div className="h-[5px] rounded mb-1.5" style={{ backgroundColor: "#fef3c7", overflow: "hidden" }}>
+              <div className="h-full rounded transition-all" style={{ width: `${Math.min(spilledPct, 100)}%`, background: "linear-gradient(90deg, #fcd34d, #d97706)" }} />
+            </div>
+            <div className="flex flex-col" style={{ gap: 3 }}>
+              {spilledBundles.map(b => (
+                <CollapsibleBundleCard
+                  key={`spilled-${b.project_id}-${b.__spilledFromWeekKey}`}
+                  bundle={b}
+                  weekKey={b.__spilledFromWeekKey}
+                  showCzk={showCzk} hourlyRate={hourlyRate} weeklyCapacity={weeklyCapacity} displayMode={displayMode}
+                  onBundleContextMenu={onBundleContextMenu}
+                  onItemContextMenu={onItemContextMenu}
+                  projectLookup={projectLookup}
+                  planHoursMap={planHoursMap}
+                  realHoursMap={realHoursMap}
+                  isSelected={selectedProjectId === b.project_id}
+                  onSelectProject={onSelectProject} searchQuery={searchQuery}
+                  forecastDarkMode={forecastDarkMode}
+                  isFocusedMatch={false}
+                  searchMatchedProjectIds={searchMatchedProjectIds}
+                  searchActive={searchActive}
+                  isWeekLocked={false}
+                  exchangeRates={exchangeRates}
+                  isSpilled
+                  spilledFromWeekNum={b.__spilledFromWeekNum}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Plan section divider when both sections are visible */}
+        {spilledBundles && spilledBundles.length > 0 && realBundles.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-2 mb-1">
+            <div className="flex-1" style={{ borderTop: "1px solid #e2ddd6" }} />
+            <span className="text-[9px] font-bold tracking-wider shrink-0" style={{ color: "#6b7280" }}>PLÁN T{weekNum}</span>
+            <div className="flex-1" style={{ borderTop: "1px solid #e2ddd6" }} />
           </div>
         )}
 
@@ -1309,7 +1403,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked, exchangeRates }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked, exchangeRates, isSpilled, spilledFromWeekNum }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -1326,6 +1420,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   searchActive?: boolean;
   isWeekLocked?: boolean;
   exchangeRates?: Array<{ year: number; eur_czk: number }>;
+  isSpilled?: boolean;
+  spilledFromWeekNum?: number;
 }) {
   const { data: statusOpts2 = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts2), [statusOpts2]);
@@ -1489,7 +1585,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
       borderBottom: forecastDarkMode
         ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
         : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
-      borderLeft: isHighlighted ? "4px solid #d97706" : `4px solid ${borderLeftColor}`,
+      borderLeft: isHighlighted ? "4px solid #d97706" : isSpilled ? "4px solid #d97706" : `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
         ? (isHighlighted ? "rgba(217,119,6,0.08)" : "#252a35")
         : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isHighlighted ? "rgba(217,119,6,0.05)" : "#ffffff"),
@@ -1523,6 +1619,11 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="truncate" style={{ fontSize: 14, color: forecastDarkMode ? (allCompleted ? "#5a6480" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#c8d0e0") : (allCompleted ? "#9ca3af" : urgencyInfo?.type === "overdue" ? "#DC2626" : urgencyInfo?.type === "urgent" ? "#D97706" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 500 }}>{highlightMatch(bundle.project_name, searchQuery)}</span>
+              {isSpilled && spilledFromWeekNum !== undefined && (
+                <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.15)", color: "#d97706", border: "1px solid rgba(217,119,6,0.35)" }}>
+                  Z T{spilledFromWeekNum}
+                </span>
+              )}
               {urgencyInfo?.type === "overdue" && (
                 <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: forecastDarkMode ? "rgba(220,38,38,0.2)" : "rgba(220,38,38,0.1)", color: "#DC2626" }}>
                   PO TERMÍNU

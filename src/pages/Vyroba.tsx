@@ -1790,33 +1790,44 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       <>
                         {slideSpilled.length > 0 && (
                           <div
-                            className="px-3 py-1 text-[9px] uppercase font-semibold"
-                            style={{ color: "#d97706", borderBottom: "1px solid #f0eeea" }}
+                            className="px-3 py-2 text-[12px] uppercase font-bold tracking-wide flex items-center gap-1.5"
+                            style={{
+                              color: "#d97706",
+                              borderTop: "3px solid #d97706",
+                              backgroundColor: "rgba(217,119,6,0.06)",
+                            }}
                           >
-                            Přelité z minulého týdne ({slideSpilled.length})
+                            <span>⚠</span>
+                            <span>Přelité z minulého týdne ({slideSpilled.length})</span>
                           </div>
                         )}
-                        {slideSpilled.map((p) => (
-                          <ProjectRow
-                            key={p.projectId}
-                            project={p}
-                            isSelected={selectedProjectId === p.projectId}
-                            onSelect={handleSelectProject}
-                            onContextMenu={handleContextMenu}
-                            getProjectStatus={getProjectStatus}
-                            getBundleProgress={() => getBundleProgress(p.projectId)}
-                            getLatestPhase={getLatestPhase}
-                            statusColors={statusColors}
-                            weeklyGoal={getWeeklyGoal(p.projectId)}
-                            isMobile={isMobile}
-                          />
-                        ))}
+                        <div style={{ backgroundColor: slideSpilled.length > 0 ? "rgba(217,119,6,0.04)" : undefined }}>
+                          {slideSpilled.map((p) => (
+                            <ProjectRow
+                              key={p.projectId}
+                              project={p}
+                              isSelected={selectedProjectId === p.projectId}
+                              onSelect={handleSelectProject}
+                              onContextMenu={handleContextMenu}
+                              getProjectStatus={getProjectStatus}
+                              getBundleProgress={() => getBundleProgress(p.projectId)}
+                              getLatestPhase={getLatestPhase}
+                              statusColors={statusColors}
+                              weeklyGoal={getWeeklyGoal(p.projectId)}
+                              isMobile={isMobile}
+                            />
+                          ))}
+                        </div>
                         {slideNormal.length > 0 && slideSpilled.length > 0 && (
                           <div
-                            className="px-3 py-1 text-[9px] uppercase font-semibold"
-                            style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
+                            className="px-3 py-2 mt-4 text-[12px] uppercase font-bold tracking-wide"
+                            style={{
+                              color: "#223937",
+                              borderTop: "2px solid #d9d4ce",
+                              backgroundColor: "#f8f6f3",
+                            }}
                           >
-                            Naplánované v T{slideWeekNum} ({slideNormal.length})
+                            Plán T{slideWeekNum} ({slideNormal.length})
                           </div>
                         )}
                         {slideNormal.map((p) => (
@@ -1966,33 +1977,44 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 <>
                   {spilledProjects.length > 0 && (
                     <div
-                      className="px-3 py-1 text-[9px] uppercase font-semibold"
-                      style={{ color: "#d97706", borderBottom: "1px solid #f0eeea" }}
+                      className="px-3 py-2 text-[12px] uppercase font-bold tracking-wide flex items-center gap-1.5"
+                      style={{
+                        color: "#d97706",
+                        borderTop: "3px solid #d97706",
+                        backgroundColor: "rgba(217,119,6,0.06)",
+                      }}
                     >
-                      Přelité z minulého týdne ({spilledProjects.length})
+                      <span>⚠</span>
+                      <span>Přelité z minulého týdne ({spilledProjects.length})</span>
                     </div>
                   )}
-                  {spilledProjects.map((p) => (
-                    <ProjectRow
-                      key={p.projectId}
-                      project={p}
-                      isSelected={selectedProjectId === p.projectId}
-                      onSelect={handleSelectProject}
-                      onContextMenu={handleContextMenu}
-                      getProjectStatus={getProjectStatus}
-                      getBundleProgress={() => getBundleProgress(p.projectId)}
-                      getLatestPhase={getLatestPhase}
-                      statusColors={statusColors}
-                      weeklyGoal={getWeeklyGoal(p.projectId)}
-                      isMobile={isMobile}
-                    />
-                  ))}
+                  <div style={{ backgroundColor: spilledProjects.length > 0 ? "rgba(217,119,6,0.04)" : undefined }}>
+                    {spilledProjects.map((p) => (
+                      <ProjectRow
+                        key={p.projectId}
+                        project={p}
+                        isSelected={selectedProjectId === p.projectId}
+                        onSelect={handleSelectProject}
+                        onContextMenu={handleContextMenu}
+                        getProjectStatus={getProjectStatus}
+                        getBundleProgress={() => getBundleProgress(p.projectId)}
+                        getLatestPhase={getLatestPhase}
+                        statusColors={statusColors}
+                        weeklyGoal={getWeeklyGoal(p.projectId)}
+                        isMobile={isMobile}
+                      />
+                    ))}
+                  </div>
                   {normalProjects.length > 0 && spilledProjects.length > 0 && (
                     <div
-                      className="px-3 py-1 text-[9px] uppercase font-semibold"
-                      style={{ color: "#6b7280", borderBottom: "1px solid #f0eeea" }}
+                      className="px-3 py-2 mt-4 text-[12px] uppercase font-bold tracking-wide"
+                      style={{
+                        color: "#223937",
+                        borderTop: "2px solid #d9d4ce",
+                        backgroundColor: "#f8f6f3",
+                      }}
                     >
-                      Naplánované v T{weekNum} ({normalProjects.length})
+                      Plán T{weekNum} ({normalProjects.length})
                     </div>
                   )}
                   {normalProjects.map((p) => (
