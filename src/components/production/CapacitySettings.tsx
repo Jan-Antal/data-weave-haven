@@ -260,6 +260,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
     } catch { /* silent */ }
   }, [vyrobniEmployees, filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek, absMap]);
 
+  // Expose triggerAutoRecalc through ref so handleToggleEmployees can call it without circular deps
+  useEffect(() => { triggerAutoRecalcRef.current = triggerAutoRecalc; }, [triggerAutoRecalc]);
+
   // Reset flag when dialog closes
   const hasAutoRecalced = useRef(false);
   useEffect(() => {
