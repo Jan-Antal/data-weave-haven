@@ -264,7 +264,7 @@ export function useYearComposition(year: number) {
         .eq("week_year", year);
       if (error) throw error;
       const result = new Map<number, Set<string>>();
-      for (const row of ((data ?? []) as Array<{ week_number: number; employee_id: string; is_included: boolean }>)) {
+      for (const row of (((data ?? []) as unknown) as Array<{ week_number: number; employee_id: string; is_included: boolean }>)) {
         if (!result.has(row.week_number)) result.set(row.week_number, new Set());
         if (row.is_included === false) result.get(row.week_number)!.add(row.employee_id);
       }
