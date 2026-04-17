@@ -1214,6 +1214,8 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             </Button>
           </div>
         </div>
+          </TabsContent>
+        </Tabs>
         </div>{/* end scrollable content */}
 
         {/* Footer */}
