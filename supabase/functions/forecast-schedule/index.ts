@@ -154,7 +154,7 @@ serve(async (req) => {
       sb.from("cost_breakdown_presets").select("id,name,is_default,production_pct").order("sort_order"),
       sb.from("production_capacity").select("week_number,week_year,capacity_hours"),
       sb.from("exchange_rates").select("year,eur_czk"),
-      sb.from("production_inbox").select("project_id,item_code,estimated_hours").in("status", ["pending", "scheduled"]),
+      sb.from("production_inbox").select("project_id,item_code,estimated_hours").eq("status", "pending"),
       sb.from("production_schedule").select("project_id,item_code,scheduled_hours,scheduled_week,status").in("status", ["scheduled", "in_progress", "completed"]),
       sb.from("project_plan_hours").select("project_id,hodiny_plan,source"),
     ]);
