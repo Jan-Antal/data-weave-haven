@@ -278,7 +278,7 @@ serve(async (req) => {
       if (!hasAnyDate) {
         safetyNetMap.set(proj.project_id, {
           project_id: proj.project_id, project_name: proj.project_name,
-          estimated_hours: totalHours, estimation_badge: badge + " – chybí termíny",
+          estimated_hours: projectEstimateHours + inboxHrs, estimation_badge: badge + " – chybí termíny",
           source: "no_dates",
         });
         continue;
@@ -289,26 +289,45 @@ serve(async (req) => {
       const statusFallback: Record<string, number> = { "Výroba IN": 4, Výroba: 4, TPV: 8, Engineering: 12, Příprava: 16 };
       const rawDeadline = dl.date ?? addWeeks(today, statusFallback[proj.status] ?? 8);
 
-      if (rawDeadline < today) {
-        // Past deadline — still schedule, but mark as overdue
-      }
-
       const deadline = lastWorkday(rawDeadline);
       const deadlineWeek = getWeekKey(deadline);
 
-      workItems.push({
-        projectId: proj.project_id,
-        projectName: proj.project_name,
-        totalHours,
-        deadlineWeek,
-        deadline,
-        deadlineSource: dl.source,
-        conflict: dl.conflict,
-        badge,
-        base,
-        tpvCount,
-        isInboxOnly,
-      });
+      // Emit Inbox items as a SEPARATE green block (high priority — already approved by konstrukter)
+      if (inboxHrs > 0) {
+        workItems.push({
+          projectId: proj.project_id,
+          projectName: proj.project_name,
+          totalHours: inboxHrs,
+          deadlineWeek,
+          deadline,
+          deadlineSource: dl.source,
+          conflict: dl.conflict,
+          badge: `Inbox · ${inboxItemCount} položek`,
+          base,
+          tpvCount,
+          isInboxOnly: true,
+          sourceKind: "inbox_item",
+          inboxItemCount,
+        });
+      }
+
+      // Emit remaining project hours as project_estimate (orange)
+      if (projectEstimateHours > 0) {
+        workItems.push({
+          projectId: proj.project_id,
+          projectName: proj.project_name,
+          totalHours: projectEstimateHours,
+          deadlineWeek,
+          deadline,
+          deadlineSource: dl.source,
+          conflict: dl.conflict,
+          badge,
+          base,
+          tpvCount,
+          isInboxOnly: false,
+          sourceKind: "project_estimate",
+        });
+      }
     }
 
     // --- STEP 2: SORT BY PRIORITY ---
