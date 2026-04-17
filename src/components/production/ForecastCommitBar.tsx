@@ -1,4 +1,4 @@
-import { Sparkles, Check, X } from "lucide-react";
+import { Sparkles, Check, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ForecastCommitBarProps {
@@ -9,6 +9,9 @@ interface ForecastCommitBarProps {
   selectedInboxCount: number;
   selectedProjectCount: number;
   isGenerating: boolean;
+  isAiOptimizing?: boolean;
+  aiSummary?: string;
+  aiWarnings?: string[];
   allInboxSelected: boolean;
   onCommitSelected: () => void;
   onCancel: () => void;
@@ -24,13 +27,16 @@ export function ForecastCommitBar({
   selectedInboxCount,
   selectedProjectCount,
   isGenerating,
+  isAiOptimizing,
+  aiSummary,
+  aiWarnings,
   allInboxSelected,
   onCommitSelected,
   onCancel,
   onToggleInboxSelect,
   onDeselectProjects,
 }: ForecastCommitBarProps) {
-  if (totalBlocks === 0 && !isGenerating) return null;
+  if (totalBlocks === 0 && !isGenerating && !isAiOptimizing) return null;
 
   const selBtnStyle: React.CSSProperties = {
     backgroundColor: "transparent",
@@ -54,10 +60,16 @@ export function ForecastCommitBar({
       }}
     >
       <div className="flex items-center gap-3">
-        <Sparkles className="h-4 w-4" style={{ color: "#f59e0b" }} />
+        {isAiOptimizing ? (
+          <Loader2 className="h-4 w-4 animate-spin" style={{ color: "#a78bfa" }} />
+        ) : (
+          <Sparkles className="h-4 w-4" style={{ color: isAiOptimizing ? "#a78bfa" : "#f59e0b" }} />
+        )}
         <span className="text-sm font-medium" style={{ color: "#a8c5c2" }}>
           {isGenerating ? (
-            "Generuji forecast..."
+            "Generuji základní plán..."
+          ) : isAiOptimizing ? (
+            <span style={{ color: "#c4b5fd" }}>🤖 AI optimalizuje rozvrh...</span>
           ) : (
             <>
               <span className="font-bold" style={{ color: "#f59e0b" }}>{totalBlocks}</span>
@@ -67,6 +79,15 @@ export function ForecastCommitBar({
               )}
               {projectBlockCount > 0 && (
                 <span style={{ color: "#f59e0b" }}> · {projectBlockCount} plánované</span>
+              )}
+              {aiSummary && (
+                <span
+                  style={{ color: "#c4b5fd", marginLeft: 8, fontSize: 11 }}
+                  title={aiWarnings && aiWarnings.length > 0 ? `⚠ ${aiWarnings.join(" · ")}` : undefined}
+                >
+                  · 🤖 {aiSummary.length > 80 ? aiSummary.slice(0, 80) + "…" : aiSummary}
+                  {aiWarnings && aiWarnings.length > 0 && <span style={{ color: "#f59e0b" }}> ({aiWarnings.length} ⚠)</span>}
+                </span>
               )}
             </>
           )}

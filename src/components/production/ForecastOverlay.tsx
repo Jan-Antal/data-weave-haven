@@ -380,10 +380,14 @@ function ForecastCard({
                 
                 <span
                   className="text-[13px] font-semibold truncate"
-                  style={{ color: style.nameColor }}>
-                  
+                  style={{ color: style.nameColor }}
+                  title={block.ai_reasoning ? `🤖 ${block.ai_reasoning}` : undefined}
+                >
                   {block.project_name}
                 </span>
+                {block.ai_reasoning && (
+                  <Sparkles className="h-2.5 w-2.5 shrink-0" style={{ color: "#a78bfa" }} />
+                )}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
