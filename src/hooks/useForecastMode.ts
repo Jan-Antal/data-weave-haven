@@ -282,14 +282,21 @@ export function useForecastMode(): UseForecastModeReturn {
       if (blocks.length > 0) {
         setIsAiOptimizing(true);
         try {
+          // Use REAL per-week capacities returned by forecast-schedule (computed from production_capacity table,
+          // including holidays + utilization). Fall back to flat default only if missing.
+          const weekCapsFromServer: Array<{ week: string; capacity: number; used: number }> =
+            Array.isArray(data?.weekCapacities) ? data.weekCapacities : [];
+          const capByWeek = new Map(weekCapsFromServer.map(w => [w.week, w]));
           const weekHoursMap = new Map<string, number>();
           for (const b of blocks) weekHoursMap.set(b.week, (weekHoursMap.get(b.week) || 0) + b.estimated_hours);
-          const capacityWeeks = Array.from(weekHoursMap.keys()).sort().map(week => {
-            const ob = overbooked.find((o: OverbookedWeek) => o.week === week);
+          // Union of weeks: those with forecast blocks + all weeks the server reported capacity for
+          const allWeeksSet = new Set<string>([...weekHoursMap.keys(), ...capByWeek.keys()]);
+          const capacityWeeks = Array.from(allWeeksSet).sort().map(week => {
+            const real = capByWeek.get(week);
             return {
               week,
-              capacity: ob?.capacity ?? weeklyCapacityHours,
-              used: ob ? Math.max(0, ob.hoursScheduled - (weekHoursMap.get(week) || 0)) : 0,
+              capacity: real?.capacity ?? weeklyCapacityHours,
+              used: real?.used ?? 0,
             };
           });
 
