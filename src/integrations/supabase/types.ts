@@ -60,6 +60,7 @@ export type Database = {
           deactivated_at: string | null
           id: string
           meno: string
+          pracovni_skupina: string | null
           usek: string
           uvazok_hodiny: number | null
         }
@@ -70,6 +71,7 @@ export type Database = {
           deactivated_at?: string | null
           id?: string
           meno: string
+          pracovni_skupina?: string | null
           usek: string
           uvazok_hodiny?: number | null
         }
@@ -80,6 +82,7 @@ export type Database = {
           deactivated_at?: string | null
           id?: string
           meno?: string
+          pracovni_skupina?: string | null
           usek?: string
           uvazok_hodiny?: number | null
         }
