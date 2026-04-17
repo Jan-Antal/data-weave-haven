@@ -1,68 +1,59 @@
 
 
-User wants AI as the **review/optimization layer** on top of the deterministic forecast. Two-stage pipeline: deterministic baseline → AI optimizer. Plus the hour-source fix is still required (1190 vs 561) otherwise AI gets garbage in.
+## Plán: Správa zaměstnanců výroby — revize
 
-Keep concise.
+### Změny oproti původnímu návrhu
+- **`usek` zůstává beze změny** (sync z Alvena)
+- **Nový sloupec `pracovni_skupina`** v `ami_employees` — manuální přiřazení (Lakovna, Kompletace, atd.)
+- **Žádná nová tabulka pro absence** — používáme existující `ami_absences` s `absencia_kod` (DOV, NEM, RD, …)
 
----
+### DB změny
 
-## Plán: AI Forecast jako 2-stage pipeline
+**1) `ami_employees` — nový sloupec**
+```sql
+ALTER TABLE ami_employees ADD COLUMN pracovni_skupina text;
+```
+- Volný text + autocomplete z existujících hodnot
+- Default NULL → fallback na `usek` v capacity logice
 
-### Cíl
-Deterministický algoritmus připraví **návrh**, AI ho zreviduje a přeplánuje pro lepší flow (méně přepínání, dodržení deadline, vyhlazení kapacity).
+**2) `ami_absences` — povolit ruční zápis**
+- Přidat RLS policies (admin/owner insert/update/delete)
+- UI bude zapisovat dlouhodobé záznamy s `source='manual'`, `absencia_kod` (DOV/NEM/RD/…), a opakovat denní řádky pro celý rozsah od–do
 
-### Architektura
+### UI: nová sekce v `CapacitySettings` → tab „Zaměstnanci"
 
 ```text
-┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│ 1. Deterministic│ →  │ 2. AI Optimizer  │ →  │ 3. UI: blocks +  │
-│  baseline       │    │  (Gemini Flash)  │    │  AI reasoning    │
-│  (frontload)    │    │                  │    │                  │
-└─────────────────┘    └──────────────────┘    └──────────────────┘
-       ~500ms                ~3-5s                  user reviews
+[Search…]                                    [+ Přidat absenci hromadně]
+─────────────────────────────────────────────────────────────────────
+Meno          Úsek      Prac. skupina  Úvazek  Absence (akt.)  Akce
+Jan Novák     Dílna_1   [Lakovna ▼]    [40h ▼] —              [⋯]
+Petr Svoboda  Dílna_2   [Kompletace▼]  [20h ▼] 🟡 RD do 6/26  [⋯]
 ```
 
-### Změny
+- **Pracovní skupina**: dropdown s existujícími hodnotami + „+ Nová skupina"
+- **Úvazek**: 20/30/40h týdně (uloží jako 4/6/8 denně do `uvazok_hodiny`)
+- **Absence (akt.)**: zobrazí aktivní záznam z `ami_absences` pro dnešek/budoucnost; klik otevře dialog s historií
+- **Dialog absence**: kód (DOV/NEM/RD/PN/jiné), datum od (povinné), datum do (volitelné — „otevřeno" → vygeneruje denní řádky 6 měsíců dopředu, prodloužitelné), poznámka
 
-**1) Sjednotit hodiny (kritické — bez toho AI dostane špatná čísla)**
-- `forecast-schedule/index.ts`: použít `project_plan_hours.hodiny_plan` jako pravdu
-- Odečíst už naplánované hodiny → forecast plánuje jen **zbývající**
-- Vyřeší rozdíl Multisport 1190h vs 561h
+### Capacity logika (`useCapacityCalc.ts`)
 
-**2) Nová edge funkce `forecast-ai-optimize`**
-- Vstup: výstup z deterministického forecastu + projekty + kapacita
-- Volá Lovable AI (`google/gemini-3-flash-preview`) přes tool calling
-- Tool schema vrací: `{ blocks: [{ projectId, week, hours, reasoning }], warnings: [], summary: "..." }`
-- Systémový prompt: priorita = nejbližší deadline, nepřekročit kapacitu, preferovat dokončení v jednom týdnu, vyhladit zatížení
+- `getActiveWorkingDays()` — kromě `deactivated_at` odečíst i dny překrývající se s `ami_absences` pro daného zaměstnance v daném týdnu
+- `useAbsencesForYear()` už čte `ami_absences` — funguje out-of-the-box pro nové ruční záznamy
+- `pracovni_skupina` se zatím nepoužívá v kapacitním výpočtu (jen evidenční), pokud nechceš jinak
 
-**3) UI flow v `useForecastMode.ts` + `ForecastCommitBar`**
-- Krok 1: tlačítko „Generovat" → běží deterministický (rychlý náhled)
-- Krok 2: automaticky pokračuje do AI optimizace s indikátorem „🤖 AI optimalizuje..."
-- Krok 3: zobrazí AI návrh + souhrn + warnings; uživatel vidí porovnání nebo rovnou commit
-- Fallback: pokud AI selže (429/402/timeout), ponechat deterministický výsledek + toast „AI nedostupná, zobrazujem základní plán"
+### Soubory
 
-**4) Per-blok AI reasoning**
-- Každý blok dostane `ai_reasoning: string` (např. „Posunuto z 4.5. na 11.5. — Multisport má dřívější deadline")
-- Zobrazit v `ForecastCard` tooltipu nebo expandu
+**Nové:**
+- `supabase/migrations/...` — `pracovni_skupina` column + RLS policies pro `ami_absences`
+- `src/components/production/EmployeeManagement.tsx` — tab obsah
+- `src/components/production/EmployeeAbsenceDialog.tsx` — přidat/upravit absenci
+- `src/hooks/useEmployeeAbsences.ts` — CRUD nad `ami_absences` (filtr `source='manual'`)
 
-### Soubory k úpravě / vytvoření
-- `supabase/functions/forecast-schedule/index.ts` — sjednocení hodin (bod 1)
-- `supabase/functions/forecast-ai-optimize/index.ts` — **nová** AI funkce (bod 2)
-- `src/hooks/useForecastMode.ts` — 2-stage volání + AI loading state
-- `src/components/production/ForecastCommitBar.tsx` — indikátor AI fáze, „🤖 AI" badge
-- `src/components/production/ForecastOverlay.tsx` — zobrazit `ai_reasoning` per blok
+**Upravené:**
+- `src/components/production/CapacitySettings.tsx` — přidat tab „Zaměstnanci"
+- `src/hooks/useCapacityCalc.ts` — proporcionální odečet dnů s absencí v `getActiveWorkingDays`
 
-### Co se NEMĚNÍ
-- DB schéma
-- Commit logika (zápis do `production_schedule` zůstává)
-- Vizuální styl bloků (zelené Inbox, oranžové Project)
-
-### Náklady
-- Default model `gemini-3-flash-preview`: ~3-5s, ~0.001 kreditu/spuštění
-- Při velkém portfoliu (>50 projektů) automaticky přepnout na `gemini-2.5-pro` pro lepší rozhodování
-
-### Co potvrdit
-1. **Jdeme přes celé** (sjednocení hodin + AI optimizace + UI flow)?
-2. **AI vždy automaticky**, nebo přepínač „Použít AI optimalizaci" (uživatel může vypnout pro rychlost)?
-3. **Per-blok reasoning** v tooltipu — ano/ne?
+### Otevřené (potvrď):
+1. **Otevřená absence (bez data do)** — vygenerujeme denní řádky 6 měsíců dopředu a noční job/manuální „prodloužit" prodlouží? Nebo jiný mechanismus?
+2. **Pracovní skupina** se má i promítnout do kapacitního forecastu (samostatné kbelíky vedle Dílna_1/2/3), nebo je to jen evidenční sloupec?
 
