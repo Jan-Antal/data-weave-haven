@@ -230,9 +230,12 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
     let upcoming = 0;
     let highRisk = 0;
     const isTPVTab = activeTab === "tpv-status";
+    // Skip finished/parked projects — they are not "po termínu"
+    const DONE_STATUSES = new Set(["Fakturace", "Dokončeno", "On Hold"]);
     activeProjects.forEach((p) => {
+      const isDone = p.status && DONE_STATUSES.has(p.status);
       const dateField = isTPVTab ? (p as any).datum_tpv : p.datum_smluvni;
-      if (dateField) {
+      if (dateField && !isDone) {
         const d = parseAppDate(dateField);
         if (d) {
           d.setHours(0, 0, 0, 0);
@@ -241,7 +244,7 @@ export function DashboardStats({ personFilter, statusFilter, riskHighlight, onRi
         }
       }
       const riskField = isTPVTab ? ((p as any).tpv_risk || p.risk) : p.risk;
-      if (riskField === "High") highRisk++;
+      if (riskField === "High" && !isDone) highRisk++;
     });
     return { overdue, upcoming, highRisk };
   }, [activeProjects, activeTab]);
