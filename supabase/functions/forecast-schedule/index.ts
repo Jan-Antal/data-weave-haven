@@ -228,6 +228,10 @@ serve(async (req) => {
       base: string;
       tpvCount: number;
       isInboxOnly: boolean;
+      /** Source kind for block emission */
+      sourceKind: "inbox_item" | "project_estimate";
+      /** Optional inbox hours bundled into this work item (for description) */
+      inboxItemCount?: number;
     }
 
     const workItems: WorkItem[] = [];
@@ -243,30 +247,32 @@ serve(async (req) => {
       // Subtract already-scheduled hours → forecast plans only what REMAINS.
       const canonical = planHoursByProject.get(proj.project_id);
       const alreadyScheduled = scheduledHoursByProject.get(proj.project_id) || 0;
+      const inboxHrs = Math.round(inboxHoursByProject.get(proj.project_id) || 0);
+      const inboxItemCount = (inboxItemsByProject.get(proj.project_id)?.size) || 0;
 
-      let totalHours = 0;
+      let projectEstimateHours = 0;
       let badge = "";
       let base: "tpv_items" | "prodejni_cena" | "none" = "none";
 
       if (canonical && canonical.hodiny_plan > 0) {
-        const remaining = Math.max(0, canonical.hodiny_plan - alreadyScheduled);
-        totalHours = Math.round(remaining);
+        // Remaining = canonical plan − already scheduled − inbox (which we'll emit as separate green blocks)
+        const remaining = Math.max(0, canonical.hodiny_plan - alreadyScheduled - inboxHrs);
+        projectEstimateHours = Math.round(remaining);
         badge = canonical.source === "Project"
-          ? `Plán projektu (zbývá ${totalHours}h z ${canonical.hodiny_plan}h)`
-          : `TPV plán (zbývá ${totalHours}h z ${canonical.hodiny_plan}h)`;
+          ? `Plán projektu (zbývá ${projectEstimateHours}h z ${canonical.hodiny_plan}h)`
+          : `TPV plán (zbývá ${projectEstimateHours}h z ${canonical.hodiny_plan}h)`;
         base = canonical.source === "Project" ? "prodejni_cena" : "tpv_items";
       } else {
         // Fallback: legacy estimate (only if no project_plan_hours record)
         const plannedCodes = new Set([...(schedItemsByProject.get(proj.project_id) || [])]);
         const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
-        const inboxHrs = inboxHoursByProject.get(proj.project_id) || 0;
-        totalHours = est.hours + inboxHrs;
-        badge = inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge);
+        projectEstimateHours = est.hours;
+        badge = est.badge;
         base = est.base as any;
       }
 
-      if (totalHours === 0) continue;
-      const isInboxOnly = (inboxHoursByProject.get(proj.project_id) || 0) > 0 && (!canonical || canonical.hodiny_plan === 0);
+      // Bail if absolutely nothing to schedule
+      if (projectEstimateHours === 0 && inboxHrs === 0) continue;
 
       const hasAnyDate = proj.tpv_date || proj.datum_objednavky || proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
       if (!hasAnyDate) {
