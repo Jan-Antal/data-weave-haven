@@ -395,6 +395,51 @@ serve(async (req) => {
       }
     }
 
+    // --- STEP 4b: RE-PLACE EVICTED HOURS ---
+    // Projects that lost hours to higher-priority preemption need them re-placed.
+    for (const work of workItems) {
+      const evicted = (work as any)._evictedHours || 0;
+      if (evicted <= 0) continue;
+      let remaining = evicted;
+      let evictedOverDeadline = false;
+      const isPastDeadline = work.deadlineWeek && work.deadlineWeek < currentWeekKey;
+
+      // Try within own deadline first
+      for (const wk of allWeeks) {
+        if (remaining <= 0) break;
+        if (!isPastDeadline && work.deadlineWeek && wk > work.deadlineWeek) break;
+        const avail = availableHours.get(wk) || 0;
+        if (avail <= 0) continue;
+        const slot = Math.min(remaining, avail);
+        scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
+        availableHours.set(wk, avail - slot);
+        remaining -= slot;
+      }
+      // Then overflow after deadline
+      if (remaining > 0) {
+        evictedOverDeadline = true;
+        for (const wk of allWeeks) {
+          if (remaining <= 0) break;
+          const avail = availableHours.get(wk) || 0;
+          if (avail <= 0) continue;
+          const slot = Math.min(remaining, avail);
+          scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
+          availableHours.set(wk, avail - slot);
+          remaining -= slot;
+        }
+      }
+      if (remaining > 0) {
+        const lastWeek = allWeeks[allWeeks.length - 1];
+        scheduledChunks.push({ projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
+        evictedOverDeadline = true;
+      }
+      if (evictedOverDeadline) {
+        for (const chunk of scheduledChunks) {
+          if (chunk.projectId === work.projectId) chunk.overDeadline = true;
+        }
+      }
+    }
+
     // --- STEP 5: AGGREGATE INTO BLOCKS ---
     // Merge chunks by (projectId, week) — use "::" separator to avoid dash conflicts with project IDs
     const blockMap = new Map<string, { projectId: string; week: string; hours: number; overDeadline: boolean }>();
