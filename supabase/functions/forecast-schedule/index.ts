@@ -575,10 +575,18 @@ serve(async (req) => {
       })
       .sort((a, b) => b.utilizationPct - a.utilizationPct);
 
+    // Per-week capacity snapshot for ALL weeks (used by AI optimizer so it sees REAL capacity, not flat default)
+    const weekCapacities = allWeeks.map(wk => {
+      const cap = getWeekCapacity(wk, capacityRows, defaultCapacity);
+      const used = usedHoursPerWeek.get(wk) || 0;
+      return { week: wk, capacity: cap, used };
+    });
+
     return new Response(JSON.stringify({
       blocks: blocks.sort((a, b) => a.week.localeCompare(b.week)),
       safetyNet: Array.from(safetyNetMap.values()),
       overbookedWeeks,
+      weekCapacities,
       ai: { forecastSummary: null, criticalWeek: null, weekInsights: null, generatedAt: new Date().toISOString() },
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
