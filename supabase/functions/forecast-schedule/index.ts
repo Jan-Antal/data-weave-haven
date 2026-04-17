@@ -220,9 +220,13 @@ serve(async (req) => {
       const tpvCount = projTpv.length;
       const preset = proj.cost_preset_id ? presets.find((p: any) => p.id === proj.cost_preset_id) : defaultPreset;
       const vyrobaPct = ((proj.cost_production_pct ? Number(proj.cost_production_pct) : null) ?? preset?.production_pct ?? 35) / 100;
-      const plannedCodes = new Set([...(inboxItemsByProject.get(proj.project_id) || []), ...(schedItemsByProject.get(proj.project_id) || [])]);
+      // Only exclude items already in production_schedule. Inbox items are pending and should be forecasted.
+      const plannedCodes = new Set([...(schedItemsByProject.get(proj.project_id) || [])]);
       const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
-      if (est.hours === 0) continue;
+      // Add inbox hours (these items are waiting to be scheduled — must show in forecast)
+      const inboxHrs = inboxHoursByProject.get(proj.project_id) || 0;
+      const totalHours = est.hours + inboxHrs;
+      if (totalHours === 0) continue;
 
       const hasAnyDate = proj.tpv_date || proj.datum_objednavky || proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
       if (!hasAnyDate) {
