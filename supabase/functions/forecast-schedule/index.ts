@@ -228,6 +228,10 @@ serve(async (req) => {
       base: string;
       tpvCount: number;
       isInboxOnly: boolean;
+      /** Source kind for block emission */
+      sourceKind: "inbox_item" | "project_estimate";
+      /** Optional inbox hours bundled into this work item (for description) */
+      inboxItemCount?: number;
     }
 
     const workItems: WorkItem[] = [];
@@ -243,36 +247,38 @@ serve(async (req) => {
       // Subtract already-scheduled hours → forecast plans only what REMAINS.
       const canonical = planHoursByProject.get(proj.project_id);
       const alreadyScheduled = scheduledHoursByProject.get(proj.project_id) || 0;
+      const inboxHrs = Math.round(inboxHoursByProject.get(proj.project_id) || 0);
+      const inboxItemCount = (inboxItemsByProject.get(proj.project_id)?.size) || 0;
 
-      let totalHours = 0;
+      let projectEstimateHours = 0;
       let badge = "";
       let base: "tpv_items" | "prodejni_cena" | "none" = "none";
 
       if (canonical && canonical.hodiny_plan > 0) {
-        const remaining = Math.max(0, canonical.hodiny_plan - alreadyScheduled);
-        totalHours = Math.round(remaining);
+        // Remaining = canonical plan − already scheduled − inbox (which we'll emit as separate green blocks)
+        const remaining = Math.max(0, canonical.hodiny_plan - alreadyScheduled - inboxHrs);
+        projectEstimateHours = Math.round(remaining);
         badge = canonical.source === "Project"
-          ? `Plán projektu (zbývá ${totalHours}h z ${canonical.hodiny_plan}h)`
-          : `TPV plán (zbývá ${totalHours}h z ${canonical.hodiny_plan}h)`;
+          ? `Plán projektu (zbývá ${projectEstimateHours}h z ${canonical.hodiny_plan}h)`
+          : `TPV plán (zbývá ${projectEstimateHours}h z ${canonical.hodiny_plan}h)`;
         base = canonical.source === "Project" ? "prodejni_cena" : "tpv_items";
       } else {
         // Fallback: legacy estimate (only if no project_plan_hours record)
         const plannedCodes = new Set([...(schedItemsByProject.get(proj.project_id) || [])]);
         const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
-        const inboxHrs = inboxHoursByProject.get(proj.project_id) || 0;
-        totalHours = est.hours + inboxHrs;
-        badge = inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge);
+        projectEstimateHours = est.hours;
+        badge = est.badge;
         base = est.base as any;
       }
 
-      if (totalHours === 0) continue;
-      const isInboxOnly = (inboxHoursByProject.get(proj.project_id) || 0) > 0 && (!canonical || canonical.hodiny_plan === 0);
+      // Bail if absolutely nothing to schedule
+      if (projectEstimateHours === 0 && inboxHrs === 0) continue;
 
       const hasAnyDate = proj.tpv_date || proj.datum_objednavky || proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
       if (!hasAnyDate) {
         safetyNetMap.set(proj.project_id, {
           project_id: proj.project_id, project_name: proj.project_name,
-          estimated_hours: totalHours, estimation_badge: badge + " – chybí termíny",
+          estimated_hours: projectEstimateHours + inboxHrs, estimation_badge: badge + " – chybí termíny",
           source: "no_dates",
         });
         continue;
@@ -283,45 +289,71 @@ serve(async (req) => {
       const statusFallback: Record<string, number> = { "Výroba IN": 4, Výroba: 4, TPV: 8, Engineering: 12, Příprava: 16 };
       const rawDeadline = dl.date ?? addWeeks(today, statusFallback[proj.status] ?? 8);
 
-      if (rawDeadline < today) {
-        // Past deadline — still schedule, but mark as overdue
-      }
-
       const deadline = lastWorkday(rawDeadline);
       const deadlineWeek = getWeekKey(deadline);
 
-      workItems.push({
-        projectId: proj.project_id,
-        projectName: proj.project_name,
-        totalHours,
-        deadlineWeek,
-        deadline,
-        deadlineSource: dl.source,
-        conflict: dl.conflict,
-        badge,
-        base,
-        tpvCount,
-        isInboxOnly,
-      });
+      // Emit Inbox items as a SEPARATE green block (high priority — already approved by konstrukter)
+      if (inboxHrs > 0) {
+        workItems.push({
+          projectId: proj.project_id,
+          projectName: proj.project_name,
+          totalHours: inboxHrs,
+          deadlineWeek,
+          deadline,
+          deadlineSource: dl.source,
+          conflict: dl.conflict,
+          badge: `Inbox · ${inboxItemCount} položek`,
+          base,
+          tpvCount,
+          isInboxOnly: true,
+          sourceKind: "inbox_item",
+          inboxItemCount,
+        });
+      }
+
+      // Emit remaining project hours as project_estimate (orange)
+      if (projectEstimateHours > 0) {
+        workItems.push({
+          projectId: proj.project_id,
+          projectName: proj.project_name,
+          totalHours: projectEstimateHours,
+          deadlineWeek,
+          deadline,
+          deadlineSource: dl.source,
+          conflict: dl.conflict,
+          badge,
+          base,
+          tpvCount,
+          isInboxOnly: false,
+          sourceKind: "project_estimate",
+        });
+      }
     }
 
     // --- STEP 2: SORT BY PRIORITY ---
-    // a) Past deadline first (most urgent)
-    // b) Earliest deadline
-    // c) Larger projects first (tie-breaker)
+    // a) Inbox items first (already approved by konstrukter — high priority)
+    // b) Past deadline first (most urgent)
+    // c) Earliest deadline
+    // d) Larger projects first (tie-breaker)
     workItems.sort((a, b) => {
+      // Inbox always before project_estimate of same project (so they get the earliest weeks)
+      if (a.sourceKind !== b.sourceKind) {
+        return a.sourceKind === "inbox_item" ? -1 : 1;
+      }
       const aPast = a.deadlineWeek && a.deadlineWeek < currentWeekKey ? 1 : 0;
       const bPast = b.deadlineWeek && b.deadlineWeek < currentWeekKey ? 1 : 0;
-      if (aPast !== bPast) return bPast - aPast; // past deadline first
+      if (aPast !== bPast) return bPast - aPast;
 
-      // Earliest deadline first
       const aDeadline = a.deadlineWeek || "9999-99-99";
       const bDeadline = b.deadlineWeek || "9999-99-99";
       if (aDeadline !== bDeadline) return aDeadline < bDeadline ? -1 : 1;
 
-      // Larger projects first
       return b.totalHours - a.totalHours;
     });
+
+    // Assign stable workId — needed because same project can have 2 work items (inbox + estimate)
+    const workIds = new Map<WorkItem, string>();
+    workItems.forEach((w, i) => workIds.set(w, `${w.projectId}__${w.sourceKind}__${i}`));
 
     // --- STEP 3: BUILD WEEK LIST & AVAILABLE CAPACITY ---
     let maxWeek = addWeeks(today, 30);
@@ -340,15 +372,17 @@ serve(async (req) => {
 
     // --- STEP 4: FRONTLOAD SCHEDULING ---
     interface ScheduledChunk {
+      workId: string;
       projectId: string;
       week: string;
       hours: number;
       overDeadline: boolean;
     }
     const scheduledChunks: ScheduledChunk[] = [];
-    const projectMeta = new Map(workItems.map(w => [w.projectId, w]));
+    const workMeta = new Map<string, WorkItem>(workItems.map(w => [workIds.get(w)!, w]));
 
     for (const work of workItems) {
+      const workId = workIds.get(work)!;
       let remaining = work.totalHours;
       let overDeadline = false;
       const isPastDeadline = work.deadlineWeek && work.deadlineWeek < currentWeekKey;
@@ -356,33 +390,30 @@ serve(async (req) => {
       // Phase 1: Schedule within deadline (or from current week if past deadline)
       for (const wk of allWeeks) {
         if (remaining <= 0) break;
-
-        // If project has a future deadline and we've passed it, stop phase 1
         if (!isPastDeadline && work.deadlineWeek && wk > work.deadlineWeek) break;
 
         const avail = availableHours.get(wk) || 0;
         if (avail <= 0) continue;
 
         const slot = Math.min(remaining, avail);
-        scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
         availableHours.set(wk, avail - slot);
         remaining -= slot;
       }
 
-      // Phase 1b: PREEMPTION — if still remaining and we have a deadline, evict hours from
-      // later-deadline (or no-deadline) projects in pre-deadline weeks to make room.
+      // Phase 1b: PREEMPTION — evict from lower-priority work items
       if (remaining > 0 && work.deadlineWeek && !isPastDeadline) {
         for (const wk of allWeeks) {
           if (remaining <= 0) break;
           if (wk > work.deadlineWeek) break;
 
-          // Find evictable chunks in this week from lower-priority projects
           const evictable = scheduledChunks.filter(c => {
             if (c.week !== wk) return false;
-            if (c.projectId === work.projectId) return false;
-            const otherMeta = projectMeta.get(c.projectId);
+            if (c.workId === workId) return false;
+            const otherMeta = workMeta.get(c.workId);
             if (!otherMeta) return false;
-            // Lower priority = no deadline, or later deadline than current work
+            // Inbox items NEVER get evicted (highest priority)
+            if (otherMeta.sourceKind === "inbox_item") return false;
             const otherDl = otherMeta.deadlineWeek || "9999-99-99";
             return otherDl > work.deadlineWeek!;
           });
@@ -391,69 +422,63 @@ serve(async (req) => {
             if (remaining <= 0) break;
             const evictAmount = Math.min(victim.hours, remaining);
             victim.hours -= evictAmount;
-            scheduledChunks.push({ projectId: work.projectId, week: wk, hours: evictAmount, overDeadline: false });
+            scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: evictAmount, overDeadline: false });
             remaining -= evictAmount;
-            // Mark victim's project as needing re-placement of evicted hours later
-            const vMeta = projectMeta.get(victim.projectId)!;
+            const vMeta = workMeta.get(victim.workId)!;
             (vMeta as any)._evictedHours = ((vMeta as any)._evictedHours || 0) + evictAmount;
           }
         }
-        // Clean up zero-hour chunks
         for (let i = scheduledChunks.length - 1; i >= 0; i--) {
           if (scheduledChunks[i].hours <= 0) scheduledChunks.splice(i, 1);
         }
       }
 
-      // Phase 2: If remaining > 0, schedule after deadline (overflow)
+      // Phase 2: overflow after deadline
       if (remaining > 0) {
         overDeadline = true;
         for (const wk of allWeeks) {
           if (remaining <= 0) break;
           const avail = availableHours.get(wk) || 0;
           if (avail <= 0) continue;
-
           const slot = Math.min(remaining, avail);
-          scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
+          scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
           availableHours.set(wk, avail - slot);
           remaining -= slot;
         }
       }
 
-      // Phase 3: If STILL remaining (all weeks full), force into last week
+      // Phase 3: force into last week
       if (remaining > 0) {
         const lastWeek = allWeeks[allWeeks.length - 1];
-        scheduledChunks.push({ projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
       }
 
-      // Mark all chunks for this project as overDeadline if any overflow happened
       if (overDeadline) {
         for (const chunk of scheduledChunks) {
-          if (chunk.projectId === work.projectId) chunk.overDeadline = true;
+          if (chunk.workId === workId) chunk.overDeadline = true;
         }
       }
     }
 
     // --- STEP 4b: RE-PLACE EVICTED HOURS ---
-    // Projects that lost hours to higher-priority preemption need them re-placed.
     for (const work of workItems) {
+      const workId = workIds.get(work)!;
       const evicted = (work as any)._evictedHours || 0;
       if (evicted <= 0) continue;
       let remaining = evicted;
       let evictedOverDeadline = false;
       const isPastDeadline = work.deadlineWeek && work.deadlineWeek < currentWeekKey;
 
-      // Try within own deadline first
       for (const wk of allWeeks) {
         if (remaining <= 0) break;
         if (!isPastDeadline && work.deadlineWeek && wk > work.deadlineWeek) break;
         const avail = availableHours.get(wk) || 0;
         if (avail <= 0) continue;
         const slot = Math.min(remaining, avail);
-        scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
         availableHours.set(wk, avail - slot);
         remaining -= slot;
       }
-      // Then overflow after deadline
       if (remaining > 0) {
         evictedOverDeadline = true;
         for (const wk of allWeeks) {
@@ -461,34 +486,34 @@ serve(async (req) => {
           const avail = availableHours.get(wk) || 0;
           if (avail <= 0) continue;
           const slot = Math.min(remaining, avail);
-          scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
+          scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
           availableHours.set(wk, avail - slot);
           remaining -= slot;
         }
       }
       if (remaining > 0) {
         const lastWeek = allWeeks[allWeeks.length - 1];
-        scheduledChunks.push({ projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
         evictedOverDeadline = true;
       }
       if (evictedOverDeadline) {
         for (const chunk of scheduledChunks) {
-          if (chunk.projectId === work.projectId) chunk.overDeadline = true;
+          if (chunk.workId === workId) chunk.overDeadline = true;
         }
       }
     }
 
     // --- STEP 5: AGGREGATE INTO BLOCKS ---
-    // Merge chunks by (projectId, week) — use "::" separator to avoid dash conflicts with project IDs
-    const blockMap = new Map<string, { projectId: string; week: string; hours: number; overDeadline: boolean }>();
+    // Merge chunks by (workId, week) — keeps inbox and project_estimate as separate blocks
+    const blockMap = new Map<string, { workId: string; projectId: string; week: string; hours: number; overDeadline: boolean }>();
     for (const chunk of scheduledChunks) {
-      const key = `${chunk.projectId}::${chunk.week}`;
+      const key = `${chunk.workId}::${chunk.week}`;
       const existing = blockMap.get(key);
       if (existing) {
         existing.hours += chunk.hours;
         existing.overDeadline = existing.overDeadline || chunk.overDeadline;
       } else {
-        blockMap.set(key, { projectId: chunk.projectId, week: chunk.week, hours: chunk.hours, overDeadline: chunk.overDeadline });
+        blockMap.set(key, { workId: chunk.workId, projectId: chunk.projectId, week: chunk.week, hours: chunk.hours, overDeadline: chunk.overDeadline });
       }
     }
 
@@ -497,26 +522,29 @@ serve(async (req) => {
 
     for (const [, val] of blockMap.entries()) {
       if (val.hours < 0.5) continue;
-      const w = projectMeta.get(val.projectId);
+      const w = workMeta.get(val.workId);
       if (!w) continue;
 
       weekTotalHours.set(val.week, (weekTotalHours.get(val.week) || 0) + val.hours);
 
-      const totalChunksForProject = [...blockMap.values()].filter(v => v.projectId === val.projectId).length;
-      let desc = `${w.tpvCount} položek`;
-      if (totalChunksForProject > 1) desc += ` (rozděleno do ${totalChunksForProject} týdnů)`;
+      const totalChunksForWork = [...blockMap.values()].filter(v => v.workId === val.workId).length;
+      const isInbox = w.sourceKind === "inbox_item";
+      let desc = isInbox
+        ? `Inbox · ${w.inboxItemCount ?? 0} položek`
+        : `${w.tpvCount} položek`;
+      if (totalChunksForWork > 1) desc += ` (rozděleno do ${totalChunksForWork} týdnů)`;
       if (val.overDeadline) desc += " ⚠ po termínu";
 
       blocks.push({
-        id: `${val.projectId}-${val.week}`,
+        id: `${val.workId}-${val.week}`,
         project_id: val.projectId,
         project_name: w.projectName,
         bundle_description: desc,
         week: val.week,
         estimated_hours: Math.round(val.hours),
         tpv_item_count: w.tpvCount,
-        confidence: val.overDeadline ? "low" : (w.base === "tpv_items" ? "high" : "medium"),
-        source: w.isInboxOnly ? "inbox_item" : "project_estimate",
+        confidence: val.overDeadline ? "low" : (isInbox ? "high" : (w.base === "tpv_items" ? "high" : "medium")),
+        source: isInbox ? "inbox_item" : "project_estimate",
         deadline: w.deadline?.toISOString().substring(0, 10) || null,
         deadline_source: w.deadlineSource,
         is_forecast: true,
