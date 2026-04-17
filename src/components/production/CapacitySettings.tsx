@@ -26,6 +26,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useVyrobniEmployees, useAbsencesForYear, computeWeekCapacity, getWeekStartFromNumber, normalizeUsek, getActiveWorkingDays, useWeekComposition, useYearComposition, toggleEmployeeForWeekRange } from "@/hooks/useCapacityCalc";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { EmployeeManagement } from "./EmployeeManagement";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
