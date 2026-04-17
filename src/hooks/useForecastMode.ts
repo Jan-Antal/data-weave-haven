@@ -46,6 +46,8 @@ export interface ForecastBlock {
   estimation_badge?: string;
   estimation_preset?: string;
   calculation_detail?: ForecastCalculationDetail;
+  /** AI optimizer reasoning — set by forecast-ai-optimize stage */
+  ai_reasoning?: string;
 }
 
 /** Tracks a real bundle move that only lives in forecast state */
