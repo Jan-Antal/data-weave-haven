@@ -27,13 +27,16 @@ export function ForecastCommitBar({
   selectedInboxCount,
   selectedProjectCount,
   isGenerating,
+  isAiOptimizing,
+  aiSummary,
+  aiWarnings,
   allInboxSelected,
   onCommitSelected,
   onCancel,
   onToggleInboxSelect,
   onDeselectProjects,
 }: ForecastCommitBarProps) {
-  if (totalBlocks === 0 && !isGenerating) return null;
+  if (totalBlocks === 0 && !isGenerating && !isAiOptimizing) return null;
 
   const selBtnStyle: React.CSSProperties = {
     backgroundColor: "transparent",
