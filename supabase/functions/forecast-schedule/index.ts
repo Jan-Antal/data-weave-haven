@@ -144,7 +144,7 @@ serve(async (req) => {
     today.setUTCHours(0, 0, 0, 0);
     const currentWeekKey = getWeekKey(today);
 
-    const [projRes, tpvRes, settingsRes, presetsRes, capacityRes, ratesRes, inboxRes, schedRes] = await Promise.all([
+    const [projRes, tpvRes, settingsRes, presetsRes, capacityRes, ratesRes, inboxRes, schedRes, planHoursRes] = await Promise.all([
       sb.from("projects")
         .select("project_id,project_name,status,risk,prodejni_cena,marze,cost_preset_id,cost_production_pct,datum_objednavky,tpv_date,expedice,montaz,predani,datum_smluvni,currency")
         .in("status", ["Příprava", "Engineering", "TPV", "Výroba IN", "Výroba"])
@@ -155,8 +155,25 @@ serve(async (req) => {
       sb.from("production_capacity").select("week_number,week_year,capacity_hours"),
       sb.from("exchange_rates").select("year,eur_czk"),
       sb.from("production_inbox").select("project_id,item_code,estimated_hours").in("status", ["pending", "scheduled"]),
-      sb.from("production_schedule").select("project_id,item_code,scheduled_hours,scheduled_week").in("status", ["scheduled", "in_progress"]),
+      sb.from("production_schedule").select("project_id,item_code,scheduled_hours,scheduled_week,status").in("status", ["scheduled", "in_progress", "completed"]),
+      sb.from("project_plan_hours").select("project_id,hodiny_plan,source"),
     ]);
+
+    // Canonical plan hours per project (same source as Project Detail / Analytics)
+    const planHoursByProject = new Map<string, { hodiny_plan: number; source: string }>();
+    for (const row of planHoursRes.data || []) {
+      planHoursByProject.set(row.project_id, {
+        hodiny_plan: Number(row.hodiny_plan) || 0,
+        source: String(row.source || ""),
+      });
+    }
+
+    // Hours already scheduled per project (scheduled + in_progress + completed)
+    const scheduledHoursByProject = new Map<string, number>();
+    for (const row of schedRes.data || []) {
+      const pid = row.project_id;
+      scheduledHoursByProject.set(pid, (scheduledHoursByProject.get(pid) || 0) + (Number(row.scheduled_hours) || 0));
+    }
 
     const projects = projRes.data || [];
     const hourlyRate = Number(settingsRes.data?.hourly_rate) || 550;
