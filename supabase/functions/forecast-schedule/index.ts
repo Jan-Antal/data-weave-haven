@@ -210,6 +210,7 @@ serve(async (req) => {
       badge: string;
       base: string;
       tpvCount: number;
+      isInboxOnly: boolean;
     }
 
     const workItems: WorkItem[] = [];
