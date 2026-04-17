@@ -2,7 +2,7 @@ import { parseAppDate } from "@/lib/dateFormat";
 
 export type RiskHighlightType = "overdue" | "upcoming" | "high-risk" | null;
 
-const COMPLETED_STATUSES = ["Fakturace", "Dokončeno"];
+const COMPLETED_STATUSES = ["Fakturace", "Dokončeno", "On Hold"];
 
 /**
  * Get the risk highlight color for a project row.
