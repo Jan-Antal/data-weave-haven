@@ -504,16 +504,16 @@ serve(async (req) => {
     }
 
     // --- STEP 5: AGGREGATE INTO BLOCKS ---
-    // Merge chunks by (projectId, week) — use "::" separator to avoid dash conflicts with project IDs
-    const blockMap = new Map<string, { projectId: string; week: string; hours: number; overDeadline: boolean }>();
+    // Merge chunks by (workId, week) — keeps inbox and project_estimate as separate blocks
+    const blockMap = new Map<string, { workId: string; projectId: string; week: string; hours: number; overDeadline: boolean }>();
     for (const chunk of scheduledChunks) {
-      const key = `${chunk.projectId}::${chunk.week}`;
+      const key = `${chunk.workId}::${chunk.week}`;
       const existing = blockMap.get(key);
       if (existing) {
         existing.hours += chunk.hours;
         existing.overDeadline = existing.overDeadline || chunk.overDeadline;
       } else {
-        blockMap.set(key, { projectId: chunk.projectId, week: chunk.week, hours: chunk.hours, overDeadline: chunk.overDeadline });
+        blockMap.set(key, { workId: chunk.workId, projectId: chunk.projectId, week: chunk.week, hours: chunk.hours, overDeadline: chunk.overDeadline });
       }
     }
 
@@ -522,26 +522,29 @@ serve(async (req) => {
 
     for (const [, val] of blockMap.entries()) {
       if (val.hours < 0.5) continue;
-      const w = projectMeta.get(val.projectId);
+      const w = workMeta.get(val.workId);
       if (!w) continue;
 
       weekTotalHours.set(val.week, (weekTotalHours.get(val.week) || 0) + val.hours);
 
-      const totalChunksForProject = [...blockMap.values()].filter(v => v.projectId === val.projectId).length;
-      let desc = `${w.tpvCount} položek`;
-      if (totalChunksForProject > 1) desc += ` (rozděleno do ${totalChunksForProject} týdnů)`;
+      const totalChunksForWork = [...blockMap.values()].filter(v => v.workId === val.workId).length;
+      const isInbox = w.sourceKind === "inbox_item";
+      let desc = isInbox
+        ? `Inbox · ${w.inboxItemCount ?? 0} položek`
+        : `${w.tpvCount} položek`;
+      if (totalChunksForWork > 1) desc += ` (rozděleno do ${totalChunksForWork} týdnů)`;
       if (val.overDeadline) desc += " ⚠ po termínu";
 
       blocks.push({
-        id: `${val.projectId}-${val.week}`,
+        id: `${val.workId}-${val.week}`,
         project_id: val.projectId,
         project_name: w.projectName,
         bundle_description: desc,
         week: val.week,
         estimated_hours: Math.round(val.hours),
         tpv_item_count: w.tpvCount,
-        confidence: val.overDeadline ? "low" : (w.base === "tpv_items" ? "high" : "medium"),
-        source: w.isInboxOnly ? "inbox_item" : "project_estimate",
+        confidence: val.overDeadline ? "low" : (isInbox ? "high" : (w.base === "tpv_items" ? "high" : "medium")),
+        source: isInbox ? "inbox_item" : "project_estimate",
         deadline: w.deadline?.toISOString().substring(0, 10) || null,
         deadline_source: w.deadlineSource,
         is_forecast: true,
