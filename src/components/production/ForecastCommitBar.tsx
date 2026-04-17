@@ -1,4 +1,4 @@
-import { Sparkles, Check, X } from "lucide-react";
+import { Sparkles, Check, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ForecastCommitBarProps {
@@ -9,6 +9,9 @@ interface ForecastCommitBarProps {
   selectedInboxCount: number;
   selectedProjectCount: number;
   isGenerating: boolean;
+  isAiOptimizing?: boolean;
+  aiSummary?: string;
+  aiWarnings?: string[];
   allInboxSelected: boolean;
   onCommitSelected: () => void;
   onCancel: () => void;
