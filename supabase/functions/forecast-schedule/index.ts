@@ -382,6 +382,7 @@ serve(async (req) => {
     const workMeta = new Map<string, WorkItem>(workItems.map(w => [workIds.get(w)!, w]));
 
     for (const work of workItems) {
+      const workId = workIds.get(work)!;
       let remaining = work.totalHours;
       let overDeadline = false;
       const isPastDeadline = work.deadlineWeek && work.deadlineWeek < currentWeekKey;
@@ -389,33 +390,30 @@ serve(async (req) => {
       // Phase 1: Schedule within deadline (or from current week if past deadline)
       for (const wk of allWeeks) {
         if (remaining <= 0) break;
-
-        // If project has a future deadline and we've passed it, stop phase 1
         if (!isPastDeadline && work.deadlineWeek && wk > work.deadlineWeek) break;
 
         const avail = availableHours.get(wk) || 0;
         if (avail <= 0) continue;
 
         const slot = Math.min(remaining, avail);
-        scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
         availableHours.set(wk, avail - slot);
         remaining -= slot;
       }
 
-      // Phase 1b: PREEMPTION — if still remaining and we have a deadline, evict hours from
-      // later-deadline (or no-deadline) projects in pre-deadline weeks to make room.
+      // Phase 1b: PREEMPTION — evict from lower-priority work items
       if (remaining > 0 && work.deadlineWeek && !isPastDeadline) {
         for (const wk of allWeeks) {
           if (remaining <= 0) break;
           if (wk > work.deadlineWeek) break;
 
-          // Find evictable chunks in this week from lower-priority projects
           const evictable = scheduledChunks.filter(c => {
             if (c.week !== wk) return false;
-            if (c.projectId === work.projectId) return false;
-            const otherMeta = projectMeta.get(c.projectId);
+            if (c.workId === workId) return false;
+            const otherMeta = workMeta.get(c.workId);
             if (!otherMeta) return false;
-            // Lower priority = no deadline, or later deadline than current work
+            // Inbox items NEVER get evicted (highest priority)
+            if (otherMeta.sourceKind === "inbox_item") return false;
             const otherDl = otherMeta.deadlineWeek || "9999-99-99";
             return otherDl > work.deadlineWeek!;
           });
@@ -424,69 +422,63 @@ serve(async (req) => {
             if (remaining <= 0) break;
             const evictAmount = Math.min(victim.hours, remaining);
             victim.hours -= evictAmount;
-            scheduledChunks.push({ projectId: work.projectId, week: wk, hours: evictAmount, overDeadline: false });
+            scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: evictAmount, overDeadline: false });
             remaining -= evictAmount;
-            // Mark victim's project as needing re-placement of evicted hours later
-            const vMeta = projectMeta.get(victim.projectId)!;
+            const vMeta = workMeta.get(victim.workId)!;
             (vMeta as any)._evictedHours = ((vMeta as any)._evictedHours || 0) + evictAmount;
           }
         }
-        // Clean up zero-hour chunks
         for (let i = scheduledChunks.length - 1; i >= 0; i--) {
           if (scheduledChunks[i].hours <= 0) scheduledChunks.splice(i, 1);
         }
       }
 
-      // Phase 2: If remaining > 0, schedule after deadline (overflow)
+      // Phase 2: overflow after deadline
       if (remaining > 0) {
         overDeadline = true;
         for (const wk of allWeeks) {
           if (remaining <= 0) break;
           const avail = availableHours.get(wk) || 0;
           if (avail <= 0) continue;
-
           const slot = Math.min(remaining, avail);
-          scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
+          scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
           availableHours.set(wk, avail - slot);
           remaining -= slot;
         }
       }
 
-      // Phase 3: If STILL remaining (all weeks full), force into last week
+      // Phase 3: force into last week
       if (remaining > 0) {
         const lastWeek = allWeeks[allWeeks.length - 1];
-        scheduledChunks.push({ projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
       }
 
-      // Mark all chunks for this project as overDeadline if any overflow happened
       if (overDeadline) {
         for (const chunk of scheduledChunks) {
-          if (chunk.projectId === work.projectId) chunk.overDeadline = true;
+          if (chunk.workId === workId) chunk.overDeadline = true;
         }
       }
     }
 
     // --- STEP 4b: RE-PLACE EVICTED HOURS ---
-    // Projects that lost hours to higher-priority preemption need them re-placed.
     for (const work of workItems) {
+      const workId = workIds.get(work)!;
       const evicted = (work as any)._evictedHours || 0;
       if (evicted <= 0) continue;
       let remaining = evicted;
       let evictedOverDeadline = false;
       const isPastDeadline = work.deadlineWeek && work.deadlineWeek < currentWeekKey;
 
-      // Try within own deadline first
       for (const wk of allWeeks) {
         if (remaining <= 0) break;
         if (!isPastDeadline && work.deadlineWeek && wk > work.deadlineWeek) break;
         const avail = availableHours.get(wk) || 0;
         if (avail <= 0) continue;
         const slot = Math.min(remaining, avail);
-        scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: false });
         availableHours.set(wk, avail - slot);
         remaining -= slot;
       }
-      // Then overflow after deadline
       if (remaining > 0) {
         evictedOverDeadline = true;
         for (const wk of allWeeks) {
@@ -494,19 +486,19 @@ serve(async (req) => {
           const avail = availableHours.get(wk) || 0;
           if (avail <= 0) continue;
           const slot = Math.min(remaining, avail);
-          scheduledChunks.push({ projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
+          scheduledChunks.push({ workId, projectId: work.projectId, week: wk, hours: slot, overDeadline: true });
           availableHours.set(wk, avail - slot);
           remaining -= slot;
         }
       }
       if (remaining > 0) {
         const lastWeek = allWeeks[allWeeks.length - 1];
-        scheduledChunks.push({ projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
+        scheduledChunks.push({ workId, projectId: work.projectId, week: lastWeek, hours: remaining, overDeadline: true });
         evictedOverDeadline = true;
       }
       if (evictedOverDeadline) {
         for (const chunk of scheduledChunks) {
-          if (chunk.projectId === work.projectId) chunk.overDeadline = true;
+          if (chunk.workId === workId) chunk.overDeadline = true;
         }
       }
     }
