@@ -267,9 +267,9 @@ export function useForecastMode(): UseForecastModeReturn {
       if (blocks.length === 0) {
         toast({ title: "Forecast", description: "Žádné položky k naplánování." });
       } else {
-        const inboxCount = blocks.filter(b => b.source === "inbox_item").length;
-        const projectCount = blocks.filter(b => b.source === "project_estimate").length;
-        toast({ title: "Forecast vygenerován", description: `${inboxCount} inbox + ${projectCount} projekt bloků naplánováno.` });
+        const inboxBlocks = blocks.filter(b => b.estimation_badge?.includes("Inbox")).length;
+        const projectCount = blocks.length;
+        toast({ title: "Forecast vygenerován", description: `${projectCount} bloků naplánováno (${inboxBlocks} obsahuje Inbox položky).` });
       }
     } catch (err: any) {
       if (generationToken !== generationTokenRef.current) return;
