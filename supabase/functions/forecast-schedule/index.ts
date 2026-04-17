@@ -232,7 +232,7 @@ serve(async (req) => {
       if (!hasAnyDate) {
         safetyNetMap.set(proj.project_id, {
           project_id: proj.project_id, project_name: proj.project_name,
-          estimated_hours: est.hours, estimation_badge: est.badge + " – chybí termíny",
+          estimated_hours: totalHours, estimation_badge: (inboxHrs > 0 ? `Inbox + ${est.badge}` : est.badge) + " – chybí termíny",
           source: "no_dates",
         });
         continue;
@@ -254,12 +254,12 @@ serve(async (req) => {
       workItems.push({
         projectId: proj.project_id,
         projectName: proj.project_name,
-        totalHours: est.hours,
+        totalHours: totalHours,
         deadlineWeek,
         deadline,
         deadlineSource: dl.source,
         conflict: dl.conflict,
-        badge: est.badge,
+        badge: inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge),
         base: est.base,
         tpvCount,
       });
