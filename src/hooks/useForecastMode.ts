@@ -114,6 +114,9 @@ interface UseForecastModeReturn {
   setPlanMode: (m: ForecastPlanMode) => void;
   forecastBlocks: ForecastBlock[];
   isGenerating: boolean;
+  isAiOptimizing: boolean;
+  aiSummary: string;
+  aiWarnings: string[];
   selectedBlockIds: Set<string>;
   toggleBlockSelection: (id: string) => void;
   selectAll: () => void;
@@ -147,6 +150,9 @@ export function useForecastMode(): UseForecastModeReturn {
   const [planMode, setPlanModeRaw] = useState<ForecastPlanMode>("respect_plan");
   const [forecastBlocks, setForecastBlocks] = useState<ForecastBlock[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAiOptimizing, setIsAiOptimizing] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
   const [realBundleOverrides, setRealBundleOverrides] = useState<RealBundleOverride[]>([]);
   const [safetyNetProjects, setSafetyNetProjects] = useState<SafetyNetProject[]>([]);
