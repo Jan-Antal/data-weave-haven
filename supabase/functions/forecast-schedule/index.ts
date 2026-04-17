@@ -210,6 +210,7 @@ serve(async (req) => {
       badge: string;
       base: string;
       tpvCount: number;
+      isInboxOnly: boolean;
     }
 
     const workItems: WorkItem[] = [];
@@ -262,6 +263,7 @@ serve(async (req) => {
         badge: inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge),
         base: est.base,
         tpvCount,
+        isInboxOnly: inboxHrs > 0,
       });
     }
 
@@ -396,7 +398,7 @@ serve(async (req) => {
         estimated_hours: Math.round(val.hours),
         tpv_item_count: w.tpvCount,
         confidence: val.overDeadline ? "low" : (w.base === "tpv_items" ? "high" : "medium"),
-        source: "project_estimate",
+        source: w.isInboxOnly ? "inbox_item" : "project_estimate",
         deadline: w.deadline?.toISOString().substring(0, 10) || null,
         deadline_source: w.deadlineSource,
         is_forecast: true,
