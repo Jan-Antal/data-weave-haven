@@ -173,12 +173,16 @@ serve(async (req) => {
     }
 
     // Build sets of already-planned item_codes per project
+    // NOTE: Inbox items are NOT yet scheduled — they should be ADDED to forecast hours, not excluded.
+    // Only items already in production_schedule (truly planned) are excluded from estimation.
     const inboxItemsByProject = new Map<string, Set<string>>();
     const schedItemsByProject = new Map<string, Set<string>>();
+    const inboxHoursByProject = new Map<string, number>();
     for (const row of inboxRes.data || []) {
       if (!row.item_code) continue;
       if (!inboxItemsByProject.has(row.project_id)) inboxItemsByProject.set(row.project_id, new Set());
       inboxItemsByProject.get(row.project_id)!.add(row.item_code);
+      inboxHoursByProject.set(row.project_id, (inboxHoursByProject.get(row.project_id) || 0) + (Number(row.estimated_hours) || 0));
     }
     for (const row of schedRes.data || []) {
       if (!row.item_code) continue;
@@ -216,15 +220,19 @@ serve(async (req) => {
       const tpvCount = projTpv.length;
       const preset = proj.cost_preset_id ? presets.find((p: any) => p.id === proj.cost_preset_id) : defaultPreset;
       const vyrobaPct = ((proj.cost_production_pct ? Number(proj.cost_production_pct) : null) ?? preset?.production_pct ?? 35) / 100;
-      const plannedCodes = new Set([...(inboxItemsByProject.get(proj.project_id) || []), ...(schedItemsByProject.get(proj.project_id) || [])]);
+      // Only exclude items already in production_schedule. Inbox items are pending and should be forecasted.
+      const plannedCodes = new Set([...(schedItemsByProject.get(proj.project_id) || [])]);
       const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
-      if (est.hours === 0) continue;
+      // Add inbox hours (these items are waiting to be scheduled — must show in forecast)
+      const inboxHrs = inboxHoursByProject.get(proj.project_id) || 0;
+      const totalHours = est.hours + inboxHrs;
+      if (totalHours === 0) continue;
 
       const hasAnyDate = proj.tpv_date || proj.datum_objednavky || proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
       if (!hasAnyDate) {
         safetyNetMap.set(proj.project_id, {
           project_id: proj.project_id, project_name: proj.project_name,
-          estimated_hours: est.hours, estimation_badge: est.badge + " – chybí termíny",
+          estimated_hours: totalHours, estimation_badge: (inboxHrs > 0 ? `Inbox + ${est.badge}` : est.badge) + " – chybí termíny",
           source: "no_dates",
         });
         continue;
@@ -246,12 +254,12 @@ serve(async (req) => {
       workItems.push({
         projectId: proj.project_id,
         projectName: proj.project_name,
-        totalHours: est.hours,
+        totalHours: totalHours,
         deadlineWeek,
         deadline,
         deadlineSource: dl.source,
         conflict: dl.conflict,
-        badge: est.badge,
+        badge: inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge),
         base: est.base,
         tpvCount,
       });
