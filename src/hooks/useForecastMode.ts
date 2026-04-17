@@ -248,6 +248,9 @@ export function useForecastMode(): UseForecastModeReturn {
   const generateForecast = useCallback(async (weeklyCapacityHours: number, modeOverride?: ForecastPlanMode) => {
     const generationToken = ++generationTokenRef.current;
     setIsGenerating(true);
+    setIsAiOptimizing(false);
+    setAiSummary("");
+    setAiWarnings([]);
 
     try {
       const mode = modeOverride ?? planMode;
@@ -264,23 +267,69 @@ export function useForecastMode(): UseForecastModeReturn {
       }
 
       const rawBlocks: ForecastBlock[] = Array.isArray(data?.blocks) ? data.blocks : [];
-      const blocks = rawBlocks.map(block => ({ ...block }));
+      let blocks = rawBlocks.map(block => ({ ...block }));
+      const overbooked = Array.isArray(data?.overbookedWeeks) ? data.overbookedWeeks : [];
 
-      const weekSet = new Set(blocks.map(b => b.week));
-      console.log(`[Forecast] Generated ${blocks.length} blocks across weeks:`, Array.from(weekSet).sort());
-      console.log(`[Forecast] By source: existing_plan=${blocks.filter(b=>b.source==="existing_plan").length}, inbox_item=${blocks.filter(b=>b.source==="inbox_item").length}, project_estimate=${blocks.filter(b=>b.source==="project_estimate").length}`);
+      console.log(`[Forecast] Deterministic baseline: ${blocks.length} blocks`);
 
       setForecastBlocks(blocks);
       setSelectedBlockIds(new Set(blocks.filter(b => b.source === "inbox_item").map(b => b.id)));
       setSafetyNetProjects(Array.isArray(data?.safetyNet) ? data.safetyNet : []);
-      setOverbookedWeeks(Array.isArray(data?.overbookedWeeks) ? data.overbookedWeeks : []);
+      setOverbookedWeeks(overbooked);
+      setIsGenerating(false);
+
+      // ---- STAGE 2: AI optimization ----
+      if (blocks.length > 0) {
+        setIsAiOptimizing(true);
+        try {
+          const weekHoursMap = new Map<string, number>();
+          for (const b of blocks) weekHoursMap.set(b.week, (weekHoursMap.get(b.week) || 0) + b.estimated_hours);
+          const capacityWeeks = Array.from(weekHoursMap.keys()).sort().map(week => {
+            const ob = overbooked.find((o: OverbookedWeek) => o.week === week);
+            return {
+              week,
+              capacity: ob?.capacity ?? weeklyCapacityHours,
+              used: ob ? Math.max(0, ob.hoursScheduled - (weekHoursMap.get(week) || 0)) : 0,
+            };
+          });
+
+          const { data: aiData, error: aiError } = await supabase.functions.invoke("forecast-ai-optimize", {
+            body: {
+              blocks: blocks.map(b => ({
+                id: b.id, project_id: b.project_id, project_name: b.project_name,
+                week: b.week, estimated_hours: b.estimated_hours,
+                deadline: b.deadline, source: b.source, bundle_description: b.bundle_description,
+              })),
+              capacity: capacityWeeks,
+            },
+          });
+
+          if (generationToken !== generationTokenRef.current) return;
+
+          if (aiError || aiData?.error) {
+            console.warn("AI optimizer failed, keeping baseline:", aiError || aiData?.error);
+            toast({ title: "AI nedostupná", description: "Zobrazujem základní plán." });
+          } else if (Array.isArray(aiData?.blocks) && aiData.blocks.length > 0) {
+            blocks = aiData.blocks.map((b: any) => ({ ...b }));
+            setForecastBlocks(blocks);
+            setSelectedBlockIds(new Set(blocks.filter(b => b.source === "inbox_item").map(b => b.id)));
+            setAiSummary(String(aiData.summary || ""));
+            setAiWarnings(Array.isArray(aiData.warnings) ? aiData.warnings : []);
+            console.log(`[Forecast] AI optimized: ${blocks.length} blocks, model=${aiData.model_used}`);
+          }
+        } catch (aiErr: any) {
+          console.warn("AI optimizer threw:", aiErr);
+          toast({ title: "AI nedostupná", description: "Zobrazujem základní plán." });
+        } finally {
+          if (generationToken === generationTokenRef.current) setIsAiOptimizing(false);
+        }
+      }
 
       if (blocks.length === 0) {
         toast({ title: "Forecast", description: "Žádné položky k naplánování." });
       } else {
-        const inboxBlocks = blocks.filter(b => b.estimation_badge?.includes("Inbox")).length;
-        const projectCount = blocks.length;
-        toast({ title: "Forecast vygenerován", description: `${projectCount} bloků naplánováno (${inboxBlocks} obsahuje Inbox položky).` });
+        const inboxBlocks = blocks.filter(b => b.source === "inbox_item").length;
+        toast({ title: "Forecast vygenerován", description: `${blocks.length} bloků naplánováno (${inboxBlocks} z Inboxu).` });
       }
     } catch (err: any) {
       if (generationToken !== generationTokenRef.current) return;
@@ -289,6 +338,7 @@ export function useForecastMode(): UseForecastModeReturn {
     } finally {
       if (generationToken === generationTokenRef.current) {
         setIsGenerating(false);
+        setIsAiOptimizing(false);
       }
     }
   }, [planMode]);
