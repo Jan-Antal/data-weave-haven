@@ -173,6 +173,9 @@ export function useForecastMode(): UseForecastModeReturn {
     setSafetyNetProjects([]);
     setOverbookedWeeks([]);
     setIsGenerating(false);
+    setIsAiOptimizing(false);
+    setAiSummary("");
+    setAiWarnings([]);
   }, []);
 
   const loadSavedSession = useCallback((modeOverride?: ForecastPlanMode): boolean => {
