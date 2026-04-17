@@ -173,12 +173,16 @@ serve(async (req) => {
     }
 
     // Build sets of already-planned item_codes per project
+    // NOTE: Inbox items are NOT yet scheduled — they should be ADDED to forecast hours, not excluded.
+    // Only items already in production_schedule (truly planned) are excluded from estimation.
     const inboxItemsByProject = new Map<string, Set<string>>();
     const schedItemsByProject = new Map<string, Set<string>>();
+    const inboxHoursByProject = new Map<string, number>();
     for (const row of inboxRes.data || []) {
       if (!row.item_code) continue;
       if (!inboxItemsByProject.has(row.project_id)) inboxItemsByProject.set(row.project_id, new Set());
       inboxItemsByProject.get(row.project_id)!.add(row.item_code);
+      inboxHoursByProject.set(row.project_id, (inboxHoursByProject.get(row.project_id) || 0) + (Number(row.estimated_hours) || 0));
     }
     for (const row of schedRes.data || []) {
       if (!row.item_code) continue;
