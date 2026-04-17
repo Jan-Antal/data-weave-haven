@@ -331,6 +331,41 @@ serve(async (req) => {
         remaining -= slot;
       }
 
+      // Phase 1b: PREEMPTION — if still remaining and we have a deadline, evict hours from
+      // later-deadline (or no-deadline) projects in pre-deadline weeks to make room.
+      if (remaining > 0 && work.deadlineWeek && !isPastDeadline) {
+        for (const wk of allWeeks) {
+          if (remaining <= 0) break;
+          if (wk > work.deadlineWeek) break;
+
+          // Find evictable chunks in this week from lower-priority projects
+          const evictable = scheduledChunks.filter(c => {
+            if (c.week !== wk) return false;
+            if (c.projectId === work.projectId) return false;
+            const otherMeta = projectMeta.get(c.projectId);
+            if (!otherMeta) return false;
+            // Lower priority = no deadline, or later deadline than current work
+            const otherDl = otherMeta.deadlineWeek || "9999-99-99";
+            return otherDl > work.deadlineWeek!;
+          });
+
+          for (const victim of evictable) {
+            if (remaining <= 0) break;
+            const evictAmount = Math.min(victim.hours, remaining);
+            victim.hours -= evictAmount;
+            scheduledChunks.push({ projectId: work.projectId, week: wk, hours: evictAmount, overDeadline: false });
+            remaining -= evictAmount;
+            // Mark victim's project as needing re-placement of evicted hours later
+            const vMeta = projectMeta.get(victim.projectId)!;
+            (vMeta as any)._evictedHours = ((vMeta as any)._evictedHours || 0) + evictAmount;
+          }
+        }
+        // Clean up zero-hour chunks
+        for (let i = scheduledChunks.length - 1; i >= 0; i--) {
+          if (scheduledChunks[i].hours <= 0) scheduledChunks.splice(i, 1);
+        }
+      }
+
       // Phase 2: If remaining > 0, schedule after deadline (overflow)
       if (remaining > 0) {
         overDeadline = true;
