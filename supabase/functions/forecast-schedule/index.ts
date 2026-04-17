@@ -331,22 +331,29 @@ serve(async (req) => {
     }
 
     // --- STEP 2: SORT BY PRIORITY ---
-    // a) Past deadline first (most urgent)
-    // b) Earliest deadline
-    // c) Larger projects first (tie-breaker)
+    // a) Inbox items first (already approved by konstrukter — high priority)
+    // b) Past deadline first (most urgent)
+    // c) Earliest deadline
+    // d) Larger projects first (tie-breaker)
     workItems.sort((a, b) => {
+      // Inbox always before project_estimate of same project (so they get the earliest weeks)
+      if (a.sourceKind !== b.sourceKind) {
+        return a.sourceKind === "inbox_item" ? -1 : 1;
+      }
       const aPast = a.deadlineWeek && a.deadlineWeek < currentWeekKey ? 1 : 0;
       const bPast = b.deadlineWeek && b.deadlineWeek < currentWeekKey ? 1 : 0;
-      if (aPast !== bPast) return bPast - aPast; // past deadline first
+      if (aPast !== bPast) return bPast - aPast;
 
-      // Earliest deadline first
       const aDeadline = a.deadlineWeek || "9999-99-99";
       const bDeadline = b.deadlineWeek || "9999-99-99";
       if (aDeadline !== bDeadline) return aDeadline < bDeadline ? -1 : 1;
 
-      // Larger projects first
       return b.totalHours - a.totalHours;
     });
+
+    // Assign stable workId — needed because same project can have 2 work items (inbox + estimate)
+    const workIds = new Map<WorkItem, string>();
+    workItems.forEach((w, i) => workIds.set(w, `${w.projectId}__${w.sourceKind}__${i}`));
 
     // --- STEP 3: BUILD WEEK LIST & AVAILABLE CAPACITY ---
     let maxWeek = addWeeks(today, 30);
@@ -365,13 +372,14 @@ serve(async (req) => {
 
     // --- STEP 4: FRONTLOAD SCHEDULING ---
     interface ScheduledChunk {
+      workId: string;
       projectId: string;
       week: string;
       hours: number;
       overDeadline: boolean;
     }
     const scheduledChunks: ScheduledChunk[] = [];
-    const projectMeta = new Map(workItems.map(w => [w.projectId, w]));
+    const workMeta = new Map<string, WorkItem>(workItems.map(w => [workIds.get(w)!, w]));
 
     for (const work of workItems) {
       let remaining = work.totalHours;
