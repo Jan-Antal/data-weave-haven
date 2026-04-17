@@ -263,7 +263,7 @@ serve(async (req) => {
         badge: inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge),
         base: est.base,
         tpvCount,
-        isInboxOnly: inboxHrs > 0 && est.hours === 0,
+        isInboxOnly: inboxHrs > 0,
       });
     }
 
