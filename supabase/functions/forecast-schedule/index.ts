@@ -238,19 +238,41 @@ serve(async (req) => {
       const tpvCount = projTpv.length;
       const preset = proj.cost_preset_id ? presets.find((p: any) => p.id === proj.cost_preset_id) : defaultPreset;
       const vyrobaPct = ((proj.cost_production_pct ? Number(proj.cost_production_pct) : null) ?? preset?.production_pct ?? 35) / 100;
-      // Only exclude items already in production_schedule. Inbox items are pending and should be forecasted.
-      const plannedCodes = new Set([...(schedItemsByProject.get(proj.project_id) || [])]);
-      const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
-      // Add inbox hours (these items are waiting to be scheduled — must show in forecast)
-      const inboxHrs = inboxHoursByProject.get(proj.project_id) || 0;
-      const totalHours = est.hours + inboxHrs;
+
+      // CANONICAL hours source: project_plan_hours.hodiny_plan (same as Project Detail / Analytics)
+      // Subtract already-scheduled hours → forecast plans only what REMAINS.
+      const canonical = planHoursByProject.get(proj.project_id);
+      const alreadyScheduled = scheduledHoursByProject.get(proj.project_id) || 0;
+
+      let totalHours = 0;
+      let badge = "";
+      let base: "tpv_items" | "prodejni_cena" | "none" = "none";
+
+      if (canonical && canonical.hodiny_plan > 0) {
+        const remaining = Math.max(0, canonical.hodiny_plan - alreadyScheduled);
+        totalHours = Math.round(remaining);
+        badge = canonical.source === "Project"
+          ? `Plán projektu (zbývá ${totalHours}h z ${canonical.hodiny_plan}h)`
+          : `TPV plán (zbývá ${totalHours}h z ${canonical.hodiny_plan}h)`;
+        base = canonical.source === "Project" ? "prodejni_cena" : "tpv_items";
+      } else {
+        // Fallback: legacy estimate (only if no project_plan_hours record)
+        const plannedCodes = new Set([...(schedItemsByProject.get(proj.project_id) || [])]);
+        const est = estimateHours(proj, projTpv, hourlyRate, vyrobaPct, eurRate, plannedCodes);
+        const inboxHrs = inboxHoursByProject.get(proj.project_id) || 0;
+        totalHours = est.hours + inboxHrs;
+        badge = inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge);
+        base = est.base as any;
+      }
+
       if (totalHours === 0) continue;
+      const isInboxOnly = (inboxHoursByProject.get(proj.project_id) || 0) > 0 && (!canonical || canonical.hodiny_plan === 0);
 
       const hasAnyDate = proj.tpv_date || proj.datum_objednavky || proj.expedice || proj.montaz || proj.predani || proj.datum_smluvni;
       if (!hasAnyDate) {
         safetyNetMap.set(proj.project_id, {
           project_id: proj.project_id, project_name: proj.project_name,
-          estimated_hours: totalHours, estimation_badge: (inboxHrs > 0 ? `Inbox + ${est.badge}` : est.badge) + " – chybí termíny",
+          estimated_hours: totalHours, estimation_badge: badge + " – chybí termíny",
           source: "no_dates",
         });
         continue;
@@ -263,7 +285,6 @@ serve(async (req) => {
 
       if (rawDeadline < today) {
         // Past deadline — still schedule, but mark as overdue
-        // We'll handle these in the scheduler with overDeadline flag
       }
 
       const deadline = lastWorkday(rawDeadline);
@@ -272,15 +293,15 @@ serve(async (req) => {
       workItems.push({
         projectId: proj.project_id,
         projectName: proj.project_name,
-        totalHours: totalHours,
+        totalHours,
         deadlineWeek,
         deadline,
         deadlineSource: dl.source,
         conflict: dl.conflict,
-        badge: inboxHrs > 0 && est.hours > 0 ? `Inbox + ${est.badge}` : (inboxHrs > 0 ? "Inbox položky" : est.badge),
-        base: est.base,
+        badge,
+        base,
         tpvCount,
-        isInboxOnly: inboxHrs > 0,
+        isInboxOnly,
       });
     }
 
