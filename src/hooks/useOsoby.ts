@@ -38,17 +38,31 @@ export function useUpsertPosition() {
   return useMutation({
     mutationFn: async (row: Partial<CataloguePosition> & { stredisko: string; usek: string; pozicia: string }) => {
       if (row.id) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("position_catalogue" as any)
           .update(row as any)
-          .eq("id", row.id);
+          .eq("id", row.id)
+          .select()
+          .single();
         if (error) throw error;
+        return { mode: "update" as const, row: data as unknown as CataloguePosition };
       } else {
-        const { error } = await supabase.from("position_catalogue" as any).insert(row as any);
+        const { data, error } = await supabase
+          .from("position_catalogue" as any)
+          .insert(row as any)
+          .select()
+          .single();
         if (error) throw error;
+        return { mode: "insert" as const, row: data as unknown as CataloguePosition };
       }
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      // Patch cache instantly so the new/updated row appears without waiting for refetch.
+      qc.setQueryData<CataloguePosition[]>(["position_catalogue"], (old) => {
+        const list = old ?? [];
+        if (result.mode === "insert") return [...list, result.row];
+        return list.map((r) => (r.id === result.row.id ? result.row : r));
+      });
       await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
       qc.invalidateQueries({ queryKey: ["people"] });
     },
