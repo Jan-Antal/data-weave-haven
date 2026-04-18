@@ -172,7 +172,10 @@ export function OsobyZamestnanci() {
   };
 
   const handlePoziciaChange = (emp: any, value: string) => {
-    if (value === "__none") return;
+    if (value === "__none") {
+      updateEmp.mutate({ id: emp.id, patch: { pozicia: null } });
+      return;
+    }
     // Position must belong to emp's úsek (UI enforces úsek selected first)
     const cat = catalogue.find((c) => c.pozicia === value && c.usek === emp.usek_nazov);
     if (!cat) return;
