@@ -25,6 +25,7 @@ export interface AnalyticsRow {
   preset_label: string;
   warning_low_tpv: boolean;
   force_project_price: boolean;
+  unmatched: boolean;
 }
 
 export interface AnalyticsSummary {
