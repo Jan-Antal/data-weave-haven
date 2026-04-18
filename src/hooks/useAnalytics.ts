@@ -74,7 +74,7 @@ const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokon
 
 export function useAnalytics() {
   return useQuery({
-    queryKey: ["analytics", "utilization-v3-capacity"],
+    queryKey: ["analytics", "utilization-v4"],
     queryFn: async () => {
       const capacityFromDate = (() => { const d = new Date(); d.setDate(d.getDate() - 100); return d.toISOString().slice(0, 10); })();
       const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes, capacityRes] = await Promise.all([
@@ -477,6 +477,18 @@ export function useAnalytics() {
       const utilization30d = pctVsCap(windowAgg.p30, cap30);
       const utilization60to30d = pctVsCap(windowAgg.p60, cap60);
       const utilization90to60d = pctVsCap(windowAgg.p90, cap90);
+
+      // Diagnostic log — remove once verified
+      console.info("[Analytics]", {
+        p30: windowAgg.p30,
+        r30: windowAgg.r30,
+        cap30: Math.round(cap30),
+        util30d: utilization30d,
+        productionEmpsCount: productionEmps.length,
+        rawLogsCount: rawLogs.length,
+        window: { W90, W60, W30, W0 },
+        capacityRowsCount: capacityRows.length,
+      });
 
       const samples = [utilization30d, utilization60to30d, utilization90to60d].filter(
         (v): v is number => v != null,
