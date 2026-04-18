@@ -353,9 +353,15 @@ export function OsobyZamestnanci() {
                                 Ukončen k {format(new Date(terminationDate), "d. M. yyyy", { locale: cs })}
                               </Badge>
                             ) : active && (active.absencia_kod === "NEM" || active.absencia_kod === "PN" || active.absencia_kod === "RD") ? (
-                              <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-200">
-                                Pozastaveno · návrat {format(new Date(active.date_to), "d. M. yyyy", { locale: cs })}
-                              </Badge>
+                              (() => {
+                                const days = Math.round((new Date(active.date_to).getTime() - new Date(active.date_from).getTime()) / 86400000);
+                                const isOpenEnded = days >= 170;
+                                return (
+                                  <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-200">
+                                    Pozastaveno · {isOpenEnded ? "předpokládaný návrat" : "návrat"} {format(new Date(active.date_to), "d. M. yyyy", { locale: cs })}
+                                  </Badge>
+                                );
+                              })()
                             ) : (
                               <Badge variant="outline" className="text-[11px] bg-green-50 text-green-700 border-green-200">
                                 Aktívny
