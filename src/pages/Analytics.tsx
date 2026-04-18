@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { PageTabsShell, type ShellTabDef } from "@/components/shell/PageTabsShell";
 import { AnalyticsBreakdownRow } from "@/components/AnalyticsBreakdownRow";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
