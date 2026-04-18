@@ -95,6 +95,8 @@ export function OsobyZamestnanci() {
     return map;
   }, [catalogue]);
 
+  const allPositions = useMemo(() => catalogue.map((c) => c.pozicia), [catalogue]);
+
   const allStrediska = useMemo(() => {
     const set = new Set<string>();
     for (const e of employees) if (e.stredisko) set.add(e.stredisko);
@@ -130,6 +132,7 @@ export function OsobyZamestnanci() {
   }, [filtered]);
 
   const handleUsekChange = (emp: any, value: string) => {
+    if (value === "__none") return;
     const cat = catalogue.find((c) => c.usek === value);
     updateEmp.mutate({
       id: emp.id,
@@ -142,7 +145,11 @@ export function OsobyZamestnanci() {
   };
 
   const handlePoziciaChange = (emp: any, value: string) => {
-    const cat = catalogue.find((c) => c.pozicia === value && c.usek === emp.usek_nazov);
+    if (value === "__none") return;
+    // Match position within emp's úsek if present, else fall back to first match anywhere
+    const cat =
+      catalogue.find((c) => c.pozicia === value && c.usek === emp.usek_nazov) ??
+      catalogue.find((c) => c.pozicia === value);
     updateEmp.mutate({
       id: emp.id,
       patch: {
@@ -253,11 +260,12 @@ export function OsobyZamestnanci() {
                           </TableCell>
                           <TableCell>
                             <Select
-                              value={emp.usek_nazov ?? ""}
+                              value={emp.usek_nazov ?? "__none"}
                               onValueChange={(v) => handleUsekChange(emp, v)}
                             >
                               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="__none" disabled>—</SelectItem>
                                 {usekOptions.map((u) => (
                                   <SelectItem key={`${u.stredisko}-${u.usek}`} value={u.usek}>{u.usek}</SelectItem>
                                 ))}
@@ -266,15 +274,17 @@ export function OsobyZamestnanci() {
                           </TableCell>
                           <TableCell>
                             <Select
-                              value={emp.pozicia ?? ""}
+                              value={emp.pozicia ?? "__none"}
                               onValueChange={(v) => handlePoziciaChange(emp, v)}
-                              disabled={!emp.usek_nazov}
                             >
                               <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder={emp.usek_nazov ? "—" : "Vyberte úsek"} />
+                                <SelectValue placeholder="—" />
                               </SelectTrigger>
                               <SelectContent>
-                                {positionsForUsek.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                <SelectItem value="__none" disabled>—</SelectItem>
+                                {(positionsForUsek.length > 0 ? positionsForUsek : allPositions).map((p) => (
+                                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </TableCell>

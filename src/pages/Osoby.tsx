@@ -38,7 +38,6 @@ export default function Osoby() {
   const requested = (params.get("tab") as TabKey | null) ?? "zamestnanci";
   const active: TabKey = visibleTabs.some((t) => t.key === requested) ? requested : "zamestnanci";
 
-  // Normalize URL if requested tab is not visible
   useEffect(() => {
     if (requested !== active) {
       const next = new URLSearchParams(params);
@@ -54,10 +53,10 @@ export default function Osoby() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#f8f7f4]">
-      {/* Page hero — title + meta */}
+    <div className="h-full flex flex-col bg-background">
+      {/* Page hero — title + tabs (full-width, no card) */}
       <div className="border-b bg-white">
-        <div className="px-6 pt-5 pb-0 max-w-[1400px] mx-auto w-full">
+        <div className="px-6 pt-5 pb-0 w-full">
           <div className="flex items-baseline gap-3">
             <h1 className="text-xl font-semibold text-foreground" style={{ fontFamily: "'Early Sans', system-ui, sans-serif" }}>
               Správa osob
@@ -68,7 +67,6 @@ export default function Osoby() {
           </div>
           {isTestUser && <div className="mt-3 mb-1"><TestModeBanner /></div>}
 
-          {/* Tabs row */}
           <nav className="flex items-end gap-0 mt-4 -mb-px overflow-x-auto" role="tablist">
             {visibleTabs.map((t) => {
               const isActive = t.key === active;
@@ -93,17 +91,13 @@ export default function Osoby() {
         </div>
       </div>
 
-      {/* Content card */}
-      <div className="flex-1 overflow-hidden p-6">
-        <div className="max-w-[1400px] mx-auto h-full">
-          <div className="h-full bg-white rounded-lg border border-border shadow-sm overflow-hidden flex flex-col">
-            {active === "zamestnanci" && <OsobyZamestnanci />}
-            {active === "externisti" && <OsobyExternisti />}
-            {active === "uzivatele" && canManageUsers && <OsobyUzivatele />}
-            {active === "katalog" && canSeeAdminTabs && <OsobyKatalog />}
-            {active === "kapacita" && canSeeAdminTabs && <OsobyKapacita />}
-          </div>
-        </div>
+      {/* Content — full width, no inner card, like Project Info / Analytics */}
+      <div className="flex-1 overflow-hidden bg-white">
+        {active === "zamestnanci" && <OsobyZamestnanci />}
+        {active === "externisti" && <OsobyExternisti />}
+        {active === "uzivatele" && canManageUsers && <OsobyUzivatele />}
+        {active === "katalog" && canSeeAdminTabs && <OsobyKatalog />}
+        {active === "kapacita" && canSeeAdminTabs && <OsobyKapacita />}
       </div>
     </div>
   );
