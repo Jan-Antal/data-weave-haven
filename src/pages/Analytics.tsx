@@ -426,9 +426,10 @@ export default function Analytics() {
             <RezieCard
               isLoading={isLoading}
               reziePct={data?.summary.reziePct ?? null}
-              totalRezieHours={data?.summary.totalRezieHours ?? 0}
+              totalRezieHours={data?.summary.productionRezieHours ?? 0}
               utilizationTarget={data?.summary.utilizationTarget ?? 83}
               rezieRows={data?.rows.filter((r) => r.category === "rezie") ?? []}
+              rezieByCode={data?.summary.rezieByCode ?? {}}
             />
           </div>
 
