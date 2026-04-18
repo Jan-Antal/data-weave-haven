@@ -55,22 +55,18 @@ export function OsobyKatalog() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-5 pt-4 pb-3 border-b">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">
-              Pozice & číselníky
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Strom <span className="font-medium text-foreground">Stredisko → Úsek → Pozice</span>.
-              Příznak na úseku určuje projektový dropdown.
-            </p>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => setShowAddStredisko(true)}>
+      <SectionToolbar
+        left={
+          <span className="text-xs text-muted-foreground">
+            Strom <span className="font-medium text-foreground">Stredisko → Úsek → Pozice</span>
+          </span>
+        }
+        right={
+          <Button size="sm" variant="outline" className="h-8" onClick={() => setShowAddStredisko(true)}>
             <Plus className="h-4 w-4 mr-1.5" /> Stredisko
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {Array.from(tree.entries()).map(([stredisko, useks]) => {
