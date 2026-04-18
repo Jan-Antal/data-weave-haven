@@ -69,7 +69,7 @@ export function OsobyKatalog() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
         {Array.from(tree.entries()).map(([stredisko, useks]) => {
           const sKey = `s::${stredisko}`;
           const sOpen = expanded.has(sKey);

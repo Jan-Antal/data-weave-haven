@@ -24,6 +24,21 @@ interface ExternalRow {
   is_external: boolean;
 }
 
+/** Deterministic pastel avatar color from name hash. Same hash as Zaměstnanci. */
+function avatarStyles(name: string): { bg: string; fg: string } {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  return { bg: `hsl(${hue}, 65%, 90%)`, fg: `hsl(${hue}, 45%, 30%)` };
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function useExternals() {
   return useQuery({
     queryKey: ["people", "externals"],
@@ -99,12 +114,14 @@ export function OsobyExternisti() {
     },
   });
 
+  const activeCount = rows.filter(r => r.is_active).length;
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-card">
       <SectionToolbar
         left={
           <span className="text-xs text-muted-foreground">
-            {rows.length} externistů
+            Externisti · {activeCount} aktivních z {rows.length}
           </span>
         }
         right={
@@ -125,74 +142,88 @@ export function OsobyExternisti() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-6">
         <Table>
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
-              <TableHead className="w-[220px]">Jméno</TableHead>
-              <TableHead className="w-[200px]">Firma</TableHead>
-              <TableHead className="w-[140px]">Role</TableHead>
+              <TableHead className="w-[300px]">Jméno</TableHead>
+              <TableHead className="w-[220px]">Firma</TableHead>
+              <TableHead className="w-[160px]">Role</TableHead>
               <TableHead className="w-[100px]">Aktivní</TableHead>
               <TableHead className="w-[60px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell>
-                  <Input
-                    defaultValue={r.name}
-                    onBlur={(e) => {
-                      const v = e.target.value.trim();
-                      if (v && v !== r.name) updateField.mutate({ id: r.id, patch: { name: v } });
-                    }}
-                    className="h-8 text-sm"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Input
-                    defaultValue={r.firma ?? ""}
-                    placeholder="—"
-                    onBlur={(e) => {
-                      const v = e.target.value.trim() || null;
-                      if (v !== (r.firma ?? null)) updateField.mutate({ id: r.id, patch: { firma: v as any } });
-                    }}
-                    className="h-8 text-sm"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Select
-                    value={r.role}
-                    onValueChange={(v) => updateField.mutate({ id: r.id, patch: { role: v } })}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ROLE_OPTIONS.map((o) => (
-                        <SelectItem key={o} value={o}>{o}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  <Switch
-                    checked={r.is_active}
-                    onCheckedChange={(v) => updateField.mutate({ id: r.id, patch: { is_active: v } })}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteFor({ id: r.id, name: r.name })}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
+            {filtered.map((r) => {
+              const av = avatarStyles(r.name);
+              return (
+                <TableRow key={r.id} className={r.is_active ? "" : "opacity-60"}>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
+                        style={{ backgroundColor: av.bg, color: av.fg }}
+                        aria-hidden
+                      >
+                        {getInitials(r.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Input
+                          defaultValue={r.name}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v && v !== r.name) updateField.mutate({ id: r.id, patch: { name: v } });
+                          }}
+                          className="h-8 text-[13px] font-medium border-transparent hover:border-border focus:border-border bg-transparent px-2"
+                        />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      defaultValue={r.firma ?? ""}
+                      placeholder="—"
+                      onBlur={(e) => {
+                        const v = e.target.value.trim() || null;
+                        if (v !== (r.firma ?? null)) updateField.mutate({ id: r.id, patch: { firma: v as any } });
+                      }}
+                      className="h-8 text-[13px] border-transparent hover:border-border focus:border-border bg-transparent px-2"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={r.role}
+                      onValueChange={(v) => updateField.mutate({ id: r.id, patch: { role: v } })}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLE_OPTIONS.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={r.is_active}
+                      onCheckedChange={(v) => updateField.mutate({ id: r.id, patch: { is_active: v } })}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteFor({ id: r.id, name: r.name })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
