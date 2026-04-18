@@ -253,10 +253,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
             holiday_name: week?.holiday_name ?? null,
             company_holiday_name: week?.company_holiday_name ?? null,
             utilization_pct: localUtilizationPct,
-            dilna1_hodiny: calc.dilna1,
-            dilna2_hodiny: calc.dilna2,
-            dilna3_hodiny: calc.dilna3,
-            sklad_hodiny: calc.sklad,
+            usek_breakdown: calc.byUsek,
             total_employees: calc.totalEmployees,
             absence_days: Math.round(calc.absenceHours / 8),
           });
@@ -317,7 +314,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   // Selected employees (respecting enabledUseky checkboxes) for reactive metrics
   const selectedEmployees = useMemo(() =>
     vyrobniEmployees.filter(e => {
-      const key = normalizeUsek(e.usek);
+      const key = normalizeUsek(e);
       return key !== null && !disabledUseky.has(key) && !disabledEmployees.has(e.id);
     }),
     [vyrobniEmployees, disabledUseky, disabledEmployees]);
@@ -575,10 +572,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
             holiday_name: week?.holiday_name ?? null,
             company_holiday_name: week?.company_holiday_name ?? null,
             utilization_pct: localUtilizationPct,
-            dilna1_hodiny: calc.dilna1,
-            dilna2_hodiny: calc.dilna2,
-            dilna3_hodiny: calc.dilna3,
-            sklad_hodiny: calc.sklad,
+            usek_breakdown: calc.byUsek,
             total_employees: calc.totalEmployees,
             absence_days: calcAbsDays,
           });
