@@ -74,7 +74,7 @@ const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokon
 
 export function useAnalytics() {
   return useQuery({
-    queryKey: ["analytics"],
+    queryKey: ["analytics", "utilization-v2"],
     queryFn: async () => {
       const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes] = await Promise.all([
         (supabase.rpc as any)("get_hours_by_project"),
@@ -492,5 +492,6 @@ export function useAnalytics() {
       return { rows, summary };
     },
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
   });
 }
