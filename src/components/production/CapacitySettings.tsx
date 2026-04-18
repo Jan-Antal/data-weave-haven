@@ -777,7 +777,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
           const totalNetto = Math.round(totalWeekly * localUtilizationPct / 100);
           const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
           return (
-            <div className="border border-border rounded-lg p-4 space-y-2">
+            <div className="space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   Složení výrobní kapacity
@@ -909,7 +909,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
         })()}
 
         {/* Year Bar Chart */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
+        <div className="border border-border/60 rounded-lg p-4 space-y-3 bg-card">
           {/* Header: Year nav + month range + scroll controls */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
