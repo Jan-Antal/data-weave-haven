@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { usePositionCatalogue, useUpsertPosition, useDeletePosition, useRenamePosition, useDeleteUsek, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
+import { usePositionCatalogue, useUpsertPosition, useDeletePosition, useRenamePosition, useRenameUsek, useDeleteUsek, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -20,6 +20,7 @@ export function OsobyKatalog() {
   const { data: rows = [] } = usePositionCatalogue();
   const upsert = useUpsertPosition();
   const rename = useRenamePosition();
+  const renameUsek = useRenameUsek();
   const del = useDeletePosition();
   const delUsek = useDeleteUsek();
 
@@ -55,6 +56,7 @@ export function OsobyKatalog() {
   const [showAddStredisko, setShowAddStredisko] = useState(false);
   const [deleteFor, setDeleteFor] = useState<CataloguePosition | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+  const [editingUsek, setEditingUsek] = useState<{ stredisko: string; usek: string; value: string } | null>(null);
 
   const commitRename = (p: CataloguePosition) => {
     if (!editing || editing.id !== p.id) return;
@@ -63,6 +65,16 @@ export function OsobyKatalog() {
     rename.mutate(
       { id: p.id, stredisko: p.stredisko, usek: p.usek, oldName: p.pozicia, newName: next },
       { onSettled: () => setEditing(null) },
+    );
+  };
+
+  const commitRenameUsek = () => {
+    if (!editingUsek) return;
+    const next = editingUsek.value.trim();
+    if (!next || next === editingUsek.usek) { setEditingUsek(null); return; }
+    renameUsek.mutate(
+      { stredisko: editingUsek.stredisko, oldName: editingUsek.usek, newName: next },
+      { onSettled: () => setEditingUsek(null) },
     );
   };
 
