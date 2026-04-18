@@ -385,10 +385,23 @@ export function OsobyZamestnanci() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <Select
-                              value={String(emp.uvazok_hodiny ?? 8)}
-                              onValueChange={(v) => handleUvazek(emp, Number(v))}
-                            >
+                            <div className="flex items-center gap-3 flex-wrap">
+                              {([
+                                ["is_pm", "PM"],
+                                ["is_kalkulant", "Kalk"],
+                                ["is_konstrukter", "Konstr"],
+                              ] as const).map(([flag, label]) => (
+                                <label key={flag} className="flex items-center gap-1.5 text-[11px] cursor-pointer select-none">
+                                  <Checkbox
+                                    checked={!!emp[flag]}
+                                    onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                  <span className="text-foreground">{label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </TableCell>
                               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 {UVAZEK_OPTIONS.map((d) => (
