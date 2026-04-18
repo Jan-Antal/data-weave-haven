@@ -310,47 +310,37 @@ export default function Analytics() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center gap-1 ml-2">
-              {([
-                { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
-                { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
-                { key: "rezie" as const, label: "🏭 Režije", activeClass: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
-              ]).map((chip) => {
-                const active = statusFilters.has(chip.key);
-                return (
-                  <button
-                    key={chip.key}
-                    onClick={() => {
-                      setStatusFilters((prev) => {
-                        const isActive = prev.has(chip.key);
-                        // Režije is exclusive — clicking it isolates overhead view
-                        if (chip.key === "rezie") {
-                          if (isActive) {
-                            // toggling off → restore default project view
-                            return new Set(["vyroba", "done"]);
-                          }
-                          return new Set(["rezie"]);
-                        }
-                        // Clicking a non-režie chip while režie is active → switch to project view
-                        if (prev.has("rezie")) {
-                          return new Set([chip.key]);
-                        }
-                        const next = new Set(prev);
-                        if (isActive) next.delete(chip.key);
-                        else next.add(chip.key);
-                        return next;
-                      });
-                    }}
-                    className={cn(
-                      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
-                      active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
-                    )}
-                  >
-                    {chip.label}
-                  </button>
-                );
-              })}
-            </div>
+            {!rezieMode && (
+              <div className="flex items-center gap-1 ml-2">
+                {([
+                  { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
+                  { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
+                ]).map((chip) => {
+                  const active = statusFilters.has(chip.key);
+                  return (
+                    <button
+                      key={chip.key}
+                      onClick={() => {
+                        setStatusFilters((prev) => {
+                          const next = new Set(prev);
+                          next.delete("rezie");
+                          if (next.has(chip.key)) next.delete(chip.key);
+                          else next.add(chip.key);
+                          if (next.size === 0) next.add(chip.key);
+                          return next;
+                        });
+                      }}
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
+                        active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
         {dilnaMode && (
