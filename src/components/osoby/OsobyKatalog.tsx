@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Check, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Check, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { usePositionCatalogue, useUpsertPosition, useDeletePosition, useRenamePosition, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { usePositionCatalogue, useUpsertPosition, useDeletePosition, useRenamePosition, useDeleteUsek, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
+import { supabase } from "@/integrations/supabase/client";
 
 const ROLE_LABELS: Record<string, string> = {
   pm: "PM dropdown",
@@ -19,8 +21,32 @@ export function OsobyKatalog() {
   const upsert = useUpsertPosition();
   const rename = useRenamePosition();
   const del = useDeletePosition();
+  const delUsek = useDeleteUsek();
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [usekDelete, setUsekDelete] = useState<{ stredisko: string; usek: string } | null>(null);
+  const [usekEmployees, setUsekEmployees] = useState<Array<{ id: string; meno: string; pozicia: string | null }> | null>(null);
+  const [usekEmployeesLoading, setUsekEmployeesLoading] = useState(false);
+
+  // Load employees in the selected úsek when dialog opens
+  useEffect(() => {
+    if (!usekDelete) { setUsekEmployees(null); return; }
+    let cancelled = false;
+    setUsekEmployeesLoading(true);
+    supabase
+      .from("ami_employees")
+      .select("id, meno, pozicia, aktivny")
+      .eq("stredisko", usekDelete.stredisko)
+      .eq("usek_nazov", usekDelete.usek)
+      .order("meno")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setUsekEmployees((data ?? []).map((e: any) => ({ id: e.id, meno: e.meno, pozicia: e.pozicia })));
+        setUsekEmployeesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [usekDelete]);
+
   const [addingTo, setAddingTo] = useState<{ stredisko: string; usek: string } | null>(null);
   const [newPozicia, setNewPozicia] = useState("");
   const [newUsek, setNewUsek] = useState<{ stredisko: string } | null>(null);
@@ -133,6 +159,15 @@ export function OsobyKatalog() {
                               <SelectItem value="kalkulant">Kalkulant</SelectItem>
                             </SelectContent>
                           </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setUsekDelete({ stredisko, usek })}
+                            title="Smazat úsek"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                         {uOpen && (
                           <div className="border-t px-3 py-2 space-y-1">
@@ -332,6 +367,54 @@ export function OsobyKatalog() {
         title="Smazat pozici?"
         description={deleteFor ? `Opravdu smazat "${deleteFor.pozicia}" (${deleteFor.usek})?` : ""}
       />
+
+      <Dialog open={!!usekDelete} onOpenChange={(o) => !o && setUsekDelete(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Smazat úsek „{usekDelete?.usek}"?</DialogTitle>
+            <DialogDescription>
+              {usekEmployeesLoading
+                ? "Načítám zaměstnance…"
+                : (usekEmployees?.length ?? 0) > 0
+                  ? "V úseku jsou přiřazení zaměstnanci. Než ho smažete, je potřeba je přeřadit do jiného úseku."
+                  : "V úseku nejsou žádní zaměstnanci. Smazáním odstraníte všechny pozice v tomto úseku."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {(usekEmployees?.length ?? 0) > 0 && (
+            <div className="rounded-md border bg-muted/30 max-h-64 overflow-y-auto">
+              <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/50 text-xs font-medium text-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                Zaměstnanci v úseku ({usekEmployees!.length})
+              </div>
+              <ul className="divide-y">
+                {usekEmployees!.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                    <span>{e.meno}</span>
+                    {e.pozicia && (
+                      <span className="text-xs text-muted-foreground">{e.pozicia}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setUsekDelete(null)}>Zavřít</Button>
+            <Button
+              variant="destructive"
+              disabled={usekEmployeesLoading || (usekEmployees?.length ?? 0) > 0 || delUsek.isPending}
+              onClick={() => {
+                if (!usekDelete) return;
+                delUsek.mutate(usekDelete, { onSuccess: () => setUsekDelete(null) });
+              }}
+            >
+              Smazat úsek
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -126,6 +126,37 @@ export function useDeletePosition() {
   });
 }
 
+/** Delete an entire úsek (all catalogue rows in stredisko+usek). Caller MUST verify there are no employees first. */
+export function useDeleteUsek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ stredisko, usek }: { stredisko: string; usek: string }) => {
+      // Safety: re-check employees right before delete
+      const { data: emps, error: e1 } = await supabase
+        .from("ami_employees")
+        .select("id, meno")
+        .eq("stredisko", stredisko)
+        .eq("usek_nazov", usek);
+      if (e1) throw e1;
+      if ((emps?.length ?? 0) > 0) {
+        throw new Error(`V úseku je ${emps!.length} zaměstnanců — nelze smazat.`);
+      }
+      const { error } = await supabase
+        .from("position_catalogue" as any)
+        .delete()
+        .eq("stredisko", stredisko)
+        .eq("usek", usek);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
+      qc.invalidateQueries({ queryKey: ["unified-members"] });
+      toast({ title: "Úsek smazán" });
+    },
+    onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
+  });
+}
+
 // =====================================================================
 // Members for project dropdowns: UNION of internal employees + externals
 // =====================================================================
