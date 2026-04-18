@@ -1237,7 +1237,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   );
 
   if (inline) {
-    return <div className="flex flex-col h-full overflow-hidden bg-background">{innerContent}</div>;
+    return <div className="flex flex-col h-full overflow-hidden bg-card">{innerContent}</div>;
   }
 
   return (

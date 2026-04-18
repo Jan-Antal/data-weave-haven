@@ -438,7 +438,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   );
 
   const wrappedContent = inline ? (
-    <div className="flex flex-col h-full overflow-hidden bg-background">
+    <div className="flex flex-col h-full overflow-hidden bg-card">
       <SectionToolbar
         left={<span className="text-xs text-muted-foreground">{users.length} uživatelů</span>}
         right={

@@ -167,9 +167,9 @@ export function OsobyZamestnanci() {
   const activeCount = employees.filter((e) => e.aktivny).length;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-card">
       {/* Section header — title meta + actions */}
-      <div className="px-5 pt-4 pb-3 border-b">
+      <div className="px-5 pt-4 pb-3 border-b bg-card">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-base font-semibold text-foreground">
@@ -207,7 +207,7 @@ export function OsobyZamestnanci() {
       {/* Table */}
       <div className="flex-1 overflow-y-auto">
         <Table>
-          <TableHeader className="sticky top-0 bg-background z-10">
+          <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
               <TableHead className="w-[260px]">Jméno</TableHead>
               <TableHead className="w-[180px]">Úsek</TableHead>
