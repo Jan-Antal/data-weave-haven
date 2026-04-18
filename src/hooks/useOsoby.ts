@@ -126,6 +126,49 @@ export function useDeletePosition() {
   });
 }
 
+/** Rename an úsek — updates all catalogue rows + cascades to ami_employees.usek_nazov */
+export function useRenameUsek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ stredisko, oldName, newName }: { stredisko: string; oldName: string; newName: string }) => {
+      const trimmed = newName.trim();
+      if (!trimmed) throw new Error("Název úseku nesmí být prázdný");
+      if (trimmed === oldName) return { updatedEmployees: 0 };
+
+      // 1) Update all catalogue rows in this úsek
+      const { error: e1 } = await supabase
+        .from("position_catalogue" as any)
+        .update({ usek: trimmed } as any)
+        .eq("stredisko", stredisko)
+        .eq("usek", oldName);
+      if (e1) throw e1;
+
+      // 2) Cascade rename to employees in same stredisko + old usek_nazov
+      const { data: emps, error: e2 } = await supabase
+        .from("ami_employees")
+        .update({ usek_nazov: trimmed } as any)
+        .eq("stredisko", stredisko)
+        .eq("usek_nazov", oldName)
+        .select("id");
+      if (e2) throw e2;
+
+      return { updatedEmployees: emps?.length ?? 0 };
+    },
+    onSuccess: async (res) => {
+      await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
+      await qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
+      qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
+      qc.invalidateQueries({ queryKey: ["employees-for-week"] });
+      qc.invalidateQueries({ queryKey: ["unified-members"] });
+      toast({
+        title: "Úsek přejmenován",
+        description: res.updatedEmployees > 0 ? `Aktualizováno ${res.updatedEmployees} zaměstnanců` : undefined,
+      });
+    },
+    onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
+  });
+}
+
 /** Delete an entire úsek (all catalogue rows in stredisko+usek). Caller MUST verify there are no employees first. */
 export function useDeleteUsek() {
   const qc = useQueryClient();
