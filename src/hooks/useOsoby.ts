@@ -70,6 +70,49 @@ export function useUpsertPosition() {
   });
 }
 
+export function useRenamePosition() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (args: { id: string; stredisko: string; usek: string; oldName: string; newName: string }) => {
+      const { id, stredisko, usek, oldName, newName } = args;
+      const trimmed = newName.trim();
+      if (!trimmed) throw new Error("Název pozice nesmí být prázdný");
+      if (trimmed === oldName) return { updatedEmployees: 0 };
+
+      // 1) Update catalogue row
+      const { error: e1 } = await supabase
+        .from("position_catalogue" as any)
+        .update({ pozicia: trimmed } as any)
+        .eq("id", id);
+      if (e1) throw e1;
+
+      // 2) Cascade rename to employees with the SAME stredisko+usek+old pozicia
+      const { data: emps, error: e2 } = await supabase
+        .from("ami_employees")
+        .update({ pozicia: trimmed } as any)
+        .eq("stredisko", stredisko)
+        .eq("usek_nazov", usek)
+        .eq("pozicia", oldName)
+        .select("id");
+      if (e2) throw e2;
+
+      return { updatedEmployees: emps?.length ?? 0 };
+    },
+    onSuccess: async (res) => {
+      await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
+      await qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
+      qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
+      qc.invalidateQueries({ queryKey: ["employees-for-week"] });
+      qc.invalidateQueries({ queryKey: ["unified-members"] });
+      toast({
+        title: "Pozice přejmenována",
+        description: res.updatedEmployees > 0 ? `Aktualizováno ${res.updatedEmployees} zaměstnanců` : undefined,
+      });
+    },
+    onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
+  });
+}
+
 export function useDeletePosition() {
   const qc = useQueryClient();
   return useMutation({

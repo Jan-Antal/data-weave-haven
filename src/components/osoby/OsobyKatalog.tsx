@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { usePositionCatalogue, useUpsertPosition, useDeletePosition, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
+import { usePositionCatalogue, useUpsertPosition, useDeletePosition, useRenamePosition, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -17,6 +17,7 @@ const ROLE_LABELS: Record<string, string> = {
 export function OsobyKatalog() {
   const { data: rows = [] } = usePositionCatalogue();
   const upsert = useUpsertPosition();
+  const rename = useRenamePosition();
   const del = useDeletePosition();
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -27,6 +28,17 @@ export function OsobyKatalog() {
   const [newStredisko, setNewStredisko] = useState("");
   const [showAddStredisko, setShowAddStredisko] = useState(false);
   const [deleteFor, setDeleteFor] = useState<CataloguePosition | null>(null);
+  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+
+  const commitRename = (p: CataloguePosition) => {
+    if (!editing || editing.id !== p.id) return;
+    const next = editing.value.trim();
+    if (!next || next === p.pozicia) { setEditing(null); return; }
+    rename.mutate(
+      { id: p.id, stredisko: p.stredisko, usek: p.usek, oldName: p.pozicia, newName: next },
+      { onSettled: () => setEditing(null) },
+    );
+  };
 
   const tree = useMemo(() => {
     const t = new Map<string, Map<string, CataloguePosition[]>>();
@@ -124,19 +136,65 @@ export function OsobyKatalog() {
                         </div>
                         {uOpen && (
                           <div className="border-t px-3 py-2 space-y-1">
-                            {list.map((p) => (
-                              <div key={p.id} className="flex items-center gap-2 text-sm">
-                                <span className="flex-1">{p.pozicia}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                  onClick={() => setDeleteFor(p)}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            ))}
+                            {list.map((p) => {
+                              const isEditing = editing?.id === p.id;
+                              return (
+                                <div key={p.id} className="flex items-center gap-2 text-sm group">
+                                  {isEditing ? (
+                                    <>
+                                      <Input
+                                        autoFocus
+                                        value={editing!.value}
+                                        onChange={(e) => setEditing({ id: p.id, value: e.target.value })}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") commitRename(p);
+                                          if (e.key === "Escape") setEditing(null);
+                                        }}
+                                        className="h-7 text-xs flex-1"
+                                      />
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6 text-primary"
+                                        onClick={() => commitRename(p)}
+                                        disabled={rename.isPending}
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6 text-muted-foreground"
+                                        onClick={() => setEditing(null)}
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="flex-1">{p.pozicia}</span>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+                                        onClick={() => setEditing({ id: p.id, value: p.pozicia })}
+                                        title="Přejmenovat pozici"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                        onClick={() => setDeleteFor(p)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
                             {addingTo?.stredisko === stredisko && addingTo?.usek === usek ? (
                               <div className="flex gap-2 items-center pt-1">
                                 <Input
