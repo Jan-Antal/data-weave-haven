@@ -1,70 +1,50 @@
 
 
-## Plán: Režie ako samostatná kategória v Analytics
+## Plán: Rozšírené režijné kódy + utilizácia podľa výrobných ľudí
 
-### Cieľ
-Oddeliť interné "režie" projekty (Z-2511-998, Z-2511-999, …) od bežných projektov v Analytics, vyhodnocovať ich utilizáciu samostatne a umožniť admin správu mapovania kód → názov.
+### 1) Doplniť 4 nové režijné projekty
+INSERT do `overhead_projects`:
+- `Z-2511-997` → "Režie - servis stroje"
+- `Z-2511-995` → "Režie - školení"
+- `Z-2511-996` → "Režie - čekání na zakázku"
+- `Z-2511-993` → "Vzorky"
 
-### DB zmeny
+(spravia sa aj cez admin UI, ale seedneme rovno aby boli okamžite v Analytics)
 
-**Nová tabuľka `overhead_projects`** (mapovanie režijných kódov):
-```text
-id uuid PK
-project_code text UNIQUE NOT NULL  -- napr. 'Z-2511-998'
-label text NOT NULL                 -- napr. 'Režie Dílna'
-description text NULL
-sort_order int DEFAULT 0
-is_active bool DEFAULT true
-created_at, updated_at
-```
-- RLS: authenticated read, admin/owner write
-- Seed: `Z-2511-998 → Režije Dílna`, `Z-2511-999 → Provozní režije`
+### 2) Prepočítať utilizáciu — len výrobní ľudia
 
-### Logika (`useAnalytics.ts`)
+**Aktuálny problém:** `reziePct = totalRezieHours / (totalRezieHours + totalProjectHours)` zahŕňa hodiny *všetkých* zamestnancov (PM, ADMIN, Engineering, Kalkulace…). To skresľuje utilizáciu kapacity dílny.
 
-1. Načítať `overhead_projects` paralelne s ostatnými dotazmi
-2. Pre každý riadok v `hoursMap` skontrolovať, či `ami_project_id` je v overhead set:
-   - Ak **áno** → priradiť `category: "rezie"`, `project_name = label` z mapovania, ignorovať `projects` tabuľku
-   - Ak **nie a v projects** → `category: "project"` (ako doteraz)
-   - Ak **nie a nie v projects** → `category: "unmatched"` (existujúce ghost rows)
-3. Rozšíriť `AnalyticsRow` o `category: "project" | "rezie" | "unmatched"`
-4. Rozšíriť `AnalyticsSummary` o:
-   - `totalRezieHours: number`
-   - `totalProjectHours: number` (len kategória "project")
-   - `reziePct: number` — `totalRezieHours / (totalRezieHours + totalProjectHours) * 100`
+**Nová logika v `useAnalytics.ts`:**
+- Načítať `ami_employees` (id, meno, usek, aktivny, activated_at, deactivated_at)
+- Vybudovať set výrobných mien — len kde `normalizeUsek(usek) !== null` (Dílna_1/2/3 + Sklad), `aktivny = true`, a v období logu `activated_at ≤ datum ≤ deactivated_at`
+- Načítať `production_hours_log` priamo (nie cez agregátnu RPC) so stĺpcami `ami_project_id, hodiny, datum_sync, zamestnanec` — aby sme mohli filtrovať per-osoba
+- Per riadok logu spočítať dvakrát:
+  - **A) Pre tabuľku Analytics (zostáva ako doteraz):** všetky hodiny per projekt (RPC `get_hours_by_project` → existujúci `hoursMap`)
+  - **B) Pre KPI utilizácie (nové):** iba hodiny od výrobných ľudí, agregované per projekt → `productionHoursMap`
+- Z `productionHoursMap` spočítať:
+  - `productionRezieHours` = súčet len z overhead kódov
+  - `productionProjectHours` = súčet len zo známych projektov (kategoria `project`)
+  - `reziePct = productionRezieHours / (productionRezieHours + productionProjectHours) * 100`
 
-### UI zmeny (`Analytics.tsx`)
+**Tabuľka projektov v Analytics zostáva nezmenená** — stĺpec "Odprac. h" naďalej ukazuje všetky hodiny (vrátane PM-ov, ktorí občas zapíšu na projekt). Mení sa len výpočet **KPI dlaždice "Režije %"**.
 
-**1) Nová KPI dlaždica "Režie %"**
-- V hornom rade dashboard kariet
-- Zobrazí `reziePct` + absolútne `totalRezieHours h`
-- Podtitulok: porovnanie s utilizáciou z `production_settings.utilization_pct` (default 83 %), ak väčšie → amber, ak menšie/rovné → zelená
-- Tooltip: rozpis per režijný projekt (Z-2511-998: X h, Z-2511-999: Y h)
+### 3) Tooltip rozšíriť
+KPI tooltip "Režie %" zobrazí:
+- Spôsob výpočtu: "Z hodín výrobních pracovníků (Dílna 1/2/3 + Sklad)"
+- Rozpis per overhead kód s hodinami od výrobných ľudí (nie od všetkých)
 
-**2) Nový filter chip "Režije"** vedle existujúcich (Výroba / Dokončeno / Vše / atď.)
-- Default view (Vše / Výroba / Dokončeno) → **skryje** režijné riadky
-- Filter "Režije" → ukáže iba režijné projekty s ich `label` z `overhead_projects`
-- Unmatched riadky zostávajú v "Vše" ako doteraz
-
-**3) Správa režijných projektov**
-- Nová sekcia v Nastavenia → "Režijné projekty" (admin/owner)
-- Tabuľka kód / názov / aktívne / akcia (edit, deactivate)
-- Tlačidlo "+ Pridať režijný kód"
-- Dialog: `project_code`, `label`, `description`, `is_active`
+### 4) Overhead admin dialog
+Žiadna zmena UI — užívateľ môže nové kódy aj manuálne pridať/upraviť cez existujúci `OverheadProjectsSettings`. Seed je len rýchlejší štart.
 
 ### Súbory
-
-**Nové:**
-- `supabase/migrations/...` — `overhead_projects` table + RLS + seed
-- `src/hooks/useOverheadProjects.ts` — CRUD hook
-- `src/components/admin/OverheadProjectsSettings.tsx` — admin UI
-
 **Upravené:**
-- `src/hooks/useAnalytics.ts` — pridať overhead fetch, kategorizácia, nové summary metriky
-- `src/pages/Analytics.tsx` — nová KPI dlaždica + filter chip + napojenie na settings
-- `src/components/AccountSettings.tsx` (alebo wherever sa otvárajú settings) — link na novú sekciu
+- `src/hooks/useAnalytics.ts` — pridať fetch `ami_employees` + `production_hours_log` (raw), spočítať `productionHoursMap`, prepísať `reziePct` výpočet, doplniť do summary `productionRezieHours`/`productionProjectHours`
+- `src/pages/Analytics.tsx` — `RezieCard` tooltip text + použitie `productionRezieHours` v rozpise
 
-### Otvorené (potvrď)
-1. **Porovnávacia hodnota pre Režie %** — má sa porovnať s `production_settings.utilization_pct` (83 %) ako "očakávaná réžia = 100 - utilization", alebo má admin nastaviť vlastný target (napr. "cieľová réžia 17 %") v overhead settings?
-2. **Filter chip umiestnenie** — vedľa stávajúcich status chip-ov, alebo ako samostatný toggle „Zobraziť režie" nad tabuľkou?
+**DB insert (cez insert tool, nie migrácia):**
+- 4× INSERT do `overhead_projects` (ON CONFLICT DO NOTHING podľa `project_code`)
+
+### Otvorené
+**Časové filtrovanie:** Aktuálne sa `reziePct` počíta z *celej histórie* logov. Z UI vidím že máš `timeRange` filter (week/month/3months/year/all) — má `reziePct` rešpektovať tento časový rozsah (presnejší obraz utilizácie za posledný mesiac/3 mesiace), alebo ostať „lifetime"? Odporúčam viazať na `timeRange` — utilizácia za "posledné 3 mesiace" má väčšiu výpovednú hodnotu než za celú históriu.
 
