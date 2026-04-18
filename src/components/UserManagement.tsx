@@ -46,9 +46,11 @@ const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "vyroba", "vi
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When true, render the user table inline (no Dialog wrapper, no header). */
+  inline?: boolean;
 }
 
-export function UserManagement({ open, onOpenChange }: Props) {
+export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   const { isTestUser } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
@@ -283,18 +285,15 @@ export function UserManagement({ open, onOpenChange }: Props) {
   const isOwner = (u: UserRow) => u.role === "owner";
   const nonOwnerUsers = users.filter((u) => u.role !== "owner");
 
-  return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
-          <div className="px-5 pt-5 pb-3 border-b">
-            <DialogHeader>
-              <DialogTitle>Správa uživatelů</DialogTitle>
-            </DialogHeader>
-            {isTestUser && <TestModeBanner />}
-          </div>
+  // When mounted inline, fetch on mount instead of on dialog open
+  useEffect(() => {
+    if (inline) fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inline]);
 
-          <div className={`flex-1 overflow-y-auto ${isTestUser ? "pointer-events-none opacity-80" : ""}`}>
+  const tableSection = (
+    <>
+      <div className={`flex-1 overflow-y-auto ${isTestUser ? "pointer-events-none opacity-80" : ""}`}>
             <Table>
               <TableHeader>
                 <TableRow>
