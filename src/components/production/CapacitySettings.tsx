@@ -695,24 +695,8 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const firstEditingWeekData = firstEditingWeek !== null ? liveWeekMap.get(firstEditingWeek) : null;
   const anyManualOverride = editingWeeks.some(wn => liveWeekMap.get(wn)?.is_manual_override);
 
-  return (
-    <Dialog open={open} onOpenChange={(val) => {
-        if (!val && hasPendingChanges) {
-          const confirmed = window.confirm("Máte neuložené změny. Opravdu chcete odejít bez uložení?");
-          if (!confirmed) return;
-        }
-        onOpenChange(val);
-      }}>
-      <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-        <div className="px-6 pt-6 pb-2">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              📊 Kapacita výroby
-            </DialogTitle>
-          </DialogHeader>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 pb-4">
+  const innerContent = (
+    <div className={inline ? "flex-1 overflow-y-auto px-6 pb-4 pt-2" : "flex-1 overflow-y-auto px-6 pb-4"}>
         <Tabs defaultValue="kapacita" className="space-y-4">
           <TabsList>
             <TabsTrigger value="kapacita">Kapacita</TabsTrigger>
