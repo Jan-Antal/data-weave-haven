@@ -1,31 +1,42 @@
 
 
-## Plán: Vyčistit 2025 a opravit auto-recalc pro 2026+
+## Diagnóza
 
-### 1) Smazat všechna data roku 2025
-Migrace, která jednorázově odstraní:
-- `production_capacity` WHERE `week_year = 2025` (všechny řádky, i manuální overrides — rok nás nezajímá)
-- `production_capacity_employees` WHERE `week_year = 2025` (kompoziční snapshoty)
+### Kde sa zapisujú týždenné hodiny?
+**Tabuľka `production_capacity`** — jeden riadok na (`week_year`, `week_number`). Stĺpce: `capacity_hours`, `working_days`, `holiday_name`, `company_holiday_name`, `is_manual_override`, `dilna1_hodiny`…`sklad_hodiny`, `total_employees`, `utilization_pct`.
 
-Absence v `ami_absences` necháváme být — používají se jako zdroj pravdy pro výpočet kapacity 2026+.
+V DB je to **správne** — overené:
+- T1 = 717h (Nový rok), T14 = 717h (Velký pátek), T15 = 717h (Velikonoční pondělí), T18/T19 = 717h (1.5./8.5.) atď.
+- Štandardný týždeň = 896h, sviatkový = 717h.
 
-### 2) Oprava auto-recalc v `CapacitySettings.tsx`
-Současný stav: `hasAutoRecalced` je jednorázový boolean → po prvním otevření Kapacity se už znovu nespustí, ani při změně roku.
+### Prečo graf vyzerá rovno?
+Vykresľovanie funguje cez `liveWeekMap`, ktorá ide cez všetkých 52 týždňov a:
+- ak `is_manual_override = true` → použije DB hodnotu,
+- inak **prepočíta lokálne** z `selectedEmployees` × `working_days` × util%.
 
-Změna:
-- Nahradit `useRef<boolean>` za `useState<Set<number>>` evidující roky, pro které už auto-recalc proběhl v této session.
-- `useEffect` na `selectedYear` → pokud rok není v setu, spustit `triggerAutoRecalc()` a přidat ho.
-- Tím se 2026 (a každý další rok, na který uživatel přepne) automaticky doplní/přepočítá z aktuálního stavu zaměstnanců + sviatků + absencí z `ami_absences`.
+Lokálny výpočet **odpočítava sviatky správne** (`workingDays = 5 - holidayCount`), ALE výsledok pre 30 zamestnancov × 8h × (4 vs 5) dní × 83% dáva **rozdiel ~199h** (896 vs 717). Na 140px-vysokom grafe to je rozdiel ~22px → mal by byť viditeľný.
 
-### 3) Ochrana proti budoucímu „zploštění"
-Drobná pojistka v `handleRecalculateAll`: ujistit se, že upsert vždy zapisuje aktuálně spočítané `holiday_name`, `working_days`, a `is_manual_override = false` (nepřepisovat existující manual overrides). Logika už to dělá — jen ověřím v kódu, ať to při refactoru nevypadlo.
+Na screenshote sú **všetky stĺpce identické** (vrátane T1, T14, T15) → znamená to, že buď:
+1. **`autoApplyHolidays` je vypnuté** v lokálnom UI state (toggle „Automaticky aplikovat svátky") → potom sa pre všetky týždne použije `workingDays = 5` a graf zploští,
+2. alebo `holidays` query (`useCzechHolidays(2026)`) ešte nedobehlo / cache vrátila prázdne pole.
 
-### Soubory
-- **Migrace** (delete-only): smazání 2025 řádků z `production_capacity` a `production_capacity_employees`.
-- **`src/components/production/CapacitySettings.tsx`** — změna `hasAutoRecalced` na set per-year + useEffect na `selectedYear`.
+Tooltip v screenshote ukazuje „Velký pátek" — to znamená, že `holiday_name` je v `liveWeekMap` (lebo sa preberá z `dbWeek?.holiday_name`), ale **`workingDays` sa neredukuje** → potvrdená hypotéza č. 1: `autoApplyHolidays = false`.
 
-### Výsledek
-- 2025 z DB zmizí kompletně.
-- Při otevření Kapacity 2026 (a každém dalším roku) se automaticky přepočítají hodiny ze sviatků + zaměstnanců + absencí — graf bude zase kolísat tak jak má.
-- Žádné jiné změny logiky ani UI.
+## Plán opravy
+
+### 1) Default `autoApplyHolidays = true` + sync z DB
+V `CapacitySettings.tsx` skontrolovať `useState(autoApplyHolidays)` — uistiť sa, že defaultná hodnota je `true` a nie je niekde resetovaná pri prepnutí roku.
+
+### 2) Fallback: ak je `autoApplyHolidays = false`, použiť DB hodnotu
+Aktuálne keď je toggle vypnutý, `liveWeekMap` aj tak prepočíta a ignoruje `dbWeek.capacity_hours`. Lepšie: ak `autoApplyHolidays = false` a existuje `dbWeek` (auto-recalc už uložil správne hodnoty so sviatkami), **použiť DB hodnotu** namiesto lokálneho prepočtu bez sviatkov. To zaručí, že graf vždy odzrkadľuje DB realitu.
+
+### 3) Vizuálny kontrast
+Pri standard 896h vs sviatok 717h je rozdiel len ~20% výšky stĺpca a farby (`BELOW_STOPS` interpolácia od standard k min) sú veľmi blízke šedej, lebo `visibleRange.min` ≈ 717 a `standard` ≈ 896. Pridáme:
+- **dolný padding pre `visibleRange.min`** — odpočítať ďalších ~15% z `visMin`, aby sviatkové týždne boli zreteľne oranžovo/jantárové, nie šedé.
+
+### Súbory
+- `src/components/production/CapacitySettings.tsx` — fix default + fallback v `liveWeekMap` + úprava `visibleRange.min` pre lepší kontrast.
+
+### Bez zmeny
+DB schéma, migrácie, dáta, ostatná logika.
 
