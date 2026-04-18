@@ -718,14 +718,15 @@ function RezieCard({
   totalRezieHours,
   utilizationTarget,
   rezieRows,
+  rezieByCode,
 }: {
   isLoading: boolean;
   reziePct: number | null;
   totalRezieHours: number;
   utilizationTarget: number;
   rezieRows: AnalyticsRow[];
+  rezieByCode: Record<string, number>;
 }) {
-  // Expected overhead = 100 - utilization target (e.g. 17% if util = 83%)
   const expectedRezie = Math.max(0, 100 - utilizationTarget);
   const isOver = reziePct != null && reziePct > expectedRezie;
 
@@ -753,18 +754,24 @@ function RezieCard({
             </CardContent>
           </Card>
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs">
-          <div className="space-y-1">
-            <p className="font-semibold text-xs">Režijní hodiny vůči celku</p>
+        <TooltipContent className="max-w-sm">
+          <div className="space-y-1.5">
+            <p className="font-semibold text-xs">Utilizace výroby — režijní hodiny</p>
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              Z hodín výrobních pracovníků (Dílna 1/2/3 + Sklad).
+              Hodiny zapsané PM/Eng/Admin se nezapočítavají.
+            </p>
             <p className="text-[10px] text-muted-foreground">
               Cíl odvozený z utilizace výroby ({utilizationTarget} %) ⇒ ≤ {expectedRezie.toFixed(0)} % režie
             </p>
             {rezieRows.length > 0 && (
               <div className="border-t pt-1 mt-1 space-y-0.5">
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5">Rozpis (jen výroba)</p>
                 {rezieRows.map((r) => (
                   <div key={r.project_id} className="flex justify-between gap-3 text-[10px] tabular-nums">
                     <span className="font-mono">{r.project_id}</span>
-                    <span>{formatHours(r.hodiny_skutocne)}</span>
+                    <span className="text-muted-foreground truncate flex-1 text-left">{r.project_name}</span>
+                    <span>{formatHours(rezieByCode[r.project_id] || 0)}</span>
                   </div>
                 ))}
               </div>
