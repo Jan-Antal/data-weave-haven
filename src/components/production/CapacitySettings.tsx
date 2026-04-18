@@ -1154,133 +1154,142 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
           )}
         </div>
 
-        {/* Holiday Summary */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">🇨🇿 České státní svátky {selectedYear}</h3>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoApplyHolidays}
-                onChange={e => setAutoApplyHolidays(e.target.checked)}
-                className="rounded"
-              />
-              Automaticky aplikovat na kapacitu
-            </label>
-          </div>
-          {holidayImpacts.length > 0 ? (
-            <div className="overflow-auto max-h-[200px]">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground">
-                    <th className="text-left py-1 pr-2">Datum</th>
-                    <th className="text-left py-1 pr-2">Svátek</th>
-                    <th className="text-left py-1 pr-2">Týden</th>
-                    <th className="text-left py-1">Dopad na kapacitu</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {holidayImpacts.map((h, i) => (
-                    <tr key={i} className="border-b border-border/50">
-                      <td className="py-1 pr-2 font-sans">{h.date}</td>
-                      <td className="py-1 pr-2">{h.name}</td>
-                      <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
-                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((totalBruttoSelectedDaily * h.workingDays) * localUtilizationPct / 100)}h</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Žádné svátky nenalezeny</p>
-          )}
-        </div>
-
-        {/* Company Holidays */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">🏖 Firemní dovolená</h3>
-
-          {companyHolidays.length > 0 && (
-            <div className="space-y-2">
-              {companyHolidays.map(ch => (
-                <div key={ch.id} className="flex items-center justify-between border border-border/50 rounded-md px-3 py-2">
-                  <div className="text-xs">
-                    <span className="font-sans">{ch.start_date} – {ch.end_date}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
-                    <span className="font-medium">{ch.name}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
-                    <span className="font-sans text-amber-600">{ch.capacity_override}h</span>
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={async () => {
-                    await deleteCompanyHoliday.mutateAsync(ch.id);
-                    if (vyrobniEmployees.length > 0) {
-                      await queryClient.invalidateQueries({ queryKey: ["company-holidays"] });
-                      setTimeout(() => triggerAutoRecalc(), 200);
-                    }
-                  }}>
-                    <X className="h-3 w-3" />
-                  </Button>
+        {/* Manual edit section — collapsed by default */}
+        <Collapsible>
+          <CollapsibleTrigger className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-2 border-t border-border/40 group">
+            <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+            <span className="underline-offset-2 group-hover:underline">Upravit manuálně (svátky &amp; firemní dovolená)</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-6 pt-4">
+            {/* Holiday Summary */}
+            <div className="border border-border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">🇨🇿 České státní svátky {selectedYear}</h3>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoApplyHolidays}
+                    onChange={e => setAutoApplyHolidays(e.target.checked)}
+                    className="rounded"
+                  />
+                  Automaticky aplikovat na kapacitu
+                </label>
+              </div>
+              {holidayImpacts.length > 0 ? (
+                <div className="overflow-auto max-h-[200px]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="text-left py-1 pr-2">Datum</th>
+                        <th className="text-left py-1 pr-2">Svátek</th>
+                        <th className="text-left py-1 pr-2">Týden</th>
+                        <th className="text-left py-1">Dopad na kapacitu</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {holidayImpacts.map((h, i) => (
+                        <tr key={i} className="border-b border-border/50">
+                          <td className="py-1 pr-2 font-sans">{h.date}</td>
+                          <td className="py-1 pr-2">{h.name}</td>
+                          <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
+                          <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((totalBruttoSelectedDaily * h.workingDays) * localUtilizationPct / 100)}h</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              ) : (
+                <p className="text-xs text-muted-foreground">Žádné svátky nenalezeny</p>
+              )}
             </div>
-          )}
 
-          <div className="grid grid-cols-5 gap-2 items-end">
-            <div>
-              <label className="text-[10px] text-muted-foreground">Název</label>
-              <Input value={newHolidayName} onChange={e => setNewHolidayName(e.target.value)} className="h-7 text-xs" placeholder="Vánoční zavírka" />
+            {/* Company Holidays */}
+            <div className="border border-border rounded-lg p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">🏖 Firemní dovolená</h3>
+
+              {companyHolidays.length > 0 && (
+                <div className="space-y-2">
+                  {companyHolidays.map(ch => (
+                    <div key={ch.id} className="flex items-center justify-between border border-border/50 rounded-md px-3 py-2">
+                      <div className="text-xs">
+                        <span className="font-sans">{ch.start_date} – {ch.end_date}</span>
+                        <span className="mx-2 text-muted-foreground">|</span>
+                        <span className="font-medium">{ch.name}</span>
+                        <span className="mx-2 text-muted-foreground">|</span>
+                        <span className="font-sans text-amber-600">{ch.capacity_override}h</span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={async () => {
+                        await deleteCompanyHoliday.mutateAsync(ch.id);
+                        if (vyrobniEmployees.length > 0) {
+                          await queryClient.invalidateQueries({ queryKey: ["company-holidays"] });
+                          setTimeout(() => triggerAutoRecalc(), 200);
+                        }
+                      }}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-5 gap-2 items-end">
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Název</label>
+                  <Input value={newHolidayName} onChange={e => setNewHolidayName(e.target.value)} className="h-7 text-xs" placeholder="Vánoční zavírka" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Od</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayStart && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-1.5 h-3 w-3" />
+                        {newHolidayStart ? format(parse(newHolidayStart, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : undefined}
+                        defaultMonth={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date()}
+                        onSelect={(d) => { if (d) setNewHolidayStart(format(d, "yyyy-MM-dd")); }}
+                        weekStartsOn={1}
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Do</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayEnd && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-1.5 h-3 w-3" />
+                        {newHolidayEnd ? format(parse(newHolidayEnd, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : undefined}
+                        defaultMonth={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : (newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date())}
+                        onSelect={(d) => { if (d) setNewHolidayEnd(format(d, "yyyy-MM-dd")); }}
+                        weekStartsOn={1}
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
+                  <Input type="number" value={newHolidayCap} onChange={e => setNewHolidayCap(e.target.value)} className="h-7 text-xs" />
+                </div>
+                <Button size="sm" className="h-7" onClick={handleAddCompanyHoliday} disabled={!newHolidayName || !newHolidayStart || !newHolidayEnd}>
+                  <Plus className="h-3 w-3 mr-1" /> Přidat
+                </Button>
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Od</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayStart && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-1.5 h-3 w-3" />
-                    {newHolidayStart ? format(parse(newHolidayStart, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : undefined}
-                    defaultMonth={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date()}
-                    onSelect={(d) => { if (d) setNewHolidayStart(format(d, "yyyy-MM-dd")); }}
-                    weekStartsOn={1}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Do</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayEnd && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-1.5 h-3 w-3" />
-                    {newHolidayEnd ? format(parse(newHolidayEnd, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : undefined}
-                    defaultMonth={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : (newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date())}
-                    onSelect={(d) => { if (d) setNewHolidayEnd(format(d, "yyyy-MM-dd")); }}
-                    weekStartsOn={1}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
-              <Input type="number" value={newHolidayCap} onChange={e => setNewHolidayCap(e.target.value)} className="h-7 text-xs" />
-            </div>
-            <Button size="sm" className="h-7" onClick={handleAddCompanyHoliday} disabled={!newHolidayName || !newHolidayStart || !newHolidayEnd}>
-              <Plus className="h-3 w-3 mr-1" /> Přidat
-            </Button>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
         </div>
         </div>{/* end scrollable content */}
 
