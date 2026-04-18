@@ -93,7 +93,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes] = await Promise.all([
+      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -114,9 +114,21 @@ function useDilnaData(weekOffset: number) {
           .from("projects")
           .select("project_id, project_name, prodejni_cena, cost_production_pct, currency")
           .is("deleted_at", null),
+        supabase
+          .from("production_capacity")
+          .select("capacity_hours")
+          .eq("week_year", weekInfo.year)
+          .eq("week_number", weekInfo.week)
+          .maybeSingle(),
       ]);
 
-      const weeklyCapacity = Number(settingsRes.data?.weekly_capacity_hours) || 875;
+      // Týdenní kapacita: 1) snapshot z production_capacity (kapacitní plán pro daný týden)
+      //                    2) fallback na production_settings.weekly_capacity_hours
+      //                    3) fallback 875
+      const weeklyCapacity =
+        Number((capacityRes.data as any)?.capacity_hours) ||
+        Number(settingsRes.data?.weekly_capacity_hours) ||
+        875;
       const hours = (hoursRes.data || []) as Array<{ ami_project_id: string; hodiny: number; created_at: string; datum_sync: string; cinnost_kod: string | null; cinnost_nazov: string | null }>;
       const schedule = (schedRes.data || []) as Array<{ project_id: string; scheduled_hours: number; status: string; item_name: string }>;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null }>;
