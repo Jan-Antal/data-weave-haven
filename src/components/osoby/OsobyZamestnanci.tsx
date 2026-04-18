@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Search, MoreVertical, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,13 @@ function useAllEmployees() {
 }
 
 export function OsobyZamestnanci() {
+  const qc = useQueryClient();
+  // Refetch catalogue + employees on mount so switching tabs from Číselníky shows latest names
+  useEffect(() => {
+    qc.invalidateQueries({ queryKey: ["position_catalogue"] });
+    qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
+  }, [qc]);
+
   const { data: employees = [] } = useAllEmployees();
   const { data: catalogue = [] } = usePositionCatalogue();
   const { data: periods = [] } = useManualAbsences();
