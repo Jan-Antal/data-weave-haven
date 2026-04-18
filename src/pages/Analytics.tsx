@@ -61,10 +61,10 @@ const ANALYTICS_DEFAULT_HIDDEN: string[] = [];
 const ANALYTICS_LABEL_MAP: Record<string, string> = Object.fromEntries(ANALYTICS_COLUMNS.map((c) => [c.key, c.label]));
 
 export default function Analytics() {
-  const { data, isLoading } = useAnalytics();
-  const { data: projects = [] } = useProjects();
   type TimeRange = "week" | "month" | "3months" | "year" | "all";
   const [timeRange, setTimeRange] = useState<TimeRange>("3months");
+  const { data, isLoading } = useAnalytics(timeRange);
+  const { data: projects = [] } = useProjects();
   const [statusFilters, setStatusFilters] = useState<Set<"vyroba" | "done" | "rezie">>(new Set(["vyroba", "done"]));
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
@@ -453,12 +453,12 @@ export default function Analytics() {
             </>); })()}
             <UtilizationCard
               isLoading={isLoading}
-              utilization30d={data?.summary.utilization30d ?? null}
-              utilizationMedian3m={data?.summary.utilizationMedian3m ?? null}
-              utilizationTrend={data?.summary.utilizationTrend ?? null}
+              utilizationPct={data?.summary.utilizationPct ?? null}
               utilizationTarget={data?.summary.utilizationTarget ?? 83}
-              productionProjectHours30d={data?.summary.productionProjectHours30d ?? 0}
-              productionRezieHours30d={data?.summary.productionRezieHours30d ?? 0}
+              totalHours={data?.summary.totalHoursWindow ?? 0}
+              overheadHours={data?.summary.overheadHoursWindow ?? 0}
+              productiveHours={data?.summary.productiveHoursWindow ?? 0}
+              timeRange={timeRange}
               rezieRows={data?.rows.filter((r) => r.category === "rezie") ?? []}
               rezieByCode={data?.summary.rezieByCode ?? {}}
             />
@@ -780,36 +780,33 @@ function PctBar({ pct }: { pct: number | null }) {
 
 function UtilizationCard({
   isLoading,
-  utilization30d,
-  utilizationMedian3m,
-  utilizationTrend,
+  utilizationPct,
   utilizationTarget,
-  productionProjectHours30d,
-  productionRezieHours30d,
+  totalHours,
+  overheadHours,
+  productiveHours,
+  timeRange,
   rezieRows,
   rezieByCode,
 }: {
   isLoading: boolean;
-  utilization30d: number | null;
-  utilizationMedian3m: number | null;
-  utilizationTrend: "up" | "down" | "flat" | null;
+  utilizationPct: number | null;
   utilizationTarget: number;
-  productionProjectHours30d: number;
-  productionRezieHours30d: number;
+  totalHours: number;
+  overheadHours: number;
+  productiveHours: number;
+  timeRange: "week" | "month" | "3months" | "year" | "all";
   rezieRows: AnalyticsRow[];
   rezieByCode: Record<string, number>;
 }) {
-  const isBelow = utilization30d != null && utilization30d < utilizationTarget;
-  const trendIcon = utilizationTrend === "up" ? "↑" : utilizationTrend === "down" ? "↓" : utilizationTrend === "flat" ? "→" : "";
-  const trendClass =
-    utilizationTrend === "up"
-      ? "text-green-600 dark:text-green-500"
-      : utilizationTrend === "down"
-      ? "text-amber-600 dark:text-amber-400"
-      : "text-muted-foreground";
-  const trendLabel =
-    utilizationTrend === "up" ? "stoupá" : utilizationTrend === "down" ? "klesá" : utilizationTrend === "flat" ? "stabilní" : "—";
-
+  const isBelow = utilizationPct != null && utilizationPct < utilizationTarget;
+  const rangeLabel: Record<typeof timeRange, string> = {
+    week: "Tento týden",
+    month: "Tento měsíc",
+    "3months": "Posledních 3 měsíce",
+    year: "Poslední rok",
+    all: "Vše",
+  };
   return (
     <TooltipProvider>
       <Tooltip>
@@ -822,44 +819,37 @@ function UtilizationCard({
               <p className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
                 🏭 Utilizace výroby
               </p>
-              <div className="flex items-baseline gap-2">
-                <p className={cn(
-                  "text-lg font-bold tabular-nums",
-                  isBelow ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-500"
-                )}>
-                  {isLoading ? <Skeleton className="h-6 w-12" /> : utilization30d != null ? `${utilization30d} %` : "—"}
-                </p>
-                {trendIcon && (
-                  <span className={cn("text-sm font-bold", trendClass)} title={`Trend: ${trendLabel}`}>
-                    {trendIcon}
-                  </span>
-                )}
-              </div>
+              <p className={cn(
+                "text-lg font-bold tabular-nums",
+                isBelow ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-500"
+              )}>
+                {isLoading ? <Skeleton className="h-6 w-12" /> : utilizationPct != null ? `${utilizationPct} %` : "—"}
+              </p>
               <p className="text-[9px] text-muted-foreground tabular-nums mt-0.5">
-                30 dní • medián 3m: {utilizationMedian3m != null ? `${utilizationMedian3m} %` : "—"} • cíl ≥ {utilizationTarget} %
+                {formatHours(productiveHours)} z {formatHours(totalHours)} • cíl ≥ {utilizationTarget} %
               </p>
             </CardContent>
           </Card>
         </TooltipTrigger>
         <TooltipContent className="max-w-sm">
           <div className="space-y-1.5">
-            <p className="font-semibold text-xs">Utilizace výroby</p>
+            <p className="font-semibold text-xs">Utilizace výroby — {rangeLabel[timeRange]}</p>
             <p className="text-[10px] text-muted-foreground leading-snug">
-              Podíl projektových hodin na celkových hodinách výrobních pracovníků (Dílna 1/2/3 + Sklad).
-              Hodiny PM/Eng/Admin se nezapočítávají.
+              <strong>Vzorec:</strong> (Výrobní hodiny − Režijní hodiny) / Výrobní hodiny<br />
+              Výrobní hodiny = všechny zaznamenané hodiny ve vybraném období bez kódů TPV/ENG/PRO.
             </p>
             <div className="border-t pt-1 space-y-0.5 text-[10px] tabular-nums">
               <div className="flex justify-between gap-3">
-                <span>Posledních 30 dní:</span>
-                <span>{formatHours(productionProjectHours30d)} proj. / {formatHours(productionRezieHours30d)} režie</span>
+                <span>Výrobní hodiny celkem:</span>
+                <span>{formatHours(totalHours)}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span>Medián 3 měsíců:</span>
-                <span>{utilizationMedian3m != null ? `${utilizationMedian3m} %` : "—"}</span>
+                <span>Z toho režijní:</span>
+                <span>{formatHours(overheadHours)}</span>
               </div>
-              <div className="flex justify-between gap-3">
-                <span>Trend:</span>
-                <span className={trendClass}>{trendIcon} {trendLabel}</span>
+              <div className="flex justify-between gap-3 font-semibold">
+                <span>Produktivní:</span>
+                <span>{formatHours(productiveHours)}</span>
               </div>
               <div className="flex justify-between gap-3">
                 <span>Cíl:</span>
@@ -868,7 +858,7 @@ function UtilizationCard({
             </div>
             {rezieRows.length > 0 && (
               <div className="border-t pt-1 mt-1 space-y-0.5">
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5">Režie celkem (lifetime)</p>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5">Rozpad režií ({rangeLabel[timeRange]})</p>
                 {rezieRows.map((r) => (
                   <div key={r.project_id} className="flex justify-between gap-3 text-[10px] tabular-nums">
                     <span className="font-mono">{r.project_id}</span>
