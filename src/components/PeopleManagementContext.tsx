@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-import { SpravaOsob, type SpravaOsobTab } from "./SpravaOsob";
+import { createContext, useContext, ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+
+export type SpravaOsobTab = "zamestnanci" | "externisti" | "uzivatele" | "katalog" | "kapacita";
 
 interface PeopleManagementContextType {
   openPeopleManagement: (tab?: SpravaOsobTab) => void;
@@ -14,20 +16,17 @@ export function usePeopleManagement() {
 }
 
 export function PeopleManagementProvider({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [defaultTab, setDefaultTab] = useState<SpravaOsobTab>("zamestnanci");
+  const navigate = useNavigate();
 
   return (
     <PeopleManagementContext.Provider
       value={{
         openPeopleManagement: (tab = "externisti") => {
-          setDefaultTab(tab);
-          setOpen(true);
+          navigate(`/osoby?tab=${tab}`);
         },
       }}
     >
       {children}
-      <SpravaOsob open={open} onOpenChange={setOpen} defaultTab={defaultTab} />
     </PeopleManagementContext.Provider>
   );
 }

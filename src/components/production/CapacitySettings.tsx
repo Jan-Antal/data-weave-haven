@@ -31,6 +31,8 @@ import { EmployeeManagement } from "./EmployeeManagement";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When true, render content inline (no Dialog wrapper). */
+  inline?: boolean;
 }
 
 // --- Capacity color interpolation ---
@@ -81,7 +83,7 @@ function getISOWeekNumber(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-export function CapacitySettings({ open, onOpenChange }: Props) {
+export function CapacitySettings({ open, onOpenChange, inline = false }: Props) {
   const currentYear = new Date().getFullYear();
   const currentWeek = getISOWeekNumber(new Date());
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -693,24 +695,9 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
   const firstEditingWeekData = firstEditingWeek !== null ? liveWeekMap.get(firstEditingWeek) : null;
   const anyManualOverride = editingWeeks.some(wn => liveWeekMap.get(wn)?.is_manual_override);
 
-  return (
-    <Dialog open={open} onOpenChange={(val) => {
-        if (!val && hasPendingChanges) {
-          const confirmed = window.confirm("Máte neuložené změny. Opravdu chcete odejít bez uložení?");
-          if (!confirmed) return;
-        }
-        onOpenChange(val);
-      }}>
-      <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-        <div className="px-6 pt-6 pb-2">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              📊 Kapacita výroby
-            </DialogTitle>
-          </DialogHeader>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-6 pb-4">
+  const innerContent = (
+    <>
+      <div className="flex-1 overflow-y-auto px-6 pb-4 pt-2">
         <Tabs defaultValue="kapacita" className="space-y-4">
           <TabsList>
             <TabsTrigger value="kapacita">Kapacita</TabsTrigger>
@@ -1257,6 +1244,30 @@ export function CapacitySettings({ open, onOpenChange }: Props) {
             }
           }}
         />
+    </>
+  );
+
+  if (inline) {
+    return <div className="flex flex-col h-full overflow-hidden bg-background">{innerContent}</div>;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => {
+        if (!val && hasPendingChanges) {
+          const confirmed = window.confirm("Máte neuložené změny. Opravdu chcete odejít bez uložení?");
+          if (!confirmed) return;
+        }
+        onOpenChange(val);
+      }}>
+      <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <div className="px-6 pt-6 pb-2">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📊 Kapacita výroby
+            </DialogTitle>
+          </DialogHeader>
+        </div>
+        {innerContent}
       </DialogContent>
     </Dialog>
   );

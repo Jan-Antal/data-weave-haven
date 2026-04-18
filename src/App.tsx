@@ -23,6 +23,7 @@ import InviteLanding from "./pages/InviteLanding";
 import PlanVyroby from "./pages/PlanVyroby";
 import Vyroba from "./pages/Vyroba";
 import Analytics from "./pages/Analytics";
+import Osoby from "./pages/Osoby";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -116,9 +117,11 @@ function PersistentDesktopHeader() {
         ? "vyroba"
         : location.pathname === "/analytics"
           ? "analytics"
-          : location.pathname === "/"
-            ? "index"
-            : null;
+          : location.pathname === "/osoby"
+            ? "osoby"
+            : location.pathname === "/"
+              ? "index"
+              : null;
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -196,6 +199,7 @@ function AppRoutes() {
                 <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
                 <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
                 <Route path="/analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
+                <Route path="/osoby" element={<AdminRoute><Osoby /></AdminRoute>} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/set-password" element={<SetPassword />} />
                 <Route path="/login" element={<Navigate to="/" replace />} />

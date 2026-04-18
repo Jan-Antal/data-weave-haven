@@ -21,7 +21,7 @@ import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { FormulaBuilder } from "@/components/settings/FormulaBuilder";
 import { cn } from "@/lib/utils";
 
-type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics";
+type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics" | "osoby";
 
 interface ProductionHeaderProps {
   module?: HeaderModule;
@@ -127,12 +127,12 @@ export function ProductionHeader({
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
   const [formulaBuilderOpen, setFormulaBuilderOpen] = useState(false);
 
-  const undoPage = (module === "index" || module === "analytics") ? undefined : module;
+  const undoPage = (module === "index" || module === "analytics" || module === "osoby") ? undefined : module;
   const hasUndo = undoPage ? canUndo(undoPage) : canUndo();
   const hasRedo = undoPage ? canRedo(undoPage) : canRedo();
   const undoDesc = undoPage ? lastUndoDescription(undoPage) : lastUndoDescription();
   const redoDesc = undoPage ? lastRedoDescription(undoPage) : lastRedoDescription();
-  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : module === "analytics" ? "Analytics" : "Plán Výroby";
+  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : module === "analytics" ? "Analytics" : module === "osoby" ? "Správa osob" : "Plán Výroby";
   const showDataLog = module === "index"
     ? canAccessSettings || realRole === "owner" || role === "pm"
     : isAdmin || role === "pm" || isOwner;
@@ -293,7 +293,7 @@ export function ProductionHeader({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {(canManageUsers || canManagePeople) && (
-                    <DropdownMenuItem onClick={() => openPeopleManagement('zamestnanci' as any)}>
+                    <DropdownMenuItem onClick={() => navigate('/osoby')}>
                       Správa osob
                     </DropdownMenuItem>
                   )}
