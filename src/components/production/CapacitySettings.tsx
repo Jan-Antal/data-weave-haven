@@ -104,19 +104,53 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const [compositionWeekNumber, setCompositionWeekNumber] = useState<number>(currentWeek);
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
-  const VISIBLE_WEEKS = 12;
+  const VISIBLE_WEEKS = 3;
   const SCROLL_STEP = 4;
+  const MIN_YEAR = 2026;
+  // Default view: current week + 2 previous weeks visible (3 weeks total)
   const getDefaultViewStart = useCallback(() => {
-    if (selectedYear === currentYear) return Math.max(1, currentWeek - Math.floor(VISIBLE_WEEKS / 2));
+    if (selectedYear === currentYear) return Math.max(1, currentWeek - 2);
     return 1;
   }, [selectedYear, currentYear, currentWeek]);
   const [viewStart, setViewStart] = useState(() => getDefaultViewStart());
 
-  const scrollLeft = () => setViewStart(v => Math.max(1, v - SCROLL_STEP));
-  const scrollRight = () => setViewStart(v => Math.min(52 - VISIBLE_WEEKS + 1, v + SCROLL_STEP));
+  // At minimum boundary (first week of MIN_YEAR)?
+  const atMinBoundary = selectedYear <= MIN_YEAR && viewStart <= 1;
+
+  const scrollLeft = () => {
+    if (atMinBoundary) return;
+    let nextStart = viewStart - SCROLL_STEP;
+    let nextYear = selectedYear;
+    if (nextStart < 1) {
+      if (nextYear - 1 < MIN_YEAR) {
+        // Clamp to first week of MIN_YEAR
+        setSelectedYear(MIN_YEAR);
+        setViewStart(1);
+        return;
+      }
+      nextYear -= 1;
+      nextStart = Math.max(1, 52 + nextStart);
+    }
+    setSelectedYear(nextYear);
+    setViewStart(nextStart);
+  };
+  const scrollRight = () => {
+    let nextStart = viewStart + SCROLL_STEP;
+    let nextYear = selectedYear;
+    const maxStart = 52 - VISIBLE_WEEKS + 1;
+    if (nextStart > maxStart) {
+      nextYear += 1;
+      nextStart = nextStart - 52;
+      if (nextStart < 1) nextStart = 1;
+    }
+    setSelectedYear(nextYear);
+    setViewStart(nextStart);
+  };
+  const canJumpToToday = currentYear > MIN_YEAR || (currentYear === MIN_YEAR && currentWeek >= 1);
   const jumpToToday = () => {
+    if (!canJumpToToday) return;
     setSelectedYear(currentYear);
-    setViewStart(Math.max(1, currentWeek - Math.floor(VISIBLE_WEEKS / 2)));
+    setViewStart(Math.max(1, currentWeek - 2));
   };
 
   const CZECH_MONTHS = ["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
