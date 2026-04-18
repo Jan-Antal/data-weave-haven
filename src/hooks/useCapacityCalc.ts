@@ -14,10 +14,8 @@ function getISOWeekNumber(date: Date): number {
 
 export interface CapacityCalcResult {
   capacity: number;
-  dilna1: number;
-  dilna2: number;
-  dilna3: number;
-  sklad: number;
+  /** Hodiny rozdelené podľa usek_nazov (Kompletace, Strojová dílna, Lakovna, Dyhárna, Balení & Expedice). */
+  byUsek: Record<string, number>;
   totalEmployees: number;
   absenceHours: number;
   bruttoHodiny: number;
@@ -28,12 +26,31 @@ export interface EmployeeRow {
   id: string;
   meno?: string;
   usek: string;
+  usek_nazov?: string | null;
+  stredisko?: string | null;
   uvazok_hodiny: number | null;
   activated_at?: string | null;
   deactivated_at?: string | null;
 }
 
-type UsekKey = "dilna1" | "dilna2" | "dilna3" | "sklad";
+/** Stredisko pre výrobné členenie. Akceptujeme len Direct. */
+const VYROBA_DIRECT = "Výroba Direct";
+
+/** Vráti kanonický názov úseku (usek_nazov) iba pre zamestnancov v stredisku Výroba Direct.
+ *  Pre Kompletace zlučujeme všetky dílny do jedného „Kompletace". */
+export function normalizeUsek(emp: Pick<EmployeeRow, "stredisko" | "usek_nazov" | "usek">): string | null {
+  // Backward-compat: ak voláme s legacy stringom, skús odhadnúť.
+  if (typeof emp === "string") {
+    return null;
+  }
+  if ((emp.stredisko ?? "") !== VYROBA_DIRECT) return null;
+  const nazov = (emp.usek_nazov ?? "").trim();
+  if (!nazov) return null;
+  return nazov;
+}
+
+/** Legacy alias — niektoré miesta volajú normalizeUsek(string). */
+export function normalizeUsekLegacy(_usek: string): null { return null; }
 
 /**
  * Format a Date as YYYY-MM-DD using LOCAL time (not UTC).
@@ -44,15 +61,6 @@ function toLocalDateStr(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-export function normalizeUsek(usek: string): UsekKey | null {
-  const u = usek ?? "";
-  if (u.includes("Dílna_1") || u.toLowerCase().includes("dilna_1") || u.toLowerCase().includes("dilna1")) return "dilna1";
-  if (u.includes("Dílna_2") || u.toLowerCase().includes("dilna_2") || u.toLowerCase().includes("dilna2")) return "dilna2";
-  if (u.includes("Dílna_3") || u.toLowerCase().includes("dilna_3") || u.toLowerCase().includes("dilna3")) return "dilna3";
-  if (u.toLowerCase().includes("sklad")) return "sklad";
-  return null;
 }
 
 export function getActiveWorkingDays(emp: EmployeeRow, weekStart: string, workingDays: number): number {
@@ -79,18 +87,18 @@ export function computeWeekCapacity(
   utilizationPct: number,
   weekStart: string,
 ): CapacityCalcResult {
-  const byUsek: Record<UsekKey, number> = { dilna1: 0, dilna2: 0, dilna3: 0, sklad: 0 };
+  const byUsek: Record<string, number> = {};
   let totalEmployees = 0;
   let bruttoHodiny = 0;
 
   for (const emp of employees) {
-    const usekKey = normalizeUsek(emp.usek);
+    const usekKey = normalizeUsek(emp);
     if (!usekKey) continue;
     const activeDays = getActiveWorkingDays(emp, weekStart, workingDays);
     if (activeDays === 0) continue;
     const dailyHours = emp.uvazok_hodiny ?? 8;
     const weeklyHours = dailyHours * activeDays;
-    byUsek[usekKey] += weeklyHours;
+    byUsek[usekKey] = (byUsek[usekKey] ?? 0) + weeklyHours;
     bruttoHodiny += weeklyHours;
     totalEmployees++;
   }
@@ -100,10 +108,7 @@ export function computeWeekCapacity(
 
   return {
     capacity: Math.max(0, capacity),
-    dilna1: byUsek.dilna1,
-    dilna2: byUsek.dilna2,
-    dilna3: byUsek.dilna3,
-    sklad: byUsek.sklad,
+    byUsek,
     totalEmployees,
     absenceHours,
     bruttoHodiny,
@@ -117,10 +122,10 @@ export function useVyrobniEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ami_employees")
-        .select("id, meno, usek, uvazok_hodiny, activated_at, deactivated_at")
+        .select("id, meno, usek, usek_nazov, stredisko, uvazok_hodiny, activated_at, deactivated_at")
         .eq("aktivny", true);
       if (error) throw error;
-      return ((data || []) as EmployeeRow[]).filter(e => normalizeUsek(e.usek) !== null);
+      return ((data || []) as EmployeeRow[]).filter(e => normalizeUsek(e) !== null);
     },
     staleTime: 5 * 60 * 1000,
   });
