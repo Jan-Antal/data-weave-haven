@@ -10,56 +10,29 @@ export interface Person {
   created_at: string;
 }
 
+const ROLE_BOOL_COLUMN: Record<string, "is_pm" | "is_kalkulant" | "is_konstrukter"> = {
+  PM: "is_pm",
+  Kalkulant: "is_kalkulant",
+  "Konstruktér": "is_konstrukter",
+};
+
 export function usePeople(role?: string) {
   return useQuery({
-    queryKey: ["people", "unified", role],
+    queryKey: ["people", "unified-v2", role],
     queryFn: async () => {
-      // 1. Externals + legacy people rows
       let q = supabase.from("people").select("*").eq("is_active", true).order("name");
-      if (role) q = q.eq("role", role);
-      const { data: peopleRows, error } = await q;
-      if (error) throw error;
-      const out: Person[] = (peopleRows ?? []) as any;
-
-      // 2. Active internal employees from catalogue (auto-merged)
-      const ROLE_MAP: Record<string, string> = { PM: "pm", "Konstruktér": "konstrukter", Kalkulant: "kalkulant" };
-      const dropdownKey = role ? ROLE_MAP[role] : null;
-      if (!role || dropdownKey) {
-        const { data: cat } = await supabase
-          .from("position_catalogue" as any)
-          .select("usek, project_dropdown_role")
-          .eq("is_active", true);
-        const useksByRole = new Map<string, string>(); // usek -> dropdown role
-        for (const c of (((cat ?? []) as unknown) as Array<{ usek: string; project_dropdown_role: string | null }>)) {
-          if (c.project_dropdown_role && (!dropdownKey || c.project_dropdown_role === dropdownKey)) {
-            useksByRole.set(c.usek, c.project_dropdown_role);
-          }
-        }
-        if (useksByRole.size > 0) {
-          const { data: emps } = await supabase
-            .from("ami_employees")
-            .select("id, meno, usek_nazov")
-            .eq("aktivny", true)
-            .in("usek_nazov", Array.from(useksByRole.keys()));
-          const inverseRoleMap: Record<string, string> = { pm: "PM", konstrukter: "Konstruktér", kalkulant: "Kalkulant" };
-          for (const e of (emps ?? []) as any[]) {
-            const dk = useksByRole.get(e.usek_nazov);
-            if (!dk) continue;
-            const empRole = inverseRoleMap[dk];
-            // dedupe by name+role
-            if (out.some(p => p.name.toLowerCase() === (e.meno ?? "").toLowerCase() && p.role === empRole)) continue;
-            out.push({
-              id: `emp:${e.id}`,
-              name: e.meno,
-              role: empRole,
-              is_active: true,
-              created_at: "",
-            });
-          }
-        }
+      const boolCol = role ? ROLE_BOOL_COLUMN[role] : null;
+      if (boolCol) {
+        q = q.eq(boolCol, true);
+      } else if (role) {
+        // Fallback for roles without bool column (e.g. Architekt) — keep string match
+        q = q.eq("role", role);
       }
-
-      return out.sort((a, b) => a.name.localeCompare(b.name, "cs"));
+      const { data, error } = await q;
+      if (error) throw error;
+      return ((data ?? []) as any as Person[]).sort((a, b) =>
+        a.name.localeCompare(b.name, "cs"),
+      );
     },
   });
 }

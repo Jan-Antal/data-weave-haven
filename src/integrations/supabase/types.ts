@@ -60,6 +60,9 @@ export type Database = {
           deactivated_at: string | null
           deactivated_date: string | null
           id: string
+          is_kalkulant: boolean
+          is_konstrukter: boolean
+          is_pm: boolean
           meno: string
           pozicia: string | null
           pracovni_skupina: string | null
@@ -75,6 +78,9 @@ export type Database = {
           deactivated_at?: string | null
           deactivated_date?: string | null
           id?: string
+          is_kalkulant?: boolean
+          is_konstrukter?: boolean
+          is_pm?: boolean
           meno: string
           pozicia?: string | null
           pracovni_skupina?: string | null
@@ -90,6 +96,9 @@ export type Database = {
           deactivated_at?: string | null
           deactivated_date?: string | null
           id?: string
+          is_kalkulant?: boolean
+          is_konstrukter?: boolean
+          is_pm?: boolean
           meno?: string
           pozicia?: string | null
           pracovni_skupina?: string | null
@@ -463,30 +472,45 @@ export type Database = {
       people: {
         Row: {
           created_at: string
+          employee_id: string | null
           firma: string | null
           id: string
           is_active: boolean
           is_external: boolean
+          is_kalkulant: boolean | null
+          is_konstrukter: boolean | null
+          is_pm: boolean | null
           name: string
           role: string
+          source: string | null
         }
         Insert: {
           created_at?: string
+          employee_id?: string | null
           firma?: string | null
           id?: string
           is_active?: boolean
           is_external?: boolean
+          is_kalkulant?: boolean | null
+          is_konstrukter?: boolean | null
+          is_pm?: boolean | null
           name: string
           role: string
+          source?: string | null
         }
         Update: {
           created_at?: string
+          employee_id?: string | null
           firma?: string | null
           id?: string
           is_active?: boolean
           is_external?: boolean
+          is_kalkulant?: boolean | null
+          is_konstrukter?: boolean | null
+          is_pm?: boolean | null
           name?: string
           role?: string
+          source?: string | null
         }
         Relationships: []
       }

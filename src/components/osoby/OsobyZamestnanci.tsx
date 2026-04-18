@@ -4,6 +4,7 @@ import { Search, MoreVertical, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -18,6 +19,7 @@ import { EmployeeAbsenceDialog } from "@/components/production/EmployeeAbsenceDi
 import { usePositionCatalogue, useUpdateEmployeeFields, useReactivateEmployee, useDeleteEmployeePermanently } from "@/hooks/useOsoby";
 import { UkoncitPracovniPomerDialog } from "./UkoncitPracovniPomerDialog";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 const UVAZEK_OPTIONS = [4, 6, 8];
 
@@ -52,7 +54,7 @@ function useAllEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ami_employees")
-        .select("id, meno, usek, usek_nazov, stredisko, pozicia, uvazok_hodiny, activated_at, deactivated_at, deactivated_date, aktivny")
+        .select("id, meno, usek, usek_nazov, stredisko, pozicia, uvazok_hodiny, activated_at, deactivated_at, deactivated_date, aktivny, is_pm, is_kalkulant, is_konstrukter")
         .order("meno", { ascending: true });
       if (error) throw error;
       return (data ?? []) as any[];
@@ -193,6 +195,66 @@ export function OsobyZamestnanci() {
     updateEmp.mutate({ id: emp.id, patch: { uvazok_hodiny: daily } });
   };
 
+  /** Toggle a project role flag on an employee + sync into people cache. */
+  const handleRoleToggle = async (
+    emp: any,
+    flag: "is_pm" | "is_kalkulant" | "is_konstrukter",
+    next: boolean,
+  ) => {
+    // 1. Update ami_employees
+    const { error: empErr } = await supabase
+      .from("ami_employees")
+      .update({ [flag]: next } as any)
+      .eq("id", emp.id);
+    if (empErr) {
+      toast({ title: "Chyba", description: empErr.message, variant: "destructive" });
+      return;
+    }
+
+    // 2. Compute new flag triple
+    const flags = {
+      is_pm: flag === "is_pm" ? next : !!emp.is_pm,
+      is_kalkulant: flag === "is_kalkulant" ? next : !!emp.is_kalkulant,
+      is_konstrukter: flag === "is_konstrukter" ? next : !!emp.is_konstrukter,
+    };
+    const anyOn = flags.is_pm || flags.is_kalkulant || flags.is_konstrukter;
+
+    // 3. Upsert people cache (key: employee_id)
+    const { data: existing } = await supabase
+      .from("people")
+      .select("id")
+      .eq("employee_id", emp.id)
+      .maybeSingle();
+
+    const primaryRole = flags.is_pm ? "PM" : flags.is_konstrukter ? "Konstruktér" : flags.is_kalkulant ? "Kalkulant" : "PM";
+
+    if (existing) {
+      await supabase
+        .from("people")
+        .update({
+          name: emp.meno,
+          ...flags,
+          is_active: anyOn,
+          source: "employee",
+          role: primaryRole,
+        } as any)
+        .eq("id", (existing as any).id);
+    } else if (anyOn) {
+      await supabase.from("people").insert({
+        name: emp.meno,
+        role: primaryRole,
+        source: "employee",
+        employee_id: emp.id,
+        is_active: true,
+        is_external: false,
+        ...flags,
+      } as any);
+    }
+
+    qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
+    qc.invalidateQueries({ queryKey: ["people"] });
+  };
+
   const activeCount = employees.filter((e) => e.aktivny).length;
 
   return (
@@ -241,6 +303,7 @@ export function OsobyZamestnanci() {
               <TableHead className="w-[260px]">Jméno</TableHead>
               <TableHead className="w-[180px]">Úsek</TableHead>
               <TableHead className="w-[160px]">Pozice</TableHead>
+              <TableHead className="w-[200px]">Role na projektu</TableHead>
               <TableHead className="w-[110px]">Úvazek</TableHead>
               <TableHead className="w-[160px]">Absence</TableHead>
               <TableHead className="w-[150px]">Stav</TableHead>
@@ -254,7 +317,7 @@ export function OsobyZamestnanci() {
                 return (
                   <>
                     <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/40 hover:bg-muted/40 border-b border-border/40">
-                      <TableCell colSpan={7} className="py-1.5">
+                      <TableCell colSpan={8} className="py-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className={cn("text-[10px] font-medium border px-2 py-0.5", strediskoStyles(stredisko))}>
                             {stredisko}
@@ -320,6 +383,24 @@ export function OsobyZamestnanci() {
                                 ))}
                               </SelectContent>
                             </Select>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              {([
+                                ["is_pm", "PM"],
+                                ["is_kalkulant", "Kalk"],
+                                ["is_konstrukter", "Konstr"],
+                              ] as const).map(([flag, label]) => (
+                                <label key={flag} className="flex items-center gap-1.5 text-[11px] cursor-pointer select-none">
+                                  <Checkbox
+                                    checked={!!emp[flag]}
+                                    onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                  <span className="text-foreground">{label}</span>
+                                </label>
+                              ))}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Select
