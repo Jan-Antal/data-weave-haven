@@ -633,95 +633,82 @@ function AnalyticsTableRow({
           )}
         </TableCell>
       )}
-      {isVisible("project_name") && (
-        <TableCell style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.unmatched ? "Hodiny v Alvenu, ale projekt nie je v databáze" : r.project_name}>
-          {r.unmatched ? (
-            <span className="text-xs text-muted-foreground truncate inline-flex items-center gap-1">
-              <span className="text-[9px] font-medium px-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">⚠</span>
-              {r.project_name}
-            </span>
-          ) : (
-            <span
-              className="font-semibold text-xs cursor-pointer hover:underline hover:text-primary transition-colors truncate"
-              onClick={() => onOpenDetail(r.project_id)}
-            >
-              {r.project_name}
+      {isVisible("pm") && <TableCell className="text-xs">{isRezie ? muted : (r.pm || "—")}</TableCell>}
+      {isVisible("status") && <TableCell>{isRezie ? muted : (r.status ? <StatusBadge status={r.status} /> : "—")}</TableCell>}
+      {isVisible("balik") && <TableCell>{isRezie || r.unmatched ? muted : <BalikBadge balik={r.balik} />}</TableCell>}
+      {isVisible("preset_label") && (
+        <TableCell className="text-xs">
+          {isRezie ? muted : (
+            <span className={cn(
+              "px-1.5 py-0.5 rounded text-[10px] font-medium",
+              r.preset_label === "Custom" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-muted text-muted-foreground"
+            )}>
+              {r.preset_label}
             </span>
           )}
         </TableCell>
       )}
-      {isVisible("pm") && <TableCell className="text-xs">{r.pm || "—"}</TableCell>}
-      {isVisible("status") && <TableCell>{r.status ? <StatusBadge status={r.status} /> : "—"}</TableCell>}
-      {isVisible("balik") && <TableCell>{r.unmatched ? <span className="text-xs text-muted-foreground">—</span> : <BalikBadge balik={r.balik} />}</TableCell>}
-      {isVisible("preset_label") && (
-        <TableCell className="text-xs">
-          <span className={cn(
-            "px-1.5 py-0.5 rounded text-[10px] font-medium",
-            r.preset_label === "Custom" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-muted text-muted-foreground"
-          )}>
-            {r.preset_label}
-          </span>
-        </TableCell>
-      )}
       {isVisible("hodiny_plan") && (
         <TableCell className="text-right text-xs tabular-nums">
-          <div className="flex items-center justify-end gap-1">
-            {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
-            {r.plan_source && r.plan_source !== "None" && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={cn(
-                      "text-[9px] font-medium px-1 rounded cursor-default",
-                      r.plan_source === "TPV"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    )}>
-                      {r.force_project_price ? "P*" : r.plan_source === "TPV" ? "T" : "P"}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {r.force_project_price
-                      ? "Manuálně přepnuto na cenu projektu"
-                      : r.plan_source === "TPV"
-                        ? "Počítáno z TPV položek"
-                        : "Počítáno z prodejní ceny projektu"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {r.warning_low_tpv && !r.force_project_price && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                  </TooltipTrigger>
-                  <TooltipContent>TPV pokrývá méně než 60 % ceny projektu</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {onToggleForceProject && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => onToggleForceProject(r.project_id, r.force_project_price)}
-                      className="ml-0.5 text-muted-foreground hover:text-primary transition-colors"
-                    >
+          {isRezie ? muted : (
+            <div className="flex items-center justify-end gap-1">
+              {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
+              {r.plan_source && r.plan_source !== "None" && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn(
+                        "text-[9px] font-medium px-1 rounded cursor-default",
+                        r.plan_source === "TPV"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      )}>
+                        {r.force_project_price ? "P*" : r.plan_source === "TPV" ? "T" : "P"}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
                       {r.force_project_price
-                        ? <ToggleRight className="h-3 w-3 text-blue-500" />
-                        : <ToggleLeft className="h-3 w-3" />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {r.force_project_price
-                      ? "Přepnout zpět na automatický výpočet"
-                      : "Vynutit výpočet z ceny projektu"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+                        ? "Manuálně přepnuto na cenu projektu"
+                        : r.plan_source === "TPV"
+                          ? "Počítáno z TPV položek"
+                          : "Počítáno z prodejní ceny projektu"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {r.warning_low_tpv && !r.force_project_price && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent>TPV pokrývá méně než 60 % ceny projektu</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onToggleForceProject && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => onToggleForceProject(r.project_id, r.force_project_price)}
+                        className="ml-0.5 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {r.force_project_price
+                          ? <ToggleRight className="h-3 w-3 text-blue-500" />
+                          : <ToggleLeft className="h-3 w-3" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {r.force_project_price
+                        ? "Přepnout zpět na automatický výpočet"
+                        : "Vynutit výpočet z ceny projektu"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          )}
         </TableCell>
       )}
       {isVisible("hodiny_skutocne") && (
@@ -729,14 +716,14 @@ function AnalyticsTableRow({
           {Math.round(r.hodiny_skutocne)}
         </TableCell>
       )}
-      {isVisible("pct") && <TableCell><PctBar pct={r.pct} /></TableCell>}
+      {isVisible("pct") && <TableCell>{isRezie ? muted : <PctBar pct={r.pct} />}</TableCell>}
       {isVisible("zostatok") && (
         <TableCell className={cn(
           "text-right text-xs tabular-nums",
-          r.zostatok != null && r.zostatok > 0 && "text-green-600",
-          r.zostatok != null && r.zostatok === 0 && "text-muted-foreground",
+          !isRezie && r.zostatok != null && r.zostatok > 0 && "text-green-600",
+          !isRezie && r.zostatok != null && r.zostatok === 0 && "text-muted-foreground",
         )}>
-          {r.zostatok != null ? Math.round(r.zostatok) : "—"}
+          {isRezie ? muted : (r.zostatok != null ? Math.round(r.zostatok) : "—")}
         </TableCell>
       )}
       {isVisible("tracking") && (
