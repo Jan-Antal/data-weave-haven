@@ -1,36 +1,32 @@
 
-## Plán: Oprava 0% utilizace v Analytics
+## Plán: Správná logika utilizace v Analytics
 
-### Diagnóza
-Datově je vše v pořádku — prověřeno přímo v DB:
-- `production_hours_log` má 8 983 záznamů (do 2026-04-18)
-- Výrobní zaměstnanci (Dílna 1/2/3 + Sklad) jsou aktivní a jejich jména v logu sedí
-- Režijní kódy (`Z-2511-99x`) jsou aktivní v `overhead_projects`
-- `production_capacity` má řádky pro všechny týdny okna 30d
+### Vzorec
+```
+Utilizace = (Výrobní hodiny − Režijní hodiny) / Výrobní hodiny
+```
+- **Výrobní hodiny** = SUM `production_hours_log.hodiny` v okně, **bez** `cinnost_kod IN ('TPV','ENG','PRO')`
+- **Režijní hodiny** = SUM hodin (stejné filtrování TPV/ENG/PRO), kde `ami_project_id ∈ aktivní overhead_projects.project_code`
+- Časové okno = aktuální `timeRange` filtr (week / month / 3months / year / all)
 
-Replikace výpočtu v SQL dává `utilization30d ≈ 52.6 %` (1 424 projektových hodin / 2 709 h kapacity), ne 0 %.
+### Změny
 
-### Pravděpodobná příčina
-Frontend zobrazuje **stará data z cache React Query**. QueryKey je `["analytics", "utilization-v3-capacity"]` a nezměnil se od posledních úprav výpočtu, takže prohlížeč si mohl uchovat starý snapshot bez nových polí (před tím, než byly `production_capacity` data dostupná pro aktuální týden, nebo před zařazením překryvu zaměstnanců).
+**1. `src/hooks/useAnalytics.ts`**
+- Hook přijme `timeRange: TimeRange`
+- Spočítat `rangeStart` (stejný helper jako v `AnalyticsBreakdownRow`)
+- Načíst `production_hours_log` ve vybraném okně + aktivní `overhead_projects`
+- Přeskočit záznamy s `cinnost_kod ∈ {TPV, ENG, PRO}`
+- `totalHours` (výrobní), `overheadHours`, `productiveHours = total − overhead`
+- `utilizationPct = totalHours > 0 ? round(productiveHours / totalHours * 100) : null`
+- Vrátit v `summary`: `utilizationPct`, `totalHours`, `overheadHours`, `productiveHours`
+- Bump key na `utilization-v6`
+- Odstranit nepoužívanou kapacitní logiku (`cap30`, employee filtering, `isEmployeeActiveForLogDate`) — pro nový vzorec není potřeba
 
-### Co uděláme
-
-1. **Bump query key** v `src/hooks/useAnalytics.ts`
-   - `["analytics", "utilization-v3-capacity"]` → `["analytics", "utilization-v4"]`
-   - Vynutí fresh fetch a přepočet u všech klientů
-
-2. **Přidat dočasné diagnostické logy** v `useAnalytics`
-   - `console.info("[Analytics]", { p30, r30, cap30, util30d, productionEmpsCount, rawLogsCount })`
-   - Uživatel pak otevře konzoli a uvidí, co reálně vyleze (nebo se logy odstraní hned po ověření)
-
-3. **Drobná robustnost výpočtu kapacity**
-   - Pokud `cap30 === 0` (např. kapacitní data ještě nebyla nahrána), nepouštět hodnotu 0 %, ale `null` → karta zobrazí "—" s tooltipem, ne matoucí "0 %"
-   - To už děláno, ale ověřit, že `pctVsCap` vrací `null` korektně
-
-4. **Po ověření** odstranit diagnostické logy a nechat jen bump query key + null-safe ošetření.
+**2. `src/pages/Analytics.tsx`**
+- Předat `timeRange` do `useAnalytics(timeRange)`
+- Karta utilizace: titulek dle okna, podtitulek `{productiveHours} h produktivních z {totalHours} h výrobních · {overheadHours} h režie`
+- Tooltip vysvětlí vzorec
 
 ### Soubory
-- `src/hooks/useAnalytics.ts` (jediná změna)
-
-### Po nasazení
-Otevři Analytics → konzole prohlížeče → pošli mi řádek `[Analytics] {...}`. Z těch čísel hned uvidím, jestli problém zmizel díky bumpnutí cache, nebo jestli je nějaký další bug v reálném prohlížečovém prostředí (např. lokalizace data).
+- `src/hooks/useAnalytics.ts`
+- `src/pages/Analytics.tsx`
