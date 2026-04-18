@@ -28,6 +28,17 @@ export function OsobyKatalog() {
   const [newStredisko, setNewStredisko] = useState("");
   const [showAddStredisko, setShowAddStredisko] = useState(false);
   const [deleteFor, setDeleteFor] = useState<CataloguePosition | null>(null);
+  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+
+  const commitRename = (p: CataloguePosition) => {
+    if (!editing || editing.id !== p.id) return;
+    const next = editing.value.trim();
+    if (!next || next === p.pozicia) { setEditing(null); return; }
+    rename.mutate(
+      { id: p.id, stredisko: p.stredisko, usek: p.usek, oldName: p.pozicia, newName: next },
+      { onSettled: () => setEditing(null) },
+    );
+  };
 
   const tree = useMemo(() => {
     const t = new Map<string, Map<string, CataloguePosition[]>>();
