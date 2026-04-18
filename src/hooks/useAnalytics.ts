@@ -380,6 +380,75 @@ export function useAnalytics() {
         ? Math.round((productionRezieHours / utilDenom) * 1000) / 10
         : null;
 
+      // ── Windowed utilization (last 30d, 60-30d, 90-60d) ──────────────
+      const today = new Date();
+      const toLocalISO = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      };
+      const dayOffset = (n: number) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() - n);
+        return toLocalISO(d);
+      };
+      const W0 = dayOffset(0);    // today
+      const W30 = dayOffset(30);  // 30 days ago
+      const W60 = dayOffset(60);
+      const W90 = dayOffset(90);
+
+      const windowAgg = { p30: 0, r30: 0, p60: 0, r60: 0, p90: 0, r90: 0 };
+      for (const log of rawLogs) {
+        if (log.cinnost_kod && ["TPV", "ENG", "PRO"].includes(log.cinnost_kod)) continue;
+        const emp = empByName.get(log.zamestnanec);
+        if (!emp) continue;
+        if (emp.activated_at && log.datum_sync < emp.activated_at.slice(0, 10)) continue;
+        if (emp.deactivated_at && log.datum_sync > emp.deactivated_at.slice(0, 10)) continue;
+
+        const h = Number(log.hodiny) || 0;
+        const isOverhead = overheadMap.has(log.ami_project_id);
+        const isProject = !isOverhead && knownProjectIdsForUtil.has(log.ami_project_id);
+        if (!isOverhead && !isProject) continue;
+
+        const d = log.datum_sync;
+        if (d > W30 && d <= W0) {
+          if (isOverhead) windowAgg.r30 += h; else windowAgg.p30 += h;
+        } else if (d > W60 && d <= W30) {
+          if (isOverhead) windowAgg.r60 += h; else windowAgg.p60 += h;
+        } else if (d > W90 && d <= W60) {
+          if (isOverhead) windowAgg.r90 += h; else windowAgg.p90 += h;
+        }
+      }
+
+      const pct = (proj: number, rez: number): number | null => {
+        const denom = proj + rez;
+        return denom > 0 ? Math.round((proj / denom) * 1000) / 10 : null;
+      };
+      const utilization30d = pct(windowAgg.p30, windowAgg.r30);
+      const utilization60to30d = pct(windowAgg.p60, windowAgg.r60);
+      const utilization90to60d = pct(windowAgg.p90, windowAgg.r90);
+
+      const samples = [utilization30d, utilization60to30d, utilization90to60d].filter(
+        (v): v is number => v != null,
+      );
+      let utilizationMedian3m: number | null = null;
+      if (samples.length > 0) {
+        const sorted = [...samples].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        utilizationMedian3m = sorted.length % 2 === 0
+          ? Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 10) / 10
+          : sorted[mid];
+      }
+
+      let utilizationTrend: "up" | "down" | "flat" | null = null;
+      if (utilization30d != null && utilizationMedian3m != null) {
+        const diff = utilization30d - utilizationMedian3m;
+        if (diff > 2) utilizationTrend = "up";
+        else if (diff < -2) utilizationTrend = "down";
+        else utilizationTrend = "flat";
+      }
+
       const withPlan = projectRows.filter((r) => r.pct != null);
       const avgPct = withPlan.length
         ? Math.round(
@@ -402,6 +471,13 @@ export function useAnalytics() {
         productionRezieHours,
         productionProjectHours,
         rezieByCode,
+        utilization30d,
+        utilization60to30d,
+        utilization90to60d,
+        utilizationMedian3m,
+        utilizationTrend,
+        productionProjectHours30d: windowAgg.p30,
+        productionRezieHours30d: windowAgg.r30,
       };
 
       return { rows, summary };
