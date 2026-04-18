@@ -28,6 +28,7 @@ import { useVyrobniEmployees, useAbsencesForYear, computeWeekCapacity, getWeekSt
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EmployeeManagement } from "./EmployeeManagement";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
