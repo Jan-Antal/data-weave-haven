@@ -142,28 +142,45 @@ export function OsobyZamestnanci() {
   const handleUsekChange = (emp: any, value: string) => {
     if (value === "__none") return;
     const cat = catalogue.find((c) => c.usek === value);
-    updateEmp.mutate({
-      id: emp.id,
-      patch: {
-        usek_nazov: value,
-        stredisko: cat?.stredisko ?? emp.stredisko,
-        pozicia: null,
+    const empId = emp.id;
+    updateEmp.mutate(
+      {
+        id: empId,
+        patch: {
+          usek_nazov: value,
+          stredisko: cat?.stredisko ?? emp.stredisko,
+          pozicia: null,
+        },
       },
-    });
+      {
+        onSuccess: () => {
+          // Keep the row visible after re-grouping by úsek
+          requestAnimationFrame(() => {
+            const el = document.querySelector(`[data-emp-row="${empId}"]`);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              (el as HTMLElement).classList.add("ring-2", "ring-primary/40");
+              setTimeout(() => {
+                (el as HTMLElement).classList.remove("ring-2", "ring-primary/40");
+              }, 1500);
+            }
+          });
+        },
+      },
+    );
   };
 
   const handlePoziciaChange = (emp: any, value: string) => {
     if (value === "__none") return;
-    // Match position within emp's úsek if present, else fall back to first match anywhere
-    const cat =
-      catalogue.find((c) => c.pozicia === value && c.usek === emp.usek_nazov) ??
-      catalogue.find((c) => c.pozicia === value);
+    // Position must belong to emp's úsek (UI enforces úsek selected first)
+    const cat = catalogue.find((c) => c.pozicia === value && c.usek === emp.usek_nazov);
+    if (!cat) return;
     updateEmp.mutate({
       id: emp.id,
       patch: {
         pozicia: value,
-        usek_nazov: cat?.usek ?? emp.usek_nazov,
-        stredisko: cat?.stredisko ?? emp.stredisko,
+        usek_nazov: cat.usek,
+        stredisko: cat.stredisko,
       },
     });
   };
