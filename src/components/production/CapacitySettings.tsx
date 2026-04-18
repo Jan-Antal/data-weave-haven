@@ -1244,6 +1244,30 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
             }
           }}
         />
+    </>
+  );
+
+  if (inline) {
+    return <div className="flex flex-col h-full overflow-hidden bg-background">{innerContent}</div>;
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => {
+        if (!val && hasPendingChanges) {
+          const confirmed = window.confirm("Máte neuložené změny. Opravdu chcete odejít bez uložení?");
+          if (!confirmed) return;
+        }
+        onOpenChange(val);
+      }}>
+      <DialogContent className="max-w-[900px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <div className="px-6 pt-6 pb-2">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📊 Kapacita výroby
+            </DialogTitle>
+          </DialogHeader>
+        </div>
+        {innerContent}
       </DialogContent>
     </Dialog>
   );
