@@ -391,7 +391,7 @@ export default function Analytics() {
       ) : (
         <>
           {/* Summary cards */}
-          <div className="shrink-0 px-4 py-2 grid grid-cols-4 gap-3">
+          <div className="shrink-0 px-4 py-2 grid grid-cols-5 gap-3">
             <Card>
               <CardContent className="pt-3 pb-2 px-3">
                 <p className="text-[10px] text-muted-foreground mb-0.5">Projekty</p>
@@ -423,6 +423,13 @@ export default function Analytics() {
                 </p>
               </CardContent>
             </Card>
+            <RezieCard
+              isLoading={isLoading}
+              reziePct={data?.summary.reziePct ?? null}
+              totalRezieHours={data?.summary.totalRezieHours ?? 0}
+              utilizationTarget={data?.summary.utilizationTarget ?? 83}
+              rezieRows={data?.rows.filter((r) => r.category === "rezie") ?? []}
+            />
           </div>
 
           {/* Table */}
