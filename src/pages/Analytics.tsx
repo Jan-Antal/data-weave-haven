@@ -62,7 +62,7 @@ export default function Analytics() {
   const { data: projects = [] } = useProjects();
   type TimeRange = "week" | "month" | "3months" | "year" | "all";
   const [timeRange, setTimeRange] = useState<TimeRange>("3months");
-  const [statusFilters, setStatusFilters] = useState<Set<"vyroba" | "done">>(new Set(["vyroba", "done"]));
+  const [statusFilters, setStatusFilters] = useState<Set<"vyroba" | "done" | "rezie">>(new Set(["vyroba", "done"]));
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -175,14 +175,21 @@ export default function Analytics() {
       });
     }
 
-    // Status filter: "vyroba" includes IN_PROGRESS + OVER, "done" = DONE
-    if (statusFilters.size < 2) {
-      filtered = filtered.filter((r) => {
-        if (statusFilters.has("vyroba") && (r.balik === "IN_PROGRESS" || r.balik === "OVER")) return true;
-        if (statusFilters.has("done") && r.balik === "DONE") return true;
-        return false;
-      });
-    }
+    // Category filter:
+    //  - "vyroba" / "done"  → projects only (category === "project")
+    //  - "rezie"            → overhead rows (category === "rezie")
+    //  - unmatched rows visible only when "vyroba" selected (kept as before)
+    const wantVyroba = statusFilters.has("vyroba");
+    const wantDone = statusFilters.has("done");
+    const wantRezie = statusFilters.has("rezie");
+    filtered = filtered.filter((r) => {
+      if (r.category === "rezie") return wantRezie;
+      if (r.category === "unmatched") return wantVyroba;
+      // category === "project"
+      if (wantVyroba && (r.balik === "IN_PROGRESS" || r.balik === "OVER")) return true;
+      if (wantDone && r.balik === "DONE") return true;
+      return false;
+    });
 
     if (search) {
       const q = normalizeSearch(search);
@@ -275,6 +282,7 @@ export default function Analytics() {
               {([
                 { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
                 { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
+                { key: "rezie" as const, label: "🏭 Režije", activeClass: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
               ]).map((chip) => {
                 const active = statusFilters.has(chip.key);
                 return (
@@ -383,7 +391,7 @@ export default function Analytics() {
       ) : (
         <>
           {/* Summary cards */}
-          <div className="shrink-0 px-4 py-2 grid grid-cols-4 gap-3">
+          <div className="shrink-0 px-4 py-2 grid grid-cols-5 gap-3">
             <Card>
               <CardContent className="pt-3 pb-2 px-3">
                 <p className="text-[10px] text-muted-foreground mb-0.5">Projekty</p>
@@ -415,6 +423,13 @@ export default function Analytics() {
                 </p>
               </CardContent>
             </Card>
+            <RezieCard
+              isLoading={isLoading}
+              reziePct={data?.summary.reziePct ?? null}
+              totalRezieHours={data?.summary.totalRezieHours ?? 0}
+              utilizationTarget={data?.summary.utilizationTarget ?? 83}
+              rezieRows={data?.rows.filter((r) => r.category === "rezie") ?? []}
+            />
           </div>
 
           {/* Table */}
@@ -693,5 +708,69 @@ function PctBar({ pct }: { pct: number | null }) {
         {pct} %
       </span>
     </div>
+  );
+}
+
+function RezieCard({
+  isLoading,
+  reziePct,
+  totalRezieHours,
+  utilizationTarget,
+  rezieRows,
+}: {
+  isLoading: boolean;
+  reziePct: number | null;
+  totalRezieHours: number;
+  utilizationTarget: number;
+  rezieRows: AnalyticsRow[];
+}) {
+  // Expected overhead = 100 - utilization target (e.g. 17% if util = 83%)
+  const expectedRezie = Math.max(0, 100 - utilizationTarget);
+  const isOver = reziePct != null && reziePct > expectedRezie;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Card className={cn(
+            "cursor-help transition-colors",
+            isOver && "border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10"
+          )}>
+            <CardContent className="pt-3 pb-2 px-3">
+              <p className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                🏭 Režije %
+              </p>
+              <p className={cn(
+                "text-lg font-bold tabular-nums",
+                isOver ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-500"
+              )}>
+                {isLoading ? <Skeleton className="h-6 w-12" /> : reziePct != null ? `${reziePct} %` : "—"}
+              </p>
+              <p className="text-[9px] text-muted-foreground tabular-nums mt-0.5">
+                {formatHours(totalRezieHours)} • cíl ≤ {expectedRezie.toFixed(0)} %
+              </p>
+            </CardContent>
+          </Card>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <div className="space-y-1">
+            <p className="font-semibold text-xs">Režijní hodiny vůči celku</p>
+            <p className="text-[10px] text-muted-foreground">
+              Cíl odvozený z utilizace výroby ({utilizationTarget} %) ⇒ ≤ {expectedRezie.toFixed(0)} % režie
+            </p>
+            {rezieRows.length > 0 && (
+              <div className="border-t pt-1 mt-1 space-y-0.5">
+                {rezieRows.map((r) => (
+                  <div key={r.project_id} className="flex justify-between gap-3 text-[10px] tabular-nums">
+                    <span className="font-mono">{r.project_id}</span>
+                    <span>{formatHours(r.hodiny_skutocne)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
