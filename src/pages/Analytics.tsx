@@ -175,14 +175,21 @@ export default function Analytics() {
       });
     }
 
-    // Status filter: "vyroba" includes IN_PROGRESS + OVER, "done" = DONE
-    if (statusFilters.size < 2) {
-      filtered = filtered.filter((r) => {
-        if (statusFilters.has("vyroba") && (r.balik === "IN_PROGRESS" || r.balik === "OVER")) return true;
-        if (statusFilters.has("done") && r.balik === "DONE") return true;
-        return false;
-      });
-    }
+    // Category filter:
+    //  - "vyroba" / "done"  → projects only (category === "project")
+    //  - "rezie"            → overhead rows (category === "rezie")
+    //  - unmatched rows visible only when "vyroba" selected (kept as before)
+    const wantVyroba = statusFilters.has("vyroba");
+    const wantDone = statusFilters.has("done");
+    const wantRezie = statusFilters.has("rezie");
+    filtered = filtered.filter((r) => {
+      if (r.category === "rezie") return wantRezie;
+      if (r.category === "unmatched") return wantVyroba;
+      // category === "project"
+      if (wantVyroba && (r.balik === "IN_PROGRESS" || r.balik === "OVER")) return true;
+      if (wantDone && r.balik === "DONE") return true;
+      return false;
+    });
 
     if (search) {
       const q = normalizeSearch(search);
@@ -275,6 +282,7 @@ export default function Analytics() {
               {([
                 { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
                 { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
+                { key: "rezie" as const, label: "🏭 Režije", activeClass: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
               ]).map((chip) => {
                 const active = statusFilters.has(chip.key);
                 return (
