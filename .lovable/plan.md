@@ -1,42 +1,36 @@
 
+## Plán: Oprava 0% utilizace v Analytics
 
-## Diagnóza
+### Diagnóza
+Datově je vše v pořádku — prověřeno přímo v DB:
+- `production_hours_log` má 8 983 záznamů (do 2026-04-18)
+- Výrobní zaměstnanci (Dílna 1/2/3 + Sklad) jsou aktivní a jejich jména v logu sedí
+- Režijní kódy (`Z-2511-99x`) jsou aktivní v `overhead_projects`
+- `production_capacity` má řádky pro všechny týdny okna 30d
 
-### Kde sa zapisujú týždenné hodiny?
-**Tabuľka `production_capacity`** — jeden riadok na (`week_year`, `week_number`). Stĺpce: `capacity_hours`, `working_days`, `holiday_name`, `company_holiday_name`, `is_manual_override`, `dilna1_hodiny`…`sklad_hodiny`, `total_employees`, `utilization_pct`.
+Replikace výpočtu v SQL dává `utilization30d ≈ 52.6 %` (1 424 projektových hodin / 2 709 h kapacity), ne 0 %.
 
-V DB je to **správne** — overené:
-- T1 = 717h (Nový rok), T14 = 717h (Velký pátek), T15 = 717h (Velikonoční pondělí), T18/T19 = 717h (1.5./8.5.) atď.
-- Štandardný týždeň = 896h, sviatkový = 717h.
+### Pravděpodobná příčina
+Frontend zobrazuje **stará data z cache React Query**. QueryKey je `["analytics", "utilization-v3-capacity"]` a nezměnil se od posledních úprav výpočtu, takže prohlížeč si mohl uchovat starý snapshot bez nových polí (před tím, než byly `production_capacity` data dostupná pro aktuální týden, nebo před zařazením překryvu zaměstnanců).
 
-### Prečo graf vyzerá rovno?
-Vykresľovanie funguje cez `liveWeekMap`, ktorá ide cez všetkých 52 týždňov a:
-- ak `is_manual_override = true` → použije DB hodnotu,
-- inak **prepočíta lokálne** z `selectedEmployees` × `working_days` × util%.
+### Co uděláme
 
-Lokálny výpočet **odpočítava sviatky správne** (`workingDays = 5 - holidayCount`), ALE výsledok pre 30 zamestnancov × 8h × (4 vs 5) dní × 83% dáva **rozdiel ~199h** (896 vs 717). Na 140px-vysokom grafe to je rozdiel ~22px → mal by byť viditeľný.
+1. **Bump query key** v `src/hooks/useAnalytics.ts`
+   - `["analytics", "utilization-v3-capacity"]` → `["analytics", "utilization-v4"]`
+   - Vynutí fresh fetch a přepočet u všech klientů
 
-Na screenshote sú **všetky stĺpce identické** (vrátane T1, T14, T15) → znamená to, že buď:
-1. **`autoApplyHolidays` je vypnuté** v lokálnom UI state (toggle „Automaticky aplikovat svátky") → potom sa pre všetky týždne použije `workingDays = 5` a graf zploští,
-2. alebo `holidays` query (`useCzechHolidays(2026)`) ešte nedobehlo / cache vrátila prázdne pole.
+2. **Přidat dočasné diagnostické logy** v `useAnalytics`
+   - `console.info("[Analytics]", { p30, r30, cap30, util30d, productionEmpsCount, rawLogsCount })`
+   - Uživatel pak otevře konzoli a uvidí, co reálně vyleze (nebo se logy odstraní hned po ověření)
 
-Tooltip v screenshote ukazuje „Velký pátek" — to znamená, že `holiday_name` je v `liveWeekMap` (lebo sa preberá z `dbWeek?.holiday_name`), ale **`workingDays` sa neredukuje** → potvrdená hypotéza č. 1: `autoApplyHolidays = false`.
+3. **Drobná robustnost výpočtu kapacity**
+   - Pokud `cap30 === 0` (např. kapacitní data ještě nebyla nahrána), nepouštět hodnotu 0 %, ale `null` → karta zobrazí "—" s tooltipem, ne matoucí "0 %"
+   - To už děláno, ale ověřit, že `pctVsCap` vrací `null` korektně
 
-## Plán opravy
+4. **Po ověření** odstranit diagnostické logy a nechat jen bump query key + null-safe ošetření.
 
-### 1) Default `autoApplyHolidays = true` + sync z DB
-V `CapacitySettings.tsx` skontrolovať `useState(autoApplyHolidays)` — uistiť sa, že defaultná hodnota je `true` a nie je niekde resetovaná pri prepnutí roku.
+### Soubory
+- `src/hooks/useAnalytics.ts` (jediná změna)
 
-### 2) Fallback: ak je `autoApplyHolidays = false`, použiť DB hodnotu
-Aktuálne keď je toggle vypnutý, `liveWeekMap` aj tak prepočíta a ignoruje `dbWeek.capacity_hours`. Lepšie: ak `autoApplyHolidays = false` a existuje `dbWeek` (auto-recalc už uložil správne hodnoty so sviatkami), **použiť DB hodnotu** namiesto lokálneho prepočtu bez sviatkov. To zaručí, že graf vždy odzrkadľuje DB realitu.
-
-### 3) Vizuálny kontrast
-Pri standard 896h vs sviatok 717h je rozdiel len ~20% výšky stĺpca a farby (`BELOW_STOPS` interpolácia od standard k min) sú veľmi blízke šedej, lebo `visibleRange.min` ≈ 717 a `standard` ≈ 896. Pridáme:
-- **dolný padding pre `visibleRange.min`** — odpočítať ďalších ~15% z `visMin`, aby sviatkové týždne boli zreteľne oranžovo/jantárové, nie šedé.
-
-### Súbory
-- `src/components/production/CapacitySettings.tsx` — fix default + fallback v `liveWeekMap` + úprava `visibleRange.min` pre lepší kontrast.
-
-### Bez zmeny
-DB schéma, migrácie, dáta, ostatná logika.
-
+### Po nasazení
+Otevři Analytics → konzole prohlížeče → pošli mi řádek `[Analytics] {...}`. Z těch čísel hned uvidím, jestli problém zmizel díky bumpnutí cache, nebo jestli je nějaký další bug v reálném prohlížečovém prostředí (např. lokalizace data).
