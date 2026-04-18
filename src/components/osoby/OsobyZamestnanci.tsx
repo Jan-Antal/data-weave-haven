@@ -393,33 +393,29 @@ export function OsobyZamestnanci() {
                                 ["is_konstrukter", "Konstruktér"],
                               ];
                               const selected = roles.filter(([f]) => !!emp[f]).map(([, l]) => l);
+                              const summary = selected.length ? selected.join(", ") : "—";
                               return (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-8 w-full justify-between text-xs font-normal px-2"
-                                    >
-                                      <span className={cn("truncate", selected.length === 0 && "text-muted-foreground")}>
-                                        {selected.length === 0 ? "—" : selected.join(", ")}
-                                      </span>
-                                      <ChevronDown className="h-3.5 w-3.5 opacity-60 shrink-0 ml-1" />
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" size="sm" className="h-8 text-xs justify-start font-normal w-full">
+                                      {summary}
                                     </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="start" className="w-[180px]">
-                                    {roles.map(([flag, label]) => (
-                                      <DropdownMenuCheckboxItem
-                                        key={flag}
-                                        checked={!!emp[flag]}
-                                        onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
-                                        onSelect={(e) => e.preventDefault()}
-                                      >
-                                        {label}
-                                      </DropdownMenuCheckboxItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-48 p-2" align="start">
+                                    <div className="space-y-1.5">
+                                      {roles.map(([flag, label]) => (
+                                        <label key={flag} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
+                                          <Checkbox
+                                            checked={!!emp[flag]}
+                                            onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
+                                            className="h-4 w-4"
+                                          />
+                                          <span className="text-xs">{label}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               );
                             })()}
                           </TableCell>
