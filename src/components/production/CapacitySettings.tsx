@@ -104,10 +104,10 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const [compositionWeekNumber, setCompositionWeekNumber] = useState<number>(currentWeek);
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
-  const VISIBLE_WEEKS = 3;
+  const VISIBLE_WEEKS = 12;
   const SCROLL_STEP = 4;
   const MIN_YEAR = 2026;
-  // Default view: current week + 2 previous weeks visible (3 weeks total)
+  // Default view: 2 past weeks + current + 9 future weeks visible (12 total)
   const getDefaultViewStart = useCallback(() => {
     if (selectedYear === currentYear) return Math.max(1, currentWeek - 2);
     return 1;
