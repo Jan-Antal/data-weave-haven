@@ -21,8 +21,32 @@ export function OsobyKatalog() {
   const upsert = useUpsertPosition();
   const rename = useRenamePosition();
   const del = useDeletePosition();
+  const delUsek = useDeleteUsek();
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [usekDelete, setUsekDelete] = useState<{ stredisko: string; usek: string } | null>(null);
+  const [usekEmployees, setUsekEmployees] = useState<Array<{ id: string; meno: string; pozicia: string | null }> | null>(null);
+  const [usekEmployeesLoading, setUsekEmployeesLoading] = useState(false);
+
+  // Load employees in the selected úsek when dialog opens
+  useEffect(() => {
+    if (!usekDelete) { setUsekEmployees(null); return; }
+    let cancelled = false;
+    setUsekEmployeesLoading(true);
+    supabase
+      .from("ami_employees")
+      .select("id, meno, pozicia, aktivny")
+      .eq("stredisko", usekDelete.stredisko)
+      .eq("usek_nazov", usekDelete.usek)
+      .order("meno")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setUsekEmployees((data ?? []).map((e: any) => ({ id: e.id, meno: e.meno, pozicia: e.pozicia })));
+        setUsekEmployeesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [usekDelete]);
+
   const [addingTo, setAddingTo] = useState<{ stredisko: string; usek: string } | null>(null);
   const [newPozicia, setNewPozicia] = useState("");
   const [newUsek, setNewUsek] = useState<{ stredisko: string } | null>(null);
