@@ -1028,25 +1028,17 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-semibold text-foreground">Kapacita</h3>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setSelectedYear(y => y - 1); setViewStart(1); }}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-bold text-foreground min-w-[50px] text-center">{selectedYear}</span>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setSelectedYear(y => y + 1); setViewStart(1); }}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+              <span className="text-sm font-bold text-foreground min-w-[50px]">{selectedYear}</span>
               <span className="text-xs text-muted-foreground">{visibleMonthRange}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={jumpToToday}>
+              <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={jumpToToday} disabled={!canJumpToToday}>
                 <CalendarDays className="h-3 w-3 mr-1" /> Dnes
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollLeft} disabled={viewStart <= 1}>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollLeft} disabled={atMinBoundary}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollRight} disabled={viewStart >= 52 - VISIBLE_WEEKS + 1}>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollRight}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
