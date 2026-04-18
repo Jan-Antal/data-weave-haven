@@ -397,6 +397,7 @@ export function useAnalytics() {
         : null;
 
       // ── Windowed utilization (last 30d, 60-30d, 90-60d) ──────────────
+      // Utilization = odpracované projektové hodiny / dostupná kapacita (z kapacitního plánu)
       const today = new Date();
       const toLocalISO = (d: Date) => {
         const y = d.getFullYear();
@@ -435,13 +436,47 @@ export function useAnalytics() {
         }
       }
 
-      const pct = (proj: number, rez: number): number | null => {
-        const denom = proj + rez;
-        return denom > 0 ? Math.round((proj / denom) * 1000) / 10 : null;
+      // Build daily-capacity map from production_capacity (week_start → capacity_hours / working_days)
+      // We approximate: each weekday in the window gets capacity_hours/5 from its containing week.
+      const fallbackWeekly = Number((settingsRes.data as any)?.weekly_capacity_hours ?? 875);
+      const capacityRows = (capacityRes.data || []) as Array<{ week_start: string; capacity_hours: number }>;
+      const capByWeekStart = new Map<string, number>();
+      for (const c of capacityRows) capByWeekStart.set(c.week_start, Number(c.capacity_hours) || 0);
+
+      const getMondayISO = (iso: string): string => {
+        const d = new Date(iso + "T00:00:00");
+        const dow = d.getDay() || 7; // 1..7 (Mon=1)
+        d.setDate(d.getDate() - (dow - 1));
+        return toLocalISO(d);
       };
-      const utilization30d = pct(windowAgg.p30, windowAgg.r30);
-      const utilization60to30d = pct(windowAgg.p60, windowAgg.r60);
-      const utilization90to60d = pct(windowAgg.p90, windowAgg.r90);
+      const sumCapacityForRange = (fromExclusive: string, toInclusive: string): number => {
+        let total = 0;
+        const start = new Date(fromExclusive + "T00:00:00");
+        const end = new Date(toInclusive + "T00:00:00");
+        const cur = new Date(start);
+        cur.setDate(cur.getDate() + 1); // exclusive start
+        while (cur <= end) {
+          const dow = cur.getDay();
+          if (dow !== 0 && dow !== 6) {
+            const monIso = getMondayISO(toLocalISO(cur));
+            const weekly = capByWeekStart.get(monIso) ?? fallbackWeekly;
+            total += weekly / 5;
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
+        return total;
+      };
+
+      const cap30 = sumCapacityForRange(W30, W0);
+      const cap60 = sumCapacityForRange(W60, W30);
+      const cap90 = sumCapacityForRange(W90, W60);
+
+      const pctVsCap = (proj: number, cap: number): number | null =>
+        cap > 0 ? Math.round((proj / cap) * 1000) / 10 : null;
+
+      const utilization30d = pctVsCap(windowAgg.p30, cap30);
+      const utilization60to30d = pctVsCap(windowAgg.p60, cap60);
+      const utilization90to60d = pctVsCap(windowAgg.p90, cap90);
 
       const samples = [utilization30d, utilization60to30d, utilization90to60d].filter(
         (v): v is number => v != null,
