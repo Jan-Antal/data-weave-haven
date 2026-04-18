@@ -1109,6 +1109,9 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                             height: barH,
                             backgroundColor: barColor,
                             minWidth: 0,
+                            ...(selectedYear === currentYear && wn === currentWeek
+                              ? { border: "1.5px solid #0a2e28" }
+                              : {}),
                           }}
                           onClick={e => handleBarClick(wn, e)}
                         />
