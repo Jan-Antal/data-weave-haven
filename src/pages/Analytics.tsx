@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useMemo, useCallback, Fragment } from "react";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { AnalyticsBreakdownRow } from "@/components/AnalyticsBreakdownRow";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -67,6 +68,14 @@ export default function Analytics() {
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
@@ -405,16 +414,17 @@ export default function Analytics() {
         <>
           {/* Summary cards */}
           <div className="shrink-0 px-4 py-2 grid grid-cols-5 gap-3">
+            {(() => { const onlyRezie = statusFilters.has("rezie") && statusFilters.size === 1; return (<>
             <Card>
               <CardContent className="pt-3 pb-2 px-3">
-                <p className="text-[10px] text-muted-foreground mb-0.5">Projekty</p>
+                <p className="text-[10px] text-muted-foreground mb-0.5">{onlyRezie ? "Režijní položky" : "Projekty"}</p>
                 <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-12" /> : summary.count}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2 px-3">
                 <p className="text-[10px] text-muted-foreground mb-0.5">Plán hodin</p>
-                <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : formatHours(summary.totalPlan)}</p>
+                <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : (onlyRezie ? "—" : formatHours(summary.totalPlan))}</p>
               </CardContent>
             </Card>
             <Card>
@@ -428,14 +438,15 @@ export default function Analytics() {
                 <p className="text-[10px] text-muted-foreground mb-0.5">Průměrné čerpání</p>
                 <p className={cn(
                   "text-lg font-bold tabular-nums",
-                  summary.avgPct != null && summary.avgPct <= 80 && "text-green-600",
-                  summary.avgPct != null && summary.avgPct > 80 && summary.avgPct <= 100 && "text-orange-500",
-                  summary.avgPct != null && summary.avgPct > 100 && "text-red-500",
+                  !onlyRezie && summary.avgPct != null && summary.avgPct <= 80 && "text-green-600",
+                  !onlyRezie && summary.avgPct != null && summary.avgPct > 80 && summary.avgPct <= 100 && "text-orange-500",
+                  !onlyRezie && summary.avgPct != null && summary.avgPct > 100 && "text-red-500",
                 )}>
-                  {isLoading ? <Skeleton className="h-6 w-12" /> : summary.avgPct != null ? `${summary.avgPct} %` : "—"}
+                  {isLoading ? <Skeleton className="h-6 w-12" /> : (onlyRezie ? "—" : (summary.avgPct != null ? `${summary.avgPct} %` : "—"))}
                 </p>
               </CardContent>
             </Card>
+            </>); })()}
             <UtilizationCard
               isLoading={isLoading}
               utilization30d={data?.summary.utilization30d ?? null}
@@ -508,13 +519,23 @@ export default function Analytics() {
                       </TableRow>
                     ) : (
                       rows.map((r) => (
-                        <AnalyticsTableRow
-                          key={r.project_id}
-                          row={r}
-                          onOpenDetail={setDetailProjectId}
-                          isVisible={isVisible}
-                          onToggleForceProject={handleToggleForceProject}
-                        />
+                        <Fragment key={r.project_id}>
+                          <AnalyticsTableRow
+                            row={r}
+                            onOpenDetail={setDetailProjectId}
+                            isVisible={isVisible}
+                            onToggleForceProject={handleToggleForceProject}
+                            expanded={expandedRows.has(r.project_id)}
+                            onToggleExpand={toggleExpand}
+                          />
+                          {expandedRows.has(r.project_id) && (
+                            <AnalyticsBreakdownRow
+                              projectId={r.project_id}
+                              colSpan={visibleCols.length + 1}
+                              timeRange={timeRange}
+                            />
+                          )}
+                        </Fragment>
                       ))
                     )}
                   </TableBody>
@@ -547,12 +568,18 @@ function AnalyticsTableRow({
   onOpenDetail,
   isVisible,
   onToggleForceProject,
+  expanded,
+  onToggleExpand,
 }: {
   row: AnalyticsRow;
   onOpenDetail: (id: string) => void;
   isVisible: (key: string) => boolean;
   onToggleForceProject?: (projectId: string, current: boolean) => void;
+  expanded?: boolean;
+  onToggleExpand?: (id: string) => void;
 }) {
+  const isRezie = r.category === "rezie";
+  const muted = <span className="text-xs text-muted-foreground">—</span>;
   return (
     <TableRow
       className={cn(
@@ -564,18 +591,29 @@ function AnalyticsTableRow({
     >
       {isVisible("project_id") && (
         <TableCell>
-          {r.unmatched ? (
-            <span className="whitespace-nowrap font-mono text-xs text-muted-foreground font-semibold" title="Projekt neexistuje v databázi">
-              {r.project_id}
-            </span>
-          ) : (
-            <button
-              onClick={() => onOpenDetail(r.project_id)}
-              className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
-            >
-              {r.project_id}
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {onToggleExpand && (
+              <button
+                onClick={() => onToggleExpand(r.project_id)}
+                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                aria-label={expanded ? "Sbalit" : "Rozbalit"}
+              >
+                {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            {r.unmatched || isRezie ? (
+              <span className="whitespace-nowrap font-mono text-xs text-muted-foreground font-semibold">
+                {r.project_id}
+              </span>
+            ) : (
+              <button
+                onClick={() => onOpenDetail(r.project_id)}
+                className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
+              >
+                {r.project_id}
+              </button>
+            )}
+          </div>
         </TableCell>
       )}
       {isVisible("project_name") && (
@@ -585,6 +623,8 @@ function AnalyticsTableRow({
               <span className="text-[9px] font-medium px-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">⚠</span>
               {r.project_name}
             </span>
+          ) : isRezie ? (
+            <span className="text-xs truncate">{r.project_name}</span>
           ) : (
             <span
               className="font-semibold text-xs cursor-pointer hover:underline hover:text-primary transition-colors truncate"
@@ -595,78 +635,82 @@ function AnalyticsTableRow({
           )}
         </TableCell>
       )}
-      {isVisible("pm") && <TableCell className="text-xs">{r.pm || "—"}</TableCell>}
-      {isVisible("status") && <TableCell>{r.status ? <StatusBadge status={r.status} /> : "—"}</TableCell>}
-      {isVisible("balik") && <TableCell>{r.unmatched ? <span className="text-xs text-muted-foreground">—</span> : <BalikBadge balik={r.balik} />}</TableCell>}
+      {isVisible("pm") && <TableCell className="text-xs">{isRezie ? muted : (r.pm || "—")}</TableCell>}
+      {isVisible("status") && <TableCell>{isRezie ? muted : (r.status ? <StatusBadge status={r.status} /> : "—")}</TableCell>}
+      {isVisible("balik") && <TableCell>{isRezie || r.unmatched ? muted : <BalikBadge balik={r.balik} />}</TableCell>}
       {isVisible("preset_label") && (
         <TableCell className="text-xs">
-          <span className={cn(
-            "px-1.5 py-0.5 rounded text-[10px] font-medium",
-            r.preset_label === "Custom" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-muted text-muted-foreground"
-          )}>
-            {r.preset_label}
-          </span>
+          {isRezie ? muted : (
+            <span className={cn(
+              "px-1.5 py-0.5 rounded text-[10px] font-medium",
+              r.preset_label === "Custom" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-muted text-muted-foreground"
+            )}>
+              {r.preset_label}
+            </span>
+          )}
         </TableCell>
       )}
       {isVisible("hodiny_plan") && (
         <TableCell className="text-right text-xs tabular-nums">
-          <div className="flex items-center justify-end gap-1">
-            {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
-            {r.plan_source && r.plan_source !== "None" && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={cn(
-                      "text-[9px] font-medium px-1 rounded cursor-default",
-                      r.plan_source === "TPV"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                    )}>
-                      {r.force_project_price ? "P*" : r.plan_source === "TPV" ? "T" : "P"}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {r.force_project_price
-                      ? "Manuálně přepnuto na cenu projektu"
-                      : r.plan_source === "TPV"
-                        ? "Počítáno z TPV položek"
-                        : "Počítáno z prodejní ceny projektu"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {r.warning_low_tpv && !r.force_project_price && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-                  </TooltipTrigger>
-                  <TooltipContent>TPV pokrývá méně než 60 % ceny projektu</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {onToggleForceProject && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => onToggleForceProject(r.project_id, r.force_project_price)}
-                      className="ml-0.5 text-muted-foreground hover:text-primary transition-colors"
-                    >
+          {isRezie ? muted : (
+            <div className="flex items-center justify-end gap-1">
+              {r.hodiny_plan != null ? Math.round(r.hodiny_plan) : "—"}
+              {r.plan_source && r.plan_source !== "None" && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn(
+                        "text-[9px] font-medium px-1 rounded cursor-default",
+                        r.plan_source === "TPV"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      )}>
+                        {r.force_project_price ? "P*" : r.plan_source === "TPV" ? "T" : "P"}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
                       {r.force_project_price
-                        ? <ToggleRight className="h-3 w-3 text-blue-500" />
-                        : <ToggleLeft className="h-3 w-3" />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {r.force_project_price
-                      ? "Přepnout zpět na automatický výpočet"
-                      : "Vynutit výpočet z ceny projektu"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+                        ? "Manuálně přepnuto na cenu projektu"
+                        : r.plan_source === "TPV"
+                          ? "Počítáno z TPV položek"
+                          : "Počítáno z prodejní ceny projektu"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {r.warning_low_tpv && !r.force_project_price && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent>TPV pokrývá méně než 60 % ceny projektu</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onToggleForceProject && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => onToggleForceProject(r.project_id, r.force_project_price)}
+                        className="ml-0.5 text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {r.force_project_price
+                          ? <ToggleRight className="h-3 w-3 text-blue-500" />
+                          : <ToggleLeft className="h-3 w-3" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {r.force_project_price
+                        ? "Přepnout zpět na automatický výpočet"
+                        : "Vynutit výpočet z ceny projektu"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+          )}
         </TableCell>
       )}
       {isVisible("hodiny_skutocne") && (
@@ -674,14 +718,14 @@ function AnalyticsTableRow({
           {Math.round(r.hodiny_skutocne)}
         </TableCell>
       )}
-      {isVisible("pct") && <TableCell><PctBar pct={r.pct} /></TableCell>}
+      {isVisible("pct") && <TableCell>{isRezie ? muted : <PctBar pct={r.pct} />}</TableCell>}
       {isVisible("zostatok") && (
         <TableCell className={cn(
           "text-right text-xs tabular-nums",
-          r.zostatok != null && r.zostatok > 0 && "text-green-600",
-          r.zostatok != null && r.zostatok === 0 && "text-muted-foreground",
+          !isRezie && r.zostatok != null && r.zostatok > 0 && "text-green-600",
+          !isRezie && r.zostatok != null && r.zostatok === 0 && "text-muted-foreground",
         )}>
-          {r.zostatok != null ? Math.round(r.zostatok) : "—"}
+          {isRezie ? muted : (r.zostatok != null ? Math.round(r.zostatok) : "—")}
         </TableCell>
       )}
       {isVisible("tracking") && (
