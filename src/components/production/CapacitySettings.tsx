@@ -205,7 +205,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const filteredEmployees = useMemo(() => {
     return vyrobniEmployees.filter(emp => {
       if (disabledEmployees.has(emp.id)) return false;
-      const key = normalizeUsek(emp.usek);
+      const key = normalizeUsek(emp);
       if (key && disabledUseky.has(key)) return false;
       return true;
     });
