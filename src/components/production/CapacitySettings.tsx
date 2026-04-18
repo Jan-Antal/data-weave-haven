@@ -770,26 +770,28 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
       <div className={cn("flex-1 overflow-y-auto pb-4 pt-4", inline ? "px-6" : "px-6")}>
         <div className="space-y-6">
 
-        {/* Standard Capacity — dashboard-style tile cards */}
+        {/* Standard Capacity — dashboard-style tile cards (reflect SELECTED week) */}
         <div className="grid grid-cols-4 gap-3">
           {/* Tile 1 — Zaměstnanci */}
           <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Výrobní zaměstnanci</p>
             <p className="font-serif font-bold text-3xl mt-1 tabular-nums">
-              {selectedEmployees.length}
+              {compositionActiveEmployees.length}
               <span className="text-base font-normal text-muted-foreground"> / {vyrobniEmployees.length}</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">aktivní z celkového počtu</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">aktivní v T{compositionWeekNumber}</p>
           </div>
 
-          {/* Tile 2 — Brutto fond */}
+          {/* Tile 2 — Brutto fond (week-specific) */}
           <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Brutto fond</p>
             <p className="font-serif font-bold text-3xl mt-1 tabular-nums">
-              {totalBruttoSelectedWeekly}
+              {Math.round(compositionBruttoWeekly)}
               <span className="text-base font-normal text-muted-foreground"> h/týden</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{Math.round(totalBruttoSelectedWeekly / 5)} h/den × 5 dní</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {compositionWorkingDays} prac. dní · absence {Math.round(compositionAbsenceHours)} h
+            </p>
           </div>
 
           {/* Tile 3 — Využití (editable) */}
@@ -814,16 +816,17 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
             </p>
           </div>
 
-          {/* Tile 4 — Čistá kapacita */}
+          {/* Tile 4 — Čistá kapacita (week-specific) */}
           <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Čistá kapacita</p>
             <p className="font-serif font-bold text-3xl mt-1 tabular-nums text-amber-600">
-              {netStandardCapacity}
+              {compositionNettoCapacity}
               <span className="text-base font-normal"> h/týden</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{Math.round(netStandardCapacity * 52 / 12)} h/měsíc</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">T{compositionWeekNumber} · standard {netStandardCapacity} h</p>
           </div>
         </div>
+
 
         {/* Úseky breakdown panel (Výroba Direct) — dynamické členenie podľa usek_nazov */}
         {vyrobniEmployees.length > 0 && (() => {
