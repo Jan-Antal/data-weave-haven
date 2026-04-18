@@ -43,10 +43,19 @@ export interface AnalyticsSummary {
   totalProjectHours: number;
   reziePct: number | null;
   utilizationTarget: number;
-  // Production-staff-only utilization (Dílna 1/2/3 + Sklad)
+  // Production-staff-only utilization (Dílna 1/2/3 + Sklad) — lifetime
   productionRezieHours: number;
   productionProjectHours: number;
-  rezieByCode: Record<string, number>; // overhead code → production-staff hours
+  rezieByCode: Record<string, number>; // overhead code → production-staff hours (lifetime)
+  // Windowed utilization (production project / (project + rezie)) * 100
+  utilization30d: number | null;
+  utilization60to30d: number | null;
+  utilization90to60d: number | null;
+  utilizationMedian3m: number | null;
+  utilizationTrend: "up" | "down" | "flat" | null;
+  // Hours behind 30d window (for tooltip)
+  productionProjectHours30d: number;
+  productionRezieHours30d: number;
 }
 
 const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokončeno"];
