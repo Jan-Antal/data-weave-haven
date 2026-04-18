@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { TestModeBanner } from "./TestModeBanner";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
+import { SectionToolbar } from "@/components/shell/SectionToolbar";
 
 interface UserRow {
   id: string;
