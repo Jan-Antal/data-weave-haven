@@ -1,55 +1,63 @@
 
 
-## Plán: Doladenie utilizácie + breakdown s time range
+## Plán: Doladiť Režie view + expandable breakdown
 
-### 1) Breakdown rešpektuje `timeRange`
-V novom `AnalyticsBreakdownRow.tsx` query kľúč rozšíriť o `timeRange`. Filter `production_hours_log.datum_sync >= rangeStart` (rovnaká logika ako v tabuľke). Pre `timeRange = "all"` bez filtra.
+### 1) Skryť irelevantné stĺpce pre režijné riadky
+V `AnalyticsTableRow` (`Analytics.tsx`) keď `r.category === "rezie"`, zobraziť `—` (zošedlo) namiesto obsahu pre:
+- **PM** — vždy `—`
+- **Status** — vždy `—` (žiadny StatusBadge)
+- **Balík** — vždy `—` (žiadny "Výroba" badge — režie nie sú "vo výrobe")
+- **Preset** — vždy `—` (odstrániť "Režie" tag — je to redundantné, kategória je jasná z kontextu)
+- **Plán h** — vždy `—`
+- **% čerpání** — vždy `—`
+- **Zostatok h** — vždy `—`
 
-### 2) Utilizácia — oddeliť od `timeRange` filtra projektov
+Zostávajú zmysluplné: ID, Název, Odprac. h, Tracking + nový chevron.
 
-**Problém:** `timeRange` filter v Analytics filtruje **projekty** podľa ich poslednej aktivity (overlap intervalu). Utilizácia je ale **agregát všetkých výrobných hodín za obdobie**, nezávisle na tom, ktoré projekty „spadnú" do filtra.
+### 2) Expandable breakdown pre VŠETKY riadky (projekty + režie + unmatched)
 
-**Riešenie:** Utilizácia má vlastný fixný časový rámec, **nezávislý od `timeRange` chip-ov**:
-
-**KPI dlaždica „Utilizace výroby"** zobrazí 2 hodnoty:
-- **Hlavná hodnota: Posledných 30 dní** — `productionProjectHours_30d / (productionProjectHours_30d + productionRezieHours_30d) * 100`
-- **Sub-text: Medián za posledné 3 mesiace** (rolling 90 dní rozdelený na 3× 30-dňové okná, vziať medián týchto 3 percent) — slúži ako trend baseline
-- **Trend indikátor:** šípka ↑/↓/→ porovnanie 30d vs medián 3m
-  - 30d > medián +2pp → ↑ zelená („utilizace stúpa")
-  - 30d < medián −2pp → ↓ amber („utilizace klesá")
-  - inak → → neutrálne
-
-**Príklad zobrazenia:**
-```text
-Utilizace výroby
-   82 %        ↑
-30 dní · medián 3m: 79 % · cíl ≥ 83 %
+**State v `Analytics`**:
+```ts
+const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+const toggleExpand = (id: string) => setExpandedRows(prev => { ... });
 ```
 
-### 3) Výpočet v `useAnalytics.ts`
+**UI v `AnalyticsTableRow`**:
+- Pridať chevron tlačidlo (`ChevronRight`/`ChevronDown` z lucide) **vľavo od ID** v prvej bunke (`project_id`). Klik prepína expand stav.
+- Po hlavnom `<TableRow>` podmienečne renderovať `<AnalyticsBreakdownRow projectId={r.project_id} colSpan={visibleCols.length + 1} timeRange={timeRange} />` (už hotový komponent — rešpektuje `timeRange`).
 
-V `queryFn` po načítaní `production_hours_log`:
-- Spočítať `now = new Date()`
-- Tri okná:
-  - `window30d` = posledných 30 dní
-  - `window60to30d` = 60–30 dní pred dneškom
-  - `window90to60d` = 90–60 dní pred dneškom
-- Pre každé okno spočítať `(prodProjectHours, prodRezieHours)` len z výrobných ľudí (existujúca `isProductionStaff` logika)
-- `pct(window) = prodProjectHours / (prodProjectHours + prodRezieHours) * 100`
-- `utilization30d = pct(window30d)`
-- `utilizationMedian3m = median([pct(window30d), pct(window60to30d), pct(window90to60d)])`
-- Pridať do `summary`: `utilization30d`, `utilizationMedian3m`, `utilizationTrend: "up" | "down" | "flat"`
-- Ponechať existujúce `productionRezieHours` / `productionProjectHours` (lifetime) pre tooltip rozpis
+Aby sub-riadok mohol byť `Fragment` susedom, prepíšem mapping v rodičovi:
+```tsx
+{rows.map((r) => (
+  <Fragment key={r.project_id}>
+    <AnalyticsTableRow row={r} expanded={expandedRows.has(r.project_id)} onToggleExpand={toggleExpand} ... />
+    {expandedRows.has(r.project_id) && (
+      <AnalyticsBreakdownRow projectId={r.project_id} colSpan={visibleCols.length + 1} timeRange={timeRange} />
+    )}
+  </Fragment>
+))}
+```
 
-### 4) Tooltip rozšíriť
-- „Posledných 30 dní: X h projekty / Y h režie"
-- „Medián 3 mesiacov: Z %"
-- „Trend: stúpa / klesá / stabilný"
-- Rozpis per overhead kód (lifetime, ako doteraz)
+### 3) Summary karty pri filtri "Režije"
+Keď `statusFilters.has("rezie") && statusFilters.size === 1`:
+- Karta **Plán hodin** → zobraziť `—` (režie nemajú plán)
+- Karta **Průměrné čerpání** → zobraziť `—`
+- **Projekty** → premenovať label na "Režijní položky"
+- **Odpracováno** → ostáva (sumarizuje vybrané)
+- **Utilizace výroby** → ostáva (vždy globálna)
 
-### 5) Súbory
+### 4) Overiť utilizáciu vizuálne
+Po build-e otvoriť `/analytics` cez browser screenshot a skontrolovať že KPI dlaždica "Utilizace výroby" zobrazuje hodnotu (~88 %) a nie "—". Dáta v DB sú v poriadku (~2880 h projekty + ~390 h režie za 30d od pracovníkov Dílna_1/2). Ak by stále chýbala, doplniť `console.log` v `useAnalytics` pre debug.
+
+### Súbory
 **Upravené:**
-- `src/hooks/useAnalytics.ts` — pridať okenné výpočty + median + trend do summary
-- `src/pages/Analytics.tsx` — `UtilizationCard` zobrazí 30d hodnotu + sub-text s mediánom + trend šípku
-- `src/components/AnalyticsBreakdownRow.tsx` — pridať `timeRange` do query key + filter
+- `src/pages/Analytics.tsx`:
+  - `AnalyticsTableRow` — pridať `expanded`/`onToggleExpand` props, chevron v ID bunke, conditional rendering pre `category === "rezie"`
+  - Rodičovský mapping — `Fragment` + `AnalyticsBreakdownRow` po expand
+  - Summary cards — conditional `—` keď filter rezie
+  - Import `Fragment`, `ChevronRight`, `ChevronDown`, `AnalyticsBreakdownRow`
+
+**Bez zmeny:**
+- `src/components/AnalyticsBreakdownRow.tsx` (už hotový, rešpektuje timeRange)
+- `src/hooks/useAnalytics.ts` (windowed utilization OK)
 
