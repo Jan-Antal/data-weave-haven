@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Check, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Check, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { usePositionCatalogue, useUpsertPosition, useDeletePosition, useRenamePosition, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { usePositionCatalogue, useUpsertPosition, useDeletePosition, useRenamePosition, useDeleteUsek, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
+import { supabase } from "@/integrations/supabase/client";
 
 const ROLE_LABELS: Record<string, string> = {
   pm: "PM dropdown",
