@@ -92,7 +92,9 @@ export function useAnalytics() {
           .select("meno, usek, aktivny, activated_at, deactivated_at"),
         supabase
           .from("production_hours_log")
-          .select("ami_project_id, hodiny, datum_sync, zamestnanec, cinnost_kod"),
+          .select("ami_project_id, hodiny, datum_sync, zamestnanec, cinnost_kod")
+          .gte("datum_sync", (() => { const d = new Date(); d.setDate(d.getDate() - 100); return d.toISOString().slice(0, 10); })())
+          .range(0, 49999),
       ]);
 
       // Build overhead lookup (active only)
