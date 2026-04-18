@@ -430,7 +430,6 @@ export function useAnalytics() {
       const utilization30d = pct(windowAgg.p30, windowAgg.r30);
       const utilization60to30d = pct(windowAgg.p60, windowAgg.r60);
       const utilization90to60d = pct(windowAgg.p90, windowAgg.r90);
-      console.log("[Analytics] util debug", { rawLogsCount: rawLogs.length, windowAgg, utilization30d, W0, W30, W60, W90, prodEmps: productionEmps.length });
 
       const samples = [utilization30d, utilization60to30d, utilization90to60d].filter(
         (v): v is number => v != null,
