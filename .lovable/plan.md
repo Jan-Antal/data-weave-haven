@@ -1,63 +1,57 @@
 
 
-## Plán: Doladiť Režie view + expandable breakdown
+## Plán: Sjednocená "Správa osob"
 
-### 1) Skryť irelevantné stĺpce pre režijné riadky
-V `AnalyticsTableRow` (`Analytics.tsx`) keď `r.category === "rezie"`, zobraziť `—` (zošedlo) namiesto obsahu pre:
-- **PM** — vždy `—`
-- **Status** — vždy `—` (žiadny StatusBadge)
-- **Balík** — vždy `—` (žiadny "Výroba" badge — režie nie sú "vo výrobe")
-- **Preset** — vždy `—` (odstrániť "Režie" tag — je to redundantné, kategória je jasná z kontextu)
-- **Plán h** — vždy `—`
-- **% čerpání** — vždy `—`
-- **Zostatok h** — vždy `—`
+### Název
+**"Správa osob"** v menu i v hlavičce dialogu (zachovává existující terminologii).
 
-Zostávajú zmysluplné: ID, Název, Odprac. h, Tracking + nový chevron.
+### A. DB změny (migrace)
 
-### 2) Expandable breakdown pre VŠETKY riadky (projekty + režie + unmatched)
+**1. `ami_employees`** — přidat:
+- `stredisko text`, `usek_nazov text`, `pozicia text`
+- `deactivated_date date` — datum ukončení (zachová historii)
 
-**State v `Analytics`**:
-```ts
-const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-const toggleExpand = (id: string) => setExpandedRows(prev => { ... });
-```
+**2. Nová `position_catalogue`**: `id, stredisko, usek, pozicia, project_dropdown_role (pm|kalkulant|konstrukter|null), is_active, sort_order` + RLS read=auth, write=admin/owner. Seed celé hierarchie.
 
-**UI v `AnalyticsTableRow`**:
-- Pridať chevron tlačidlo (`ChevronRight`/`ChevronDown` z lucide) **vľavo od ID** v prvej bunke (`project_id`). Klik prepína expand stav.
-- Po hlavnom `<TableRow>` podmienečne renderovať `<AnalyticsBreakdownRow projectId={r.project_id} colSpan={visibleCols.length + 1} timeRange={timeRange} />` (už hotový komponent — rešpektuje `timeRange`).
+**3. `people`** — přidat `is_external bool default false`, `firma text`.
 
-Aby sub-riadok mohol byť `Fragment` susedom, prepíšem mapping v rodičovi:
-```tsx
-{rows.map((r) => (
-  <Fragment key={r.project_id}>
-    <AnalyticsTableRow row={r} expanded={expandedRows.has(r.project_id)} onToggleExpand={toggleExpand} ... />
-    {expandedRows.has(r.project_id) && (
-      <AnalyticsBreakdownRow projectId={r.project_id} colSpan={visibleCols.length + 1} timeRange={timeRange} />
-    )}
-  </Fragment>
-))}
-```
+**RLS:** Existující anon insert/update/select na `ami_employees` a `ami_absences` zůstává netknuté (n8n/Alveno funguje dál). Restrikce pouze v UI.
 
-### 3) Summary karty pri filtri "Režije"
-Keď `statusFilters.has("rezie") && statusFilters.size === 1`:
-- Karta **Plán hodin** → zobraziť `—` (režie nemajú plán)
-- Karta **Průměrné čerpání** → zobraziť `—`
-- **Projekty** → premenovať label na "Režijní položky"
-- **Odpracováno** → ostáva (sumarizuje vybrané)
-- **Utilizace výroby** → ostáva (vždy globálna)
+### B. Komponenta `SpravaOsob.tsx` (5 záložek)
 
-### 4) Overiť utilizáciu vizuálne
-Po build-e otvoriť `/analytics` cez browser screenshot a skontrolovať že KPI dlaždica "Utilizace výroby" zobrazuje hodnotu (~88 %) a nie "—". Dáta v DB sú v poriadku (~2880 h projekty + ~390 h režie za 30d od pracovníkov Dílna_1/2). Ak by stále chýbala, doplniť `console.log` v `useAnalytics` pre debug.
+**1. Zaměstnanci** — `ami_employees` seskupené `stredisko → usek_nazov`. Sloupce: Jméno | Úsek | Pozice | Úvazek | Absence | Stav (Aktivní / "Ukončen k DD.MM.YYYY") | Alveno úsek (readonly) | ⋯ menu (Ukončit pracovní poměr → date picker → `deactivated_date` + `aktivny=false`; Obnovit; Smazat trvale s ConfirmDialog).
 
-### Súbory
-**Upravené:**
-- `src/pages/Analytics.tsx`:
-  - `AnalyticsTableRow` — pridať `expanded`/`onToggleExpand` props, chevron v ID bunke, conditional rendering pre `category === "rezie"`
-  - Rodičovský mapping — `Fragment` + `AnalyticsBreakdownRow` po expand
-  - Summary cards — conditional `—` keď filter rezie
-  - Import `Fragment`, `ChevronRight`, `ChevronDown`, `AnalyticsBreakdownRow`
+**2. Externisti** — `people WHERE is_external=true`. Sloupce: Jméno | Firma | Role (PM/Konstruktér/Kalkulant/Architekt) | Aktivní | Smazat. "+ Přidat externistu".
 
-**Bez zmeny:**
-- `src/components/AnalyticsBreakdownRow.tsx` (už hotový, rešpektuje timeRange)
-- `src/hooks/useAnalytics.ts` (windowed utilization OK)
+**3. Uživatelé** — stávající `UserManagement` přesunutý beze změn.
+
+**4. Pozice & číselníky** — tree editor `position_catalogue`. Stredisko → Úsek (s flag `project_dropdown_role`) → Pozice.
+
+**5. Kapacita** — dvě sub-záložky:
+- **Kapacita** (default) — graf + složení útvarů, jako dnes.
+- **Zaměstnanci** — seznam zaměstnanců aktivních **v aktuálně vybraném týdnu** (z grafu/picker). Při otevření = current week + future. Klik na týden v grafu změní vybraný týden → seznam přefiltruje podle:
+  - `aktivny=true` v daném týdnu (`activated_at <= weekEnd` AND (`deactivated_date` IS NULL OR `deactivated_date >= weekStart`))
+  - + composition snapshot (`production_capacity_employees` pro historické týdny)
+  - Možnost include/exclude per zaměstnanec pro daný týden (existující `toggleEmployeeForWeekRange` logika).
+
+### C. Logika sjednocení
+
+- `useActiveMembersForRole(role)` UNION:
+  - `ami_employees` JOIN `position_catalogue` kde `project_dropdown_role` matchuje AND `aktivny=true`
+  - `people` kde role matchuje AND `is_active=true`
+- `usePeople(role)` → tenký wrapper. Projektové dropdowny fungují bez změny.
+- `useVyrobniEmployees` přijme i `stredisko='Výroba Direct'` (fallback na Alveno `usek`).
+
+### D. Wiring
+
+- `ProductionHeader` settings menu: jediná položka **"Správa osob"** místo tří (odstranit "Správa uživatelů", "Kapacita výroby" → vše uvnitř).
+- `PeopleManagementContext.openPeopleManagement()` → otevře Správu osob na Tab 2 (Externisti).
+- Staré soubory (`UserManagement.tsx`, `PeopleManagement.tsx`, `EmployeeManagement.tsx`, `CapacitySettings.tsx`) zůstanou nepoužité na disku (cleanup později).
+
+### Soubory
+
+**Migrace** (1): sloupce + `position_catalogue` + seed + RLS.
+**Nové**: `SpravaOsob.tsx`, `osoby/OsobyZamestnanci.tsx`, `OsobyExternisti.tsx`, `OsobyUzivatele.tsx`, `OsobyKatalog.tsx`, `OsobyKapacita.tsx` (s 2 sub-taby), `UkoncitPracovniPomerDialog.tsx`.
+**Nový hook**: `useOsoby.ts` (katalog + active-members-for-role + active-employees-for-week).
+**Upravené**: `usePeople.ts`, `useCapacityCalc.ts`, `PeopleManagementContext.tsx`, `ProductionHeader.tsx`.
 
