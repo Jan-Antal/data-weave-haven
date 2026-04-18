@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, Fragment } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { PageTabsShell, type ShellTabDef } from "@/components/shell/PageTabsShell";
@@ -82,9 +82,20 @@ export default function Analytics() {
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const dilnaMode = (searchParams.get("tab") ?? "projekty") === "dilna";
+  const activeTab = searchParams.get("tab") ?? "projekty";
+  const dilnaMode = activeTab === "dilna";
+  const rezieMode = activeTab === "rezie";
   const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
+
+  // Sync status filters with active tab — Režije tab forces overhead-only view
+  useEffect(() => {
+    if (rezieMode) {
+      setStatusFilters(new Set(["rezie"]));
+    } else if (!dilnaMode) {
+      setStatusFilters((prev) => (prev.has("rezie") ? new Set(["vyroba", "done"]) : prev));
+    }
+  }, [rezieMode, dilnaMode]);
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
 
   const { isVisible, toggleColumn } = useColumnVisibility(
@@ -273,6 +284,7 @@ export default function Analytics() {
 
   const tabs: ShellTabDef[] = [
     { key: "projekty", label: "Projekty" },
+    { key: "rezie", label: "Režije" },
     { key: "dilna", label: "Dílna" },
   ];
 
@@ -298,47 +310,37 @@ export default function Analytics() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center gap-1 ml-2">
-              {([
-                { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
-                { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
-                { key: "rezie" as const, label: "🏭 Režije", activeClass: "bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-400" },
-              ]).map((chip) => {
-                const active = statusFilters.has(chip.key);
-                return (
-                  <button
-                    key={chip.key}
-                    onClick={() => {
-                      setStatusFilters((prev) => {
-                        const isActive = prev.has(chip.key);
-                        // Režije is exclusive — clicking it isolates overhead view
-                        if (chip.key === "rezie") {
-                          if (isActive) {
-                            // toggling off → restore default project view
-                            return new Set(["vyroba", "done"]);
-                          }
-                          return new Set(["rezie"]);
-                        }
-                        // Clicking a non-režie chip while režie is active → switch to project view
-                        if (prev.has("rezie")) {
-                          return new Set([chip.key]);
-                        }
-                        const next = new Set(prev);
-                        if (isActive) next.delete(chip.key);
-                        else next.add(chip.key);
-                        return next;
-                      });
-                    }}
-                    className={cn(
-                      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
-                      active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
-                    )}
-                  >
-                    {chip.label}
-                  </button>
-                );
-              })}
-            </div>
+            {!rezieMode && (
+              <div className="flex items-center gap-1 ml-2">
+                {([
+                  { key: "vyroba" as const, label: "🔄 Výroba", activeClass: "bg-green-500/15 text-green-700 border-green-500/30 dark:text-green-400" },
+                  { key: "done" as const, label: "✅ Dokončeno", activeClass: "bg-muted text-muted-foreground" },
+                ]).map((chip) => {
+                  const active = statusFilters.has(chip.key);
+                  return (
+                    <button
+                      key={chip.key}
+                      onClick={() => {
+                        setStatusFilters((prev) => {
+                          const next = new Set(prev);
+                          next.delete("rezie");
+                          if (next.has(chip.key)) next.delete(chip.key);
+                          else next.add(chip.key);
+                          if (next.size === 0) next.add(chip.key);
+                          return next;
+                        });
+                      }}
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
+                        active ? chip.activeClass : "border-dashed border-muted-foreground/30 text-muted-foreground/50"
+                      )}
+                    >
+                      {chip.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
         {dilnaMode && (
