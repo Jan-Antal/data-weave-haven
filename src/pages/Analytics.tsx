@@ -710,3 +710,67 @@ function PctBar({ pct }: { pct: number | null }) {
     </div>
   );
 }
+
+function RezieCard({
+  isLoading,
+  reziePct,
+  totalRezieHours,
+  utilizationTarget,
+  rezieRows,
+}: {
+  isLoading: boolean;
+  reziePct: number | null;
+  totalRezieHours: number;
+  utilizationTarget: number;
+  rezieRows: AnalyticsRow[];
+}) {
+  // Expected overhead = 100 - utilization target (e.g. 17% if util = 83%)
+  const expectedRezie = Math.max(0, 100 - utilizationTarget);
+  const isOver = reziePct != null && reziePct > expectedRezie;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Card className={cn(
+            "cursor-help transition-colors",
+            isOver && "border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10"
+          )}>
+            <CardContent className="pt-3 pb-2 px-3">
+              <p className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
+                🏭 Režije %
+              </p>
+              <p className={cn(
+                "text-lg font-bold tabular-nums",
+                isOver ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-500"
+              )}>
+                {isLoading ? <Skeleton className="h-6 w-12" /> : reziePct != null ? `${reziePct} %` : "—"}
+              </p>
+              <p className="text-[9px] text-muted-foreground tabular-nums mt-0.5">
+                {formatHours(totalRezieHours)} • cíl ≤ {expectedRezie.toFixed(0)} %
+              </p>
+            </CardContent>
+          </Card>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <div className="space-y-1">
+            <p className="font-semibold text-xs">Režijní hodiny vůči celku</p>
+            <p className="text-[10px] text-muted-foreground">
+              Cíl odvozený z utilizace výroby ({utilizationTarget} %) ⇒ ≤ {expectedRezie.toFixed(0)} % režie
+            </p>
+            {rezieRows.length > 0 && (
+              <div className="border-t pt-1 mt-1 space-y-0.5">
+                {rezieRows.map((r) => (
+                  <div key={r.project_id} className="flex justify-between gap-3 text-[10px] tabular-nums">
+                    <span className="font-mono">{r.project_id}</span>
+                    <span>{formatHours(r.hodiny_skutocne)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
