@@ -422,17 +422,40 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                 )}
               </TableBody>
             </Table>
-          </div>
+      </div>
 
-          <div className="px-5 py-3 border-t">
-            {!isTestUser && (
-              <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
-                <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <div className="px-5 py-3 border-t">
+        {!isTestUser && (
+          <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
+          </Button>
+        )}
+      </div>
+    </>
+  );
+
+  const wrappedContent = inline ? (
+    <div className="flex flex-col h-full overflow-hidden bg-background">
+      {isTestUser && <div className="px-5 pt-3"><TestModeBanner /></div>}
+      {tableSection}
+    </div>
+  ) : (
+    <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <div className="px-5 pt-5 pb-3 border-b">
+          <DialogHeader>
+            <DialogTitle>Správa uživatelů</DialogTitle>
+          </DialogHeader>
+          {isTestUser && <TestModeBanner />}
+        </div>
+        {tableSection}
+      </DialogContent>
+    </Dialog>
+  );
+
+  return (
+    <>
+      {wrappedContent}
 
       {/* Add User Dialog */}
       <Dialog open={addOpen} onOpenChange={(v) => { setAddOpen(v); if (!v) { setFieldErrors({}); setSubmitError(""); } }}>
