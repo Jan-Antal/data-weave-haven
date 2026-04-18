@@ -700,46 +700,58 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
       <div className={cn("flex-1 overflow-y-auto pb-4 pt-4", inline ? "px-6" : "px-6")}>
         <div className="space-y-6">
 
-        {/* Standard Capacity — flat metric blocks (no card wrapper) */}
-        <div className="grid grid-cols-4 gap-4">
-          {/* Column 1 — Zaměstnanci */}
-          <div className="space-y-1">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Výrobní zaměstnanci</div>
-            <div className="text-2xl font-semibold font-sans">{selectedEmployees.length} / {vyrobniEmployees.length} <span className="text-sm font-normal text-muted-foreground">osob</span></div>
-            <div className="text-[10px] text-muted-foreground">aktivní z celkového počtu</div>
+        {/* Standard Capacity — dashboard-style tile cards */}
+        <div className="grid grid-cols-4 gap-3">
+          {/* Tile 1 — Zaměstnanci */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Výrobní zaměstnanci</p>
+            <p className="font-serif font-bold text-3xl mt-1 tabular-nums">
+              {selectedEmployees.length}
+              <span className="text-base font-normal text-muted-foreground"> / {vyrobniEmployees.length}</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">aktivní z celkového počtu</p>
           </div>
-          {/* Column 2 — Brutto fond */}
-          <div className="space-y-1">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Brutto fond</div>
-            <div className="text-2xl font-semibold font-sans">{totalBruttoSelectedWeekly} <span className="text-sm font-normal text-muted-foreground">h/týden</span></div>
-            <div className="text-[10px] text-muted-foreground">{Math.round(totalBruttoSelectedWeekly / 5)} h/den × 5 dní</div>
+
+          {/* Tile 2 — Brutto fond */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Brutto fond</p>
+            <p className="font-serif font-bold text-3xl mt-1 tabular-nums">
+              {totalBruttoSelectedWeekly}
+              <span className="text-base font-normal text-muted-foreground"> h/týden</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{Math.round(totalBruttoSelectedWeekly / 5)} h/den × 5 dní</p>
           </div>
-          {/* Column 3 — Využití (editable) */}
-          <div className="space-y-1">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Využití kapacity</div>
-            <div className="flex items-baseline gap-1">
+
+          {/* Tile 3 — Využití (editable) */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Využití kapacity</p>
+            <div className="flex items-baseline gap-1 mt-1">
               <Input
                 type="number"
                 min={1}
                 max={100}
                 value={localUtilizationPct}
                 onChange={e => setLocalUtilizationPct(Math.max(1, Math.min(100, Number(e.target.value) || 83)))}
-                className="h-8 w-20 text-lg font-semibold font-sans"
+                className="h-9 w-20 text-2xl font-serif font-bold tabular-nums px-2"
               />
-              <span className="text-sm text-muted-foreground">%</span>
+              <span className="text-base text-muted-foreground">%</span>
             </div>
-            <div className="text-[10px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground mt-0.5">
               Výchozí: 83 %
               {localUtilizationPct !== dbUtilizationPct && (
                 <span className="ml-2 text-amber-500">● neuloženo</span>
               )}
-            </div>
+            </p>
           </div>
-          {/* Column 4 — Čistá kapacita */}
-          <div className="space-y-1">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Čistá kapacita</div>
-            <div className="text-2xl font-semibold font-sans text-amber-600">{netStandardCapacity} <span className="text-sm font-normal">h/týden</span></div>
-            <div className="text-[10px] text-muted-foreground">{Math.round(netStandardCapacity * 52 / 12)} h/měsíc</div>
+
+          {/* Tile 4 — Čistá kapacita */}
+          <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Čistá kapacita</p>
+            <p className="font-serif font-bold text-3xl mt-1 tabular-nums text-amber-600">
+              {netStandardCapacity}
+              <span className="text-base font-normal"> h/týden</span>
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{Math.round(netStandardCapacity * 52 / 12)} h/měsíc</p>
           </div>
         </div>
 
