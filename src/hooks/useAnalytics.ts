@@ -74,7 +74,7 @@ const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokon
 
 export function useAnalytics() {
   return useQuery({
-    queryKey: ["analytics", "utilization-v2"],
+    queryKey: ["analytics", "utilization-v3-capacity"],
     queryFn: async () => {
       const capacityFromDate = (() => { const d = new Date(); d.setDate(d.getDate() - 100); return d.toISOString().slice(0, 10); })();
       const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes, capacityRes] = await Promise.all([
