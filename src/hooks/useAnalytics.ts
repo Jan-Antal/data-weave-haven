@@ -209,6 +209,39 @@ export function useAnalytics() {
             preset_label,
             warning_low_tpv,
             force_project_price,
+            unmatched: false,
+          });
+        }
+      }
+
+      // Add ghost rows for unmatched AMI project IDs (logged hours without project record)
+      const knownProjectIds = new Set(projectsMap.keys());
+      if (hoursRes.data) {
+        for (const r of hoursRes.data as Array<{ ami_project_id: string; total_hodiny: number; min_datum: string; max_datum: string }>) {
+          if (knownProjectIds.has(r.ami_project_id)) continue;
+          const skutocne = Number(r.total_hodiny || 0);
+          if (skutocne < 0.05) continue;
+          if (r.max_datum && (!lastSync || r.max_datum > lastSync)) lastSync = r.max_datum;
+          rows.push({
+            project_id: r.ami_project_id,
+            project_name: "Nesparovaná data z Alvena",
+            pm: null,
+            status: null,
+            hodiny_plan: null,
+            hodiny_skutocne: skutocne,
+            pct: null,
+            zostatok: null,
+            balik: "IN_PROGRESS",
+            trend: null,
+            tracking_od: r.min_datum || null,
+            tracking_do: r.max_datum || null,
+            schedule_od: null,
+            schedule_do: null,
+            plan_source: null,
+            preset_label: "—",
+            warning_low_tpv: false,
+            force_project_price: false,
+            unmatched: true,
           });
         }
       }
