@@ -53,7 +53,7 @@ export function UkoncitPracovniPomerDialog({ open, onOpenChange, employeeId, emp
                   {date ? format(date, "d. M. yyyy", { locale: cs }) : "Vyberte datum"}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                 <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
               </PopoverContent>
             </Popover>
