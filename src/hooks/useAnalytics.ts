@@ -58,11 +58,23 @@ export interface AnalyticsSummary {
   productionRezieHours30d: number;
 }
 
+function normalizeEmployeeName(name: string | null | undefined): string {
+  return (name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("cs-CZ");
+}
+
+function isExcludedActivityCode(code: string | null | undefined): boolean {
+  return !!code && ["TPV", "ENG", "PRO"].includes(code);
+}
+
+function isOverheadCode(projectId: string, overheadMap: Map<string, string>): boolean {
+  return overheadMap.has(projectId);
+}
+
 const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokončeno"];
 
 export function useAnalytics() {
   return useQuery({
-    queryKey: ["analytics"],
+    queryKey: ["analytics", "utilization-v2"],
     queryFn: async () => {
       const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes] = await Promise.all([
         (supabase.rpc as any)("get_hours_by_project"),
@@ -344,9 +356,8 @@ export function useAnalytics() {
         (e) => e.aktivny !== false && normalizeUsek(e.usek) !== null,
       );
       const empByName = new Map<string, EmpRow>();
-      for (const e of productionEmps) empByName.set(e.meno, e);
+      for (const e of productionEmps) empByName.set(normalizeEmployeeName(e.meno), e);
 
-      const knownProjectIdsForUtil = new Set(projectsMap.keys());
       let productionRezieHours = 0;
       let productionProjectHours = 0;
       const rezieByCode: Record<string, number> = {};
@@ -359,22 +370,20 @@ export function useAnalytics() {
         cinnost_kod: string | null;
       }>;
       for (const log of rawLogs) {
-        // Same exclusion as RPC: skip TPV / ENG / PRO activity codes
-        if (log.cinnost_kod && ["TPV", "ENG", "PRO"].includes(log.cinnost_kod)) continue;
-        const emp = empByName.get(log.zamestnanec);
+        if (isExcludedActivityCode(log.cinnost_kod)) continue;
+        const emp = empByName.get(normalizeEmployeeName(log.zamestnanec));
         if (!emp) continue; // not a production worker
         // Respect active period: activated_at ≤ datum ≤ deactivated_at
         if (emp.activated_at && log.datum_sync < emp.activated_at.slice(0, 10)) continue;
         if (emp.deactivated_at && log.datum_sync > emp.deactivated_at.slice(0, 10)) continue;
 
         const h = Number(log.hodiny) || 0;
-        if (overheadMap.has(log.ami_project_id)) {
+        if (isOverheadCode(log.ami_project_id, overheadMap)) {
           productionRezieHours += h;
           rezieByCode[log.ami_project_id] = (rezieByCode[log.ami_project_id] || 0) + h;
-        } else if (knownProjectIdsForUtil.has(log.ami_project_id)) {
+        } else {
           productionProjectHours += h;
         }
-        // unmatched ids are ignored for utilization
       }
 
       const utilDenom = productionRezieHours + productionProjectHours;
@@ -402,16 +411,14 @@ export function useAnalytics() {
 
       const windowAgg = { p30: 0, r30: 0, p60: 0, r60: 0, p90: 0, r90: 0 };
       for (const log of rawLogs) {
-        if (log.cinnost_kod && ["TPV", "ENG", "PRO"].includes(log.cinnost_kod)) continue;
-        const emp = empByName.get(log.zamestnanec);
+        if (isExcludedActivityCode(log.cinnost_kod)) continue;
+        const emp = empByName.get(normalizeEmployeeName(log.zamestnanec));
         if (!emp) continue;
         if (emp.activated_at && log.datum_sync < emp.activated_at.slice(0, 10)) continue;
         if (emp.deactivated_at && log.datum_sync > emp.deactivated_at.slice(0, 10)) continue;
 
         const h = Number(log.hodiny) || 0;
-        const isOverhead = overheadMap.has(log.ami_project_id);
-        const isProject = !isOverhead && knownProjectIdsForUtil.has(log.ami_project_id);
-        if (!isOverhead && !isProject) continue;
+        const isOverhead = isOverheadCode(log.ami_project_id, overheadMap);
 
         const d = log.datum_sync;
         if (d > W30 && d <= W0) {
@@ -485,5 +492,6 @@ export function useAnalytics() {
       return { rows, summary };
     },
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
   });
 }
