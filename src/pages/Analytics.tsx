@@ -436,11 +436,14 @@ export default function Analytics() {
                 </p>
               </CardContent>
             </Card>
-            <RezieCard
+            <UtilizationCard
               isLoading={isLoading}
-              reziePct={data?.summary.reziePct ?? null}
-              totalRezieHours={data?.summary.productionRezieHours ?? 0}
+              utilization30d={data?.summary.utilization30d ?? null}
+              utilizationMedian3m={data?.summary.utilizationMedian3m ?? null}
+              utilizationTrend={data?.summary.utilizationTrend ?? null}
               utilizationTarget={data?.summary.utilizationTarget ?? 83}
+              productionProjectHours30d={data?.summary.productionProjectHours30d ?? 0}
+              productionRezieHours30d={data?.summary.productionRezieHours30d ?? 0}
               rezieRows={data?.rows.filter((r) => r.category === "rezie") ?? []}
               rezieByCode={data?.summary.rezieByCode ?? {}}
             />
