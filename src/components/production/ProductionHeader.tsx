@@ -127,7 +127,7 @@ export function ProductionHeader({
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
   const [formulaBuilderOpen, setFormulaBuilderOpen] = useState(false);
 
-  const undoPage = (module === "index" || module === "analytics") ? undefined : module;
+  const undoPage = (module === "index" || module === "analytics" || module === "osoby") ? undefined : module;
   const hasUndo = undoPage ? canUndo(undoPage) : canUndo();
   const hasRedo = undoPage ? canRedo(undoPage) : canRedo();
   const undoDesc = undoPage ? lastUndoDescription(undoPage) : lastUndoDescription();
