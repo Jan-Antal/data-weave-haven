@@ -58,10 +58,14 @@ export type Database = {
           aktivny: boolean | null
           created_at: string | null
           deactivated_at: string | null
+          deactivated_date: string | null
           id: string
           meno: string
+          pozicia: string | null
           pracovni_skupina: string | null
+          stredisko: string | null
           usek: string
+          usek_nazov: string | null
           uvazok_hodiny: number | null
         }
         Insert: {
@@ -69,10 +73,14 @@ export type Database = {
           aktivny?: boolean | null
           created_at?: string | null
           deactivated_at?: string | null
+          deactivated_date?: string | null
           id?: string
           meno: string
+          pozicia?: string | null
           pracovni_skupina?: string | null
+          stredisko?: string | null
           usek: string
+          usek_nazov?: string | null
           uvazok_hodiny?: number | null
         }
         Update: {
@@ -80,10 +88,14 @@ export type Database = {
           aktivny?: boolean | null
           created_at?: string | null
           deactivated_at?: string | null
+          deactivated_date?: string | null
           id?: string
           meno?: string
+          pozicia?: string | null
           pracovni_skupina?: string | null
+          stredisko?: string | null
           usek?: string
+          usek_nazov?: string | null
           uvazok_hodiny?: number | null
         }
         Relationships: []
@@ -451,24 +463,66 @@ export type Database = {
       people: {
         Row: {
           created_at: string
+          firma: string | null
           id: string
           is_active: boolean
+          is_external: boolean
           name: string
           role: string
         }
         Insert: {
           created_at?: string
+          firma?: string | null
           id?: string
           is_active?: boolean
+          is_external?: boolean
           name: string
           role: string
         }
         Update: {
           created_at?: string
+          firma?: string | null
           id?: string
           is_active?: boolean
+          is_external?: boolean
           name?: string
           role?: string
+        }
+        Relationships: []
+      }
+      position_catalogue: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          pozicia: string
+          project_dropdown_role: string | null
+          sort_order: number
+          stredisko: string
+          updated_at: string
+          usek: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          pozicia: string
+          project_dropdown_role?: string | null
+          sort_order?: number
+          stredisko: string
+          updated_at?: string
+          usek: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          pozicia?: string
+          project_dropdown_role?: string | null
+          sort_order?: number
+          stredisko?: string
+          updated_at?: string
+          usek?: string
         }
         Relationships: []
       }
