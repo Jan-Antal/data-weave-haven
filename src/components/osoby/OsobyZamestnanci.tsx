@@ -402,6 +402,11 @@ export function OsobyZamestnanci() {
                               ))}
                             </div>
                           </TableCell>
+                          <TableCell>
+                            <Select
+                              value={String(emp.uvazok_hodiny ?? 8)}
+                              onValueChange={(v) => handleUvazek(emp, Number(v))}
+                            >
                               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 {UVAZEK_OPTIONS.map((d) => (
