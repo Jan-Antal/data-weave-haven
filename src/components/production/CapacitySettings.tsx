@@ -270,25 +270,25 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   // Expose triggerAutoRecalc through ref so handleToggleEmployees can call it without circular deps
   useEffect(() => { triggerAutoRecalcRef.current = triggerAutoRecalc; }, [triggerAutoRecalc]);
 
-  // Reset flag when dialog closes
-  const hasAutoRecalced = useRef(false);
+  // Auto-recalc once per year per session. Reset when dialog closes.
+  const hasAutoRecalcedYears = useRef<Set<number>>(new Set());
   useEffect(() => {
     if (!open) {
-      hasAutoRecalced.current = false;
+      hasAutoRecalcedYears.current = new Set();
       return;
     }
-    if (hasAutoRecalced.current) return;
+    if (hasAutoRecalcedYears.current.has(selectedYear)) return;
     if (vyrobniEmployees.length === 0 || weekMap.size === 0) return;
-    
-    hasAutoRecalced.current = true;
+
+    hasAutoRecalcedYears.current.add(selectedYear);
     // Delay to ensure data is fully loaded
     const t = setTimeout(() => {
-      console.log('[auto-recalc] firing with', vyrobniEmployees.length, 'employees');
+      console.log('[auto-recalc] firing for year', selectedYear, 'with', vyrobniEmployees.length, 'employees');
       handleRecalculateAll(true);
     }, 500);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, vyrobniEmployees.length, weekMap.size]);
+  }, [open, selectedYear, vyrobniEmployees.length, weekMap.size]);
 
   // CHANGE 3: Trigger recalc when utilization changes
   const utilizationRef = useRef(localUtilizationPct);
