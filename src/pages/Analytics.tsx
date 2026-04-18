@@ -87,6 +87,15 @@ export default function Analytics() {
   const rezieMode = activeTab === "rezie";
   const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
+
+  // Sync status filters with active tab — Režije tab forces overhead-only view
+  useEffect(() => {
+    if (rezieMode) {
+      setStatusFilters(new Set(["rezie"]));
+    } else if (!dilnaMode) {
+      setStatusFilters((prev) => (prev.has("rezie") ? new Set(["vyroba", "done"]) : prev));
+    }
+  }, [rezieMode, dilnaMode]);
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
 
   const { isVisible, toggleColumn } = useColumnVisibility(
