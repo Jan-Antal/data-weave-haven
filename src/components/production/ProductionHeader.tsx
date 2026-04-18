@@ -219,8 +219,13 @@ export function ProductionHeader({
 
             {(isAdmin || isOwner) && (
               <button
-                onClick={() => navigate("/analytics")}
-                className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors"
+                onClick={module === "analytics" ? undefined : () => navigate("/analytics")}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  module === "analytics"
+                    ? "text-primary-foreground bg-primary-foreground/10 cursor-default"
+                    : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                )}
                 title="Analytics — Výroba"
               >
                 <BarChart3 className="h-5 w-5" />
