@@ -100,7 +100,7 @@ export function OsobyExternisti() {
   });
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-card">
       <SectionToolbar
         left={
           <span className="text-xs text-muted-foreground">
@@ -127,7 +127,7 @@ export function OsobyExternisti() {
 
       <div className="flex-1 overflow-y-auto">
         <Table>
-          <TableHeader className="sticky top-0 bg-background z-10">
+          <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
               <TableHead className="w-[220px]">Jméno</TableHead>
               <TableHead className="w-[200px]">Firma</TableHead>

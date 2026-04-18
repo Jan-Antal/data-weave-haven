@@ -92,8 +92,8 @@ export function PageTabsShell({
 
       {belowTabsSlot && <div className="shrink-0">{belowTabsSlot}</div>}
 
-      {/* Content */}
-      <div className="flex-1 min-h-0 overflow-hidden bg-background">
+      {/* Content — white card surface so rows pop like in Project Info */}
+      <div className="flex-1 min-h-0 overflow-hidden bg-card">
         {children(active)}
       </div>
     </div>
