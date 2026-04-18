@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeUsek } from "@/hooks/useCapacityCalc";
 
 export type Balik = "DONE" | "IN_PROGRESS" | "OVER";
 export type Trend = "ok" | "warning" | "over";
@@ -42,6 +43,10 @@ export interface AnalyticsSummary {
   totalProjectHours: number;
   reziePct: number | null;
   utilizationTarget: number;
+  // Production-staff-only utilization (Dílna 1/2/3 + Sklad)
+  productionRezieHours: number;
+  productionProjectHours: number;
+  rezieByCode: Record<string, number>; // overhead code → production-staff hours
 }
 
 const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokončeno"];
