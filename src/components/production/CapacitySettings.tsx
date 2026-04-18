@@ -343,6 +343,13 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
         continue;
       }
 
+      // Fallback: when auto-holidays toggle is OFF but DB has a recalculated value
+      // (with holidays/absences applied), trust the DB row instead of flattening to 5d.
+      if (!autoApplyHolidays && dbWeek && dbWeek.capacity_hours != null) {
+        map.set(wn, dbWeek);
+        continue;
+      }
+
       const weekStart = dbWeek?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
 
       // Working days: start from base 5
@@ -470,7 +477,10 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
       if (cap < min) min = cap;
       if (cap > max) max = cap;
     }
-    return { min, max };
+    // Visual contrast padding: drop min by ~15% of standard so holiday weeks
+    // render in clearly amber/orange tones instead of near-grey.
+    const padded = Math.max(0, min - Math.round(netStandardCapacity * 0.15));
+    return { min: padded, max };
   }, [liveWeekMap, viewStart, selectedYear, currentYear, currentWeek, netStandardCapacity]);
 
   // Selected (filtered) daily hours for holiday impact — respects disabled úseky/employees
