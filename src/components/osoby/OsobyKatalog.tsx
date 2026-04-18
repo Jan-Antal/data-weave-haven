@@ -17,6 +17,7 @@ const ROLE_LABELS: Record<string, string> = {
 export function OsobyKatalog() {
   const { data: rows = [] } = usePositionCatalogue();
   const upsert = useUpsertPosition();
+  const rename = useRenamePosition();
   const del = useDeletePosition();
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
