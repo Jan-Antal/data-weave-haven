@@ -279,9 +279,9 @@ export default function Analytics() {
   return (
     <PageTabsShell tabs={tabs} defaultTab="projekty" paramName="tab">
       {() => (
-    <div className="h-full flex flex-col overflow-hidden bg-background">
+    <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Per-tab toolbar */}
-      <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b">
+      <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b bg-card">
 
         {!dilnaMode && (
           <div className="flex items-center gap-2">
