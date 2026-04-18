@@ -560,6 +560,8 @@ export default function Analytics() {
         onAll={() => doRecalculate(true)}
       />
     </div>
+      )}
+    </PageTabsShell>
   );
 }
 
