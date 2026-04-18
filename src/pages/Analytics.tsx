@@ -271,10 +271,18 @@ export default function Analytics() {
     return visibleCols.map((c) => getLabel(c.key, ANALYTICS_LABEL_MAP[c.key] || c.label));
   }, [visibleCols, getLabel]);
 
+  const tabs: ShellTabDef[] = [
+    { key: "projekty", label: "Projekty" },
+    { key: "dilna", label: "Dílna" },
+  ];
+
   return (
+    <PageTabsShell tabs={tabs} defaultTab="projekty" paramName="tab">
+      {() => (
     <div className="h-full flex flex-col overflow-hidden bg-background">
-      {/* Filter row — always visible for toggle + recalculate */}
+      {/* Per-tab toolbar */}
       <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b">
+
         {!dilnaMode && (
           <div className="flex items-center gap-2">
             <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
@@ -373,15 +381,6 @@ export default function Analytics() {
           })()
         )}
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant={dilnaMode ? "default" : "outline"}
-            size="sm"
-            className="h-7 px-2.5 text-xs gap-1.5"
-            onClick={() => setDilnaMode((v) => !v)}
-          >
-            <Factory className="h-3.5 w-3.5" />
-            Dílna
-          </Button>
           {!dilnaMode && (
             <>
               <TooltipProvider>
