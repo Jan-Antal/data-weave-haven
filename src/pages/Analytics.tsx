@@ -81,7 +81,8 @@ export default function Analytics() {
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
-  const [dilnaMode, setDilnaMode] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dilnaMode = (searchParams.get("tab") ?? "projekty") === "dilna";
   const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
