@@ -103,7 +103,7 @@ export function OsobyZamestnanci() {
     return map;
   }, [catalogue]);
 
-  const allPositions = useMemo(() => catalogue.map((c) => c.pozicia), [catalogue]);
+  
 
   const allStrediska = useMemo(() => {
     const set = new Set<string>();
