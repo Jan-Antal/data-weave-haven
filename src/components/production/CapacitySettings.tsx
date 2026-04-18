@@ -28,6 +28,7 @@ import { useVyrobniEmployees, useAbsencesForYear, computeWeekCapacity, getWeekSt
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EmployeeManagement } from "./EmployeeManagement";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -326,6 +327,70 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const netStandardCapacity = useMemo(() =>
     Math.round(totalBruttoSelectedWeekly * localUtilizationPct / 100),
     [totalBruttoSelectedWeekly, localUtilizationPct]);
+
+  // ====== PER-WEEK (composition week) calculation ======
+  // Employees active that specific week (activated_at/deactivated_at), their hours after absences,
+  // and resulting capacity per úsek for the selected composition week.
+  const compositionWeekStart = useMemo(
+    () => getWeekStartFromNumber(selectedYear, compositionWeekNumber),
+    [selectedYear, compositionWeekNumber],
+  );
+
+  const compositionWorkingDays = useMemo(() => {
+    if (!autoApplyHolidays) return 5;
+    const ws = new Date(compositionWeekStart + "T00:00:00");
+    const we = new Date(ws); we.setDate(ws.getDate() + 5);
+    const hCount = (holidays ?? []).filter(h => {
+      const d = new Date(h.date + "T00:00:00");
+      return d >= ws && d < we && d.getDay() !== 0 && d.getDay() !== 6;
+    }).length;
+    let days = Math.max(0, 5 - hCount);
+    for (const ch of (companyHolidays ?? [])) {
+      const cs = new Date(ch.start_date + "T00:00:00");
+      const ce = new Date(ch.end_date + "T00:00:00");
+      if (ws <= ce && we > cs) {
+        let overlap = 0;
+        const cur = new Date(ws);
+        for (let d = 0; d < 5; d++) {
+          if (cur.getDay() !== 0 && cur.getDay() !== 6 && cur >= cs && cur <= ce) overlap++;
+          cur.setDate(cur.getDate() + 1);
+        }
+        days = Math.max(0, days - overlap);
+      }
+    }
+    return days;
+  }, [compositionWeekStart, holidays, companyHolidays, autoApplyHolidays]);
+
+  const compositionAbsenceHours = useMemo(
+    () => absMap.get(compositionWeekStart) ?? 0,
+    [absMap, compositionWeekStart],
+  );
+
+  /** Hours worked per employee that week (uvazok × activeDays). */
+  const compositionEmpHours = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const emp of vyrobniEmployees) {
+      const activeDays = getActiveWorkingDays(emp, compositionWeekStart, compositionWorkingDays);
+      map.set(emp.id, (emp.uvazok_hodiny ?? 8) * activeDays);
+    }
+    return map;
+  }, [vyrobniEmployees, compositionWeekStart, compositionWorkingDays]);
+
+  /** Employees actually contributing in the composition week (active that week + included). */
+  const compositionActiveEmployees = useMemo(
+    () => selectedEmployees.filter(e => (compositionEmpHours.get(e.id) ?? 0) > 0),
+    [selectedEmployees, compositionEmpHours],
+  );
+
+  const compositionBruttoWeekly = useMemo(
+    () => compositionActiveEmployees.reduce((s, e) => s + (compositionEmpHours.get(e.id) ?? 0), 0),
+    [compositionActiveEmployees, compositionEmpHours],
+  );
+
+  const compositionNettoCapacity = useMemo(
+    () => Math.max(0, Math.round((compositionBruttoWeekly - compositionAbsenceHours) * localUtilizationPct / 100)),
+    [compositionBruttoWeekly, compositionAbsenceHours, localUtilizationPct],
+  );
 
 
   // Fully reactive liveWeekMap computed from local state
@@ -705,26 +770,28 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
       <div className={cn("flex-1 overflow-y-auto pb-4 pt-4", inline ? "px-6" : "px-6")}>
         <div className="space-y-6">
 
-        {/* Standard Capacity — dashboard-style tile cards */}
+        {/* Standard Capacity — dashboard-style tile cards (reflect SELECTED week) */}
         <div className="grid grid-cols-4 gap-3">
           {/* Tile 1 — Zaměstnanci */}
           <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Výrobní zaměstnanci</p>
             <p className="font-serif font-bold text-3xl mt-1 tabular-nums">
-              {selectedEmployees.length}
+              {compositionActiveEmployees.length}
               <span className="text-base font-normal text-muted-foreground"> / {vyrobniEmployees.length}</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">aktivní z celkového počtu</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">aktivní v T{compositionWeekNumber}</p>
           </div>
 
-          {/* Tile 2 — Brutto fond */}
+          {/* Tile 2 — Brutto fond (week-specific) */}
           <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Brutto fond</p>
             <p className="font-serif font-bold text-3xl mt-1 tabular-nums">
-              {totalBruttoSelectedWeekly}
+              {Math.round(compositionBruttoWeekly)}
               <span className="text-base font-normal text-muted-foreground"> h/týden</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{Math.round(totalBruttoSelectedWeekly / 5)} h/den × 5 dní</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {compositionWorkingDays} prac. dní · absence {Math.round(compositionAbsenceHours)} h
+            </p>
           </div>
 
           {/* Tile 3 — Využití (editable) */}
@@ -749,43 +816,44 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
             </p>
           </div>
 
-          {/* Tile 4 — Čistá kapacita */}
+          {/* Tile 4 — Čistá kapacita (week-specific) */}
           <div className="rounded-lg border bg-card p-4 flex flex-col justify-center min-h-[110px]">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Čistá kapacita</p>
             <p className="font-serif font-bold text-3xl mt-1 tabular-nums text-amber-600">
-              {netStandardCapacity}
+              {compositionNettoCapacity}
               <span className="text-base font-normal"> h/týden</span>
             </p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{Math.round(netStandardCapacity * 52 / 12)} h/měsíc</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">T{compositionWeekNumber} · standard {netStandardCapacity} h</p>
           </div>
         </div>
 
-        {/* Úseky breakdown panel (Výroba Direct) — dynamické členenie podľa usek_nazov */}
+
+        {/* Úseky breakdown panel (Výroba Direct) — per-week (compositionWeekNumber) */}
         {vyrobniEmployees.length > 0 && (() => {
-          // Build dynamic groups from usek_nazov (Kompletace, Strojová dílna, Lakovna, Dyhárna, Balení & Expedice).
+          // Build dynamic groups from usek_nazov (Kompletace, Strojová dílna, …).
+          // Hours are PER-WEEK (uvazok × activeDays for the composition week).
           const groups: Record<string, {count: number, weeklyHours: number, employees: typeof vyrobniEmployees}> = {};
           for (const emp of vyrobniEmployees) {
             const usekKey = normalizeUsek(emp);
             if (!usekKey) continue;
             if (!groups[usekKey]) groups[usekKey] = { count: 0, weeklyHours: 0, employees: [] };
             groups[usekKey].count++;
-            groups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
+            groups[usekKey].weeklyHours += compositionEmpHours.get(emp.id) ?? 0;
             groups[usekKey].employees.push(emp);
           }
+          // Filtered (included + active that week) groups
           const filteredGroups: Record<string, {count: number, weeklyHours: number}> = {};
           for (const key of Object.keys(groups)) filteredGroups[key] = { count: 0, weeklyHours: 0 };
-          for (const emp of filteredEmployees) {
+          for (const emp of compositionActiveEmployees) {
             const usekKey = normalizeUsek(emp);
             if (!usekKey || !filteredGroups[usekKey]) continue;
             filteredGroups[usekKey].count++;
-            filteredGroups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
+            filteredGroups[usekKey].weeklyHours += compositionEmpHours.get(emp.id) ?? 0;
           }
-          // Stable order: alphabetical by úsek name (Kompletace, Strojová dílna, …)
           const orderedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b, "cs"));
           const totalCount = Object.values(filteredGroups).reduce((s, g) => s + g.count, 0);
           const totalWeekly = Object.values(filteredGroups).reduce((s, g) => s + g.weeklyHours, 0);
-          const totalMonthly = Math.round(totalWeekly * 52 / 12);
-          const totalNetto = Math.round(totalWeekly * localUtilizationPct / 100);
+          const totalNetto = compositionNettoCapacity;
           return (
             <div className="space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -810,7 +878,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                📊 Výrobní zaměstnanci: {totalCount} celkem · Brutto fond: {totalWeekly} h/týden · Měsíčně: {totalMonthly} h
+                📊 Aktivní v T{compositionWeekNumber}: {totalCount} zam. · Brutto fond: {Math.round(totalWeekly)} h · Absence: {Math.round(compositionAbsenceHours)} h · Prac. dní: {compositionWorkingDays}
               </p>
               <div className="overflow-hidden rounded border border-border">
                 <table className="w-full text-xs">
@@ -818,8 +886,8 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                     <tr className="bg-muted/50 border-b border-border">
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground w-5"></th>
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Úsek</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Zaměstnanci</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Aktivní zam.</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden (T{compositionWeekNumber})</th>
                       <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Čistá kapacita (h/týden)</th>
                     </tr>
                   </thead>
@@ -859,15 +927,17 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                               {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
                               {key}
                             </td>
-                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{g.count}</td>
-                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{fg.weeklyHours} h</td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{fg.count}<span className="text-muted-foreground">/{g.count}</span></td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{Math.round(fg.weeklyHours)} h</td>
                             <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-accent")}>{netto} h</td>
                           </tr>
                           {isExpanded && g.employees.length > 0 && g.employees.map(emp => {
                             const isEmpDisabled = disabledEmployees.has(emp.id) || isUsekDisabled;
                             const isRecent = emp.activated_at && new Date(emp.activated_at) > threeMonthsAgo;
+                            const empWeekHours = compositionEmpHours.get(emp.id) ?? 0;
+                            const isInactiveThisWeek = empWeekHours === 0;
                             return (
-                              <tr key={emp.id} className="bg-muted/20 border-b border-border/30">
+                              <tr key={emp.id} className={cn("bg-muted/20 border-b border-border/30", isInactiveThisWeek && "opacity-60")}>
                                 <td className="px-1 py-0.5">
                                   <input
                                     type="checkbox"
@@ -887,10 +957,13 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                                   {isRecent && (
                                     <span className="ml-1.5 text-[10px] text-emerald-600">od {emp.activated_at?.split("T")[0]}</span>
                                   )}
+                                  {isInactiveThisWeek && !isEmpDisabled && (
+                                    <span className="ml-1.5 text-[10px] text-muted-foreground italic">(neaktivní v T{compositionWeekNumber})</span>
+                                  )}
                                 </td>
                                 <td className="px-3 py-0.5 text-right font-sans text-muted-foreground"></td>
                                 <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{(emp.uvazok_hodiny ?? 8)} h/den</td>
-                                <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{(emp.uvazok_hodiny ?? 8) * 5} h/týd</td>
+                                <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{Math.round(empWeekHours)} h/týd</td>
                               </tr>
                             );
                           })}
@@ -901,19 +974,19 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                       <td className="px-1 py-1.5"></td>
                       <td className="px-3 py-1.5 text-foreground">Celkem</td>
                       <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalCount}</td>
-                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly} h</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{Math.round(totalWeekly)} h</td>
                       <td className="px-3 py-1.5 text-right font-sans text-accent font-bold">{totalNetto} h</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                Skutečná kapacita = {totalNetto} h/týden (fond {totalWeekly}h × využití {localUtilizationPct}%)
+                Skutečná kapacita T{compositionWeekNumber} = {totalNetto} h/týden · (brutto {Math.round(totalWeekly)}h − absence {Math.round(compositionAbsenceHours)}h) × využití {localUtilizationPct}%
               </p>
-              <p className="text-[10px] text-muted-foreground">Změny ovlivní výpočet kapacity po přepočtení.</p>
             </div>
           );
         })()}
+
 
         {/* Year Bar Chart */}
         <div className="border border-border/60 rounded-lg p-4 space-y-3 bg-card">
@@ -996,11 +1069,16 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                   const wAny = week as any;
                   const hasDilna = wAny.total_employees > 0;
 
+                  const isCompositionBar = wn === compositionWeekNumber;
                   return (
                     <Tooltip key={wn}>
                       <TooltipTrigger asChild>
                         <button
-                          className={`flex-1 rounded-t-sm transition-all hover:opacity-80 cursor-pointer ${isBarSelected ? "ring-2 ring-foreground" : ""}`}
+                          className={cn(
+                            "flex-1 rounded-t-sm transition-all hover:opacity-80 cursor-pointer",
+                            isBarSelected && "ring-2 ring-foreground",
+                            isCompositionBar && !isBarSelected && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                          )}
                           style={{
                             height: barH,
                             backgroundColor: barColor,
@@ -1076,133 +1154,142 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
           )}
         </div>
 
-        {/* Holiday Summary */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">🇨🇿 České státní svátky {selectedYear}</h3>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoApplyHolidays}
-                onChange={e => setAutoApplyHolidays(e.target.checked)}
-                className="rounded"
-              />
-              Automaticky aplikovat na kapacitu
-            </label>
-          </div>
-          {holidayImpacts.length > 0 ? (
-            <div className="overflow-auto max-h-[200px]">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground">
-                    <th className="text-left py-1 pr-2">Datum</th>
-                    <th className="text-left py-1 pr-2">Svátek</th>
-                    <th className="text-left py-1 pr-2">Týden</th>
-                    <th className="text-left py-1">Dopad na kapacitu</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {holidayImpacts.map((h, i) => (
-                    <tr key={i} className="border-b border-border/50">
-                      <td className="py-1 pr-2 font-sans">{h.date}</td>
-                      <td className="py-1 pr-2">{h.name}</td>
-                      <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
-                      <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((totalBruttoSelectedDaily * h.workingDays) * localUtilizationPct / 100)}h</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">Žádné svátky nenalezeny</p>
-          )}
-        </div>
-
-        {/* Company Holidays */}
-        <div className="border border-border rounded-lg p-4 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">🏖 Firemní dovolená</h3>
-
-          {companyHolidays.length > 0 && (
-            <div className="space-y-2">
-              {companyHolidays.map(ch => (
-                <div key={ch.id} className="flex items-center justify-between border border-border/50 rounded-md px-3 py-2">
-                  <div className="text-xs">
-                    <span className="font-sans">{ch.start_date} – {ch.end_date}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
-                    <span className="font-medium">{ch.name}</span>
-                    <span className="mx-2 text-muted-foreground">|</span>
-                    <span className="font-sans text-amber-600">{ch.capacity_override}h</span>
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={async () => {
-                    await deleteCompanyHoliday.mutateAsync(ch.id);
-                    if (vyrobniEmployees.length > 0) {
-                      await queryClient.invalidateQueries({ queryKey: ["company-holidays"] });
-                      setTimeout(() => triggerAutoRecalc(), 200);
-                    }
-                  }}>
-                    <X className="h-3 w-3" />
-                  </Button>
+        {/* Manual edit section — collapsed by default */}
+        <Collapsible>
+          <CollapsibleTrigger className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-2 border-t border-border/40 group">
+            <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
+            <span className="underline-offset-2 group-hover:underline">Upravit manuálně (svátky &amp; firemní dovolená)</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-6 pt-4">
+            {/* Holiday Summary */}
+            <div className="border border-border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">🇨🇿 České státní svátky {selectedYear}</h3>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoApplyHolidays}
+                    onChange={e => setAutoApplyHolidays(e.target.checked)}
+                    className="rounded"
+                  />
+                  Automaticky aplikovat na kapacitu
+                </label>
+              </div>
+              {holidayImpacts.length > 0 ? (
+                <div className="overflow-auto max-h-[200px]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="text-left py-1 pr-2">Datum</th>
+                        <th className="text-left py-1 pr-2">Svátek</th>
+                        <th className="text-left py-1 pr-2">Týden</th>
+                        <th className="text-left py-1">Dopad na kapacitu</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {holidayImpacts.map((h, i) => (
+                        <tr key={i} className="border-b border-border/50">
+                          <td className="py-1 pr-2 font-sans">{h.date}</td>
+                          <td className="py-1 pr-2">{h.name}</td>
+                          <td className="py-1 pr-2 font-sans">T{h.weekNum}</td>
+                          <td className="py-1 font-sans text-amber-600">-{h.reducedHours}h · kapacita týdne: {Math.round((totalBruttoSelectedDaily * h.workingDays) * localUtilizationPct / 100)}h</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              ) : (
+                <p className="text-xs text-muted-foreground">Žádné svátky nenalezeny</p>
+              )}
             </div>
-          )}
 
-          <div className="grid grid-cols-5 gap-2 items-end">
-            <div>
-              <label className="text-[10px] text-muted-foreground">Název</label>
-              <Input value={newHolidayName} onChange={e => setNewHolidayName(e.target.value)} className="h-7 text-xs" placeholder="Vánoční zavírka" />
+            {/* Company Holidays */}
+            <div className="border border-border rounded-lg p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">🏖 Firemní dovolená</h3>
+
+              {companyHolidays.length > 0 && (
+                <div className="space-y-2">
+                  {companyHolidays.map(ch => (
+                    <div key={ch.id} className="flex items-center justify-between border border-border/50 rounded-md px-3 py-2">
+                      <div className="text-xs">
+                        <span className="font-sans">{ch.start_date} – {ch.end_date}</span>
+                        <span className="mx-2 text-muted-foreground">|</span>
+                        <span className="font-medium">{ch.name}</span>
+                        <span className="mx-2 text-muted-foreground">|</span>
+                        <span className="font-sans text-amber-600">{ch.capacity_override}h</span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive" onClick={async () => {
+                        await deleteCompanyHoliday.mutateAsync(ch.id);
+                        if (vyrobniEmployees.length > 0) {
+                          await queryClient.invalidateQueries({ queryKey: ["company-holidays"] });
+                          setTimeout(() => triggerAutoRecalc(), 200);
+                        }
+                      }}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-5 gap-2 items-end">
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Název</label>
+                  <Input value={newHolidayName} onChange={e => setNewHolidayName(e.target.value)} className="h-7 text-xs" placeholder="Vánoční zavírka" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Od</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayStart && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-1.5 h-3 w-3" />
+                        {newHolidayStart ? format(parse(newHolidayStart, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : undefined}
+                        defaultMonth={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date()}
+                        onSelect={(d) => { if (d) setNewHolidayStart(format(d, "yyyy-MM-dd")); }}
+                        weekStartsOn={1}
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Do</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayEnd && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-1.5 h-3 w-3" />
+                        {newHolidayEnd ? format(parse(newHolidayEnd, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : undefined}
+                        defaultMonth={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : (newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date())}
+                        onSelect={(d) => { if (d) setNewHolidayEnd(format(d, "yyyy-MM-dd")); }}
+                        weekStartsOn={1}
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
+                  <Input type="number" value={newHolidayCap} onChange={e => setNewHolidayCap(e.target.value)} className="h-7 text-xs" />
+                </div>
+                <Button size="sm" className="h-7" onClick={handleAddCompanyHoliday} disabled={!newHolidayName || !newHolidayStart || !newHolidayEnd}>
+                  <Plus className="h-3 w-3 mr-1" /> Přidat
+                </Button>
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Od</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayStart && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-1.5 h-3 w-3" />
-                    {newHolidayStart ? format(parse(newHolidayStart, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : undefined}
-                    defaultMonth={newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date()}
-                    onSelect={(d) => { if (d) setNewHolidayStart(format(d, "yyyy-MM-dd")); }}
-                    weekStartsOn={1}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Do</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className={cn("h-7 w-full justify-start text-left font-normal text-xs", !newHolidayEnd && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-1.5 h-3 w-3" />
-                    {newHolidayEnd ? format(parse(newHolidayEnd, "yyyy-MM-dd", new Date()), "d. M. yyyy") : "—"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : undefined}
-                    defaultMonth={newHolidayEnd ? parse(newHolidayEnd, "yyyy-MM-dd", new Date()) : (newHolidayStart ? parse(newHolidayStart, "yyyy-MM-dd", new Date()) : new Date())}
-                    onSelect={(d) => { if (d) setNewHolidayEnd(format(d, "yyyy-MM-dd")); }}
-                    weekStartsOn={1}
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Kapacita (h)</label>
-              <Input type="number" value={newHolidayCap} onChange={e => setNewHolidayCap(e.target.value)} className="h-7 text-xs" />
-            </div>
-            <Button size="sm" className="h-7" onClick={handleAddCompanyHoliday} disabled={!newHolidayName || !newHolidayStart || !newHolidayEnd}>
-              <Plus className="h-3 w-3 mr-1" /> Přidat
-            </Button>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
         </div>
         </div>{/* end scrollable content */}
 
