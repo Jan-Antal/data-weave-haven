@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, ReactNode } from "react";
-import { PeopleManagement } from "./PeopleManagement";
+import { SpravaOsob, type SpravaOsobTab } from "./SpravaOsob";
 
 interface PeopleManagementContextType {
-  openPeopleManagement: () => void;
+  openPeopleManagement: (tab?: SpravaOsobTab) => void;
 }
 
 const PeopleManagementContext = createContext<PeopleManagementContextType>({
@@ -15,11 +15,19 @@ export function usePeopleManagement() {
 
 export function PeopleManagementProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [defaultTab, setDefaultTab] = useState<SpravaOsobTab>("zamestnanci");
 
   return (
-    <PeopleManagementContext.Provider value={{ openPeopleManagement: () => setOpen(true) }}>
+    <PeopleManagementContext.Provider
+      value={{
+        openPeopleManagement: (tab = "externisti") => {
+          setDefaultTab(tab);
+          setOpen(true);
+        },
+      }}
+    >
       {children}
-      <PeopleManagement open={open} onOpenChange={setOpen} />
+      <SpravaOsob open={open} onOpenChange={setOpen} defaultTab={defaultTab} />
     </PeopleManagementContext.Provider>
   );
 }
