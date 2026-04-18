@@ -292,13 +292,8 @@ export function ProductionHeader({
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {canManageUsers && (
-                    <DropdownMenuItem onClick={() => setUserMgmtOpen(true)}>
-                      Správa uživatelů
-                    </DropdownMenuItem>
-                  )}
-                  {canManagePeople && (
-                    <DropdownMenuItem onClick={() => openPeopleManagement()}>
+                  {(canManageUsers || canManagePeople) && (
+                    <DropdownMenuItem onClick={() => openPeopleManagement('zamestnanci' as any)}>
                       Správa osob
                     </DropdownMenuItem>
                   )}
@@ -315,11 +310,6 @@ export function ProductionHeader({
                   {isAdmin && (
                     <DropdownMenuItem onClick={() => setOverheadOpen(true)}>
                       Režijní projekty
-                    </DropdownMenuItem>
-                  )}
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
-                      Kapacita výroby
                     </DropdownMenuItem>
                   )}
                   {canManageStatuses && (
