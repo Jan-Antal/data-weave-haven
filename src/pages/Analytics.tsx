@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, Fragment } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { PageTabsShell, type ShellTabDef } from "@/components/shell/PageTabsShell";
