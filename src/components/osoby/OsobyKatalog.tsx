@@ -55,7 +55,7 @@ export function OsobyKatalog() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden bg-card">
       <SectionToolbar
         left={
           <span className="text-xs text-muted-foreground">
