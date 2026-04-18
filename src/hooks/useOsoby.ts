@@ -221,12 +221,29 @@ export function useUpdateEmployeeFields() {
       const { error } = await supabase.from("ami_employees").update(patch).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onMutate: async ({ id, patch }) => {
+      // Optimistic local update — instant UI feedback (no refresh needed)
+      await qc.cancelQueries({ queryKey: ["all-employees-osoby"] });
+      const prev = qc.getQueryData<any[]>(["all-employees-osoby"]);
+      qc.setQueryData<any[]>(["all-employees-osoby"], (old) =>
+        old?.map((e) => (e.id === id ? { ...e, ...patch } : e)) ?? old,
+      );
+      qc.setQueriesData<any[]>({ queryKey: ["vyrobni-employees"] }, (old) =>
+        old?.map((e) => (e.id === id ? { ...e, ...patch } : e)) ?? old,
+      );
+      return { prev };
+    },
+    onError: (e: any, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["all-employees-osoby"], ctx.prev);
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
       qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
       qc.invalidateQueries({ queryKey: ["employees-for-week"] });
       qc.invalidateQueries({ queryKey: ["weekly-capacity"] });
+      qc.invalidateQueries({ queryKey: ["unified-members"] });
     },
-    onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
   });
 }
 
@@ -241,6 +258,7 @@ export function useTerminateEmployee() {
       if (error) throw error;
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
       qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
       qc.invalidateQueries({ queryKey: ["employees-for-week"] });
       qc.invalidateQueries({ queryKey: ["weekly-capacity"] });
@@ -261,6 +279,7 @@ export function useReactivateEmployee() {
       if (error) throw error;
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
       qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
       qc.invalidateQueries({ queryKey: ["employees-for-week"] });
       toast({ title: "Zaměstnanec obnoven" });
@@ -278,6 +297,7 @@ export function useDeleteEmployeePermanently() {
       if (error) throw error;
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
       qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
       qc.invalidateQueries({ queryKey: ["employees-for-week"] });
       qc.invalidateQueries({ queryKey: ["manual-absences"] });

@@ -698,17 +698,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const innerContent = (
     <>
       <div className="flex-1 overflow-y-auto px-6 pb-4 pt-2">
-        <Tabs defaultValue="kapacita" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="kapacita">Kapacita</TabsTrigger>
-            <TabsTrigger value="zamestnanci">Zaměstnanci</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="zamestnanci" className="mt-0">
-            <EmployeeManagement />
-          </TabsContent>
-
-          <TabsContent value="kapacita" className="space-y-4 mt-0">
+        <div className="space-y-4">
 
         {/* Standard Capacity — informational with live data */}
         <div className="border border-border rounded-lg p-4">
@@ -1201,8 +1191,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
             </Button>
           </div>
         </div>
-          </TabsContent>
-        </Tabs>
+        </div>
         </div>{/* end scrollable content */}
 
         {/* Footer */}

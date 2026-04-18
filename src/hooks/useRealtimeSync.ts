@@ -331,6 +331,38 @@ export function useRealtimeSync() {
         }
       )
 
+      // ━━━ AMI EMPLOYEES (Správa osob) ━━━
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ami_employees" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["all-employees-osoby"] });
+          queryClient.invalidateQueries({ queryKey: ["vyrobni-employees"] });
+          queryClient.invalidateQueries({ queryKey: ["employees-for-week"] });
+          queryClient.invalidateQueries({ queryKey: ["unified-members"] });
+        }
+      )
+
+      // ━━━ POSITION CATALOGUE ━━━
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "position_catalogue" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["position_catalogue"] });
+          queryClient.invalidateQueries({ queryKey: ["unified-members"] });
+        }
+      )
+
+      // ━━━ PEOPLE (externisti) ━━━
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "people" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["people"] });
+          queryClient.invalidateQueries({ queryKey: ["unified-members"] });
+        }
+      )
+
       // ━━━ NOTIFICATIONS ━━━
       .on(
         "postgres_changes",
