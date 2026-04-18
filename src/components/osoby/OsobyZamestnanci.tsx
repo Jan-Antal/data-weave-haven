@@ -267,7 +267,7 @@ export function OsobyZamestnanci() {
                       const positionsForUsek = positionsByUsek.get(emp.usek_nazov ?? "") ?? [];
                       const av = avatarStyles(emp.meno ?? "");
                       return (
-                        <TableRow key={emp.id} className={isTerminated ? "opacity-50" : ""}>
+                        <TableRow key={emp.id} data-emp-row={emp.id} className={cn("transition-shadow", isTerminated ? "opacity-50" : "")}>
                           <TableCell>
                             <div className="flex items-center gap-2.5">
                               <div
@@ -301,13 +301,17 @@ export function OsobyZamestnanci() {
                             <Select
                               value={emp.pozicia ?? "__none"}
                               onValueChange={(v) => handlePoziciaChange(emp, v)}
+                              disabled={!emp.usek_nazov}
                             >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="—" />
+                              <SelectTrigger
+                                className="h-8 text-xs"
+                                title={!emp.usek_nazov ? "Nejprve vyberte úsek" : undefined}
+                              >
+                                <SelectValue placeholder={!emp.usek_nazov ? "Vyberte úsek…" : "—"} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none" disabled>—</SelectItem>
-                                {(positionsForUsek.length > 0 ? positionsForUsek : allPositions).map((p) => (
+                                {positionsForUsek.map((p) => (
                                   <SelectItem key={p} value={p}>{p}</SelectItem>
                                 ))}
                               </SelectContent>
