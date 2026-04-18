@@ -77,16 +77,14 @@ export function useRenamePosition() {
       const { id, stredisko, usek, oldName, newName } = args;
       const trimmed = newName.trim();
       if (!trimmed) throw new Error("Název pozice nesmí být prázdný");
-      if (trimmed === oldName) return { updatedEmployees: 0 };
+      if (trimmed === oldName) return { updatedEmployees: 0, stredisko, usek, oldName, newName: trimmed };
 
-      // 1) Update catalogue row
       const { error: e1 } = await supabase
         .from("position_catalogue" as any)
         .update({ pozicia: trimmed } as any)
         .eq("id", id);
       if (e1) throw e1;
 
-      // 2) Cascade rename to employees with the SAME stredisko+usek+old pozicia
       const { data: emps, error: e2 } = await supabase
         .from("ami_employees")
         .update({ pozicia: trimmed } as any)
@@ -96,9 +94,19 @@ export function useRenamePosition() {
         .select("id");
       if (e2) throw e2;
 
-      return { updatedEmployees: emps?.length ?? 0 };
+      return { updatedEmployees: emps?.length ?? 0, stredisko, usek, oldName, newName: trimmed };
     },
     onSuccess: async (res) => {
+      // Patch employee caches optimistically so UI reflects rename immediately.
+      const patchEmps = (old: any[] | undefined) =>
+        old?.map((e) =>
+          e.stredisko === res.stredisko && e.usek_nazov === res.usek && e.pozicia === res.oldName
+            ? { ...e, pozicia: res.newName }
+            : e,
+        ) ?? old;
+      qc.setQueryData<any[]>(["all-employees-osoby"], patchEmps);
+      qc.setQueriesData<any[]>({ queryKey: ["vyrobni-employees"] }, patchEmps);
+
       await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
       await qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
       qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
@@ -133,9 +141,8 @@ export function useRenameUsek() {
     mutationFn: async ({ stredisko, oldName, newName }: { stredisko: string; oldName: string; newName: string }) => {
       const trimmed = newName.trim();
       if (!trimmed) throw new Error("Název úseku nesmí být prázdný");
-      if (trimmed === oldName) return { updatedEmployees: 0 };
+      if (trimmed === oldName) return { updatedEmployees: 0, stredisko, oldName, newName: trimmed };
 
-      // 1) Update all catalogue rows in this úsek
       const { error: e1 } = await supabase
         .from("position_catalogue" as any)
         .update({ usek: trimmed } as any)
@@ -143,7 +150,6 @@ export function useRenameUsek() {
         .eq("usek", oldName);
       if (e1) throw e1;
 
-      // 2) Cascade rename to employees in same stredisko + old usek_nazov
       const { data: emps, error: e2 } = await supabase
         .from("ami_employees")
         .update({ usek_nazov: trimmed } as any)
@@ -152,9 +158,19 @@ export function useRenameUsek() {
         .select("id");
       if (e2) throw e2;
 
-      return { updatedEmployees: emps?.length ?? 0 };
+      return { updatedEmployees: emps?.length ?? 0, stredisko, oldName, newName: trimmed };
     },
     onSuccess: async (res) => {
+      // Patch employee caches optimistically so UI reflects rename immediately.
+      const patchEmps = (old: any[] | undefined) =>
+        old?.map((e) =>
+          e.stredisko === res.stredisko && e.usek_nazov === res.oldName
+            ? { ...e, usek_nazov: res.newName }
+            : e,
+        ) ?? old;
+      qc.setQueryData<any[]>(["all-employees-osoby"], patchEmps);
+      qc.setQueriesData<any[]>({ queryKey: ["vyrobni-employees"] }, patchEmps);
+
       await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
       await qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
       qc.invalidateQueries({ queryKey: ["vyrobni-employees"] });
