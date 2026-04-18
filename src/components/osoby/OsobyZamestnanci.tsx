@@ -52,7 +52,8 @@ function useAllEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ami_employees")
-        .select("id, meno, usek, usek_nazov, stredisko, pozicia, uvazok_hodiny, activated_at, deactivated_at, deactivated_date, aktivny");
+        .select("id, meno, usek, usek_nazov, stredisko, pozicia, uvazok_hodiny, activated_at, deactivated_at, deactivated_date, aktivny")
+        .order("meno", { ascending: true });
       if (error) throw error;
       return (data ?? []) as any[];
     },
