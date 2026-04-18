@@ -31,6 +31,8 @@ import { EmployeeManagement } from "./EmployeeManagement";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When true, render content inline (no Dialog wrapper). */
+  inline?: boolean;
 }
 
 // --- Capacity color interpolation ---
@@ -81,7 +83,7 @@ function getISOWeekNumber(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-export function CapacitySettings({ open, onOpenChange }: Props) {
+export function CapacitySettings({ open, onOpenChange, inline = false }: Props) {
   const currentYear = new Date().getFullYear();
   const currentWeek = getISOWeekNumber(new Date());
   const [selectedYear, setSelectedYear] = useState(currentYear);
