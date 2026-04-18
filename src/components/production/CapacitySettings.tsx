@@ -1069,11 +1069,16 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                   const wAny = week as any;
                   const hasDilna = wAny.total_employees > 0;
 
+                  const isCompositionBar = wn === compositionWeekNumber;
                   return (
                     <Tooltip key={wn}>
                       <TooltipTrigger asChild>
                         <button
-                          className={`flex-1 rounded-t-sm transition-all hover:opacity-80 cursor-pointer ${isBarSelected ? "ring-2 ring-foreground" : ""}`}
+                          className={cn(
+                            "flex-1 rounded-t-sm transition-all hover:opacity-80 cursor-pointer",
+                            isBarSelected && "ring-2 ring-foreground",
+                            isCompositionBar && !isBarSelected && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                          )}
                           style={{
                             height: barH,
                             backgroundColor: barColor,
