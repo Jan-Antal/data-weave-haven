@@ -388,9 +388,7 @@ export function useAnalytics() {
         if (isExcludedActivityCode(log.cinnost_kod)) continue;
         const emp = empByName.get(normalizeEmployeeName(log.zamestnanec));
         if (!emp) continue; // not a production worker
-        // Respect active period: activated_at ≤ datum ≤ deactivated_at
-        if (emp.activated_at && log.datum_sync < emp.activated_at.slice(0, 10)) continue;
-        if (emp.deactivated_at && log.datum_sync > emp.deactivated_at.slice(0, 10)) continue;
+        if (!isEmployeeActiveForLogDate(emp, log.datum_sync)) continue;
 
         const h = Number(log.hodiny) || 0;
         if (isOverheadCode(log.ami_project_id, overheadMap)) {
