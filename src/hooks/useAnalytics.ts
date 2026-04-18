@@ -55,7 +55,7 @@ export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics"],
     queryFn: async () => {
-      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes] = await Promise.all([
+      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes] = await Promise.all([
         (supabase.rpc as any)("get_hours_by_project"),
         supabase
           .from("projects")
@@ -78,6 +78,12 @@ export function useAnalytics() {
           .select("utilization_pct")
           .limit(1)
           .maybeSingle(),
+        supabase
+          .from("ami_employees")
+          .select("meno, usek, aktivny, activated_at, deactivated_at"),
+        supabase
+          .from("production_hours_log")
+          .select("ami_project_id, hodiny, datum_sync, zamestnanec, cinnost_kod"),
       ]);
 
       // Build overhead lookup (active only)
@@ -319,8 +325,51 @@ export function useAnalytics() {
         .filter((r) => r.category === "rezie")
         .reduce((s, r) => s + r.hodiny_skutocne, 0);
       const totalProjectHours = totalSkutocne;
-      const denom = totalRezieHours + totalProjectHours;
-      const reziePct = denom > 0 ? Math.round((totalRezieHours / denom) * 1000) / 10 : null;
+
+      // ── Production-staff-only utilization ─────────────────────────────
+      // Build set of production employee names (Dílna 1/2/3 + Sklad), respecting active period.
+      type EmpRow = { meno: string; usek: string; aktivny: boolean | null; activated_at: string | null; deactivated_at: string | null };
+      const productionEmps = ((employeesRes.data || []) as EmpRow[]).filter(
+        (e) => e.aktivny !== false && normalizeUsek(e.usek) !== null,
+      );
+      const empByName = new Map<string, EmpRow>();
+      for (const e of productionEmps) empByName.set(e.meno, e);
+
+      const knownProjectIdsForUtil = new Set(projectsMap.keys());
+      let productionRezieHours = 0;
+      let productionProjectHours = 0;
+      const rezieByCode: Record<string, number> = {};
+
+      const rawLogs = (rawLogsRes.data || []) as Array<{
+        ami_project_id: string;
+        hodiny: number | string;
+        datum_sync: string;
+        zamestnanec: string;
+        cinnost_kod: string | null;
+      }>;
+      for (const log of rawLogs) {
+        // Same exclusion as RPC: skip TPV / ENG / PRO activity codes
+        if (log.cinnost_kod && ["TPV", "ENG", "PRO"].includes(log.cinnost_kod)) continue;
+        const emp = empByName.get(log.zamestnanec);
+        if (!emp) continue; // not a production worker
+        // Respect active period: activated_at ≤ datum ≤ deactivated_at
+        if (emp.activated_at && log.datum_sync < emp.activated_at.slice(0, 10)) continue;
+        if (emp.deactivated_at && log.datum_sync > emp.deactivated_at.slice(0, 10)) continue;
+
+        const h = Number(log.hodiny) || 0;
+        if (overheadMap.has(log.ami_project_id)) {
+          productionRezieHours += h;
+          rezieByCode[log.ami_project_id] = (rezieByCode[log.ami_project_id] || 0) + h;
+        } else if (knownProjectIdsForUtil.has(log.ami_project_id)) {
+          productionProjectHours += h;
+        }
+        // unmatched ids are ignored for utilization
+      }
+
+      const utilDenom = productionRezieHours + productionProjectHours;
+      const reziePct = utilDenom > 0
+        ? Math.round((productionRezieHours / utilDenom) * 1000) / 10
+        : null;
 
       const withPlan = projectRows.filter((r) => r.pct != null);
       const avgPct = withPlan.length
@@ -341,6 +390,9 @@ export function useAnalytics() {
         totalProjectHours,
         reziePct,
         utilizationTarget,
+        productionRezieHours,
+        productionProjectHours,
+        rezieByCode,
       };
 
       return { rows, summary };
