@@ -76,7 +76,8 @@ export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics", "utilization-v2"],
     queryFn: async () => {
-      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes] = await Promise.all([
+      const capacityFromDate = (() => { const d = new Date(); d.setDate(d.getDate() - 100); return d.toISOString().slice(0, 10); })();
+      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes, capacityRes] = await Promise.all([
         (supabase.rpc as any)("get_hours_by_project"),
         supabase
           .from("projects")
@@ -96,7 +97,7 @@ export function useAnalytics() {
           .select("project_code, label, is_active"),
         supabase
           .from("production_settings")
-          .select("utilization_pct")
+          .select("utilization_pct, weekly_capacity_hours")
           .limit(1)
           .maybeSingle(),
         supabase
@@ -105,8 +106,12 @@ export function useAnalytics() {
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, datum_sync, zamestnanec, cinnost_kod")
-          .gte("datum_sync", (() => { const d = new Date(); d.setDate(d.getDate() - 100); return d.toISOString().slice(0, 10); })())
+          .gte("datum_sync", capacityFromDate)
           .range(0, 49999),
+        supabase
+          .from("production_capacity")
+          .select("week_start, capacity_hours")
+          .gte("week_start", capacityFromDate),
       ]);
 
       // Build overhead lookup (active only)
