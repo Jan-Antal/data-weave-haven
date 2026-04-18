@@ -61,7 +61,7 @@ export function PageTabsShell({
     <div className="h-full flex flex-col bg-background">
       {/* Tab bar — flush under topbar, no gap */}
       <div className="bg-background border-b border-border/60">
-        <div className="flex items-center justify-between gap-3 px-5">
+        <div className="flex items-center justify-between gap-3 px-6">
           <nav
             className="flex items-end gap-0 -mb-px overflow-x-auto"
             role="tablist"

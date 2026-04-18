@@ -449,7 +449,9 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
           ) : null
         }
       />
-      {tableSection}
+      <div className="flex-1 overflow-y-auto px-6">
+        {tableSection}
+      </div>
     </div>
   ) : (
     <Dialog open={open} onOpenChange={onOpenChange} modal={true}>

@@ -17,7 +17,7 @@ export function SectionToolbar({ left, right, className }: SectionToolbarProps) 
   return (
     <div
       className={cn(
-        "shrink-0 flex items-center justify-between gap-3 px-5 h-12 border-b border-border/60 bg-card",
+        "shrink-0 flex items-center justify-between gap-3 px-6 h-12 border-b border-border/60 bg-card",
         className,
       )}
     >

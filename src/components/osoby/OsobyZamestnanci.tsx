@@ -169,7 +169,7 @@ export function OsobyZamestnanci() {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-card">
       {/* Section header — title meta + actions */}
-      <div className="px-5 pt-4 pb-3 border-b bg-card">
+      <div className="px-6 pt-4 pb-3 border-b bg-card">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-base font-semibold text-foreground">
@@ -205,7 +205,7 @@ export function OsobyZamestnanci() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-6">
         <Table>
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
@@ -224,14 +224,14 @@ export function OsobyZamestnanci() {
                 const totalHrs = emps.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
                 return (
                   <>
-                    <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={7} className="py-2">
+                    <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/40 hover:bg-muted/40 border-b border-border/40">
+                      <TableCell colSpan={7} className="py-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={cn("text-[11px] font-semibold border", strediskoStyles(stredisko))}>
+                          <Badge variant="outline" className={cn("text-[10px] font-medium border px-2 py-0.5", strediskoStyles(stredisko))}>
                             {stredisko}
                           </Badge>
-                          <span className="text-sm font-semibold text-foreground">{usek}</span>
-                          <span className="text-xs text-muted-foreground">· {emps.length} osob · {totalHrs}h brutto/týd</span>
+                          <span className="text-[11px] font-medium uppercase tracking-wide text-foreground">{usek}</span>
+                          <span className="text-[11px] text-muted-foreground">· {emps.length} osob · {totalHrs}h brutto/týd</span>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -377,7 +377,7 @@ export function OsobyZamestnanci() {
       </div>
 
       {/* Footer hint */}
-      <div className="px-5 py-2.5 border-t bg-muted/20 text-[11px] text-muted-foreground">
+      <div className="px-6 py-2.5 border-t bg-muted/20 text-[11px] text-muted-foreground">
         Alveno absencia se importuje automaticky · manuálně lze přidat: RD / NEM / PN / Jiné
       </div>
 
