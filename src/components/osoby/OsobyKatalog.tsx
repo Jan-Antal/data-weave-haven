@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { usePositionCatalogue, useUpsertPosition, useDeletePosition, type CataloguePosition, type ProjectDropdownRole } from "@/hooks/useOsoby";
+import { SectionToolbar } from "@/components/shell/SectionToolbar";
 
 const ROLE_LABELS: Record<string, string> = {
   pm: "PM dropdown",
