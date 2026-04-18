@@ -436,11 +436,14 @@ export default function Analytics() {
                 </p>
               </CardContent>
             </Card>
-            <RezieCard
+            <UtilizationCard
               isLoading={isLoading}
-              reziePct={data?.summary.reziePct ?? null}
-              totalRezieHours={data?.summary.productionRezieHours ?? 0}
+              utilization30d={data?.summary.utilization30d ?? null}
+              utilizationMedian3m={data?.summary.utilizationMedian3m ?? null}
+              utilizationTrend={data?.summary.utilizationTrend ?? null}
               utilizationTarget={data?.summary.utilizationTarget ?? 83}
+              productionProjectHours30d={data?.summary.productionProjectHours30d ?? 0}
+              productionRezieHours30d={data?.summary.productionRezieHours30d ?? 0}
               rezieRows={data?.rows.filter((r) => r.category === "rezie") ?? []}
               rezieByCode={data?.summary.rezieByCode ?? {}}
             />
@@ -725,23 +728,37 @@ function PctBar({ pct }: { pct: number | null }) {
   );
 }
 
-function RezieCard({
+function UtilizationCard({
   isLoading,
-  reziePct,
-  totalRezieHours,
+  utilization30d,
+  utilizationMedian3m,
+  utilizationTrend,
   utilizationTarget,
+  productionProjectHours30d,
+  productionRezieHours30d,
   rezieRows,
   rezieByCode,
 }: {
   isLoading: boolean;
-  reziePct: number | null;
-  totalRezieHours: number;
+  utilization30d: number | null;
+  utilizationMedian3m: number | null;
+  utilizationTrend: "up" | "down" | "flat" | null;
   utilizationTarget: number;
+  productionProjectHours30d: number;
+  productionRezieHours30d: number;
   rezieRows: AnalyticsRow[];
   rezieByCode: Record<string, number>;
 }) {
-  const expectedRezie = Math.max(0, 100 - utilizationTarget);
-  const isOver = reziePct != null && reziePct > expectedRezie;
+  const isBelow = utilization30d != null && utilization30d < utilizationTarget;
+  const trendIcon = utilizationTrend === "up" ? "↑" : utilizationTrend === "down" ? "↓" : utilizationTrend === "flat" ? "→" : "";
+  const trendClass =
+    utilizationTrend === "up"
+      ? "text-green-600 dark:text-green-500"
+      : utilizationTrend === "down"
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-muted-foreground";
+  const trendLabel =
+    utilizationTrend === "up" ? "stoupá" : utilizationTrend === "down" ? "klesá" : utilizationTrend === "flat" ? "stabilní" : "—";
 
   return (
     <TooltipProvider>
@@ -749,37 +766,59 @@ function RezieCard({
         <TooltipTrigger asChild>
           <Card className={cn(
             "cursor-help transition-colors",
-            isOver && "border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10"
+            isBelow && "border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10"
           )}>
             <CardContent className="pt-3 pb-2 px-3">
               <p className="text-[10px] text-muted-foreground mb-0.5 flex items-center gap-1">
-                🏭 Režije %
+                🏭 Utilizace výroby
               </p>
-              <p className={cn(
-                "text-lg font-bold tabular-nums",
-                isOver ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-500"
-              )}>
-                {isLoading ? <Skeleton className="h-6 w-12" /> : reziePct != null ? `${reziePct} %` : "—"}
-              </p>
+              <div className="flex items-baseline gap-2">
+                <p className={cn(
+                  "text-lg font-bold tabular-nums",
+                  isBelow ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-500"
+                )}>
+                  {isLoading ? <Skeleton className="h-6 w-12" /> : utilization30d != null ? `${utilization30d} %` : "—"}
+                </p>
+                {trendIcon && (
+                  <span className={cn("text-sm font-bold", trendClass)} title={`Trend: ${trendLabel}`}>
+                    {trendIcon}
+                  </span>
+                )}
+              </div>
               <p className="text-[9px] text-muted-foreground tabular-nums mt-0.5">
-                {formatHours(totalRezieHours)} • cíl ≤ {expectedRezie.toFixed(0)} %
+                30 dní • medián 3m: {utilizationMedian3m != null ? `${utilizationMedian3m} %` : "—"} • cíl ≥ {utilizationTarget} %
               </p>
             </CardContent>
           </Card>
         </TooltipTrigger>
         <TooltipContent className="max-w-sm">
           <div className="space-y-1.5">
-            <p className="font-semibold text-xs">Utilizace výroby — režijní hodiny</p>
+            <p className="font-semibold text-xs">Utilizace výroby</p>
             <p className="text-[10px] text-muted-foreground leading-snug">
-              Z hodín výrobních pracovníků (Dílna 1/2/3 + Sklad).
-              Hodiny zapsané PM/Eng/Admin se nezapočítavají.
+              Podíl projektových hodin na celkových hodinách výrobních pracovníků (Dílna 1/2/3 + Sklad).
+              Hodiny PM/Eng/Admin se nezapočítávají.
             </p>
-            <p className="text-[10px] text-muted-foreground">
-              Cíl odvozený z utilizace výroby ({utilizationTarget} %) ⇒ ≤ {expectedRezie.toFixed(0)} % režie
-            </p>
+            <div className="border-t pt-1 space-y-0.5 text-[10px] tabular-nums">
+              <div className="flex justify-between gap-3">
+                <span>Posledních 30 dní:</span>
+                <span>{formatHours(productionProjectHours30d)} proj. / {formatHours(productionRezieHours30d)} režie</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Medián 3 měsíců:</span>
+                <span>{utilizationMedian3m != null ? `${utilizationMedian3m} %` : "—"}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Trend:</span>
+                <span className={trendClass}>{trendIcon} {trendLabel}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Cíl:</span>
+                <span>≥ {utilizationTarget} %</span>
+              </div>
+            </div>
             {rezieRows.length > 0 && (
               <div className="border-t pt-1 mt-1 space-y-0.5">
-                <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5">Rozpis (jen výroba)</p>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5">Režie celkem (lifetime)</p>
                 {rezieRows.map((r) => (
                   <div key={r.project_id} className="flex justify-between gap-3 text-[10px] tabular-nums">
                     <span className="font-mono">{r.project_id}</span>
