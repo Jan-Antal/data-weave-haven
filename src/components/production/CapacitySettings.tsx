@@ -1016,8 +1016,13 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                         <div className="text-muted-foreground">{typeLabel}{week.holiday_name ? ` · ${week.holiday_name}` : ""}</div>
                         {hasDilna && (
                           <div className="border-t border-border/50 pt-0.5 mt-0.5 space-y-0">
-                            <div>Dílna 1: {wAny.dilna1_hodiny ?? 0}h · Dílna 2: {wAny.dilna2_hodiny ?? 0}h</div>
-                            <div>Dílna 3: {wAny.dilna3_hodiny ?? 0}h · Sklad: {wAny.sklad_hodiny ?? 0}h</div>
+                            {(() => {
+                              const breakdown = (wAny.usek_breakdown ?? {}) as Record<string, number>;
+                              const entries = Object.entries(breakdown).sort(([a], [b]) => a.localeCompare(b, "cs"));
+                              return entries.length > 0
+                                ? entries.map(([usek, h]) => <div key={usek}>{usek}: {Math.round(h)}h</div>)
+                                : null;
+                            })()}
                             <div>Zaměstnanci: {wAny.total_employees} · Absence: {Math.round((absMap.get(wAny.week_start) ?? 0) / 8)} dní</div>
                             <div>Využití: {wAny.utilization_pct ?? 83}%</div>
                           </div>
