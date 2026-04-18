@@ -48,8 +48,8 @@ export function useUpsertPosition() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["position_catalogue"] });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
       qc.invalidateQueries({ queryKey: ["people"] });
     },
     onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
@@ -63,7 +63,9 @@ export function useDeletePosition() {
       const { error } = await supabase.from("position_catalogue" as any).delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["position_catalogue"] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
+    },
   });
 }
 
