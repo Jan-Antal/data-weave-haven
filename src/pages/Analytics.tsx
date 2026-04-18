@@ -566,12 +566,18 @@ function AnalyticsTableRow({
   onOpenDetail,
   isVisible,
   onToggleForceProject,
+  expanded,
+  onToggleExpand,
 }: {
   row: AnalyticsRow;
   onOpenDetail: (id: string) => void;
   isVisible: (key: string) => boolean;
   onToggleForceProject?: (projectId: string, current: boolean) => void;
+  expanded?: boolean;
+  onToggleExpand?: (id: string) => void;
 }) {
+  const isRezie = r.category === "rezie";
+  const muted = <span className="text-xs text-muted-foreground">—</span>;
   return (
     <TableRow
       className={cn(
@@ -583,17 +589,47 @@ function AnalyticsTableRow({
     >
       {isVisible("project_id") && (
         <TableCell>
+          <div className="flex items-center gap-1">
+            {onToggleExpand && (
+              <button
+                onClick={() => onToggleExpand(r.project_id)}
+                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                aria-label={expanded ? "Sbalit" : "Rozbalit"}
+              >
+                {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            {r.unmatched || isRezie ? (
+              <span className="whitespace-nowrap font-mono text-xs text-muted-foreground font-semibold">
+                {r.project_id}
+              </span>
+            ) : (
+              <button
+                onClick={() => onOpenDetail(r.project_id)}
+                className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
+              >
+                {r.project_id}
+              </button>
+            )}
+          </div>
+        </TableCell>
+      )}
+      {isVisible("project_name") && (
+        <TableCell style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.unmatched ? "Hodiny v Alvenu, ale projekt nie je v databáze" : r.project_name}>
           {r.unmatched ? (
-            <span className="whitespace-nowrap font-mono text-xs text-muted-foreground font-semibold" title="Projekt neexistuje v databázi">
-              {r.project_id}
+            <span className="text-xs text-muted-foreground truncate inline-flex items-center gap-1">
+              <span className="text-[9px] font-medium px-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">⚠</span>
+              {r.project_name}
             </span>
+          ) : isRezie ? (
+            <span className="text-xs truncate">{r.project_name}</span>
           ) : (
-            <button
+            <span
+              className="font-semibold text-xs cursor-pointer hover:underline hover:text-primary transition-colors truncate"
               onClick={() => onOpenDetail(r.project_id)}
-              className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
             >
-              {r.project_id}
-            </button>
+              {r.project_name}
+            </span>
           )}
         </TableCell>
       )}
