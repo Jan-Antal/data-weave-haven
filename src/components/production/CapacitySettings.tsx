@@ -142,12 +142,13 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   );
 
   // Derive disabledUseky for the displayed composition week (all employees of úsek excluded → úsek is "off")
+  // Úseky sú teraz dynamické (usek_nazov v rámci Výroba Direct).
   const disabledUseky = useMemo(() => {
     const result = new Set<string>();
-    const usekEmployees: Record<string, string[]> = { dilna1: [], dilna2: [], dilna3: [], sklad: [] };
+    const usekEmployees: Record<string, string[]> = {};
     for (const emp of vyrobniEmployees) {
-      const key = normalizeUsek(emp.usek);
-      if (key) usekEmployees[key].push(emp.id);
+      const key = normalizeUsek(emp);
+      if (key) (usekEmployees[key] ??= []).push(emp.id);
     }
     for (const [key, ids] of Object.entries(usekEmployees)) {
       if (ids.length > 0 && ids.every(id => excludedForCompositionWeek.has(id))) result.add(key);
