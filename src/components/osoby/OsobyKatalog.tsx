@@ -367,6 +367,54 @@ export function OsobyKatalog() {
         title="Smazat pozici?"
         description={deleteFor ? `Opravdu smazat "${deleteFor.pozicia}" (${deleteFor.usek})?` : ""}
       />
+
+      <Dialog open={!!usekDelete} onOpenChange={(o) => !o && setUsekDelete(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Smazat úsek „{usekDelete?.usek}"?</DialogTitle>
+            <DialogDescription>
+              {usekEmployeesLoading
+                ? "Načítám zaměstnance…"
+                : (usekEmployees?.length ?? 0) > 0
+                  ? "V úseku jsou přiřazení zaměstnanci. Než ho smažete, je potřeba je přeřadit do jiného úseku."
+                  : "V úseku nejsou žádní zaměstnanci. Smazáním odstraníte všechny pozice v tomto úseku."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {(usekEmployees?.length ?? 0) > 0 && (
+            <div className="rounded-md border bg-muted/30 max-h-64 overflow-y-auto">
+              <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/50 text-xs font-medium text-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                Zaměstnanci v úseku ({usekEmployees!.length})
+              </div>
+              <ul className="divide-y">
+                {usekEmployees!.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                    <span>{e.meno}</span>
+                    {e.pozicia && (
+                      <span className="text-xs text-muted-foreground">{e.pozicia}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setUsekDelete(null)}>Zavřít</Button>
+            <Button
+              variant="destructive"
+              disabled={usekEmployeesLoading || (usekEmployees?.length ?? 0) > 0 || delUsek.isPending}
+              onClick={() => {
+                if (!usekDelete) return;
+                delUsek.mutate(usekDelete, { onSuccess: () => setUsekDelete(null) });
+              }}
+            >
+              Smazat úsek
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
