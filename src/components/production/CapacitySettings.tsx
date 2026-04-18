@@ -696,7 +696,8 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const anyManualOverride = editingWeeks.some(wn => liveWeekMap.get(wn)?.is_manual_override);
 
   const innerContent = (
-    <div className={inline ? "flex-1 overflow-y-auto px-6 pb-4 pt-2" : "flex-1 overflow-y-auto px-6 pb-4"}>
+    <>
+      <div className="flex-1 overflow-y-auto px-6 pb-4 pt-2">
         <Tabs defaultValue="kapacita" className="space-y-4">
           <TabsList>
             <TabsTrigger value="kapacita">Kapacita</TabsTrigger>
