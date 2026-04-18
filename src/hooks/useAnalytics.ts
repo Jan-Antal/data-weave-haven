@@ -72,9 +72,19 @@ function isOverheadCode(projectId: string, overheadMap: Map<string, string>): bo
 
 const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokončeno"];
 
+function isEmployeeActiveForLogDate(
+  emp: { deactivated_at: string | null },
+  logDate: string,
+): boolean {
+  // `activated_at` on ami_employees is record/reactivation metadata, not a reliable
+  // historical employment start for analytics log filtering.
+  if (emp.deactivated_at && logDate > emp.deactivated_at.slice(0, 10)) return false;
+  return true;
+}
+
 export function useAnalytics() {
   return useQuery({
-    queryKey: ["analytics", "utilization-v4"],
+    queryKey: ["analytics", "utilization-v5"],
     queryFn: async () => {
       const capacityFromDate = (() => { const d = new Date(); d.setDate(d.getDate() - 100); return d.toISOString().slice(0, 10); })();
       const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes, capacityRes] = await Promise.all([
@@ -378,9 +388,7 @@ export function useAnalytics() {
         if (isExcludedActivityCode(log.cinnost_kod)) continue;
         const emp = empByName.get(normalizeEmployeeName(log.zamestnanec));
         if (!emp) continue; // not a production worker
-        // Respect active period: activated_at ≤ datum ≤ deactivated_at
-        if (emp.activated_at && log.datum_sync < emp.activated_at.slice(0, 10)) continue;
-        if (emp.deactivated_at && log.datum_sync > emp.deactivated_at.slice(0, 10)) continue;
+        if (!isEmployeeActiveForLogDate(emp, log.datum_sync)) continue;
 
         const h = Number(log.hodiny) || 0;
         if (isOverheadCode(log.ami_project_id, overheadMap)) {
@@ -420,8 +428,7 @@ export function useAnalytics() {
         if (isExcludedActivityCode(log.cinnost_kod)) continue;
         const emp = empByName.get(normalizeEmployeeName(log.zamestnanec));
         if (!emp) continue;
-        if (emp.activated_at && log.datum_sync < emp.activated_at.slice(0, 10)) continue;
-        if (emp.deactivated_at && log.datum_sync > emp.deactivated_at.slice(0, 10)) continue;
+        if (!isEmployeeActiveForLogDate(emp, log.datum_sync)) continue;
 
         const h = Number(log.hodiny) || 0;
         const isOverhead = isOverheadCode(log.ami_project_id, overheadMap);
