@@ -414,16 +414,17 @@ export default function Analytics() {
         <>
           {/* Summary cards */}
           <div className="shrink-0 px-4 py-2 grid grid-cols-5 gap-3">
+            {(() => { const onlyRezie = statusFilters.has("rezie") && statusFilters.size === 1; return (<>
             <Card>
               <CardContent className="pt-3 pb-2 px-3">
-                <p className="text-[10px] text-muted-foreground mb-0.5">Projekty</p>
+                <p className="text-[10px] text-muted-foreground mb-0.5">{onlyRezie ? "Režijní položky" : "Projekty"}</p>
                 <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-12" /> : summary.count}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-3 pb-2 px-3">
                 <p className="text-[10px] text-muted-foreground mb-0.5">Plán hodin</p>
-                <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : formatHours(summary.totalPlan)}</p>
+                <p className="text-lg font-bold tabular-nums">{isLoading ? <Skeleton className="h-6 w-16" /> : (onlyRezie ? "—" : formatHours(summary.totalPlan))}</p>
               </CardContent>
             </Card>
             <Card>
@@ -437,14 +438,15 @@ export default function Analytics() {
                 <p className="text-[10px] text-muted-foreground mb-0.5">Průměrné čerpání</p>
                 <p className={cn(
                   "text-lg font-bold tabular-nums",
-                  summary.avgPct != null && summary.avgPct <= 80 && "text-green-600",
-                  summary.avgPct != null && summary.avgPct > 80 && summary.avgPct <= 100 && "text-orange-500",
-                  summary.avgPct != null && summary.avgPct > 100 && "text-red-500",
+                  !onlyRezie && summary.avgPct != null && summary.avgPct <= 80 && "text-green-600",
+                  !onlyRezie && summary.avgPct != null && summary.avgPct > 80 && summary.avgPct <= 100 && "text-orange-500",
+                  !onlyRezie && summary.avgPct != null && summary.avgPct > 100 && "text-red-500",
                 )}>
-                  {isLoading ? <Skeleton className="h-6 w-12" /> : summary.avgPct != null ? `${summary.avgPct} %` : "—"}
+                  {isLoading ? <Skeleton className="h-6 w-12" /> : (onlyRezie ? "—" : (summary.avgPct != null ? `${summary.avgPct} %` : "—"))}
                 </p>
               </CardContent>
             </Card>
+            </>); })()}
             <UtilizationCard
               isLoading={isLoading}
               utilization30d={data?.summary.utilization30d ?? null}
