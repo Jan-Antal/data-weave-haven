@@ -328,6 +328,70 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
     Math.round(totalBruttoSelectedWeekly * localUtilizationPct / 100),
     [totalBruttoSelectedWeekly, localUtilizationPct]);
 
+  // ====== PER-WEEK (composition week) calculation ======
+  // Employees active that specific week (activated_at/deactivated_at), their hours after absences,
+  // and resulting capacity per úsek for the selected composition week.
+  const compositionWeekStart = useMemo(
+    () => getWeekStartFromNumber(selectedYear, compositionWeekNumber),
+    [selectedYear, compositionWeekNumber],
+  );
+
+  const compositionWorkingDays = useMemo(() => {
+    if (!autoApplyHolidays) return 5;
+    const ws = new Date(compositionWeekStart + "T00:00:00");
+    const we = new Date(ws); we.setDate(ws.getDate() + 5);
+    const hCount = (holidays ?? []).filter(h => {
+      const d = new Date(h.date + "T00:00:00");
+      return d >= ws && d < we && d.getDay() !== 0 && d.getDay() !== 6;
+    }).length;
+    let days = Math.max(0, 5 - hCount);
+    for (const ch of (companyHolidays ?? [])) {
+      const cs = new Date(ch.start_date + "T00:00:00");
+      const ce = new Date(ch.end_date + "T00:00:00");
+      if (ws <= ce && we > cs) {
+        let overlap = 0;
+        const cur = new Date(ws);
+        for (let d = 0; d < 5; d++) {
+          if (cur.getDay() !== 0 && cur.getDay() !== 6 && cur >= cs && cur <= ce) overlap++;
+          cur.setDate(cur.getDate() + 1);
+        }
+        days = Math.max(0, days - overlap);
+      }
+    }
+    return days;
+  }, [compositionWeekStart, holidays, companyHolidays, autoApplyHolidays]);
+
+  const compositionAbsenceHours = useMemo(
+    () => absMap.get(compositionWeekStart) ?? 0,
+    [absMap, compositionWeekStart],
+  );
+
+  /** Hours worked per employee that week (uvazok × activeDays). */
+  const compositionEmpHours = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const emp of vyrobniEmployees) {
+      const activeDays = getActiveWorkingDays(emp, compositionWeekStart, compositionWorkingDays);
+      map.set(emp.id, (emp.uvazok_hodiny ?? 8) * activeDays);
+    }
+    return map;
+  }, [vyrobniEmployees, compositionWeekStart, compositionWorkingDays]);
+
+  /** Employees actually contributing in the composition week (active that week + included). */
+  const compositionActiveEmployees = useMemo(
+    () => selectedEmployees.filter(e => (compositionEmpHours.get(e.id) ?? 0) > 0),
+    [selectedEmployees, compositionEmpHours],
+  );
+
+  const compositionBruttoWeekly = useMemo(
+    () => compositionActiveEmployees.reduce((s, e) => s + (compositionEmpHours.get(e.id) ?? 0), 0),
+    [compositionActiveEmployees, compositionEmpHours],
+  );
+
+  const compositionNettoCapacity = useMemo(
+    () => Math.max(0, Math.round((compositionBruttoWeekly - compositionAbsenceHours) * localUtilizationPct / 100)),
+    [compositionBruttoWeekly, compositionAbsenceHours, localUtilizationPct],
+  );
+
 
   // Fully reactive liveWeekMap computed from local state
   const liveWeekMap = useMemo(() => {
