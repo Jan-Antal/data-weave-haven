@@ -828,32 +828,32 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
         </div>
 
 
-        {/* Úseky breakdown panel (Výroba Direct) — dynamické členenie podľa usek_nazov */}
+        {/* Úseky breakdown panel (Výroba Direct) — per-week (compositionWeekNumber) */}
         {vyrobniEmployees.length > 0 && (() => {
-          // Build dynamic groups from usek_nazov (Kompletace, Strojová dílna, Lakovna, Dyhárna, Balení & Expedice).
+          // Build dynamic groups from usek_nazov (Kompletace, Strojová dílna, …).
+          // Hours are PER-WEEK (uvazok × activeDays for the composition week).
           const groups: Record<string, {count: number, weeklyHours: number, employees: typeof vyrobniEmployees}> = {};
           for (const emp of vyrobniEmployees) {
             const usekKey = normalizeUsek(emp);
             if (!usekKey) continue;
             if (!groups[usekKey]) groups[usekKey] = { count: 0, weeklyHours: 0, employees: [] };
             groups[usekKey].count++;
-            groups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
+            groups[usekKey].weeklyHours += compositionEmpHours.get(emp.id) ?? 0;
             groups[usekKey].employees.push(emp);
           }
+          // Filtered (included + active that week) groups
           const filteredGroups: Record<string, {count: number, weeklyHours: number}> = {};
           for (const key of Object.keys(groups)) filteredGroups[key] = { count: 0, weeklyHours: 0 };
-          for (const emp of filteredEmployees) {
+          for (const emp of compositionActiveEmployees) {
             const usekKey = normalizeUsek(emp);
             if (!usekKey || !filteredGroups[usekKey]) continue;
             filteredGroups[usekKey].count++;
-            filteredGroups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
+            filteredGroups[usekKey].weeklyHours += compositionEmpHours.get(emp.id) ?? 0;
           }
-          // Stable order: alphabetical by úsek name (Kompletace, Strojová dílna, …)
           const orderedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b, "cs"));
           const totalCount = Object.values(filteredGroups).reduce((s, g) => s + g.count, 0);
           const totalWeekly = Object.values(filteredGroups).reduce((s, g) => s + g.weeklyHours, 0);
-          const totalMonthly = Math.round(totalWeekly * 52 / 12);
-          const totalNetto = Math.round(totalWeekly * localUtilizationPct / 100);
+          const totalNetto = compositionNettoCapacity;
           return (
             <div className="space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -878,7 +878,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                📊 Výrobní zaměstnanci: {totalCount} celkem · Brutto fond: {totalWeekly} h/týden · Měsíčně: {totalMonthly} h
+                📊 Aktivní v T{compositionWeekNumber}: {totalCount} zam. · Brutto fond: {Math.round(totalWeekly)} h · Absence: {Math.round(compositionAbsenceHours)} h · Prac. dní: {compositionWorkingDays}
               </p>
               <div className="overflow-hidden rounded border border-border">
                 <table className="w-full text-xs">
@@ -886,8 +886,8 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                     <tr className="bg-muted/50 border-b border-border">
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground w-5"></th>
                       <th className="text-left px-3 py-1.5 font-medium text-muted-foreground">Úsek</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Zaměstnanci</th>
-                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Aktivní zam.</th>
+                      <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">H/týden (T{compositionWeekNumber})</th>
                       <th className="text-right px-3 py-1.5 font-medium text-muted-foreground">Čistá kapacita (h/týden)</th>
                     </tr>
                   </thead>
@@ -927,15 +927,17 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                               {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
                               {key}
                             </td>
-                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{g.count}</td>
-                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{fg.weeklyHours} h</td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{fg.count}<span className="text-muted-foreground">/{g.count}</span></td>
+                            <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{Math.round(fg.weeklyHours)} h</td>
                             <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-accent")}>{netto} h</td>
                           </tr>
                           {isExpanded && g.employees.length > 0 && g.employees.map(emp => {
                             const isEmpDisabled = disabledEmployees.has(emp.id) || isUsekDisabled;
                             const isRecent = emp.activated_at && new Date(emp.activated_at) > threeMonthsAgo;
+                            const empWeekHours = compositionEmpHours.get(emp.id) ?? 0;
+                            const isInactiveThisWeek = empWeekHours === 0;
                             return (
-                              <tr key={emp.id} className="bg-muted/20 border-b border-border/30">
+                              <tr key={emp.id} className={cn("bg-muted/20 border-b border-border/30", isInactiveThisWeek && "opacity-60")}>
                                 <td className="px-1 py-0.5">
                                   <input
                                     type="checkbox"
@@ -955,10 +957,13 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                                   {isRecent && (
                                     <span className="ml-1.5 text-[10px] text-emerald-600">od {emp.activated_at?.split("T")[0]}</span>
                                   )}
+                                  {isInactiveThisWeek && !isEmpDisabled && (
+                                    <span className="ml-1.5 text-[10px] text-muted-foreground italic">(neaktivní v T{compositionWeekNumber})</span>
+                                  )}
                                 </td>
                                 <td className="px-3 py-0.5 text-right font-sans text-muted-foreground"></td>
                                 <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{(emp.uvazok_hodiny ?? 8)} h/den</td>
-                                <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{(emp.uvazok_hodiny ?? 8) * 5} h/týd</td>
+                                <td className="px-3 py-0.5 text-right font-sans text-muted-foreground">{Math.round(empWeekHours)} h/týd</td>
                               </tr>
                             );
                           })}
@@ -969,19 +974,19 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                       <td className="px-1 py-1.5"></td>
                       <td className="px-3 py-1.5 text-foreground">Celkem</td>
                       <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalCount}</td>
-                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{totalWeekly} h</td>
+                      <td className="px-3 py-1.5 text-right font-sans text-foreground">{Math.round(totalWeekly)} h</td>
                       <td className="px-3 py-1.5 text-right font-sans text-accent font-bold">{totalNetto} h</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                Skutečná kapacita = {totalNetto} h/týden (fond {totalWeekly}h × využití {localUtilizationPct}%)
+                Skutečná kapacita T{compositionWeekNumber} = {totalNetto} h/týden · (brutto {Math.round(totalWeekly)}h − absence {Math.round(compositionAbsenceHours)}h) × využití {localUtilizationPct}%
               </p>
-              <p className="text-[10px] text-muted-foreground">Změny ovlivní výpočet kapacity po přepočtení.</p>
             </div>
           );
         })()}
+
 
         {/* Year Bar Chart */}
         <div className="border border-border/60 rounded-lg p-4 space-y-3 bg-card">
