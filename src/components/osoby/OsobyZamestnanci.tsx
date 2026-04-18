@@ -19,6 +19,7 @@ import { EmployeeAbsenceDialog } from "@/components/production/EmployeeAbsenceDi
 import { usePositionCatalogue, useUpdateEmployeeFields, useReactivateEmployee, useDeleteEmployeePermanently } from "@/hooks/useOsoby";
 import { UkoncitPracovniPomerDialog } from "./UkoncitPracovniPomerDialog";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 const UVAZEK_OPTIONS = [4, 6, 8];
 
@@ -53,7 +54,7 @@ function useAllEmployees() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ami_employees")
-        .select("id, meno, usek, usek_nazov, stredisko, pozicia, uvazok_hodiny, activated_at, deactivated_at, deactivated_date, aktivny")
+        .select("id, meno, usek, usek_nazov, stredisko, pozicia, uvazok_hodiny, activated_at, deactivated_at, deactivated_date, aktivny, is_pm, is_kalkulant, is_konstrukter")
         .order("meno", { ascending: true });
       if (error) throw error;
       return (data ?? []) as any[];
@@ -302,6 +303,7 @@ export function OsobyZamestnanci() {
               <TableHead className="w-[260px]">Jméno</TableHead>
               <TableHead className="w-[180px]">Úsek</TableHead>
               <TableHead className="w-[160px]">Pozice</TableHead>
+              <TableHead className="w-[200px]">Role na projektu</TableHead>
               <TableHead className="w-[110px]">Úvazek</TableHead>
               <TableHead className="w-[160px]">Absence</TableHead>
               <TableHead className="w-[150px]">Stav</TableHead>
@@ -315,7 +317,7 @@ export function OsobyZamestnanci() {
                 return (
                   <>
                     <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/40 hover:bg-muted/40 border-b border-border/40">
-                      <TableCell colSpan={7} className="py-1.5">
+                      <TableCell colSpan={8} className="py-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className={cn("text-[10px] font-medium border px-2 py-0.5", strediskoStyles(stredisko))}>
                             {stredisko}
