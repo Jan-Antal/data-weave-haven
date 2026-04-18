@@ -292,7 +292,14 @@ export function ProductionHeader({
             {(canAccessSettings || realRole === "owner") && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="p-2 rounded-md text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-colors">
+                  <button
+                    className={cn(
+                      "p-2 rounded-md transition-colors",
+                      module === "osoby"
+                        ? "text-primary-foreground bg-primary-foreground/10"
+                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                    )}
+                  >
                     <Settings className="h-5 w-5" />
                   </button>
                 </DropdownMenuTrigger>
