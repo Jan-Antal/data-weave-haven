@@ -314,7 +314,7 @@ export function OsobyZamestnanci() {
                                 <SelectValue placeholder={!emp.usek_nazov ? "Vyberte úsek…" : "—"} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="__none" disabled>—</SelectItem>
+                                <SelectItem value="__none">— Neobsazeno</SelectItem>
                                 {positionsForUsek.map((p) => (
                                   <SelectItem key={p} value={p}>{p}</SelectItem>
                                 ))}
