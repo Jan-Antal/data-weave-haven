@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -20,12 +20,7 @@ function getCurrentISOWeek(): { year: number; week: number } {
   return { year: target.getUTCFullYear(), week };
 }
 
-interface Props {
-  /** Render the dialog wrapper too? When inside SpravaOsob we render inline only. */
-  inline?: boolean;
-}
-
-export function OsobyKapacita({ inline = true }: Props) {
+export function OsobyKapacita() {
   const qc = useQueryClient();
   const today = getCurrentISOWeek();
   const [selectedYear, setSelectedYear] = useState(today.year);
@@ -35,9 +30,7 @@ export function OsobyKapacita({ inline = true }: Props) {
   const { data: empList = [] } = useEmployeesForWeek(weekStart, selectedYear, selectedWeek);
 
   // Listen to week changes from CapacitySettings via custom event
-  // (simple cross-component bridge without modifying CapacitySettings internals)
-  // Falls back to current week if no event has been received.
-  useMemo(() => {
+  useEffect(() => {
     const handler = (e: Event) => {
       const ce = e as CustomEvent<{ year: number; week: number }>;
       if (ce.detail) {
@@ -56,7 +49,6 @@ export function OsobyKapacita({ inline = true }: Props) {
     qc.invalidateQueries({ queryKey: ["weekly-capacity"] });
   };
 
-  // Group by stredisko
   const grouped = useMemo(() => {
     const g = new Map<string, EmployeeWeekRow[]>();
     for (const e of empList) {
@@ -69,24 +61,25 @@ export function OsobyKapacita({ inline = true }: Props) {
 
   return (
     <Tabs defaultValue="kapacita" className="h-full flex flex-col overflow-hidden">
-      <TabsList className="mx-4 mt-2 self-start">
-        <TabsTrigger value="kapacita">Kapacita</TabsTrigger>
-        <TabsTrigger value="zamestnanci">Zaměstnanci</TabsTrigger>
-      </TabsList>
+      <div className="px-5 pt-4 border-b">
+        <TabsList className="self-start">
+          <TabsTrigger value="kapacita">Kapacita</TabsTrigger>
+          <TabsTrigger value="zamestnanci">Zaměstnanci v týdnu</TabsTrigger>
+        </TabsList>
+      </div>
 
-      <TabsContent value="kapacita" className="flex-1 overflow-hidden mt-2">
-        {/* Embed the existing capacity settings as inline (open=true). */}
-        <CapacitySettings open={true} onOpenChange={() => { /* controlled by parent */ }} />
+      <TabsContent value="kapacita" className="flex-1 overflow-hidden mt-0">
+        <CapacitySettings open={true} onOpenChange={() => {}} inline />
       </TabsContent>
 
-      <TabsContent value="zamestnanci" className="flex-1 overflow-y-auto mt-2 px-4">
+      <TabsContent value="zamestnanci" className="flex-1 overflow-y-auto mt-0 p-5">
         <div className="mb-3 flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Vybraný týden:</span>
           <Badge variant="secondary">
             T{selectedWeek}/{selectedYear} ({format(new Date(weekStart + "T00:00:00"), "d. M.", { locale: cs })})
           </Badge>
           <span className="text-xs text-muted-foreground ml-auto">
-            Aktivních: {empList.filter(e => e.is_included_in_week).length} / {empList.length}
+            Aktivních: {empList.filter((e) => e.is_included_in_week).length} / {empList.length}
           </span>
         </div>
 
