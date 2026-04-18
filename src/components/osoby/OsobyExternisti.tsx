@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
+import { SectionToolbar } from "@/components/shell/SectionToolbar";
 
 const ROLE_OPTIONS = ["PM", "Konstruktér", "Kalkulant", "Architekt"] as const;
 
@@ -100,32 +101,29 @@ export function OsobyExternisti() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-5 pt-4 pb-3 border-b">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">
-              Externisti · {rows.length}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Externí PM, konstruktéři, kalkulanti a architekti spolupracující na projektech
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+      <SectionToolbar
+        left={
+          <span className="text-xs text-muted-foreground">
+            {rows.length} externistů
+          </span>
+        }
+        right={
+          <>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Hledat externistu nebo firmu…"
-                className="pl-8 h-9 w-[260px]"
+                className="pl-8 h-8 w-[260px] text-xs"
               />
             </div>
-            <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Button size="sm" className="h-8" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" /> Přidat externistu
             </Button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto">
         <Table>

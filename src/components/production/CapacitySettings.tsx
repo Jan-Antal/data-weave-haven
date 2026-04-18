@@ -697,7 +697,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
 
   const innerContent = (
     <>
-      <div className="flex-1 overflow-y-auto px-6 pb-4 pt-2">
+      <div className={cn("flex-1 overflow-y-auto pb-4 pt-3", inline ? "px-5" : "px-6")}>
         <div className="space-y-4">
 
         {/* Standard Capacity — informational with live data */}

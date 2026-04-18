@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { TestModeBanner } from "./TestModeBanner";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
+import { SectionToolbar } from "@/components/shell/SectionToolbar";
 
 interface UserRow {
   id: string;
@@ -424,19 +425,30 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
             </Table>
       </div>
 
-      <div className="px-5 py-3 border-t">
-        {!isTestUser && (
-          <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
-          </Button>
-        )}
-      </div>
+      {!inline && (
+        <div className="px-5 py-3 border-t">
+          {!isTestUser && (
+            <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
+            </Button>
+          )}
+        </div>
+      )}
     </>
   );
 
   const wrappedContent = inline ? (
     <div className="flex flex-col h-full overflow-hidden bg-background">
-      {isTestUser && <div className="px-5 pt-3"><TestModeBanner /></div>}
+      <SectionToolbar
+        left={<span className="text-xs text-muted-foreground">{users.length} uživatelů</span>}
+        right={
+          !isTestUser ? (
+            <Button size="sm" className="h-8" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Přidat uživatele
+            </Button>
+          ) : null
+        }
+      />
       {tableSection}
     </div>
   ) : (

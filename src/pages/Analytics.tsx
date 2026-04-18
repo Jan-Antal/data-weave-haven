@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { PageTabsShell, type ShellTabDef } from "@/components/shell/PageTabsShell";
 import { AnalyticsBreakdownRow } from "@/components/AnalyticsBreakdownRow";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,7 +81,8 @@ export default function Analytics() {
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
-  const [dilnaMode, setDilnaMode] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dilnaMode = (searchParams.get("tab") ?? "projekty") === "dilna";
   const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
   const { getLabel, getWidth, updateLabel, updateWidth } = useColumnLabels("analytics");
@@ -268,10 +271,18 @@ export default function Analytics() {
     return visibleCols.map((c) => getLabel(c.key, ANALYTICS_LABEL_MAP[c.key] || c.label));
   }, [visibleCols, getLabel]);
 
+  const tabs: ShellTabDef[] = [
+    { key: "projekty", label: "Projekty" },
+    { key: "dilna", label: "Dílna" },
+  ];
+
   return (
+    <PageTabsShell tabs={tabs} defaultTab="projekty" paramName="tab">
+      {() => (
     <div className="h-full flex flex-col overflow-hidden bg-background">
-      {/* Filter row — always visible for toggle + recalculate */}
+      {/* Per-tab toolbar */}
       <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b">
+
         {!dilnaMode && (
           <div className="flex items-center gap-2">
             <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
@@ -370,15 +381,6 @@ export default function Analytics() {
           })()
         )}
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant={dilnaMode ? "default" : "outline"}
-            size="sm"
-            className="h-7 px-2.5 text-xs gap-1.5"
-            onClick={() => setDilnaMode((v) => !v)}
-          >
-            <Factory className="h-3.5 w-3.5" />
-            Dílna
-          </Button>
           {!dilnaMode && (
             <>
               <TooltipProvider>
@@ -558,6 +560,8 @@ export default function Analytics() {
         onAll={() => doRecalculate(true)}
       />
     </div>
+      )}
+    </PageTabsShell>
   );
 }
 
