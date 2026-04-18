@@ -15,6 +15,7 @@ import { AccountSettings } from "@/components/AccountSettings";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
 import { RecycleBin } from "@/components/RecycleBin";
+import { OverheadProjectsSettings } from "@/components/OverheadProjectsSettings";
 import { CostBreakdownPresetsDialog } from "@/components/CostBreakdownPresetsDialog";
 import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { FormulaBuilder } from "@/components/settings/FormulaBuilder";
@@ -121,6 +122,7 @@ export function ProductionHeader({
   const [statusMgmtOpen, setStatusMgmtOpen] = useState(false);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [costPresetsOpen, setCostPresetsOpen] = useState(false);
+  const [overheadOpen, setOverheadOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
   const [formulaBuilderOpen, setFormulaBuilderOpen] = useState(false);
@@ -311,6 +313,11 @@ export function ProductionHeader({
                     </DropdownMenuItem>
                   )}
                   {isAdmin && (
+                    <DropdownMenuItem onClick={() => setOverheadOpen(true)}>
+                      Režijní projekty
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && (
                     <DropdownMenuItem onClick={() => setCapacitySettingsOpen(true)}>
                       Kapacita výroby
                     </DropdownMenuItem>
@@ -367,6 +374,7 @@ export function ProductionHeader({
       <ExchangeRateSettings open={exchangeRateOpen} onOpenChange={setExchangeRateOpen} />
       <StatusManagement open={statusMgmtOpen} onOpenChange={setStatusMgmtOpen} />
       <RecycleBin open={recycleBinOpen} onOpenChange={setRecycleBinOpen} />
+      <OverheadProjectsSettings open={overheadOpen} onOpenChange={setOverheadOpen} />
       <AccountSettings open={accountSettingsOpen} onOpenChange={setAccountSettingsOpen} />
       <CapacitySettings open={capacitySettingsOpen} onOpenChange={setCapacitySettingsOpen} />
       <CostBreakdownPresetsDialog open={costPresetsOpen} onOpenChange={setCostPresetsOpen} />
