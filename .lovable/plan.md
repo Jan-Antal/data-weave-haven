@@ -1,57 +1,50 @@
 
 
-## Plán: Sjednocená "Správa osob"
+## Plán: "Správa osob" jako samostatná stránka `/osoby`
 
-### Název
-**"Správa osob"** v menu i v hlavičce dialogu (zachovává existující terminologii).
+### Layout (dle reference)
 
-### A. DB změny (migrace)
+**Hlavička stránky** (pod globálním app headerem):
+- Tabové navigace nahoře (ne sidebar): `Zaměstnanci · Externi · Uživatelé · Pozice & číselníky · Kapacita`
+- Underline indikátor aktivního tabu, brand barvy (`#223937`), Early Sans typografie
+- URL state: `/osoby?tab=zamestnanci|externi|uzivatele|katalog|kapacita`
 
-**1. `ami_employees`** — přidat:
-- `stredisko text`, `usek_nazov text`, `pozicia text`
-- `deactivated_date date` — datum ukončení (zachová historii)
+**Obsah tabu** (card-style):
+- Sekční hlavička: titulek + meta ("Zaměstnanci · 46 osob", "Alveno sync · 18.4. 22:00 · jen aktivní")
+- Pravá strana hlavičky: filter Select ("Všetky strediská"), Search input, primary CTA ("+ Manuálne / + Přidat")
+- Tabulka s grouping rows (`Výroba Direct · Kompletace · 8 osob · 320h brutto`) jako barevné pill labely podle strediska:
+  - Výroba Direct = zelený pill
+  - Výroba Indirect = oranžový pill
+  - Provoz = fialový pill
+- Řádky: avatar (iniciály) + jméno | Úsek Select | Pozice Select | Úvazek Select | Absencia (badge "RD · do 31.8." nebo "—") | Status badge (aktívny/neaktívny)
+- Neaktivní řádky šedé/fade
+- Footer tabulky: "+ Přidat absenci" + nápověda ("Alveno absencia sa importuje automaticky · manuálna: RD/NEM/PN/Jiné")
 
-**2. Nová `position_catalogue`**: `id, stredisko, usek, pozicia, project_dropdown_role (pm|kalkulant|konstrukter|null), is_active, sort_order` + RLS read=auth, write=admin/owner. Seed celé hierarchie.
+### Routing & integrace
 
-**3. `people`** — přidat `is_external bool default false`, `firma text`.
+**Nové:**
+- `src/pages/Osoby.tsx` — plnostránkový layout, query-param tab state, žádný Dialog
+- `src/components/osoby/UzivateleTable.tsx` — extrakt z `UserManagement` (tabulka inline, pomocné dialogy zůstávají)
+- `src/components/osoby/KapacitaPanel.tsx` — extrakt z `CapacitySettings` (graf + composition inline) + sub-tab Zaměstnanci s reaktivitou na vybraný týden
 
-**RLS:** Existující anon insert/update/select na `ami_employees` a `ami_absences` zůstává netknuté (n8n/Alveno funguje dál). Restrikce pouze v UI.
+**Upravené:**
+- `src/App.tsx` — route `/osoby` chráněná `AdminRoute`, rozšířit `PersistentDesktopHeader` modules
+- `src/components/PeopleManagementContext.tsx` — `navigate('/osoby?tab=externi')` místo `setOpen`
+- `src/components/production/ProductionHeader.tsx` — settings menu "Správa osob" → `navigate('/osoby')`
+- `src/components/osoby/OsobyUzivatele.tsx` → použít `UzivateleTable` (žádný modal-on-modal)
+- `src/components/osoby/OsobyKapacita.tsx` → použít `KapacitaPanel`
+- `src/components/osoby/OsobyZamestnanci.tsx` → redesign dle reference: avatar, pill grouping, kompaktnější řádky, sekční hlavička s meta + filter
 
-### B. Komponenta `SpravaOsob.tsx` (5 záložek)
+**Smazané:**
+- `src/components/SpravaOsob.tsx` (modal verze nahrazena stránkou)
 
-**1. Zaměstnanci** — `ami_employees` seskupené `stredisko → usek_nazov`. Sloupce: Jméno | Úsek | Pozice | Úvazek | Absence | Stav (Aktivní / "Ukončen k DD.MM.YYYY") | Alveno úsek (readonly) | ⋯ menu (Ukončit pracovní poměr → date picker → `deactivated_date` + `aktivny=false`; Obnovit; Smazat trvale s ConfirmDialog).
+### Vizuální detaily
 
-**2. Externisti** — `people WHERE is_external=true`. Sloupce: Jméno | Firma | Role (PM/Konstruktér/Kalkulant/Architekt) | Aktivní | Smazat. "+ Přidat externistu".
-
-**3. Uživatelé** — stávající `UserManagement` přesunutý beze změn.
-
-**4. Pozice & číselníky** — tree editor `position_catalogue`. Stredisko → Úsek (s flag `project_dropdown_role`) → Pozice.
-
-**5. Kapacita** — dvě sub-záložky:
-- **Kapacita** (default) — graf + složení útvarů, jako dnes.
-- **Zaměstnanci** — seznam zaměstnanců aktivních **v aktuálně vybraném týdnu** (z grafu/picker). Při otevření = current week + future. Klik na týden v grafu změní vybraný týden → seznam přefiltruje podle:
-  - `aktivny=true` v daném týdnu (`activated_at <= weekEnd` AND (`deactivated_date` IS NULL OR `deactivated_date >= weekStart`))
-  - + composition snapshot (`production_capacity_employees` pro historické týdny)
-  - Možnost include/exclude per zaměstnanec pro daný týden (existující `toggleEmployeeForWeekRange` logika).
-
-### C. Logika sjednocení
-
-- `useActiveMembersForRole(role)` UNION:
-  - `ami_employees` JOIN `position_catalogue` kde `project_dropdown_role` matchuje AND `aktivny=true`
-  - `people` kde role matchuje AND `is_active=true`
-- `usePeople(role)` → tenký wrapper. Projektové dropdowny fungují bez změny.
-- `useVyrobniEmployees` přijme i `stredisko='Výroba Direct'` (fallback na Alveno `usek`).
-
-### D. Wiring
-
-- `ProductionHeader` settings menu: jediná položka **"Správa osob"** místo tří (odstranit "Správa uživatelů", "Kapacita výroby" → vše uvnitř).
-- `PeopleManagementContext.openPeopleManagement()` → otevře Správu osob na Tab 2 (Externisti).
-- Staré soubory (`UserManagement.tsx`, `PeopleManagement.tsx`, `EmployeeManagement.tsx`, `CapacitySettings.tsx`) zůstanou nepoužité na disku (cleanup později).
-
-### Soubory
-
-**Migrace** (1): sloupce + `position_catalogue` + seed + RLS.
-**Nové**: `SpravaOsob.tsx`, `osoby/OsobyZamestnanci.tsx`, `OsobyExternisti.tsx`, `OsobyUzivatele.tsx`, `OsobyKatalog.tsx`, `OsobyKapacita.tsx` (s 2 sub-taby), `UkoncitPracovniPomerDialog.tsx`.
-**Nový hook**: `useOsoby.ts` (katalog + active-members-for-role + active-employees-for-week).
-**Upravené**: `usePeople.ts`, `useCapacityCalc.ts`, `PeopleManagementContext.tsx`, `ProductionHeader.tsx`.
+- Pozadí stránky: `bg-[#f8f7f4]` (existing app bg), card `bg-white rounded-lg border`
+- Stredisko pill barvy: zelený `bg-green-100 text-green-800`, oranžový `bg-orange-100 text-orange-800`, fialový `bg-purple-100 text-purple-800`
+- Status badge: aktívny `bg-green-50 text-green-700 border-green-200`, neaktívny `bg-red-50 text-red-700`
+- Absencia badge: `bg-amber-100 text-amber-800`
+- Avatar circle: deterministický pastel z hash jména, 32px, iniciály
+- Tabové underline: `border-b-2 border-[#223937]` na aktivním
+- Konzistentní s app: Early Sans, accent `#223937`/`#EA592A`, `rounded-md` borders
 
