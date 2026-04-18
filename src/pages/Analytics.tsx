@@ -68,6 +68,14 @@ export default function Analytics() {
   const [sortCol, setSortCol] = useState<SortKey | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
   const [recalculating, setRecalculating] = useState(false);
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
