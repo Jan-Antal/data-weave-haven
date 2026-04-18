@@ -104,19 +104,53 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const [compositionWeekNumber, setCompositionWeekNumber] = useState<number>(currentWeek);
   const { role } = useAuth();
   const isAdmin = role === "admin" || role === "owner";
-  const VISIBLE_WEEKS = 12;
+  const VISIBLE_WEEKS = 3;
   const SCROLL_STEP = 4;
+  const MIN_YEAR = 2026;
+  // Default view: current week + 2 previous weeks visible (3 weeks total)
   const getDefaultViewStart = useCallback(() => {
-    if (selectedYear === currentYear) return Math.max(1, currentWeek - Math.floor(VISIBLE_WEEKS / 2));
+    if (selectedYear === currentYear) return Math.max(1, currentWeek - 2);
     return 1;
   }, [selectedYear, currentYear, currentWeek]);
   const [viewStart, setViewStart] = useState(() => getDefaultViewStart());
 
-  const scrollLeft = () => setViewStart(v => Math.max(1, v - SCROLL_STEP));
-  const scrollRight = () => setViewStart(v => Math.min(52 - VISIBLE_WEEKS + 1, v + SCROLL_STEP));
+  // At minimum boundary (first week of MIN_YEAR)?
+  const atMinBoundary = selectedYear <= MIN_YEAR && viewStart <= 1;
+
+  const scrollLeft = () => {
+    if (atMinBoundary) return;
+    let nextStart = viewStart - SCROLL_STEP;
+    let nextYear = selectedYear;
+    if (nextStart < 1) {
+      if (nextYear - 1 < MIN_YEAR) {
+        // Clamp to first week of MIN_YEAR
+        setSelectedYear(MIN_YEAR);
+        setViewStart(1);
+        return;
+      }
+      nextYear -= 1;
+      nextStart = Math.max(1, 52 + nextStart);
+    }
+    setSelectedYear(nextYear);
+    setViewStart(nextStart);
+  };
+  const scrollRight = () => {
+    let nextStart = viewStart + SCROLL_STEP;
+    let nextYear = selectedYear;
+    const maxStart = 52 - VISIBLE_WEEKS + 1;
+    if (nextStart > maxStart) {
+      nextYear += 1;
+      nextStart = nextStart - 52;
+      if (nextStart < 1) nextStart = 1;
+    }
+    setSelectedYear(nextYear);
+    setViewStart(nextStart);
+  };
+  const canJumpToToday = currentYear > MIN_YEAR || (currentYear === MIN_YEAR && currentWeek >= 1);
   const jumpToToday = () => {
+    if (!canJumpToToday) return;
     setSelectedYear(currentYear);
-    setViewStart(Math.max(1, currentWeek - Math.floor(VISIBLE_WEEKS / 2)));
+    setViewStart(Math.max(1, currentWeek - 2));
   };
 
   const CZECH_MONTHS = ["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
@@ -994,25 +1028,17 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-semibold text-foreground">Kapacita</h3>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setSelectedYear(y => y - 1); setViewStart(1); }}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm font-bold text-foreground min-w-[50px] text-center">{selectedYear}</span>
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => { setSelectedYear(y => y + 1); setViewStart(1); }}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+              <span className="text-sm font-bold text-foreground min-w-[50px]">{selectedYear}</span>
               <span className="text-xs text-muted-foreground">{visibleMonthRange}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={jumpToToday}>
+              <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={jumpToToday} disabled={!canJumpToToday}>
                 <CalendarDays className="h-3 w-3 mr-1" /> Dnes
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollLeft} disabled={viewStart <= 1}>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollLeft} disabled={atMinBoundary}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollRight} disabled={viewStart >= 52 - VISIBLE_WEEKS + 1}>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={scrollRight}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -1083,6 +1109,9 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                             height: barH,
                             backgroundColor: barColor,
                             minWidth: 0,
+                            ...(selectedYear === currentYear && wn === currentWeek
+                              ? { border: "1.5px solid #0a2e28" }
+                              : {}),
                           }}
                           onClick={e => handleBarClick(wn, e)}
                         />
