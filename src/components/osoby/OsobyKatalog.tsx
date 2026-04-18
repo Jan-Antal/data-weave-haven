@@ -384,7 +384,7 @@ export function OsobyKatalog() {
           {(usekEmployees?.length ?? 0) > 0 && (
             <div className="rounded-md border bg-muted/30 max-h-64 overflow-y-auto">
               <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/50 text-xs font-medium text-foreground">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
                 Zaměstnanci v úseku ({usekEmployees!.length})
               </div>
               <ul className="divide-y">
