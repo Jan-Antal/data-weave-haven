@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { normalizeUsek } from "@/hooks/useCapacityCalc";
 
 export type Balik = "DONE" | "IN_PROGRESS" | "OVER";
 export type Trend = "ok" | "warning" | "over";
 
 export type PlanSource = "TPV" | "Project" | "None" | null;
 export type RowCategory = "project" | "rezie" | "unmatched";
+
+export type TimeRange = "week" | "month" | "3months" | "year" | "all";
 
 export interface AnalyticsRow {
   project_id: string;
@@ -43,51 +44,49 @@ export interface AnalyticsSummary {
   totalProjectHours: number;
   reziePct: number | null;
   utilizationTarget: number;
-  // Production-staff-only utilization (Dílna 1/2/3 + Sklad) — lifetime
-  productionRezieHours: number;
-  productionProjectHours: number;
-  rezieByCode: Record<string, number>; // overhead code → production-staff hours (lifetime)
-  // Windowed utilization (production project / (project + rezie)) * 100
-  utilization30d: number | null;
-  utilization60to30d: number | null;
-  utilization90to60d: number | null;
-  utilizationMedian3m: number | null;
-  utilizationTrend: "up" | "down" | "flat" | null;
-  // Hours behind 30d window (for tooltip)
-  productionProjectHours30d: number;
-  productionRezieHours30d: number;
-}
-
-function normalizeEmployeeName(name: string | null | undefined): string {
-  return (name ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("cs-CZ");
+  rezieByCode: Record<string, number>;
+  // ── New windowed utilization (pure hours-based) ──
+  // Utilization = (Výrobní hodiny − Režijní hodiny) / Výrobní hodiny
+  utilizationPct: number | null;
+  totalHoursWindow: number;       // sum of production hours (excl TPV/ENG/PRO) in window
+  overheadHoursWindow: number;    // sum of overhead-coded hours in window
+  productiveHoursWindow: number;  // total − overhead
 }
 
 function isExcludedActivityCode(code: string | null | undefined): boolean {
   return !!code && ["TPV", "ENG", "PRO"].includes(code);
 }
 
-function isOverheadCode(projectId: string, overheadMap: Map<string, string>): boolean {
-  return overheadMap.has(projectId);
-}
-
 const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokončeno"];
 
-function isEmployeeActiveForLogDate(
-  emp: { deactivated_at: string | null },
-  logDate: string,
-): boolean {
-  // `activated_at` on ami_employees is record/reactivation metadata, not a reliable
-  // historical employment start for analytics log filtering.
-  if (emp.deactivated_at && logDate > emp.deactivated_at.slice(0, 10)) return false;
-  return true;
+function getRangeStart(range: TimeRange): string | null {
+  if (range === "all") return null;
+  const now = new Date();
+  const d = new Date(now);
+  if (range === "week") {
+    const day = d.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    d.setDate(d.getDate() - diff);
+  } else if (range === "month") {
+    d.setDate(1);
+  } else if (range === "3months") {
+    d.setMonth(d.getMonth() - 3);
+  } else if (range === "year") {
+    d.setFullYear(d.getFullYear() - 1);
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-export function useAnalytics() {
+export function useAnalytics(timeRange: TimeRange = "3months") {
   return useQuery({
-    queryKey: ["analytics", "utilization-v5"],
+    queryKey: ["analytics", "utilization-v6", timeRange],
     queryFn: async () => {
-      const capacityFromDate = (() => { const d = new Date(); d.setDate(d.getDate() - 100); return d.toISOString().slice(0, 10); })();
-      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, employeesRes, rawLogsRes, capacityRes] = await Promise.all([
+      const rangeStart = getRangeStart(timeRange);
+
+      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes, windowLogsRes] = await Promise.all([
         (supabase.rpc as any)("get_hours_by_project"),
         supabase
           .from("projects")
@@ -110,18 +109,14 @@ export function useAnalytics() {
           .select("utilization_pct, weekly_capacity_hours")
           .limit(1)
           .maybeSingle(),
-        supabase
-          .from("ami_employees")
-          .select("meno, usek, aktivny, activated_at, deactivated_at"),
-        supabase
-          .from("production_hours_log")
-          .select("ami_project_id, hodiny, datum_sync, zamestnanec, cinnost_kod")
-          .gte("datum_sync", capacityFromDate)
-          .range(0, 49999),
-        supabase
-          .from("production_capacity")
-          .select("week_start, capacity_hours")
-          .gte("week_start", capacityFromDate),
+        (() => {
+          let q = supabase
+            .from("production_hours_log")
+            .select("ami_project_id, hodiny, cinnost_kod")
+            .range(0, 99999);
+          if (rangeStart) q = q.gte("datum_sync", rangeStart);
+          return q;
+        })(),
       ]);
 
       // Build overhead lookup (active only)
@@ -171,33 +166,15 @@ export function useAnalytics() {
       }
 
       // Build projects lookup
-      const projectsMap = new Map<string, {
-        project_name: string;
-        status: string | null;
-        pm: string | null;
-        cost_preset_id: string | null;
-        cost_is_custom: boolean;
-        plan_use_project_price: boolean;
-      }>();
+      const projectsMap = new Map<string, any>();
       if (projectsRes.data) {
         for (const p of projectsRes.data as any[]) {
-          projectsMap.set(p.project_id, {
-            project_name: p.project_name,
-            status: p.status,
-            pm: p.pm,
-            cost_preset_id: p.cost_preset_id,
-            cost_is_custom: p.cost_is_custom ?? false,
-            plan_use_project_price: p.plan_use_project_price ?? false,
-          });
+          projectsMap.set(p.project_id, p);
         }
       }
 
-      // Build actual hours from pre-aggregated RPC
-      interface HoursAgg {
-        skutocne: number;
-        tracking_od: string | null;
-        tracking_do: string | null;
-      }
+      // Build actual hours from pre-aggregated RPC (lifetime — for table rows)
+      interface HoursAgg { skutocne: number; tracking_od: string | null; tracking_do: string | null; }
       const hoursMap = new Map<string, HoursAgg>();
       if (hoursRes.data) {
         for (const r of hoursRes.data as Array<{ ami_project_id: string; total_hodiny: number; min_datum: string; max_datum: string }>) {
@@ -216,7 +193,6 @@ export function useAnalytics() {
       if (projectsRes.data) {
         for (const proj of projectsRes.data as any[]) {
           const pid = proj.project_id;
-          // If project_id is mapped as overhead, it will be emitted from the overhead loop instead
           if (overheadMap.has(pid)) continue;
 
           const name = proj.project_name || pid;
@@ -235,9 +211,7 @@ export function useAnalytics() {
           const pct = hodiny_plan
             ? Math.round((hodiny_skutocne / hodiny_plan) * 1000) / 10
             : null;
-          const zostatok = hodiny_plan
-            ? Math.max(0, hodiny_plan - hodiny_skutocne)
-            : null;
+          const zostatok = hodiny_plan ? Math.max(0, hodiny_plan - hodiny_skutocne) : null;
 
           const isDone = DONE_STATUSES.includes(status || "");
           let balik: Balik = "IN_PROGRESS";
@@ -251,79 +225,50 @@ export function useAnalytics() {
             else trend = "over";
           }
 
-          if (h?.tracking_do && (!lastSync || h.tracking_do > lastSync))
-            lastSync = h.tracking_do;
+          if (h?.tracking_do && (!lastSync || h.tracking_do > lastSync)) lastSync = h.tracking_do;
 
-          // Resolve preset label
           let preset_label = "Default";
-          if (proj.cost_is_custom) {
-            preset_label = "Custom";
-          } else if (proj.cost_preset_id) {
-            const matchedPreset = presets.find((p: any) => p.id === proj.cost_preset_id);
-            preset_label = matchedPreset?.name || "Default";
+          if (proj.cost_is_custom) preset_label = "Custom";
+          else if (proj.cost_preset_id) {
+            const matched = presets.find((p: any) => p.id === proj.cost_preset_id);
+            preset_label = matched?.name || "Default";
           } else {
-            const defaultPreset = presets.find((p: any) => p.is_default);
-            preset_label = defaultPreset ? defaultPreset.name : "Default";
+            const def = presets.find((p: any) => p.is_default);
+            preset_label = def ? def.name : "Default";
           }
 
           const sched = scheduleMap.get(pid);
 
           rows.push({
-            project_id: pid,
-            project_name: name,
-            pm,
-            status,
-            hodiny_plan,
-            hodiny_skutocne,
-            pct,
-            zostatok,
-            balik,
-            trend,
-            tracking_od: h?.tracking_od ?? null,
-            tracking_do: h?.tracking_do ?? null,
-            schedule_od: sched?.min ?? null,
-            schedule_do: sched?.max ?? null,
-            plan_source,
-            preset_label,
-            warning_low_tpv,
-            force_project_price,
-            unmatched: false,
-            category: "project",
+            project_id: pid, project_name: name, pm, status,
+            hodiny_plan, hodiny_skutocne, pct, zostatok, balik, trend,
+            tracking_od: h?.tracking_od ?? null, tracking_do: h?.tracking_do ?? null,
+            schedule_od: sched?.min ?? null, schedule_do: sched?.max ?? null,
+            plan_source, preset_label, warning_low_tpv, force_project_price,
+            unmatched: false, category: "project",
           });
         }
       }
 
-      // Add overhead rows (režie) — pull hours by overhead code
+      // Add overhead rows (lifetime)
       const knownProjectIds = new Set(projectsMap.keys());
       for (const [code, label] of overheadMap.entries()) {
         const h = hoursMap.get(code);
         const hodiny_skutocne = h?.skutocne ?? 0;
         if (h?.tracking_do && (!lastSync || h.tracking_do > lastSync)) lastSync = h.tracking_do;
         rows.push({
-          project_id: code,
-          project_name: label,
-          pm: null,
-          status: null,
-          hodiny_plan: null,
-          hodiny_skutocne,
-          pct: null,
-          zostatok: null,
-          balik: "IN_PROGRESS",
-          trend: null,
-          tracking_od: h?.tracking_od ?? null,
-          tracking_do: h?.tracking_do ?? null,
-          schedule_od: null,
-          schedule_do: null,
-          plan_source: null,
-          preset_label: "Režie",
-          warning_low_tpv: false,
-          force_project_price: false,
-          unmatched: false,
-          category: "rezie",
+          project_id: code, project_name: label, pm: null, status: null,
+          hodiny_plan: null, hodiny_skutocne, pct: null, zostatok: null,
+          balik: "IN_PROGRESS", trend: null,
+          tracking_od: h?.tracking_od ?? null, tracking_do: h?.tracking_do ?? null,
+          schedule_od: null, schedule_do: null,
+          plan_source: null, preset_label: "Režie",
+          warning_low_tpv: false, force_project_price: false,
+          unmatched: false, category: "rezie",
         });
       }
 
-      // Add ghost rows for unmatched AMI project IDs (logged hours without project record AND not overhead)
+      // Unmatched ghost rows
       if (hoursRes.data) {
         for (const r of hoursRes.data as Array<{ ami_project_id: string; total_hodiny: number; min_datum: string; max_datum: string }>) {
           if (knownProjectIds.has(r.ami_project_id)) continue;
@@ -332,26 +277,14 @@ export function useAnalytics() {
           if (skutocne < 0.05) continue;
           if (r.max_datum && (!lastSync || r.max_datum > lastSync)) lastSync = r.max_datum;
           rows.push({
-            project_id: r.ami_project_id,
-            project_name: "Nesparovaná data z Alvena",
-            pm: null,
-            status: null,
-            hodiny_plan: null,
-            hodiny_skutocne: skutocne,
-            pct: null,
-            zostatok: null,
-            balik: "IN_PROGRESS",
-            trend: null,
-            tracking_od: r.min_datum || null,
-            tracking_do: r.max_datum || null,
-            schedule_od: null,
-            schedule_do: null,
-            plan_source: null,
-            preset_label: "—",
-            warning_low_tpv: false,
-            force_project_price: false,
-            unmatched: true,
-            category: "unmatched",
+            project_id: r.ami_project_id, project_name: "Nesparovaná data z Alvena",
+            pm: null, status: null, hodiny_plan: null, hodiny_skutocne: skutocne,
+            pct: null, zostatok: null, balik: "IN_PROGRESS", trend: null,
+            tracking_od: r.min_datum || null, tracking_do: r.max_datum || null,
+            schedule_od: null, schedule_do: null,
+            plan_source: null, preset_label: "—",
+            warning_low_tpv: false, force_project_price: false,
+            unmatched: true, category: "unmatched",
           });
         }
       }
@@ -359,169 +292,42 @@ export function useAnalytics() {
       const projectRows = rows.filter((r) => r.category === "project");
       const totalPlan = projectRows.reduce((s, r) => s + (r.hodiny_plan || 0), 0);
       const totalSkutocne = projectRows.reduce((s, r) => s + r.hodiny_skutocne, 0);
-      const totalRezieHours = rows
-        .filter((r) => r.category === "rezie")
-        .reduce((s, r) => s + r.hodiny_skutocne, 0);
-      const totalProjectHours = totalSkutocne;
+      const totalRezieHours = rows.filter((r) => r.category === "rezie").reduce((s, r) => s + r.hodiny_skutocne, 0);
 
-      // ── Production-staff-only utilization ─────────────────────────────
-      // Build set of production employee names (Dílna 1/2/3 + Sklad), respecting active period.
-      type EmpRow = { meno: string; usek: string; aktivny: boolean | null; activated_at: string | null; deactivated_at: string | null };
-      const productionEmps = ((employeesRes.data || []) as EmpRow[]).filter(
-        (e) => e.aktivny !== false && normalizeUsek(e.usek) !== null,
-      );
-      const empByName = new Map<string, EmpRow>();
-      for (const e of productionEmps) empByName.set(normalizeEmployeeName(e.meno), e);
-
-      let productionRezieHours = 0;
-      let productionProjectHours = 0;
+      // ── Utilization in window ─────────────────────────
+      // Výrobní hodiny = SUM hodiny in window, excluding TPV/ENG/PRO
+      // Režijní hodiny = subset where ami_project_id ∈ overheadMap
+      // Utilizace = (Výrobní − Režijní) / Výrobní
+      let totalHoursWindow = 0;
+      let overheadHoursWindow = 0;
       const rezieByCode: Record<string, number> = {};
 
-      const rawLogs = (rawLogsRes.data || []) as Array<{
+      const windowLogs = (windowLogsRes.data || []) as Array<{
         ami_project_id: string;
         hodiny: number | string;
-        datum_sync: string;
-        zamestnanec: string;
         cinnost_kod: string | null;
       }>;
-      for (const log of rawLogs) {
+      for (const log of windowLogs) {
         if (isExcludedActivityCode(log.cinnost_kod)) continue;
-        const emp = empByName.get(normalizeEmployeeName(log.zamestnanec));
-        if (!emp) continue; // not a production worker
-        if (!isEmployeeActiveForLogDate(emp, log.datum_sync)) continue;
-
         const h = Number(log.hodiny) || 0;
-        if (isOverheadCode(log.ami_project_id, overheadMap)) {
-          productionRezieHours += h;
+        if (h <= 0) continue;
+        totalHoursWindow += h;
+        if (overheadMap.has(log.ami_project_id)) {
+          overheadHoursWindow += h;
           rezieByCode[log.ami_project_id] = (rezieByCode[log.ami_project_id] || 0) + h;
-        } else {
-          productionProjectHours += h;
         }
       }
-
-      const utilDenom = productionRezieHours + productionProjectHours;
-      const reziePct = utilDenom > 0
-        ? Math.round((productionRezieHours / utilDenom) * 1000) / 10
+      const productiveHoursWindow = totalHoursWindow - overheadHoursWindow;
+      const utilizationPct = totalHoursWindow > 0
+        ? Math.round((productiveHoursWindow / totalHoursWindow) * 1000) / 10
         : null;
-
-      // ── Windowed utilization (last 30d, 60-30d, 90-60d) ──────────────
-      // Utilization = odpracované projektové hodiny / dostupná kapacita (z kapacitního plánu)
-      const today = new Date();
-      const toLocalISO = (d: Date) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-      };
-      const dayOffset = (n: number) => {
-        const d = new Date(today);
-        d.setDate(d.getDate() - n);
-        return toLocalISO(d);
-      };
-      const W0 = dayOffset(0);    // today
-      const W30 = dayOffset(30);  // 30 days ago
-      const W60 = dayOffset(60);
-      const W90 = dayOffset(90);
-
-      const windowAgg = { p30: 0, r30: 0, p60: 0, r60: 0, p90: 0, r90: 0 };
-      for (const log of rawLogs) {
-        if (isExcludedActivityCode(log.cinnost_kod)) continue;
-        const emp = empByName.get(normalizeEmployeeName(log.zamestnanec));
-        if (!emp) continue;
-        if (!isEmployeeActiveForLogDate(emp, log.datum_sync)) continue;
-
-        const h = Number(log.hodiny) || 0;
-        const isOverhead = isOverheadCode(log.ami_project_id, overheadMap);
-
-        const d = log.datum_sync;
-        if (d > W30 && d <= W0) {
-          if (isOverhead) windowAgg.r30 += h; else windowAgg.p30 += h;
-        } else if (d > W60 && d <= W30) {
-          if (isOverhead) windowAgg.r60 += h; else windowAgg.p60 += h;
-        } else if (d > W90 && d <= W60) {
-          if (isOverhead) windowAgg.r90 += h; else windowAgg.p90 += h;
-        }
-      }
-
-      // Build daily-capacity map from production_capacity (week_start → capacity_hours / working_days)
-      // We approximate: each weekday in the window gets capacity_hours/5 from its containing week.
-      const fallbackWeekly = Number((settingsRes.data as any)?.weekly_capacity_hours ?? 875);
-      const capacityRows = (capacityRes.data || []) as Array<{ week_start: string; capacity_hours: number }>;
-      const capByWeekStart = new Map<string, number>();
-      for (const c of capacityRows) capByWeekStart.set(c.week_start, Number(c.capacity_hours) || 0);
-
-      const getMondayISO = (iso: string): string => {
-        const d = new Date(iso + "T00:00:00");
-        const dow = d.getDay() || 7; // 1..7 (Mon=1)
-        d.setDate(d.getDate() - (dow - 1));
-        return toLocalISO(d);
-      };
-      const sumCapacityForRange = (fromExclusive: string, toInclusive: string): number => {
-        let total = 0;
-        const start = new Date(fromExclusive + "T00:00:00");
-        const end = new Date(toInclusive + "T00:00:00");
-        const cur = new Date(start);
-        cur.setDate(cur.getDate() + 1); // exclusive start
-        while (cur <= end) {
-          const dow = cur.getDay();
-          if (dow !== 0 && dow !== 6) {
-            const monIso = getMondayISO(toLocalISO(cur));
-            const weekly = capByWeekStart.get(monIso) ?? fallbackWeekly;
-            total += weekly / 5;
-          }
-          cur.setDate(cur.getDate() + 1);
-        }
-        return total;
-      };
-
-      const cap30 = sumCapacityForRange(W30, W0);
-      const cap60 = sumCapacityForRange(W60, W30);
-      const cap90 = sumCapacityForRange(W90, W60);
-
-      const pctVsCap = (proj: number, cap: number): number | null =>
-        cap > 0 ? Math.round((proj / cap) * 1000) / 10 : null;
-
-      const utilization30d = pctVsCap(windowAgg.p30, cap30);
-      const utilization60to30d = pctVsCap(windowAgg.p60, cap60);
-      const utilization90to60d = pctVsCap(windowAgg.p90, cap90);
-
-      // Diagnostic log — remove once verified
-      console.info("[Analytics]", {
-        p30: windowAgg.p30,
-        r30: windowAgg.r30,
-        cap30: Math.round(cap30),
-        util30d: utilization30d,
-        productionEmpsCount: productionEmps.length,
-        rawLogsCount: rawLogs.length,
-        window: { W90, W60, W30, W0 },
-        capacityRowsCount: capacityRows.length,
-      });
-
-      const samples = [utilization30d, utilization60to30d, utilization90to60d].filter(
-        (v): v is number => v != null,
-      );
-      let utilizationMedian3m: number | null = null;
-      if (samples.length > 0) {
-        const sorted = [...samples].sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        utilizationMedian3m = sorted.length % 2 === 0
-          ? Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 10) / 10
-          : sorted[mid];
-      }
-
-      let utilizationTrend: "up" | "down" | "flat" | null = null;
-      if (utilization30d != null && utilizationMedian3m != null) {
-        const diff = utilization30d - utilizationMedian3m;
-        if (diff > 2) utilizationTrend = "up";
-        else if (diff < -2) utilizationTrend = "down";
-        else utilizationTrend = "flat";
-      }
+      const reziePct = totalHoursWindow > 0
+        ? Math.round((overheadHoursWindow / totalHoursWindow) * 1000) / 10
+        : null;
 
       const withPlan = projectRows.filter((r) => r.pct != null);
       const avgPct = withPlan.length
-        ? Math.round(
-            (withPlan.reduce((s, r) => s + r.pct!, 0) / withPlan.length) * 10
-          ) / 10
+        ? Math.round((withPlan.reduce((s, r) => s + r.pct!, 0) / withPlan.length) * 10) / 10
         : null;
 
       const summary: AnalyticsSummary = {
@@ -533,19 +339,14 @@ export function useAnalytics() {
         countOver: projectRows.filter((r) => r.balik === "OVER").length,
         lastSync,
         totalRezieHours,
-        totalProjectHours,
+        totalProjectHours: totalSkutocne,
         reziePct,
         utilizationTarget,
-        productionRezieHours,
-        productionProjectHours,
         rezieByCode,
-        utilization30d,
-        utilization60to30d,
-        utilization90to60d,
-        utilizationMedian3m,
-        utilizationTrend,
-        productionProjectHours30d: windowAgg.p30,
-        productionRezieHours30d: windowAgg.r30,
+        utilizationPct,
+        totalHoursWindow,
+        overheadHoursWindow,
+        productiveHoursWindow,
       };
 
       return { rows, summary };
