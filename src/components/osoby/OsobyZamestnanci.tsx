@@ -360,8 +360,11 @@ export function OsobyZamestnanci() {
                                 const days = Math.round((new Date(active.date_to).getTime() - new Date(active.date_from).getTime()) / 86400000);
                                 const isOpenEnded = days >= 170;
                                 return (
-                                  <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-200">
-                                    Pozastaveno · {isOpenEnded ? "předpokládaný návrat" : "návrat"} {format(new Date(active.date_to), "d. M. yyyy", { locale: cs })}
+                                  <Badge variant="outline" className="text-[10px] leading-tight bg-amber-50 text-amber-800 border-amber-200 flex flex-col items-start py-0.5 px-1.5 max-w-[140px]">
+                                    <span className="font-medium">Pozastaveno</span>
+                                    <span className="text-[9px] opacity-80 truncate w-full">
+                                      {isOpenEnded ? "předp. návrat" : "návrat"} {format(new Date(active.date_to), "d. M. yyyy", { locale: cs })}
+                                    </span>
                                   </Badge>
                                 );
                               })()
