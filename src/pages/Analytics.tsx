@@ -290,8 +290,21 @@ export default function Analytics() {
                     key={chip.key}
                     onClick={() => {
                       setStatusFilters((prev) => {
+                        const isActive = prev.has(chip.key);
+                        // Režije is exclusive — clicking it isolates overhead view
+                        if (chip.key === "rezie") {
+                          if (isActive) {
+                            // toggling off → restore default project view
+                            return new Set(["vyroba", "done"]);
+                          }
+                          return new Set(["rezie"]);
+                        }
+                        // Clicking a non-režie chip while režie is active → switch to project view
+                        if (prev.has("rezie")) {
+                          return new Set([chip.key]);
+                        }
                         const next = new Set(prev);
-                        if (next.has(chip.key)) next.delete(chip.key);
+                        if (isActive) next.delete(chip.key);
                         else next.add(chip.key);
                         return next;
                       });
