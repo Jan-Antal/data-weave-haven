@@ -5,6 +5,7 @@ export type Balik = "DONE" | "IN_PROGRESS" | "OVER";
 export type Trend = "ok" | "warning" | "over";
 
 export type PlanSource = "TPV" | "Project" | "None" | null;
+export type RowCategory = "project" | "rezie" | "unmatched";
 
 export interface AnalyticsRow {
   project_id: string;
@@ -26,6 +27,7 @@ export interface AnalyticsRow {
   warning_low_tpv: boolean;
   force_project_price: boolean;
   unmatched: boolean;
+  category: RowCategory;
 }
 
 export interface AnalyticsSummary {
@@ -36,6 +38,10 @@ export interface AnalyticsSummary {
   countInProgress: number;
   countOver: number;
   lastSync: string | null;
+  totalRezieHours: number;
+  totalProjectHours: number;
+  reziePct: number | null;
+  utilizationTarget: number;
 }
 
 const DONE_STATUSES = ["Expedice", "Montáž", "Předání", "Fakturace", "Dokončeno"];
@@ -44,7 +50,7 @@ export function useAnalytics() {
   return useQuery({
     queryKey: ["analytics"],
     queryFn: async () => {
-      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes] = await Promise.all([
+      const [hoursRes, projectsRes, planHoursRes, presetsRes, scheduleRes, overheadRes, settingsRes] = await Promise.all([
         (supabase.rpc as any)("get_hours_by_project"),
         supabase
           .from("projects")
@@ -59,7 +65,27 @@ export function useAnalytics() {
         supabase
           .from("production_schedule")
           .select("project_id, scheduled_week"),
+        supabase
+          .from("overhead_projects" as any)
+          .select("project_code, label, is_active"),
+        supabase
+          .from("production_settings")
+          .select("utilization_pct")
+          .limit(1)
+          .maybeSingle(),
       ]);
+
+      // Build overhead lookup (active only)
+      const overheadMap = new Map<string, string>();
+      if (overheadRes.data) {
+        for (const o of overheadRes.data as any[]) {
+          if (o.is_active !== false) {
+            overheadMap.set(o.project_code, o.label);
+          }
+        }
+      }
+
+      const utilizationTarget = Number((settingsRes.data as any)?.utilization_pct ?? 83);
 
       // Build schedule date range lookup
       const scheduleMap = new Map<string, { min: string; max: string }>();
@@ -141,6 +167,9 @@ export function useAnalytics() {
       if (projectsRes.data) {
         for (const proj of projectsRes.data as any[]) {
           const pid = proj.project_id;
+          // If project_id is mapped as overhead, it will be emitted from the overhead loop instead
+          if (overheadMap.has(pid)) continue;
+
           const name = proj.project_name || pid;
           const status = proj.status || null;
           const pm = proj.pm || null;
@@ -210,15 +239,46 @@ export function useAnalytics() {
             warning_low_tpv,
             force_project_price,
             unmatched: false,
+            category: "project",
           });
         }
       }
 
-      // Add ghost rows for unmatched AMI project IDs (logged hours without project record)
+      // Add overhead rows (režie) — pull hours by overhead code
       const knownProjectIds = new Set(projectsMap.keys());
+      for (const [code, label] of overheadMap.entries()) {
+        const h = hoursMap.get(code);
+        const hodiny_skutocne = h?.skutocne ?? 0;
+        if (h?.tracking_do && (!lastSync || h.tracking_do > lastSync)) lastSync = h.tracking_do;
+        rows.push({
+          project_id: code,
+          project_name: label,
+          pm: null,
+          status: null,
+          hodiny_plan: null,
+          hodiny_skutocne,
+          pct: null,
+          zostatok: null,
+          balik: "IN_PROGRESS",
+          trend: null,
+          tracking_od: h?.tracking_od ?? null,
+          tracking_do: h?.tracking_do ?? null,
+          schedule_od: null,
+          schedule_do: null,
+          plan_source: null,
+          preset_label: "Režie",
+          warning_low_tpv: false,
+          force_project_price: false,
+          unmatched: false,
+          category: "rezie",
+        });
+      }
+
+      // Add ghost rows for unmatched AMI project IDs (logged hours without project record AND not overhead)
       if (hoursRes.data) {
         for (const r of hoursRes.data as Array<{ ami_project_id: string; total_hodiny: number; min_datum: string; max_datum: string }>) {
           if (knownProjectIds.has(r.ami_project_id)) continue;
+          if (overheadMap.has(r.ami_project_id)) continue;
           const skutocne = Number(r.total_hodiny || 0);
           if (skutocne < 0.05) continue;
           if (r.max_datum && (!lastSync || r.max_datum > lastSync)) lastSync = r.max_datum;
@@ -242,13 +302,22 @@ export function useAnalytics() {
             warning_low_tpv: false,
             force_project_price: false,
             unmatched: true,
+            category: "unmatched",
           });
         }
       }
 
-      const totalPlan = rows.reduce((s, r) => s + (r.hodiny_plan || 0), 0);
-      const totalSkutocne = rows.reduce((s, r) => s + r.hodiny_skutocne, 0);
-      const withPlan = rows.filter((r) => r.pct != null);
+      const projectRows = rows.filter((r) => r.category === "project");
+      const totalPlan = projectRows.reduce((s, r) => s + (r.hodiny_plan || 0), 0);
+      const totalSkutocne = projectRows.reduce((s, r) => s + r.hodiny_skutocne, 0);
+      const totalRezieHours = rows
+        .filter((r) => r.category === "rezie")
+        .reduce((s, r) => s + r.hodiny_skutocne, 0);
+      const totalProjectHours = totalSkutocne;
+      const denom = totalRezieHours + totalProjectHours;
+      const reziePct = denom > 0 ? Math.round((totalRezieHours / denom) * 1000) / 10 : null;
+
+      const withPlan = projectRows.filter((r) => r.pct != null);
       const avgPct = withPlan.length
         ? Math.round(
             (withPlan.reduce((s, r) => s + r.pct!, 0) / withPlan.length) * 10
@@ -259,10 +328,14 @@ export function useAnalytics() {
         totalPlan,
         totalSkutocne,
         avgPct,
-        countDone: rows.filter((r) => r.balik === "DONE").length,
-        countInProgress: rows.filter((r) => r.balik === "IN_PROGRESS").length,
-        countOver: rows.filter((r) => r.balik === "OVER").length,
+        countDone: projectRows.filter((r) => r.balik === "DONE").length,
+        countInProgress: projectRows.filter((r) => r.balik === "IN_PROGRESS").length,
+        countOver: projectRows.filter((r) => r.balik === "OVER").length,
         lastSync,
+        totalRezieHours,
+        totalProjectHours,
+        reziePct,
+        utilizationTarget,
       };
 
       return { rows, summary };
