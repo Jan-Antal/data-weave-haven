@@ -14,10 +14,8 @@ function getISOWeekNumber(date: Date): number {
 
 export interface CapacityCalcResult {
   capacity: number;
-  dilna1: number;
-  dilna2: number;
-  dilna3: number;
-  sklad: number;
+  /** Hodiny rozdelené podľa usek_nazov (Kompletace, Strojová dílna, Lakovna, Dyhárna, Balení & Expedice). */
+  byUsek: Record<string, number>;
   totalEmployees: number;
   absenceHours: number;
   bruttoHodiny: number;
@@ -28,12 +26,31 @@ export interface EmployeeRow {
   id: string;
   meno?: string;
   usek: string;
+  usek_nazov?: string | null;
+  stredisko?: string | null;
   uvazok_hodiny: number | null;
   activated_at?: string | null;
   deactivated_at?: string | null;
 }
 
-type UsekKey = "dilna1" | "dilna2" | "dilna3" | "sklad";
+/** Stredisko pre výrobné členenie. Akceptujeme len Direct. */
+const VYROBA_DIRECT = "Výroba Direct";
+
+/** Vráti kanonický názov úseku (usek_nazov) iba pre zamestnancov v stredisku Výroba Direct.
+ *  Pre Kompletace zlučujeme všetky dílny do jedného „Kompletace". */
+export function normalizeUsek(emp: Pick<EmployeeRow, "stredisko" | "usek_nazov" | "usek">): string | null {
+  // Backward-compat: ak voláme s legacy stringom, skús odhadnúť.
+  if (typeof emp === "string") {
+    return null;
+  }
+  if ((emp.stredisko ?? "") !== VYROBA_DIRECT) return null;
+  const nazov = (emp.usek_nazov ?? "").trim();
+  if (!nazov) return null;
+  return nazov;
+}
+
+/** Legacy alias — niektoré miesta volajú normalizeUsek(string). */
+export function normalizeUsekLegacy(_usek: string): null { return null; }
 
 /**
  * Format a Date as YYYY-MM-DD using LOCAL time (not UTC).
