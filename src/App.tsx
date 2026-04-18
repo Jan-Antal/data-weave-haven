@@ -188,8 +188,8 @@ function AppRoutes() {
 
   return (
     <UndoRedoProvider>
-      <PeopleManagementProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <PeopleManagementProvider>
           <RealtimeSyncProvider />
           <div style={{ display: 'flex', flexDirection: 'column', height: '100svh', overflow: 'hidden', background: '#f8f7f4' }}>
             <PersistentDesktopHeader />
@@ -208,8 +208,8 @@ function AppRoutes() {
             </main>
             <AmiAssistant />
           </div>
-        </BrowserRouter>
-      </PeopleManagementProvider>
+        </PeopleManagementProvider>
+      </BrowserRouter>
     </UndoRedoProvider>
   );
 }
