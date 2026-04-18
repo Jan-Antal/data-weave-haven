@@ -760,45 +760,38 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
           </div>
         </div>
 
-        {/* Dílny breakdown panel with expandable employee lists */}
+        {/* Úseky breakdown panel (Výroba Direct) — dynamické členenie podľa usek_nazov */}
         {vyrobniEmployees.length > 0 && (() => {
-          const groups: Record<string, {count: number, weeklyHours: number, employees: typeof vyrobniEmployees}> = {
-            dilna1: {count:0, weeklyHours:0, employees:[]},
-            dilna2: {count:0, weeklyHours:0, employees:[]},
-            dilna3: {count:0, weeklyHours:0, employees:[]},
-            sklad:  {count:0, weeklyHours:0, employees:[]},
-          };
+          // Build dynamic groups from usek_nazov (Kompletace, Strojová dílna, Lakovna, Dyhárna, Balení & Expedice).
+          const groups: Record<string, {count: number, weeklyHours: number, employees: typeof vyrobniEmployees}> = {};
           for (const emp of vyrobniEmployees) {
-            const usekKey = normalizeUsek(emp.usek);
-            if (usekKey && groups[usekKey]) {
-              groups[usekKey].count++;
-              groups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
-              groups[usekKey].employees.push(emp);
-            }
+            const usekKey = normalizeUsek(emp);
+            if (!usekKey) continue;
+            if (!groups[usekKey]) groups[usekKey] = { count: 0, weeklyHours: 0, employees: [] };
+            groups[usekKey].count++;
+            groups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
+            groups[usekKey].employees.push(emp);
           }
-          // Filtered totals
-          const filteredGroups: Record<string, {count: number, weeklyHours: number}> = {
-            dilna1: {count:0, weeklyHours:0}, dilna2: {count:0, weeklyHours:0},
-            dilna3: {count:0, weeklyHours:0}, sklad: {count:0, weeklyHours:0},
-          };
+          const filteredGroups: Record<string, {count: number, weeklyHours: number}> = {};
+          for (const key of Object.keys(groups)) filteredGroups[key] = { count: 0, weeklyHours: 0 };
           for (const emp of filteredEmployees) {
-            const usekKey = normalizeUsek(emp.usek);
-            if (usekKey && filteredGroups[usekKey]) {
-              filteredGroups[usekKey].count++;
-              filteredGroups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
-            }
+            const usekKey = normalizeUsek(emp);
+            if (!usekKey || !filteredGroups[usekKey]) continue;
+            filteredGroups[usekKey].count++;
+            filteredGroups[usekKey].weeklyHours += (emp.uvazok_hodiny ?? 8) * 5;
           }
+          // Stable order: alphabetical by úsek name (Kompletace, Strojová dílna, …)
+          const orderedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b, "cs"));
           const totalCount = Object.values(filteredGroups).reduce((s, g) => s + g.count, 0);
           const totalWeekly = Object.values(filteredGroups).reduce((s, g) => s + g.weeklyHours, 0);
           const totalMonthly = Math.round(totalWeekly * 52 / 12);
           const totalNetto = Math.round(totalWeekly * localUtilizationPct / 100);
-          const labels: Record<string, string> = { dilna1: "Dílna 1", dilna2: "Dílna 2", dilna3: "Dílna 3", sklad: "Sklad" };
           return (
             <div className="space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   Složení výrobní kapacity
-                  <span className="text-xs font-normal text-muted-foreground">· Týden T{compositionWeekNumber} {selectedYear}</span>
+                  <span className="text-xs font-normal text-muted-foreground">· Týden T{compositionWeekNumber} {selectedYear} · Výroba Direct</span>
                   {compositionIsHistorical && (
                     <Badge variant="secondary" className="text-[10px] font-normal">
                       historický snapshot — read-only
@@ -831,9 +824,9 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                     </tr>
                   </thead>
                   <tbody>
-                    {(["dilna1","dilna2","dilna3","sklad"] as const).map(key => {
+                    {orderedKeys.map(key => {
                       const g = groups[key];
-                      const fg = filteredGroups[key];
+                      const fg = filteredGroups[key] ?? { count: 0, weeklyHours: 0 };
                       const isExpanded = expandedUsek === key;
                       const isUsekDisabled = disabledUseky.has(key);
                       const netto = Math.round(fg.weeklyHours * localUtilizationPct / 100);
@@ -853,10 +846,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                                 onChange={(e) => {
                                   e.stopPropagation();
                                   if (!compositionIsEditable) return;
-                                  // Toggle ALL employees of this úsek for current composition week..52
                                   const empIds = g.employees.map(emp => emp.id);
-                                  // If currently enabled (checkbox checked) → exclude (set is_included=false)
-                                  // If currently disabled → include (set is_included=true)
                                   const shouldInclude = isUsekDisabled;
                                   handleToggleEmployees(empIds, shouldInclude);
                                 }}
@@ -867,7 +857,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
                             </td>
                             <td className={cn("px-3 py-1 flex items-center gap-1", isUsekDisabled && "text-muted-foreground line-through")}>
                               {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
-                              {labels[key]}
+                              {key}
                             </td>
                             <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{g.count}</td>
                             <td className={cn("px-3 py-1 text-right font-sans", isUsekDisabled ? "text-muted-foreground" : "text-foreground")}>{fg.weeklyHours} h</td>
