@@ -275,6 +275,7 @@ export default function Analytics() {
 
   const tabs: ShellTabDef[] = [
     { key: "projekty", label: "Projekty" },
+    { key: "rezie", label: "Režije" },
     { key: "dilna", label: "Dílna" },
   ];
 
