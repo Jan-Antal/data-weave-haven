@@ -144,42 +144,88 @@ export function OsobyKatalog() {
                     return (
                       <div key={usek} className="border rounded">
                         <div className="flex items-center gap-2 px-2 py-1.5">
-                          <button
-                            onClick={() => toggle(uKey)}
-                            className="flex items-center gap-1.5 text-sm flex-1 text-left hover:underline"
-                          >
-                            {uOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                            <span className="font-medium">{usek}</span>
-                            <span className="text-xs text-muted-foreground">({list.length})</span>
-                          </button>
-                          {role && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              {ROLE_LABELS[role]}
-                            </Badge>
+                          {editingUsek?.stredisko === stredisko && editingUsek?.usek === usek ? (
+                            <>
+                              {uOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                              <Input
+                                autoFocus
+                                value={editingUsek.value}
+                                onChange={(e) => setEditingUsek({ ...editingUsek, value: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") commitRenameUsek();
+                                  if (e.key === "Escape") setEditingUsek(null);
+                                }}
+                                className="h-7 text-sm flex-1"
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-primary"
+                                onClick={commitRenameUsek}
+                                disabled={renameUsek.isPending}
+                                title="Uložit"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground"
+                                onClick={() => setEditingUsek(null)}
+                                title="Zrušit"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => toggle(uKey)}
+                                className="flex items-center gap-1.5 text-sm flex-1 text-left hover:underline"
+                              >
+                                {uOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                <span className="font-medium">{usek}</span>
+                                <span className="text-xs text-muted-foreground">({list.length})</span>
+                              </button>
+                              {role && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {ROLE_LABELS[role]}
+                                </Badge>
+                              )}
+                              <Select
+                                value={role ?? "none"}
+                                onValueChange={(v) => handleRoleChange(list, v === "none" ? null : v as ProjectDropdownRole)}
+                              >
+                                <SelectTrigger className="h-7 w-[160px] text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Bez dropdownu</SelectItem>
+                                  <SelectItem value="pm">PM</SelectItem>
+                                  <SelectItem value="konstrukter">Konstruktér</SelectItem>
+                                  <SelectItem value="kalkulant">Kalkulant</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                onClick={() => setEditingUsek({ stredisko, usek, value: usek })}
+                                title="Přejmenovat úsek"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => setUsekDelete({ stredisko, usek })}
+                                title="Smazat úsek"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
                           )}
-                          <Select
-                            value={role ?? "none"}
-                            onValueChange={(v) => handleRoleChange(list, v === "none" ? null : v as ProjectDropdownRole)}
-                          >
-                            <SelectTrigger className="h-7 w-[160px] text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Bez dropdownu</SelectItem>
-                              <SelectItem value="pm">PM</SelectItem>
-                              <SelectItem value="konstrukter">Konstruktér</SelectItem>
-                              <SelectItem value="kalkulant">Kalkulant</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => setUsekDelete({ stredisko, usek })}
-                            title="Smazat úsek"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
                         {uOpen && (
                           <div className="border-t px-3 py-2 space-y-1">
@@ -223,7 +269,7 @@ export function OsobyKatalog() {
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+                                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
                                         onClick={() => setEditing({ id: p.id, value: p.pozicia })}
                                         title="Přejmenovat pozici"
                                       >
