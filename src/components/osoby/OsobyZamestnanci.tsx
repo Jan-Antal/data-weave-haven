@@ -386,22 +386,42 @@ export function OsobyZamestnanci() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-3 flex-wrap">
-                              {([
+                            {(() => {
+                              const roles: Array<["is_pm" | "is_kalkulant" | "is_konstrukter", string]> = [
                                 ["is_pm", "PM"],
-                                ["is_kalkulant", "Kalk"],
-                                ["is_konstrukter", "Konstr"],
-                              ] as const).map(([flag, label]) => (
-                                <label key={flag} className="flex items-center gap-1.5 text-[11px] cursor-pointer select-none">
-                                  <Checkbox
-                                    checked={!!emp[flag]}
-                                    onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
-                                    className="h-3.5 w-3.5"
-                                  />
-                                  <span className="text-foreground">{label}</span>
-                                </label>
-                              ))}
-                            </div>
+                                ["is_kalkulant", "Kalkulant"],
+                                ["is_konstrukter", "Konstruktér"],
+                              ];
+                              const selected = roles.filter(([f]) => !!emp[f]).map(([, l]) => l);
+                              return (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 w-full justify-between text-xs font-normal px-2"
+                                    >
+                                      <span className={cn("truncate", selected.length === 0 && "text-muted-foreground")}>
+                                        {selected.length === 0 ? "—" : selected.join(", ")}
+                                      </span>
+                                      <ChevronDown className="h-3.5 w-3.5 opacity-60 shrink-0 ml-1" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start" className="w-[180px]">
+                                    {roles.map(([flag, label]) => (
+                                      <DropdownMenuCheckboxItem
+                                        key={flag}
+                                        checked={!!emp[flag]}
+                                        onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
+                                        onSelect={(e) => e.preventDefault()}
+                                      >
+                                        {label}
+                                      </DropdownMenuCheckboxItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <Select
