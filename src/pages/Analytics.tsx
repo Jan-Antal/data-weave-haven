@@ -517,13 +517,23 @@ export default function Analytics() {
                       </TableRow>
                     ) : (
                       rows.map((r) => (
-                        <AnalyticsTableRow
-                          key={r.project_id}
-                          row={r}
-                          onOpenDetail={setDetailProjectId}
-                          isVisible={isVisible}
-                          onToggleForceProject={handleToggleForceProject}
-                        />
+                        <Fragment key={r.project_id}>
+                          <AnalyticsTableRow
+                            row={r}
+                            onOpenDetail={setDetailProjectId}
+                            isVisible={isVisible}
+                            onToggleForceProject={handleToggleForceProject}
+                            expanded={expandedRows.has(r.project_id)}
+                            onToggleExpand={toggleExpand}
+                          />
+                          {expandedRows.has(r.project_id) && (
+                            <AnalyticsBreakdownRow
+                              projectId={r.project_id}
+                              colSpan={visibleCols.length + 1}
+                              timeRange={timeRange}
+                            />
+                          )}
+                        </Fragment>
                       ))
                     )}
                   </TableBody>
