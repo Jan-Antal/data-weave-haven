@@ -315,128 +315,36 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="text-sm">
-                        {editingNameId === u.id ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              value={editingNameValue}
-                              onChange={(e) => setEditingNameValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleUpdateName(u.id);
-                                if (e.key === "Escape") setEditingNameId(null);
-                              }}
-                              className="h-7 text-sm"
-                              autoFocus
-                            />
-                            <button onClick={() => handleUpdateName(u.id)} className="text-green-600 hover:text-green-700"><Check className="h-4 w-4" /></button>
-                            <button onClick={() => setEditingNameId(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-                          </div>
-                        ) : (
-                          <button
-                            className="flex items-center gap-1 group hover:text-primary transition-colors text-left"
-                            onClick={() => { setEditingNameId(u.id); setEditingNameValue(u.full_name || ""); }}
-                            title="Upravit jméno"
-                          >
-                            <span>{u.full_name || "—"}</span>
-                            <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
-                          </button>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
-                      <TableCell>
-                        {isOwner(u) ? (
-                          <span className="inline-flex items-center h-8 px-3 text-xs font-semibold text-primary">Owner</span>
-                        ) : (
-                          <Select value={u.role ?? ""} onValueChange={(v) => handleUpdateRole(u.id, v as AppRole)}>
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ASSIGNABLE_ROLES.map((r) => (
-                                <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={u.person_id ?? "__none__"}
-                          onValueChange={(v) => handleUpdatePerson(u.id, v === "__none__" ? null : v)}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">— Nepřiřazeno —</SelectItem>
-                            {people.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isOwner(u) ? (
-                          <Switch checked={true} disabled />
-                        ) : (
-                          <Switch checked={u.is_active} onCheckedChange={(v) => handleToggleActive(u.id, v)} />
-                        )}
-                      </TableCell>
-                        <TableCell className="flex gap-1">
-                        <button
-                          onClick={() => handleCopyInviteLink(u.id)}
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          title="Kopírovat odkaz pozvánky"
-                          disabled={copyingLinkId === u.id}
-                        >
-                          <Link2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setPasswordTarget({ id: u.id, name: u.full_name || u.email }); setNewPassword(""); setShowNewPassword(false); }}
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          title="Změnit heslo"
-                        >
-                          <Lock className="h-4 w-4" />
-                        </button>
-                        {isOwner(u) ? (
-                          <button
-                            onClick={() => { setTransferOpen(true); setTransferTarget(""); }}
-                            className="text-muted-foreground hover:text-primary transition-colors"
-                            title="Předat vlastnictví"
-                          >
-                            <ArrowRightLeft className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteTarget(u.id)}
-                            className="text-muted-foreground hover:text-destructive transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+{tableRowsContent}
                 )}
               </TableBody>
             </Table>
       </div>
 
-      <div className="px-5 py-3 border-t">
-        {!isTestUser && (
-          <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
-          </Button>
-        )}
-      </div>
+      {!inline && (
+        <div className="px-5 py-3 border-t">
+          {!isTestUser && (
+            <Button variant="outline" size="sm" className="text-sm" onClick={() => setAddOpen(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Přidat uživatele
+            </Button>
+          )}
+        </div>
+      )}
     </>
   );
 
   const wrappedContent = inline ? (
     <div className="flex flex-col h-full overflow-hidden bg-background">
-      {isTestUser && <div className="px-5 pt-3"><TestModeBanner /></div>}
+      <SectionToolbar
+        left={<span className="text-xs text-muted-foreground">{users.length} uživatelů</span>}
+        right={
+          !isTestUser ? (
+            <Button size="sm" className="h-8" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Přidat uživatele
+            </Button>
+          ) : null
+        }
+      />
       {tableSection}
     </div>
   ) : (
