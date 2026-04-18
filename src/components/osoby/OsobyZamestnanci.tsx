@@ -4,6 +4,7 @@ import { Search, MoreVertical, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -191,6 +192,66 @@ export function OsobyZamestnanci() {
 
   const handleUvazek = (emp: any, daily: number) => {
     updateEmp.mutate({ id: emp.id, patch: { uvazok_hodiny: daily } });
+  };
+
+  /** Toggle a project role flag on an employee + sync into people cache. */
+  const handleRoleToggle = async (
+    emp: any,
+    flag: "is_pm" | "is_kalkulant" | "is_konstrukter",
+    next: boolean,
+  ) => {
+    // 1. Update ami_employees
+    const { error: empErr } = await supabase
+      .from("ami_employees")
+      .update({ [flag]: next } as any)
+      .eq("id", emp.id);
+    if (empErr) {
+      toast({ title: "Chyba", description: empErr.message, variant: "destructive" });
+      return;
+    }
+
+    // 2. Compute new flag triple
+    const flags = {
+      is_pm: flag === "is_pm" ? next : !!emp.is_pm,
+      is_kalkulant: flag === "is_kalkulant" ? next : !!emp.is_kalkulant,
+      is_konstrukter: flag === "is_konstrukter" ? next : !!emp.is_konstrukter,
+    };
+    const anyOn = flags.is_pm || flags.is_kalkulant || flags.is_konstrukter;
+
+    // 3. Upsert people cache (key: employee_id)
+    const { data: existing } = await supabase
+      .from("people")
+      .select("id")
+      .eq("employee_id", emp.id)
+      .maybeSingle();
+
+    const primaryRole = flags.is_pm ? "PM" : flags.is_konstrukter ? "Konstruktér" : flags.is_kalkulant ? "Kalkulant" : "PM";
+
+    if (existing) {
+      await supabase
+        .from("people")
+        .update({
+          name: emp.meno,
+          ...flags,
+          is_active: anyOn,
+          source: "employee",
+          role: primaryRole,
+        } as any)
+        .eq("id", (existing as any).id);
+    } else if (anyOn) {
+      await supabase.from("people").insert({
+        name: emp.meno,
+        role: primaryRole,
+        source: "employee",
+        employee_id: emp.id,
+        is_active: true,
+        is_external: false,
+        ...flags,
+      } as any);
+    }
+
+    qc.invalidateQueries({ queryKey: ["all-employees-osoby"] });
+    qc.invalidateQueries({ queryKey: ["people"] });
   };
 
   const activeCount = employees.filter((e) => e.aktivny).length;
