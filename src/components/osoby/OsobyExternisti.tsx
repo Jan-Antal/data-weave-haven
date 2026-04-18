@@ -5,7 +5,8 @@ import { Plus, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,13 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
 
-const ROLE_OPTIONS = ["PM", "Konstruktér", "Kalkulant", "Architekt"] as const;
+const ROLE_FLAGS = [
+  { key: "is_pm", label: "PM" },
+  { key: "is_kalkulant", label: "Kalkulant" },
+  { key: "is_konstrukter", label: "Konstruktér" },
+] as const;
+
+const ARCHITEKT_LABEL = "Architekt";
 
 interface ExternalRow {
   id: string;
@@ -22,9 +29,12 @@ interface ExternalRow {
   firma: string | null;
   is_active: boolean;
   is_external: boolean;
+  is_pm: boolean | null;
+  is_kalkulant: boolean | null;
+  is_konstrukter: boolean | null;
 }
 
-/** Deterministic pastel avatar color from name hash. Same hash as Zaměstnanci. */
+/** Deterministic pastel avatar color from name hash. */
 function avatarStyles(name: string): { bg: string; fg: string } {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
@@ -39,14 +49,23 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function rolesSummary(r: ExternalRow): string {
+  const parts: string[] = [];
+  if (r.is_pm) parts.push("PM");
+  if (r.is_kalkulant) parts.push("Kalkulant");
+  if (r.is_konstrukter) parts.push("Konstruktér");
+  if (r.role === ARCHITEKT_LABEL) parts.push("Architekt");
+  return parts.length ? parts.join(", ") : "—";
+}
+
 function useExternals() {
   return useQuery({
     queryKey: ["people", "externals"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("people")
-        .select("id, name, role, firma, is_active, is_external")
-        .eq("is_external", true)
+        .select("id, name, role, firma, is_active, is_external, is_pm, is_kalkulant, is_konstrukter")
+        .eq("source", "external")
         .order("name");
       if (error) throw error;
       return (data ?? []) as any as ExternalRow[];
@@ -59,7 +78,14 @@ export function OsobyExternisti() {
   const { data: rows = [] } = useExternals();
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [newRow, setNewRow] = useState({ name: "", firma: "", role: "PM" });
+  const [newRow, setNewRow] = useState({
+    name: "",
+    firma: "",
+    is_pm: false,
+    is_kalkulant: false,
+    is_konstrukter: false,
+    is_architekt: false,
+  });
   const [deleteFor, setDeleteFor] = useState<{ id: string; name: string } | null>(null);
 
   const filtered = useMemo(() => {
@@ -68,7 +94,7 @@ export function OsobyExternisti() {
     return rows.filter(r =>
       r.name.toLowerCase().includes(q) ||
       (r.firma ?? "").toLowerCase().includes(q) ||
-      r.role.toLowerCase().includes(q),
+      rolesSummary(r).toLowerCase().includes(q),
     );
   }, [rows, search]);
 
@@ -83,21 +109,34 @@ export function OsobyExternisti() {
 
   const addExternal = useMutation({
     mutationFn: async () => {
+      const flagsOn = newRow.is_pm || newRow.is_kalkulant || newRow.is_konstrukter || newRow.is_architekt;
+      if (!flagsOn) throw new Error("Vyberte alespoň jednu roli");
+      const primaryRole = newRow.is_pm
+        ? "PM"
+        : newRow.is_konstrukter
+        ? "Konstruktér"
+        : newRow.is_kalkulant
+        ? "Kalkulant"
+        : ARCHITEKT_LABEL;
       const { error } = await supabase
         .from("people")
         .insert({
           name: newRow.name.trim(),
-          role: newRow.role,
+          role: newRow.is_architekt ? ARCHITEKT_LABEL : primaryRole,
           firma: newRow.firma.trim() || null,
           is_external: true,
           is_active: true,
+          source: "external",
+          is_pm: newRow.is_pm,
+          is_kalkulant: newRow.is_kalkulant,
+          is_konstrukter: newRow.is_konstrukter,
         } as any);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["people"] });
       setAddOpen(false);
-      setNewRow({ name: "", firma: "", role: "PM" });
+      setNewRow({ name: "", firma: "", is_pm: false, is_kalkulant: false, is_konstrukter: false, is_architekt: false });
       toast({ title: "Externista přidán" });
     },
     onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
@@ -113,6 +152,18 @@ export function OsobyExternisti() {
       toast({ title: "Externista smazán" });
     },
   });
+
+  const toggleRole = (
+    r: ExternalRow,
+    flag: "is_pm" | "is_kalkulant" | "is_konstrukter" | "is_architekt",
+    next: boolean,
+  ) => {
+    if (flag === "is_architekt") {
+      updateField.mutate({ id: r.id, patch: { role: next ? ARCHITEKT_LABEL : "" } as any });
+      return;
+    }
+    updateField.mutate({ id: r.id, patch: { [flag]: next } as any });
+  };
 
   const activeCount = rows.filter(r => r.is_active).length;
 
@@ -148,7 +199,7 @@ export function OsobyExternisti() {
             <TableRow>
               <TableHead className="w-[300px]">Jméno</TableHead>
               <TableHead className="w-[220px]">Firma</TableHead>
-              <TableHead className="w-[160px]">Role</TableHead>
+              <TableHead className="w-[220px]">Role</TableHead>
               <TableHead className="w-[100px]">Aktivní</TableHead>
               <TableHead className="w-[60px]" />
             </TableRow>
@@ -156,6 +207,7 @@ export function OsobyExternisti() {
           <TableBody>
             {filtered.map((r) => {
               const av = avatarStyles(r.name);
+              const isArchitekt = r.role === ARCHITEKT_LABEL;
               return (
                 <TableRow key={r.id} className={r.is_active ? "" : "opacity-60"}>
                   <TableCell>
@@ -191,19 +243,35 @@ export function OsobyExternisti() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Select
-                      value={r.role}
-                      onValueChange={(v) => updateField.mutate({ id: r.id, patch: { role: v } })}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ROLE_OPTIONS.map((o) => (
-                          <SelectItem key={o} value={o}>{o}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 text-xs justify-start font-normal w-full">
+                          {rolesSummary(r)}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-2" align="start">
+                        <div className="space-y-1.5">
+                          {ROLE_FLAGS.map((rf) => (
+                            <label key={rf.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
+                              <Checkbox
+                                checked={!!r[rf.key]}
+                                onCheckedChange={(v) => toggleRole(r, rf.key, v === true)}
+                                className="h-4 w-4"
+                              />
+                              <span className="text-xs">{rf.label}</span>
+                            </label>
+                          ))}
+                          <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
+                            <Checkbox
+                              checked={isArchitekt}
+                              onCheckedChange={(v) => toggleRole(r, "is_architekt", v === true)}
+                              className="h-4 w-4"
+                            />
+                            <span className="text-xs">Architekt</span>
+                          </label>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </TableCell>
                   <TableCell>
                     <Switch
@@ -251,12 +319,26 @@ export function OsobyExternisti() {
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Select value={newRow.role} onValueChange={(v) => setNewRow({ ...newRow, role: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ROLE_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {ROLE_FLAGS.map((rf) => (
+                  <label key={rf.key} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={newRow[rf.key as keyof typeof newRow] as boolean}
+                      onCheckedChange={(v) => setNewRow({ ...newRow, [rf.key]: v === true })}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm">{rf.label}</span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={newRow.is_architekt}
+                    onCheckedChange={(v) => setNewRow({ ...newRow, is_architekt: v === true })}
+                    className="h-4 w-4"
+                  />
+                  <span className="text-sm">Architekt</span>
+                </label>
+              </div>
             </div>
           </div>
           <DialogFooter>
