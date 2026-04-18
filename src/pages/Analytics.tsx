@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
-import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useMemo, useCallback, Fragment } from "react";
+import { AlertTriangle, RefreshCw, ToggleLeft, ToggleRight, Factory, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { AnalyticsBreakdownRow } from "@/components/AnalyticsBreakdownRow";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
