@@ -298,7 +298,8 @@ export function OsobyZamestnanci() {
         <EmployeeAbsenceDialog
           open={!!absenceFor}
           onOpenChange={(v) => !v && setAbsenceFor(null)}
-          employee={absenceFor}
+          employeeId={absenceFor.id}
+          employeeName={absenceFor.meno ?? ""}
         />
       )}
 

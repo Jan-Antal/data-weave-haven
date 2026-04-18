@@ -298,7 +298,7 @@ export function ProductionHeader({
                     </DropdownMenuItem>
                   )}
                   {canManagePeople && (
-                    <DropdownMenuItem onClick={openPeopleManagement}>
+                    <DropdownMenuItem onClick={() => openPeopleManagement()}>
                       Správa osob
                     </DropdownMenuItem>
                   )}
