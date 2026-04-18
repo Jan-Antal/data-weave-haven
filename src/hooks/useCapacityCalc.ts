@@ -63,15 +63,6 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export function normalizeUsek(usek: string): UsekKey | null {
-  const u = usek ?? "";
-  if (u.includes("Dílna_1") || u.toLowerCase().includes("dilna_1") || u.toLowerCase().includes("dilna1")) return "dilna1";
-  if (u.includes("Dílna_2") || u.toLowerCase().includes("dilna_2") || u.toLowerCase().includes("dilna2")) return "dilna2";
-  if (u.includes("Dílna_3") || u.toLowerCase().includes("dilna_3") || u.toLowerCase().includes("dilna3")) return "dilna3";
-  if (u.toLowerCase().includes("sklad")) return "sklad";
-  return null;
-}
-
 export function getActiveWorkingDays(emp: EmployeeRow, weekStart: string, workingDays: number): number {
   if (!emp.deactivated_at) return workingDays;
   const wStart = new Date(weekStart + "T00:00:00");
@@ -96,18 +87,18 @@ export function computeWeekCapacity(
   utilizationPct: number,
   weekStart: string,
 ): CapacityCalcResult {
-  const byUsek: Record<UsekKey, number> = { dilna1: 0, dilna2: 0, dilna3: 0, sklad: 0 };
+  const byUsek: Record<string, number> = {};
   let totalEmployees = 0;
   let bruttoHodiny = 0;
 
   for (const emp of employees) {
-    const usekKey = normalizeUsek(emp.usek);
+    const usekKey = normalizeUsek(emp);
     if (!usekKey) continue;
     const activeDays = getActiveWorkingDays(emp, weekStart, workingDays);
     if (activeDays === 0) continue;
     const dailyHours = emp.uvazok_hodiny ?? 8;
     const weeklyHours = dailyHours * activeDays;
-    byUsek[usekKey] += weeklyHours;
+    byUsek[usekKey] = (byUsek[usekKey] ?? 0) + weeklyHours;
     bruttoHodiny += weeklyHours;
     totalEmployees++;
   }
@@ -117,10 +108,7 @@ export function computeWeekCapacity(
 
   return {
     capacity: Math.max(0, capacity),
-    dilna1: byUsek.dilna1,
-    dilna2: byUsek.dilna2,
-    dilna3: byUsek.dilna3,
-    sklad: byUsek.sklad,
+    byUsek,
     totalEmployees,
     absenceHours,
     bruttoHodiny,
