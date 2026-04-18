@@ -156,14 +156,6 @@ export function useDeleteUsek() {
     onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
   });
 }
-      const { error } = await supabase.from("position_catalogue" as any).delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["position_catalogue"], refetchType: "active" });
-    },
-  });
-}
 
 // =====================================================================
 // Members for project dropdowns: UNION of internal employees + externals
