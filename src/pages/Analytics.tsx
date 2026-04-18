@@ -526,32 +526,46 @@ function AnalyticsTableRow({
       className={cn(
         "hover:bg-muted/50 transition-colors h-9",
         r.balik === "OVER" && "bg-red-50 dark:bg-red-950/20",
-        r.balik === "DONE" && "opacity-60"
+        r.balik === "DONE" && "opacity-60",
+        r.unmatched && "bg-amber-50/40 dark:bg-amber-950/10 italic"
       )}
     >
       {isVisible("project_id") && (
         <TableCell>
-          <button
-            onClick={() => onOpenDetail(r.project_id)}
-            className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
-          >
-            {r.project_id}
-          </button>
+          {r.unmatched ? (
+            <span className="whitespace-nowrap font-mono text-xs text-muted-foreground font-semibold" title="Projekt neexistuje v databázi">
+              {r.project_id}
+            </span>
+          ) : (
+            <button
+              onClick={() => onOpenDetail(r.project_id)}
+              className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
+            >
+              {r.project_id}
+            </button>
+          )}
         </TableCell>
       )}
       {isVisible("project_name") && (
-        <TableCell style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.project_name}>
-          <span
-            className="font-semibold text-xs cursor-pointer hover:underline hover:text-primary transition-colors truncate"
-            onClick={() => onOpenDetail(r.project_id)}
-          >
-            {r.project_name}
-          </span>
+        <TableCell style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.unmatched ? "Hodiny v Alvenu, ale projekt nie je v databáze" : r.project_name}>
+          {r.unmatched ? (
+            <span className="text-xs text-muted-foreground truncate inline-flex items-center gap-1">
+              <span className="text-[9px] font-medium px-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">⚠</span>
+              {r.project_name}
+            </span>
+          ) : (
+            <span
+              className="font-semibold text-xs cursor-pointer hover:underline hover:text-primary transition-colors truncate"
+              onClick={() => onOpenDetail(r.project_id)}
+            >
+              {r.project_name}
+            </span>
+          )}
         </TableCell>
       )}
       {isVisible("pm") && <TableCell className="text-xs">{r.pm || "—"}</TableCell>}
       {isVisible("status") && <TableCell>{r.status ? <StatusBadge status={r.status} /> : "—"}</TableCell>}
-      {isVisible("balik") && <TableCell><BalikBadge balik={r.balik} /></TableCell>}
+      {isVisible("balik") && <TableCell>{r.unmatched ? <span className="text-xs text-muted-foreground">—</span> : <BalikBadge balik={r.balik} />}</TableCell>}
       {isVisible("preset_label") && (
         <TableCell className="text-xs">
           <span className={cn(
