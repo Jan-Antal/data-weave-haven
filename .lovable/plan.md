@@ -1,59 +1,70 @@
 
 
-## Plán: Správa zaměstnanců výroby — revize
+## Plán: Režie ako samostatná kategória v Analytics
 
-### Změny oproti původnímu návrhu
-- **`usek` zůstává beze změny** (sync z Alvena)
-- **Nový sloupec `pracovni_skupina`** v `ami_employees` — manuální přiřazení (Lakovna, Kompletace, atd.)
-- **Žádná nová tabulka pro absence** — používáme existující `ami_absences` s `absencia_kod` (DOV, NEM, RD, …)
+### Cieľ
+Oddeliť interné "režie" projekty (Z-2511-998, Z-2511-999, …) od bežných projektov v Analytics, vyhodnocovať ich utilizáciu samostatne a umožniť admin správu mapovania kód → názov.
 
-### DB změny
+### DB zmeny
 
-**1) `ami_employees` — nový sloupec**
-```sql
-ALTER TABLE ami_employees ADD COLUMN pracovni_skupina text;
-```
-- Volný text + autocomplete z existujících hodnot
-- Default NULL → fallback na `usek` v capacity logice
-
-**2) `ami_absences` — povolit ruční zápis**
-- Přidat RLS policies (admin/owner insert/update/delete)
-- UI bude zapisovat dlouhodobé záznamy s `source='manual'`, `absencia_kod` (DOV/NEM/RD/…), a opakovat denní řádky pro celý rozsah od–do
-
-### UI: nová sekce v `CapacitySettings` → tab „Zaměstnanci"
-
+**Nová tabuľka `overhead_projects`** (mapovanie režijných kódov):
 ```text
-[Search…]                                    [+ Přidat absenci hromadně]
-─────────────────────────────────────────────────────────────────────
-Meno          Úsek      Prac. skupina  Úvazek  Absence (akt.)  Akce
-Jan Novák     Dílna_1   [Lakovna ▼]    [40h ▼] —              [⋯]
-Petr Svoboda  Dílna_2   [Kompletace▼]  [20h ▼] 🟡 RD do 6/26  [⋯]
+id uuid PK
+project_code text UNIQUE NOT NULL  -- napr. 'Z-2511-998'
+label text NOT NULL                 -- napr. 'Režie Dílna'
+description text NULL
+sort_order int DEFAULT 0
+is_active bool DEFAULT true
+created_at, updated_at
 ```
+- RLS: authenticated read, admin/owner write
+- Seed: `Z-2511-998 → Režije Dílna`, `Z-2511-999 → Provozní režije`
 
-- **Pracovní skupina**: dropdown s existujícími hodnotami + „+ Nová skupina"
-- **Úvazek**: 20/30/40h týdně (uloží jako 4/6/8 denně do `uvazok_hodiny`)
-- **Absence (akt.)**: zobrazí aktivní záznam z `ami_absences` pro dnešek/budoucnost; klik otevře dialog s historií
-- **Dialog absence**: kód (DOV/NEM/RD/PN/jiné), datum od (povinné), datum do (volitelné — „otevřeno" → vygeneruje denní řádky 6 měsíců dopředu, prodloužitelné), poznámka
+### Logika (`useAnalytics.ts`)
 
-### Capacity logika (`useCapacityCalc.ts`)
+1. Načítať `overhead_projects` paralelne s ostatnými dotazmi
+2. Pre každý riadok v `hoursMap` skontrolovať, či `ami_project_id` je v overhead set:
+   - Ak **áno** → priradiť `category: "rezie"`, `project_name = label` z mapovania, ignorovať `projects` tabuľku
+   - Ak **nie a v projects** → `category: "project"` (ako doteraz)
+   - Ak **nie a nie v projects** → `category: "unmatched"` (existujúce ghost rows)
+3. Rozšíriť `AnalyticsRow` o `category: "project" | "rezie" | "unmatched"`
+4. Rozšíriť `AnalyticsSummary` o:
+   - `totalRezieHours: number`
+   - `totalProjectHours: number` (len kategória "project")
+   - `reziePct: number` — `totalRezieHours / (totalRezieHours + totalProjectHours) * 100`
 
-- `getActiveWorkingDays()` — kromě `deactivated_at` odečíst i dny překrývající se s `ami_absences` pro daného zaměstnance v daném týdnu
-- `useAbsencesForYear()` už čte `ami_absences` — funguje out-of-the-box pro nové ruční záznamy
-- `pracovni_skupina` se zatím nepoužívá v kapacitním výpočtu (jen evidenční), pokud nechceš jinak
+### UI zmeny (`Analytics.tsx`)
 
-### Soubory
+**1) Nová KPI dlaždica "Režie %"**
+- V hornom rade dashboard kariet
+- Zobrazí `reziePct` + absolútne `totalRezieHours h`
+- Podtitulok: porovnanie s utilizáciou z `production_settings.utilization_pct` (default 83 %), ak väčšie → amber, ak menšie/rovné → zelená
+- Tooltip: rozpis per režijný projekt (Z-2511-998: X h, Z-2511-999: Y h)
+
+**2) Nový filter chip "Režije"** vedle existujúcich (Výroba / Dokončeno / Vše / atď.)
+- Default view (Vše / Výroba / Dokončeno) → **skryje** režijné riadky
+- Filter "Režije" → ukáže iba režijné projekty s ich `label` z `overhead_projects`
+- Unmatched riadky zostávajú v "Vše" ako doteraz
+
+**3) Správa režijných projektov**
+- Nová sekcia v Nastavenia → "Režijné projekty" (admin/owner)
+- Tabuľka kód / názov / aktívne / akcia (edit, deactivate)
+- Tlačidlo "+ Pridať režijný kód"
+- Dialog: `project_code`, `label`, `description`, `is_active`
+
+### Súbory
 
 **Nové:**
-- `supabase/migrations/...` — `pracovni_skupina` column + RLS policies pro `ami_absences`
-- `src/components/production/EmployeeManagement.tsx` — tab obsah
-- `src/components/production/EmployeeAbsenceDialog.tsx` — přidat/upravit absenci
-- `src/hooks/useEmployeeAbsences.ts` — CRUD nad `ami_absences` (filtr `source='manual'`)
+- `supabase/migrations/...` — `overhead_projects` table + RLS + seed
+- `src/hooks/useOverheadProjects.ts` — CRUD hook
+- `src/components/admin/OverheadProjectsSettings.tsx` — admin UI
 
 **Upravené:**
-- `src/components/production/CapacitySettings.tsx` — přidat tab „Zaměstnanci"
-- `src/hooks/useCapacityCalc.ts` — proporcionální odečet dnů s absencí v `getActiveWorkingDays`
+- `src/hooks/useAnalytics.ts` — pridať overhead fetch, kategorizácia, nové summary metriky
+- `src/pages/Analytics.tsx` — nová KPI dlaždica + filter chip + napojenie na settings
+- `src/components/AccountSettings.tsx` (alebo wherever sa otvárajú settings) — link na novú sekciu
 
-### Otevřené (potvrď):
-1. **Otevřená absence (bez data do)** — vygenerujeme denní řádky 6 měsíců dopředu a noční job/manuální „prodloužit" prodlouží? Nebo jiný mechanismus?
-2. **Pracovní skupina** se má i promítnout do kapacitního forecastu (samostatné kbelíky vedle Dílna_1/2/3), nebo je to jen evidenční sloupec?
+### Otvorené (potvrď)
+1. **Porovnávacia hodnota pre Režie %** — má sa porovnať s `production_settings.utilization_pct` (83 %) ako "očakávaná réžia = 100 - utilization", alebo má admin nastaviť vlastný target (napr. "cieľová réžia 17 %") v overhead settings?
+2. **Filter chip umiestnenie** — vedľa stávajúcich status chip-ov, alebo ako samostatný toggle „Zobraziť režie" nad tabuľkou?
 
