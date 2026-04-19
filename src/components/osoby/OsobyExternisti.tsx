@@ -110,15 +110,10 @@ export function OsobyExternisti() {
     );
   }, [rows, search]);
 
-  /** Group externisti by firma. */
+  /** Single "Externisté" group — sorted alphabetically. */
   const grouped = useMemo(() => {
-    const map = new Map<string, ExternalRow[]>();
-    for (const r of filtered) {
-      const key = r.firma?.trim() || "Bez firmy";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(r);
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "cs"));
+    const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name, "cs"));
+    return [["Externisté", sorted]] as Array<[string, ExternalRow[]]>;
   }, [filtered]);
 
   const updateField = useMutation({
@@ -200,7 +195,7 @@ export function OsobyExternisti() {
       <SectionToolbar
         left={
           <span className="text-xs text-muted-foreground">
-            Externisti · {activeCount} aktivních z {rows.length}
+            Externisté · {activeCount} aktivních z {rows.length}
           </span>
         }
         right={
