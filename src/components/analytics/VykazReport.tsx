@@ -447,90 +447,140 @@ export function VykazReport() {
         </div>
       </div>
 
-      {/* Scrollable content area */}
+      {/* Scrollable content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-      {/* Summary cards */}
-      <div className="shrink-0 px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Celkem hodin</div>
-          <div className="text-2xl font-bold mt-1 tabular-nums">{formatHours(summaryStats.totalHours)}</div>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aktivní pracovníci</div>
-          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
-          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
-          <div
-            className={cn(
-              "text-2xl font-bold mt-1 tabular-nums",
-              summaryStats.unmatchedProjects > 0 ? "" : "text-muted-foreground",
-            )}
-            style={summaryStats.unmatchedProjects > 0 ? { color: "#854F0B" } : undefined}
-          >
-            {summaryStats.unmatchedProjects}
-          </div>
-        </Card>
-      </div>
+        {/* Summary cards */}
+        <div className="px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="p-4 shadow-sm">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Celkem hodin</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">{formatHours(summaryStats.totalHours)}</div>
+          </Card>
+          <Card className="p-4 shadow-sm">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aktivní pracovníci</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
+          </Card>
+          <Card className="p-4 shadow-sm">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
+          </Card>
+          <Card className="p-4 shadow-sm">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
+            <div
+              className={cn(
+                "text-2xl font-bold mt-1 tabular-nums",
+                summaryStats.unmatchedProjects > 0 ? "text-amber-700" : "text-muted-foreground",
+              )}
+            >
+              {summaryStats.unmatchedProjects}
+            </div>
+          </Card>
+        </div>
 
-      {/* Table */}
-      <div className="flex-1 min-h-0 px-4 py-4">
-        <div className="rounded-lg border bg-card flex flex-col h-full">
-          <div className="flex-1 overflow-auto always-scrollbar rounded-lg">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted/50">
-                {groupBy === "projekt" && (
-                  <TableRow className="hover:bg-transparent border-b">
-                    <TableHead className="w-[40%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Projekt</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Stav</TableHead>
-                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny</TableHead>
-                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Záznamů</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Posledný záznam</TableHead>
-                    <TableHead className="w-8" />
+        {/* Chart: Hodiny v čase */}
+        <div className="px-4 pt-2">
+          <Card className="p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-baseline gap-2">
+                <h3 className="text-sm font-semibold">Hodiny v čase</h3>
+                <span className="text-[11px] text-muted-foreground">
+                  {effectiveBucket === "day" ? "per den" : "per týden"}
+                </span>
+              </div>
+              <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
+                {([
+                  { key: "auto", label: "Auto" },
+                  { key: "day", label: "Den" },
+                  { key: "week", label: "Týden" },
+                ] as const).map((opt) => {
+                  const active = bucketMode === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      onClick={() => setBucketMode(opt.key)}
+                      className={cn(
+                        "h-6 px-2.5 text-[11px] rounded-md transition-colors",
+                        active
+                          ? "bg-background shadow-sm font-medium text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {chartData.length === 0 || chartData.every((d) => d.hodiny === 0) ? (
+              <div className="h-[180px] flex items-center justify-center text-xs text-muted-foreground">
+                Žádné záznamy v období
+              </div>
+            ) : (
+              <div className="h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/40" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <RTooltip
+                      cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
+                      contentStyle={{
+                        background: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      formatter={(value: number) => [formatHours(value), "Hodiny"]}
+                    />
+                    <Bar dataKey="hodiny" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Tables / sections */}
+        <div className="px-4 py-4 space-y-4">
+          {isLoading ? (
+            <Card className="p-4 shadow-sm space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </Card>
+          ) : grouped.length === 0 ? (
+            <Card className="p-8 shadow-sm text-center text-sm text-muted-foreground">
+              Žádné záznamy v zvoleném období
+            </Card>
+          ) : groupBy === "projekt" ? (
+            <ProjektSections
+              grouped={grouped as any}
+              expanded={expanded}
+              toggleExpand={toggleExpand}
+              onOpenDetail={setDetailProjectId}
+              collapsedSections={collapsedSections}
+              toggleSection={toggleSection}
+            />
+          ) : groupBy === "osoba" ? (
+            <FlatSection title="Osoby" count={grouped.length} hours={totalHours} tone="neutral">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
+                    <TableHead className="w-[60%] h-9 text-[11px] uppercase tracking-wide">Jméno</TableHead>
+                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Počet projektů</TableHead>
+                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Hodiny celkem</TableHead>
+                    <TableHead className="w-8 h-9" />
                   </TableRow>
-                )}
-                {groupBy === "osoba" && (
-                  <TableRow className="hover:bg-transparent border-b">
-                    <TableHead className="w-[60%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Jméno</TableHead>
-                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Počet projektů</TableHead>
-                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny celkem</TableHead>
-                    <TableHead className="w-8" />
-                  </TableRow>
-                )}
-                {groupBy === "cinnost" && (
-                  <TableRow className="hover:bg-transparent border-b">
-                    <TableHead className="w-[60%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Název činnosti</TableHead>
-                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Kód</TableHead>
-                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny</TableHead>
-                    <TableHead className="w-8" />
-                  </TableRow>
-                )}
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell colSpan={6}><Skeleton className="h-4 w-full" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : grouped.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
-                      Žádné záznamy v zvoleném období
-                    </TableCell>
-                  </TableRow>
-                ) : groupBy === "projekt" ? (
-                  <ProjektRows
-                    grouped={grouped as any}
-                    expanded={expanded}
-                    toggleExpand={toggleExpand}
-                    onOpenDetail={setDetailProjectId}
-                  />
-                ) : groupBy === "osoba" ? (
+                </TableHeader>
+                <TableBody>
                   <OsobaRows
                     grouped={grouped as any}
                     expanded={expanded}
@@ -539,7 +589,21 @@ export function VykazReport() {
                     overheadMap={overheadMap}
                     onOpenDetail={setDetailProjectId}
                   />
-                ) : (
+                </TableBody>
+              </Table>
+            </FlatSection>
+          ) : (
+            <FlatSection title="Činnosti" count={grouped.length} hours={totalHours} tone="neutral">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
+                    <TableHead className="w-[60%] h-9 text-[11px] uppercase tracking-wide">Název činnosti</TableHead>
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Kód</TableHead>
+                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Hodiny</TableHead>
+                    <TableHead className="w-8 h-9" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   <CinnostRows
                     grouped={grouped as any}
                     expanded={expanded}
@@ -548,40 +612,18 @@ export function VykazReport() {
                     overheadMap={overheadMap}
                     onOpenDetail={setDetailProjectId}
                   />
-                )}
-              </TableBody>
-              {grouped.length > 0 && (
-                <tfoot className="bg-muted/50 sticky bottom-0 border-t border-border">
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell className="text-[13px] font-semibold">Celkem</TableCell>
-                    {groupBy === "projekt" && (
-                      <>
-                        <TableCell />
-                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
-                        <TableCell />
-                        <TableCell />
-                        <TableCell />
-                      </>
-                    )}
-                    {groupBy === "osoba" && (
-                      <>
-                        <TableCell />
-                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
-                        <TableCell />
-                      </>
-                    )}
-                    {groupBy === "cinnost" && (
-                      <>
-                        <TableCell />
-                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
-                        <TableCell />
-                      </>
-                    )}
-                  </TableRow>
-                </tfoot>
-              )}
-            </Table>
-          </div>
+                </TableBody>
+              </Table>
+            </FlatSection>
+          )}
+
+          {/* Celkem footer card */}
+          {!isLoading && grouped.length > 0 && (
+            <Card className="px-4 py-2.5 shadow-sm bg-muted/40 flex items-center justify-between">
+              <span className="text-[13px] font-semibold">Celkem</span>
+              <span className="text-[14px] font-bold tabular-nums text-primary">{formatHours(totalHours)}</span>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -591,6 +633,168 @@ export function VykazReport() {
         onOpenChange={(open) => { if (!open) setDetailProjectId(null); }}
       />
     </div>
+  );
+}
+
+// ── Section helpers (Zaměstnanci-style cards) ───────────────────────
+type SectionTone = "projekty" | "rezie" | "nesparovane" | "neutral";
+
+function sectionStyle(tone: SectionTone): { card: string; header: string; badge: string; icon?: boolean } {
+  switch (tone) {
+    case "projekty":
+      return { card: "border-green-200", header: "bg-green-50/80", badge: "bg-green-100 text-green-800 border-green-300" };
+    case "rezie":
+      return { card: "border-purple-200", header: "bg-purple-50/80", badge: "bg-purple-100 text-purple-800 border-purple-300" };
+    case "nesparovane":
+      return { card: "border-amber-300", header: "bg-amber-50/80", badge: "bg-amber-100 text-amber-800 border-amber-300", icon: true };
+    default:
+      return { card: "border-border", header: "bg-muted/40", badge: "bg-background text-foreground border-border" };
+  }
+}
+
+function CollapsibleSection({
+  tone, title, count, hours, collapsed, onToggle, children,
+}: {
+  tone: SectionTone; title: string; count: number; hours: number;
+  collapsed: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  const s = sectionStyle(tone);
+  return (
+    <section className={cn("rounded-lg border shadow-sm overflow-hidden bg-card", s.card)}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          "w-full flex items-center justify-between gap-3 px-3 py-2 border-b text-left transition-colors hover:brightness-95",
+          s.header,
+        )}
+        aria-expanded={!collapsed}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {s.icon && <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />}
+          <Badge variant="outline" className={cn("text-[11px] font-semibold border px-2.5 py-0.5 shrink-0", s.badge)}>
+            {title}
+          </Badge>
+          <span className="text-[12px] font-medium text-foreground/80">
+            {count} {count === 1 ? "projekt" : count < 5 ? "projekty" : "projektů"}
+          </span>
+          <span className="text-[11px] text-muted-foreground">· {formatHours(hours)}</span>
+        </div>
+        <ChevronDown
+          className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", collapsed && "-rotate-90")}
+        />
+      </button>
+      {!collapsed && <div className="overflow-x-auto">{children}</div>}
+    </section>
+  );
+}
+
+function FlatSection({
+  title, count, hours, tone, children,
+}: {
+  title: string; count: number; hours: number; tone: SectionTone; children: React.ReactNode;
+}) {
+  const s = sectionStyle(tone);
+  return (
+    <section className={cn("rounded-lg border shadow-sm overflow-hidden bg-card", s.card)}>
+      <div className={cn("flex items-center justify-between gap-3 px-3 py-2 border-b", s.header)}>
+        <div className="flex items-center gap-2 min-w-0">
+          <Badge variant="outline" className={cn("text-[11px] font-semibold border px-2.5 py-0.5", s.badge)}>
+            {title}
+          </Badge>
+          <span className="text-[12px] font-medium text-foreground/80">{count}</span>
+          <span className="text-[11px] text-muted-foreground">· {formatHours(hours)}</span>
+        </div>
+      </div>
+      <div className="overflow-x-auto">{children}</div>
+    </section>
+  );
+}
+
+// ── Projekt: 3 categorized sections ─────────────────────────────────
+function ProjektSections({
+  grouped, expanded, toggleExpand, onOpenDetail, collapsedSections, toggleSection,
+}: {
+  grouped: Array<{
+    key: string; projectId: string; projectName: string; matched: boolean; isOverhead: boolean;
+    hodiny: number; records: number; last: string; rows: LogRow[];
+  }>;
+  expanded: Set<string>;
+  toggleExpand: (k: string) => void;
+  onOpenDetail: (id: string) => void;
+  collapsedSections: Set<string>;
+  toggleSection: (k: string) => void;
+}) {
+  const realProjects = grouped.filter((g) => g.matched && !g.isOverhead);
+  const overheadProjects = grouped.filter((g) => g.isOverhead);
+  const unmatched = grouped.filter((g) => !g.matched);
+  const sumHrs = (arr: typeof grouped) => arr.reduce((s, g) => s + g.hodiny, 0);
+
+  const renderTable = (rows: typeof grouped) => (
+    <Table>
+      <TableHeader>
+        <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
+          <TableHead className="w-[40%] h-9 text-[11px] uppercase tracking-wide">Projekt</TableHead>
+          <TableHead className="h-9 text-[11px] uppercase tracking-wide">Stav</TableHead>
+          <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Hodiny</TableHead>
+          <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Záznamů</TableHead>
+          <TableHead className="h-9 text-[11px] uppercase tracking-wide">Poslední záznam</TableHead>
+          <TableHead className="w-8 h-9" />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((g) => (
+          <ProjektRow
+            key={g.key}
+            g={g}
+            expanded={expanded.has(g.key)}
+            onToggle={() => toggleExpand(g.key)}
+            onOpenDetail={onOpenDetail}
+          />
+        ))}
+      </TableBody>
+    </Table>
+  );
+
+  return (
+    <>
+      {realProjects.length > 0 && (
+        <CollapsibleSection
+          tone="projekty"
+          title="Projekty"
+          count={realProjects.length}
+          hours={sumHrs(realProjects)}
+          collapsed={collapsedSections.has("projekty")}
+          onToggle={() => toggleSection("projekty")}
+        >
+          {renderTable(realProjects)}
+        </CollapsibleSection>
+      )}
+      {overheadProjects.length > 0 && (
+        <CollapsibleSection
+          tone="rezie"
+          title="Režie"
+          count={overheadProjects.length}
+          hours={sumHrs(overheadProjects)}
+          collapsed={collapsedSections.has("rezie")}
+          onToggle={() => toggleSection("rezie")}
+        >
+          {renderTable(overheadProjects)}
+        </CollapsibleSection>
+      )}
+      {unmatched.length > 0 && (
+        <CollapsibleSection
+          tone="nesparovane"
+          title="Nespárované"
+          count={unmatched.length}
+          hours={sumHrs(unmatched)}
+          collapsed={collapsedSections.has("nesparovane")}
+          onToggle={() => toggleSection("nesparovane")}
+        >
+          {renderTable(unmatched)}
+        </CollapsibleSection>
+      )}
+    </>
   );
 }
 
