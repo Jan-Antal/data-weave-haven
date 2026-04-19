@@ -415,8 +415,11 @@ export default function Analytics() {
           )}
         </div>
       </div>
+      )}
 
-      {dilnaMode ? (
+      {vykazMode ? (
+        <VykazReport />
+      ) : dilnaMode ? (
         <DilnaDashboard weekOffset={dilnaWeekOffset} />
       ) : (
         <>
