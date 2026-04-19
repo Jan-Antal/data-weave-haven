@@ -371,11 +371,19 @@ export function VykazReport() {
     type Bucket = {
       label: string;
       sortKey: string;
-      hodiny: number;
+      projekty: number;
+      rezije: number;
+      nesparovane: number;
       isNonWorking: boolean;
       nonWorkingLabel?: string;
     };
     const buckets = new Map<string, Bucket>();
+
+    const categorize = (id: string): "projekty" | "rezije" | "nesparovane" => {
+      if (projectsMap.has(id)) return "projekty";
+      if (overheadMap.has(id)) return "rezije";
+      return "nesparovane";
+    };
 
     if (eff === "day") {
       for (let i = 0; i < spanDays; i++) {
@@ -397,14 +405,16 @@ export function VykazReport() {
         buckets.set(key, {
           label,
           sortKey: key,
-          hodiny: 0,
+          projekty: 0,
+          rezije: 0,
+          nesparovane: 0,
           isNonWorking: !!nonWorkingLabel,
           nonWorkingLabel,
         });
       }
       for (const r of logs) {
         const b = buckets.get(r.datum_sync);
-        if (b) b.hodiny += Number(r.hodiny) || 0;
+        if (b) b[categorize(r.ami_project_id || "—")] += Number(r.hodiny) || 0;
       }
     } else {
       const cursor = new Date(fromD);
@@ -415,7 +425,9 @@ export function VykazReport() {
           buckets.set(key, {
             label: `T${week}`,
             sortKey: toLocalDateStr(monday),
-            hodiny: 0,
+            projekty: 0,
+            rezije: 0,
+            nesparovane: 0,
             isNonWorking: false,
           });
         }
@@ -426,21 +438,25 @@ export function VykazReport() {
         const { year, week } = isoWeek(d);
         const key = `${year}-W${String(week).padStart(2, "0")}`;
         const b = buckets.get(key);
-        if (b) b.hodiny += Number(r.hodiny) || 0;
+        if (b) b[categorize(r.ami_project_id || "—")] += Number(r.hodiny) || 0;
       }
     }
 
     const arr = Array.from(buckets.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    const round1 = (n: number) => Math.round(n * 10) / 10;
     return {
-      chartData: arr.map(({ label, hodiny, isNonWorking, nonWorkingLabel }) => ({
+      chartData: arr.map(({ label, projekty, rezije, nesparovane, isNonWorking, nonWorkingLabel }) => ({
         label,
-        hodiny: Math.round(hodiny * 10) / 10,
+        projekty: round1(projekty),
+        rezije: round1(rezije),
+        nesparovane: round1(nesparovane),
+        hodiny: round1(projekty + rezije + nesparovane),
         isNonWorking,
         nonWorkingLabel,
       })),
       effectiveBucket: eff,
     };
-  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday]);
+  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday, projectsMap, overheadMap]);
 
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
@@ -770,17 +786,27 @@ export function VykazReport() {
                       content={({ active, payload, label }: any) => {
                         if (!active || !payload || !payload.length) return null;
                         const item = payload[0].payload;
+                        const total = (item.projekty || 0) + (item.rezije || 0) + (item.nesparovane || 0);
+                        const rows: Array<{ key: string; name: string; value: number; color: string }> = [
+                          { key: "projekty", name: "Projekty", value: item.projekty || 0, color: "hsl(var(--primary))" },
+                          { key: "rezije", name: "Režie", value: item.rezije || 0, color: "hsl(var(--accent))" },
+                          { key: "nesparovane", name: "Nespárované", value: item.nesparovane || 0, color: "hsl(var(--muted-foreground))" },
+                        ];
                         return (
-                          <div
-                            className="rounded-lg border bg-background px-2.5 py-1.5 shadow-md"
-                            style={{ fontSize: 12 }}
-                          >
+                          <div className="rounded-lg border bg-background px-2.5 py-1.5 shadow-md" style={{ fontSize: 12 }}>
                             <div className="font-medium text-foreground">{label}</div>
-                            <div className="text-muted-foreground tabular-nums">
-                              {formatHours(payload[0].value as number)}
+                            <div className="text-foreground tabular-nums font-medium mb-1">{formatHours(total)}</div>
+                            <div className="space-y-0.5">
+                              {rows.filter((r) => r.value > 0).map((r) => (
+                                <div key={r.key} className="flex items-center gap-1.5 text-[11px]">
+                                  <span className="inline-block w-2 h-2 rounded-sm" style={{ background: r.color }} />
+                                  <span className="text-muted-foreground">{r.name}</span>
+                                  <span className="ml-auto tabular-nums text-foreground">{formatHours(r.value)}</span>
+                                </div>
+                              ))}
                             </div>
                             {item?.nonWorkingLabel && (
-                              <div className="text-[11px] italic text-muted-foreground mt-0.5">
+                              <div className="text-[11px] italic text-muted-foreground mt-1">
                                 {item.nonWorkingLabel}
                               </div>
                             )}
@@ -788,11 +814,18 @@ export function VykazReport() {
                         );
                       }}
                     />
-                    <Bar dataKey="hodiny" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="projekty" stackId="h" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="rezije" stackId="h" fill="hsl(var(--accent))" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="nesparovane" stackId="h" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             )}
+            <div className="flex items-center justify-center gap-4 mt-2 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary" />Projekty</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent" />Režie</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: "hsl(var(--muted-foreground))" }} />Nespárované</span>
+            </div>
           </Card>
         </div>
 
