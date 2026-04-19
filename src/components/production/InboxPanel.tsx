@@ -1588,7 +1588,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       {(item.split_part && item.split_total) && (
         <span className="text-[9px] font-sans shrink-0 px-1 rounded" style={{ color: "#6b7280", backgroundColor: "#f3f4f6", border: "1px solid #e5e7eb" }}>{item.split_part}/{item.split_total}</span>
       )}
-      <span className="font-sans text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${item.estimated_hours}h`}</span>
+      <span className="font-sans text-[10px] shrink-0" style={{ color: "#1a1a1a", fontWeight: 700 }}>{displayMode === "czk" ? formatCompactCzk(item.estimated_hours * hourlyRate) : `${Math.round(item.estimated_hours * 10) / 10}h`}</span>
     </div>
   );
 }
@@ -1606,7 +1606,7 @@ function DraggableInboxProject({ project }: { project: InboxProject }) {
       onMouseEnter={(e) => { e.currentTarget.style.borderStyle = "solid"; e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.1)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.borderStyle = "dashed"; e.currentTarget.style.backgroundColor = "rgba(58,138,54,0.05)"; }}
     >
-      Přetáhni celý projekt ({Math.round(project.total_hours)}h)
+      Přetáhni celý projekt ({Math.round(project.total_hours * 10) / 10}h)
     </div>
   );
 }
