@@ -309,7 +309,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const locInputRef = useRef<HTMLInputElement>(null);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-  const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [deletingFile, setDeletingFile] = useState<{ categoryKey: string; fileName: string } | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<{ categoryKey: string; files: SPFile[] } | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
   const sp = useSharePointDocs(project?.project_id ?? "");
