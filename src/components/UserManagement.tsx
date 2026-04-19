@@ -374,7 +374,10 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => (
+                  users.map((u) => {
+                    const isExpanded = expandedPermsUserId === u.id;
+                    return (
+                    <>
                     <TableRow key={u.id}>
                       <TableCell className="text-sm">
                         {editingNameId === u.id ? (
@@ -389,7 +392,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                               className="h-7 text-sm"
                               autoFocus
                             />
-                            <button onClick={() => handleUpdateName(u.id)} className="text-green-600 hover:text-green-700"><Check className="h-4 w-4" /></button>
+                            <button onClick={() => handleUpdateName(u.id)} className="text-success hover:text-success/80"><Check className="h-4 w-4" /></button>
                             <button onClick={() => setEditingNameId(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
                           </div>
                         ) : (
@@ -443,7 +446,14 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                           <Switch checked={u.is_active} onCheckedChange={(v) => handleToggleActive(u.id, v)} />
                         )}
                       </TableCell>
-                        <TableCell className="flex gap-1">
+                      <TableCell className="flex gap-1">
+                        <button
+                          onClick={() => togglePermsPanel(u)}
+                          className={`transition-colors ${isExpanded ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                          title="Oprávnenia"
+                        >
+                          <Shield className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleCopyInviteLink(u.id)}
                           className="text-muted-foreground hover:text-foreground transition-colors"
@@ -477,7 +487,53 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                         )}
                       </TableCell>
                     </TableRow>
-                  ))
+                    {isExpanded && permsDraft && (
+                      <TableRow key={`${u.id}-perms`} className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={6} className="p-0">
+                          <div className="p-4 border-l-4 border-primary">
+                            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <Shield className="h-4 w-4 text-primary" />
+                                <span className="font-semibold text-sm">Oprávnenia</span>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Preset: {u.role ? ROLE_LABELS[u.role] : "—"}
+                                </Badge>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resetPermsToPreset(u)}>
+                                  Resetovat na preset
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setExpandedPermsUserId(null); setPermsDraft(null); }}>
+                                  Zrušit
+                                </Button>
+                                <Button size="sm" className="h-7 text-xs" onClick={() => handleSavePerms(u)} disabled={permsSaving}>
+                                  {permsSaving ? "Ukládám..." : "Uložiť"}
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
+                              {PERMISSION_FLAGS.map((flag) => (
+                                <label
+                                  key={flag}
+                                  className="flex items-center gap-2 text-xs cursor-pointer hover:text-foreground text-muted-foreground"
+                                >
+                                  <Checkbox
+                                    checked={!!permsDraft[flag]}
+                                    onCheckedChange={(v) =>
+                                      setPermsDraft((prev) => (prev ? { ...prev, [flag]: v === true } : prev))
+                                    }
+                                  />
+                                  <span>{PERMISSION_LABELS[flag]}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
