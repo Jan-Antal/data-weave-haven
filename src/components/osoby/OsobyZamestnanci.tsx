@@ -328,22 +328,6 @@ export function OsobyZamestnanci() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-y-auto px-6">
-        <Table>
-          <TableHeader className="sticky top-0 bg-card z-10">
-            <TableRow>
-              <TableHead className="w-[260px]">Jméno</TableHead>
-              <TableHead className="w-[180px]">Úsek</TableHead>
-              <TableHead className="w-[160px]">Pozice</TableHead>
-              <TableHead className="w-[200px]">Role na projektu</TableHead>
-              <TableHead className="w-[110px]">Úvazek</TableHead>
-              <TableHead className="w-[160px]">Absence</TableHead>
-              <TableHead className="w-[150px]">Stav</TableHead>
-              <TableHead className="w-[40px]" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
       {/* Sticky column header (one per page) */}
       <div className="px-6 pt-3 sticky top-0 z-20 bg-card">
         <Table className="table-fixed">
