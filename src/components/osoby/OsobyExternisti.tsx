@@ -195,7 +195,7 @@ export function OsobyExternisti() {
       <SectionToolbar
         left={
           <span className="text-xs text-muted-foreground">
-            Externisti · {activeCount} aktivních z {rows.length}
+            Externisté · {activeCount} aktivních z {rows.length}
           </span>
         }
         right={
