@@ -73,6 +73,7 @@ export async function recalculateProductionHours(
       preset,
       hourlyRate,
       exchangeRates,
+      defaultMarginPct,
       formulas,
     });
 
