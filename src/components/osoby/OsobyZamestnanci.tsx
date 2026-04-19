@@ -24,13 +24,66 @@ import { toast } from "@/hooks/use-toast";
 
 const UVAZEK_OPTIONS = [4, 6, 8];
 
-/** Stredisko pill colors — green/orange/purple per spec. */
-function strediskoStyles(stredisko: string | null | undefined): string {
+/** Stredisko canonical kind from raw label. */
+type StrediskoKind = "direct" | "indirect" | "provoz" | "none";
+function strediskoKind(stredisko: string | null | undefined): StrediskoKind {
   const s = (stredisko ?? "").toLowerCase();
-  if (s.includes("direct")) return "bg-green-100 text-green-800 border-green-200";
-  if (s.includes("indirect")) return "bg-orange-100 text-orange-800 border-orange-200";
-  if (s.includes("provoz")) return "bg-purple-100 text-purple-800 border-purple-200";
-  return "bg-muted text-muted-foreground border-border";
+  if (s.includes("direct")) return "direct";
+  if (s.includes("indirect")) return "indirect";
+  if (s.includes("provoz")) return "provoz";
+  return "none";
+}
+
+/** Block-level theming per stredisko. */
+const BLOCK_THEME: Record<StrediskoKind, {
+  headerBg: string;
+  headerBorder: string;
+  badgeBg: string;
+  badgeFg: string;
+  subBg: string;
+  description: string;
+}> = {
+  direct: {
+    headerBg: "#EAF3DE",
+    headerBorder: "#97C459",
+    badgeBg: "#D7E9BC",
+    badgeFg: "#3F6212",
+    subBg: "#F5F9EE",
+    description: "Kapacita výroby · priame náklady",
+  },
+  indirect: {
+    headerBg: "#FAEEDA",
+    headerBorder: "#EF9F27",
+    badgeBg: "#F4DEB1",
+    badgeFg: "#7C4A03",
+    subBg: "#FCF6EA",
+    description: "Podporné výrobné činnosti · nepriame náklady",
+  },
+  provoz: {
+    headerBg: "#EEEDFE",
+    headerBorder: "#AFA9EC",
+    badgeBg: "#DDDAFB",
+    badgeFg: "#3F367C",
+    subBg: "#F6F5FE",
+    description: "Réžia a projektové role",
+  },
+  none: {
+    headerBg: "hsl(var(--muted))",
+    headerBorder: "hsl(var(--border))",
+    badgeBg: "hsl(var(--muted))",
+    badgeFg: "hsl(var(--muted-foreground))",
+    subBg: "hsl(var(--muted) / 0.4)",
+    description: "Bez priradenia",
+  },
+};
+
+/** Map a Provoz úsek name to its dropdown role tag. */
+function provozRoleTag(usek: string): { label: string; color: string } | null {
+  const u = usek.toLowerCase();
+  if (u.includes("projekt") || u.includes("pm")) return { label: "→ PM", color: "#3F367C" };
+  if (u.includes("konštruk") || u.includes("konstruk")) return { label: "→ Konštruktér", color: "#3F367C" };
+  if (u.includes("kalkul")) return { label: "→ Kalkulant", color: "#3F367C" };
+  return null;
 }
 
 /** Deterministic pastel avatar color from name hash. */
