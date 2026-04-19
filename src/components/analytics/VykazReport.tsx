@@ -24,7 +24,7 @@ import { formatAppDate } from "@/lib/dateFormat";
 
 type DateRange = "week" | "month" | "prev_week" | "prev_month" | "3months" | "custom";
 
-const EXCLUDED_CINNOST = new Set(["TPV", "ENG", "PRO"]);
+
 
 interface LogRow {
   ami_project_id: string;
@@ -170,7 +170,7 @@ export function VykazReport() {
         if (batch.length < PAGE) break;
         offset += PAGE;
       }
-      return all.filter((r) => !r.cinnost_kod || !EXCLUDED_CINNOST.has(r.cinnost_kod));
+      return all;
     },
   });
 
