@@ -716,6 +716,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           projectName={projectName}
           currency={currency}
           productionStatusMap={productionStatusMap}
+          stages={projectStages}
           onBack={onBack}
           onOpenDetail={() => setDetailOpen(true)}
           onAddItem={(name) => addItem.mutate({ project_id: projectId, item_code: name })}
