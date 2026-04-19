@@ -427,7 +427,7 @@ export function VykazReport() {
           nonWorkingLabel,
         });
       }
-      for (const r of logs) {
+      for (const r of filteredLogs) {
         const b = buckets.get(r.datum_sync);
         if (b) b[categorize(r.ami_project_id || "—")] += Number(r.hodiny) || 0;
       }
@@ -448,7 +448,7 @@ export function VykazReport() {
         }
         cursor.setDate(cursor.getDate() + 1);
       }
-      for (const r of logs) {
+      for (const r of filteredLogs) {
         const d = new Date(r.datum_sync + "T00:00:00");
         const { year, week } = isoWeek(d);
         const key = `${year}-W${String(week).padStart(2, "0")}`;
@@ -471,53 +471,33 @@ export function VykazReport() {
       })),
       effectiveBucket: eff,
     };
-  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday, projectsMap, overheadMap]);
+  }, [filteredLogs, from, to, bucketMode, holidayMap, findCompanyHoliday, projectsMap, overheadMap]);
 
-  // ── CSV Export ──────────────────────────────────────────────────
+  // ── CSV Export (project grouping) ───────────────────────────────
   const handleExport = useCallback(() => {
     const lines: string[] = [];
-    if (groupBy === "projekt") {
-      lines.push("Projekt ID;Název;Stav;Hodiny;Záznamů;Poslední záznam");
-      for (const g of grouped as any[]) {
-        lines.push([
-          g.projectId,
-          `"${g.projectName.replace(/"/g, '""')}"`,
-          g.matched ? "Spárováno" : "Nespárováno",
-          (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
-          g.records,
-          g.last,
-        ].join(";"));
-      }
-    } else if (groupBy === "osoba") {
-      lines.push("Jméno;Počet projektů;Hodiny celkem");
-      for (const g of grouped as any[]) {
-        lines.push([
-          `"${g.zamestnanec.replace(/"/g, '""')}"`,
-          g.projects.size,
-          (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
-        ].join(";"));
-      }
-    } else {
-      lines.push("Název činnosti;Kód;Hodiny");
-      for (const g of grouped as any[]) {
-        lines.push([
-          `"${g.cinnost_nazov.replace(/"/g, '""')}"`,
-          g.cinnost_kod,
-          (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
-        ].join(";"));
-      }
+    lines.push("Projekt ID;Název;Stav;Hodiny;Záznamů;Poslední záznam");
+    for (const g of grouped as any[]) {
+      lines.push([
+        g.projectId,
+        `"${g.projectName.replace(/"/g, '""')}"`,
+        g.matched ? "Spárováno" : "Nespárováno",
+        (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
+        g.records,
+        g.last,
+      ].join(";"));
     }
     const csv = "\uFEFF" + lines.join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `vykaz_${from}_${to}_${groupBy}.csv`;
+    a.download = `vykaz_${from}_${to}_projekt.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [grouped, groupBy, from, to]);
+  }, [grouped, from, to]);
 
   // ── Render ──────────────────────────────────────────────────────
   return (
