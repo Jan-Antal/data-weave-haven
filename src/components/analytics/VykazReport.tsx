@@ -75,6 +75,16 @@ export function VykazReport() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [bucketMode, setBucketMode] = useState<"auto" | "day" | "week">("auto");
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = useCallback((key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const { from, to } = useMemo(
     () => getRangeBounds(dateRange, customFrom, customTo),
