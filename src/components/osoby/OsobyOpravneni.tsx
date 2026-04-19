@@ -768,6 +768,9 @@ function TriToggle({
         onClick={() => onChange("none")}
       >
         Ne
+      </SegBtn>
+      <SegBtn
+        selected={value === "read"}
         variant="read"
         onClick={() => onChange("read")}
       >
