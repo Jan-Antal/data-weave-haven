@@ -321,17 +321,29 @@ export function OsobyZamestnanci() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {Array.from(grouped.entries()).map(([stredisko, useks]) =>
-              Array.from(useks.entries()).map(([usek, emps]) => {
-                const totalHrs = emps.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
-                return (
+            {Array.from(grouped.entries()).map(([stredisko, useks]) => {
+              const allEmpsInStredisko = Array.from(useks.values()).flat();
+              const strediskoHrs = allEmpsInStredisko.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
+              return (
+                <>
+                  {/* Stredisko block header */}
+                  <TableRow key={`${stredisko}-block`} className="hover:bg-transparent border-b-0">
+                    <TableCell colSpan={8} className="pt-4 pb-1.5 px-0">
+                      <div className={cn("flex items-center gap-2 flex-wrap rounded-md border px-3 py-2", strediskoStyles(stredisko))}>
+                        <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5 bg-background/60", strediskoStyles(stredisko))}>
+                          {stredisko}
+                        </Badge>
+                        <span className="text-[11px] opacity-80">Kapacita výroby · {allEmpsInStredisko.length} osob · {strediskoHrs}h brutto/týd</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  {Array.from(useks.entries()).map(([usek, emps]) => {
+                    const totalHrs = emps.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
+                    return (
                   <>
-                    <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/40 hover:bg-muted/40 border-b border-border/40">
-                      <TableCell colSpan={8} className="py-1.5">
+                    <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/30 hover:bg-muted/30 border-b border-border/40">
+                      <TableCell colSpan={8} className="py-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={cn("text-[10px] font-medium border px-2 py-0.5", strediskoStyles(stredisko))}>
-                            {stredisko}
-                          </Badge>
                           <span className="text-[11px] font-medium uppercase tracking-wide text-foreground">{usek}</span>
                           <span className="text-[11px] text-muted-foreground">· {emps.length} osob · {totalHrs}h brutto/týd</span>
                         </div>
@@ -522,9 +534,11 @@ export function OsobyZamestnanci() {
                       );
                     })}
                   </>
-                );
-              }),
-            )}
+                    );
+                  })}
+                </>
+              );
+            })}
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
