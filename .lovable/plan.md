@@ -1,45 +1,53 @@
 
-Plán: Nahradiť pole "Měsíční kapacita" za "Výchozí marže" v Rozpad ceny nastaveniach
+## Plán: 3 nezávislé multi-select filtre namiesto toggle
 
 ### Kontext
-V sekcii Rozpad ceny (CostBreakdownPresetsSection) sú aktuálne dve polia: **Hodinová sazba** a **Měsíční kapacita**. Pole "Měsíční kapacita" sa nikde reálne nepoužíva pre výpočty plánu hodín — namiesto toho chceme tam mať **Výchozí marže (%)**, ktorú bude `computePlanHours` používať ako fallback keď projekt nemá vlastnú maržu (namiesto hardcoded 15%).
+Aktuálne je v toolbare `VykazReport` segmentovaný prepínač **Projekt | Osoba | Činnosť**, ktorý určuje **iba režim zoskupenia** (groupBy) zobrazených riadkov. Užívateľ chce z toho urobiť **3 samostatné multi-select filtre** (ako Toggl) — každý s vlastným zoznamom a vyhľadávaním, default = všetko vybrané. Filtre obmedzia, **ktoré záznamy sa zarátajú** do tabuľky, kariet (Celkem hodin, Aktívni pracovníci, Utilizace, Nespárované) aj grafu.
 
-### Stav z prerušeného behu
-Posledná migrácia + zmeny boli čiastočne spravené (prerušené užívateľom). Diff ukazuje že migrácia `default_margin_pct numeric NOT NULL DEFAULT 15` na `production_settings` bola nahratá, a `useProductionSettings.ts`, `CostBreakdownPresetsSection.tsx`, `computePlanHours.ts` boli upravené. Treba overiť že všetko sedí a doplniť čo chýba.
+### Zmeny v `src/components/analytics/VykazReport.tsx`
 
-### Zmeny
+**1. Odstrániť segmentovaný prepínač groupBy** (riadky ~641–666) a `const [groupBy, setGroupBy]`. Tabuľka pod kartami sa zjednoduší — zobrazí sa **len projektové zoskupenie** (najinformatívnejšie). `OsobaRows` a `CinnostRows` sekcie odstránime z renderu (kód nechávame, ale nepoužijeme — prípadne neskôr odstrániť).
 
-**1. DB migrácia** (už hotové podľa diffu):
-- `production_settings.default_margin_pct numeric NOT NULL DEFAULT 15` ✅
+**2. Pridať 3 nové filtre (state)**:
+- `projectFilter: Set<string>` (kľúč = `ami_project_id`)
+- `personFilter: Set<string>` (kľúč = `zamestnanec`)
+- `activityFilter: Set<string>` (kľúč = `cinnost_kod`)
+- Default: `null` = "všetko vybrané" (žiadne filtrovanie). Keď užívateľ začne odznačovať, prepne sa na `Set` s vybranými hodnotami.
 
-**2. `src/hooks/useProductionSettings.ts`**:
-- Pridať `default_margin_pct: number` do interface
-- Povoliť update tohto poľa v mutation
+**3. Zoznamy hodnôt pre dropdowny** (z `logs`, `useMemo`):
+- `availableProjects`: `[{ id, name }]` zoradené podľa hodín DESC, kde `name = projectsMap.get(id) ?? overheadMap.get(id) ?? id`
+- `availablePersons`: zoznam unikátnych `zamestnanec` zoradený podľa hodín
+- `availableActivities`: `[{ kod, nazov }]` zoradené podľa hodín
 
-**3. `src/components/CostBreakdownPresetsSection.tsx`**:
-- Nahradiť pole "Měsíční kapacita" (h) za "Výchozí marže" (%)
-- Label: "Výchozí marže"
-- Suffix: "%", step="0.1"
-- Bind na `settings.default_margin_pct`, save cez `handleSaveSettings("default_margin_pct", value)`
+**4. Nový komponent `MultiSelectFilter`** (lokálny vo VykazReport):
+- Trigger: `Button variant="outline" size="sm"` s labelom `"Projekty (12)"` resp. `"Projekty: Vše"` keď filter je null
+- `PopoverContent` šírka ~280px obsahuje:
+  - `Input` "Hledat..." (search v zozname; pre projekty aj `id` aj `name`)
+  - `Vybrat vše` / `Zrušit vše` tlačidlá
+  - Scrollovateľný zoznam s `Checkbox` + label (názov + malý sivý sufix s ID/kódom napravo)
+- Po zmene volá `onChange(newSet | null)` (null keď sú vybrané všetky)
 
-**4. `src/lib/computePlanHours.ts`**:
-- Pridať `defaultMarginPct?: number` do `PlanHoursInput`
-- Použiť ho ako fallback namiesto hardcoded `0.15` keď `project.marze` je prázdne/0
-- Konverzia: hodnota >1 → /100 (napr. 15 → 0.15)
+**5. Aplikovať filtre** — vytvoriť `filteredLogs` (`useMemo`):
+```ts
+const filteredLogs = logs.filter(r =>
+  (!projectFilter || projectFilter.has(r.ami_project_id || "—")) &&
+  (!personFilter || personFilter.has(r.zamestnanec || "—")) &&
+  (!activityFilter || activityFilter.has(r.cinnost_kod || "—"))
+);
+```
+A nahradiť všetky výskyty `logs` v down-stream `useMemo`-ch (`grouped`, `summaryStats`, `chartData`) za `filteredLogs`. `availableProjects/Persons/Activities` musia ostať zo **zdrojových `logs`** (aby si užívateľ vedel pridať späť to, čo si odfiltroval).
 
-**5. `src/lib/recalculateProductionHours.ts`**:
-- Načítať `default_margin_pct` zo settings a posielať do `computePlanHours` ako `defaultMarginPct`
+**6. Layout toolbaru** (riadok 641–666 nahradíme):
+- Center segment nahradíme za `flex gap-2` s tromi `MultiSelectFilter` triggermi: **Projekty**, **Osoby**, **Činnosti**
+- Search input napravo ostáva (hľadá v aktuálne zobrazenej projektovej tabuľke — funkcia `q` v `grouped`)
 
-**6. Volacie miesta `computePlanHours`** (nájsť všetky):
-- Skontrolovať či sa volá aj inde mimo recalculate (napr. `useAnalytics`, `RozpadCeny`) a doplniť `defaultMarginPct` zo settings
-
-### Súbory na overenie / úpravu
-- `src/hooks/useProductionSettings.ts`
-- `src/components/CostBreakdownPresetsSection.tsx`
-- `src/lib/computePlanHours.ts`
-- `src/lib/recalculateProductionHours.ts`
-- ďalšie volacie miesta `computePlanHours` (search)
+**7. Reset filtrov**: malý `X` ikon button vedľa filtrov keď je aspoň jeden aktívny — nastaví všetky 3 na `null`.
 
 ### Bez zmien
-- `monthly_capacity_hours` zostáva v DB (nemažeme — nepoužívané, ale nech zostane pre prípadné budúce použitie)
-- Žiadne zmeny v RLS, ani v iných UI sekciách
+- Karty, graf, presety dátumov, export CSV — len pracujú nad `filteredLogs`
+- DB / hooks / typy
+
+### Edge cases
+- Prázdny výsledok po filtroch → existujúci empty state v grafe a tabuľke ostane funkčný
+- Search v dropdowne projektov je diakritiky-insensitive (použijeme `normalizedIncludes` z `@/lib/statusFilter`)
+- Keď užívateľ odznačí všetko v dropdowne → `Set()` (prázdny set = nič) — výsledok bude prázdny; vizuálne zobrazíme `"Projekty (0)"`
