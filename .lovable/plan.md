@@ -1,63 +1,62 @@
 
+Cieľ: zjednotiť logiku tak, aby sa projekt/bundle správal ako jeden naviazaný split naprieč rôznymi kódmi prvkov a aby prepočty v Recalculate aj Midflight korektne rešpektovali množstvo `pocet`.
 
-## Diagnóza (potvrdená z DB)
+1. Potvrdím a zavedem jednotnú definíciu splitu
+- Split nebude viazaný na jeden `item_code`, ale na celý bundle projektu.
+- Všetky súvisiace riadky budú zdieľať jedno `split_group_id`.
+- `split_part/split_total` budú globálne poradie v celom bundle, nie lokálne 1/2 pre jednu položku.
+- Pri ďalšom splitnutí sa celý chain prečísluje na `N+1`.
 
-Z-2617-001:
-- `hodiny_plan` = 1214 h (zo `project_plan_hours`)
-- Midflight schedule = 4 týždne × ~19 h = **77.8 h** ✓
-- Inbox = 6 položiek (T.01–T.06, `Schváleno`) = **1136.2 h** ❌ nadhodnotené
-- Súčet = 77.8 + 1136.2 = 1214 h (matematika reconciliation sedí, ale rozdelenie je nesprávne)
+2. Opravím Midflight
+- V `src/lib/midflightImportPlanVyroby.ts` ponechám projektový bundle split cez všetky pending inbox položky.
+- Doplním, aby sa pri ďalších zásahoch držal jeden spoločný chain pre projekt.
+- Skontrolujem, že výpočet podielu používa CZK vrátane `pocet` aj pre pending TPV.
+- Zaokrúhľovanie ostane max na 1 desatinné miesto.
 
-V TPV je **40+ položiek**, len 6 z nich má status `Schváleno` a je v Inboxe. Zvyšných ~34 položiek (`Připraveno ke zpracování`, `Zpracovává se`, `Připomínky`, atď.) ešte nikto neposlal do výroby. Reconciliation algoritmus rozdelil **celých 1136 h zvyšku plánu** len medzi týchto 6 schválených položiek → každá dostala 5× viac hodín než reálne reprezentuje (T.04 = 405 h, T.01 = 202 h…).
+3. Opravím Recalculate
+- V `src/lib/recalculateProductionHours.ts` upravím prepočet schedule/inbox tak, aby:
+  - počítal hodnotu položiek konzistentne s `pocet`,
+  - neprepisoval bundle split na per-item logiku,
+  - vedel zachovať spoločný `split_group_id` a správne rozdeľovať hodiny v rámci celého chainu.
+- Zrevidujem väzbu na `computePlanHours`, aby sa množstvo používalo rovnako vo všetkých vetvách.
 
-## Príčina
+4. Opravím samotné split operácie
+- `src/components/production/SplitItemDialog.tsx`: namiesto resetu na `1/2` vložím novú časť do existujúceho chainu a následne prečíslujem všetky časti na `N+1`.
+- `src/components/production/SplitBundleDialog.tsx`: split celého bundle bude robiť rovnaké percento na všetkých položkách, ale výsledok zapíše ako jeden naviazaný chain, nie sériu izolovaných 1/2 splitov.
+- Prečíslovanie spravím cez spoločný helper, ktorý upraví všetky riadky v group.
 
-V `midflightImportPlanVyroby.ts` reconciliation step:
-```
-inboxRemainder = hodiny_plan − Σ midflight
-distribuuj inboxRemainder medzi VŠETKY pending Inbox položky proporcionálne podľa estimated_czk
-```
+5. Opravím všetky presuny, aby badge nezmizol
+- V `src/hooks/useProductionDragDrop.ts`, `PlanVyrobyTableView.tsx`, prípadne return flow zachovám a prenesiem `split_group_id/split_part/split_total` pri:
+  - Inbox → week silo
+  - presunoch medzi týždňami
+  - návrate späť do Inboxu
+  - bundle move / merge / redo-undo
+- Toto je hlavný dôvod, prečo badge v sile niekedy zmizne alebo ostane staré N/N.
 
-Algoritmus implicitne predpokladá, že **Inbox = celý zvyšok projektu**. To platilo pre Z-2515-001 (kde 30 inbox položiek pokrývalo celé TPV), ale **neplatí všeobecne** — keď v TPV existujú schválené položky aj nezschvátlené, Inbox má len časť projektu.
+6. Zjednotím vizuálnu prezentáciu
+- Screenshot beriem ako referenciu správneho správania v Inboxe: header badge `5/10` a item badge `5/10 ... 10/10`.
+- Weekly Silo už badge renderuje, takže opravím hlavne dáta; zároveň dorovnám zobrazenie, aby sa badge držal rovnako spoľahlivo aj po ďalšom splite.
 
-## Riešenie
+7. Overenie po implementácii
+- Otestujem scenár:
+  - Midflight projekt s viacerými rôznymi `item_code`
+  - presun Inbox → Silo
+  - ďalší split jednej časti
+  - kontrola, že všetky riadky majú spoločný chain a `split_total = N+1`
+  - spustenie Recalculate
+  - opätovná kontrola, že hodiny aj badge ostali konzistentné
+- Špeciálne overím problémový projekt Z-2617-001.
 
-Reconciliation musí **rešpektovať reálny pomer Inbox vs. celé TPV**. Inbox dostane len svoj **proporcionálny podiel** zo zvyšku plánu, nie celý zvyšok.
+Dotknuté súbory
+- `src/lib/midflightImportPlanVyroby.ts`
+- `src/lib/recalculateProductionHours.ts`
+- `src/components/production/SplitItemDialog.tsx`
+- `src/components/production/SplitBundleDialog.tsx`
+- `src/hooks/useProductionDragDrop.ts`
+- `src/components/production/PlanVyrobyTableView.tsx`
 
-### Nový algoritmus per projekt
-
-1. `H_mf` = Σ midflight hodín
-2. `inboxRemainder = max(0, hodiny_plan − H_mf)`
-3. **Načítať CZK všetkých nezrušených TPV položiek projektu** (`Σ tpv_czk_total`).
-4. **Načítať CZK Inbox položiek** (`Σ inbox_czk`) a **CZK pending TPV položiek** (`Σ pending_tpv_czk`) — t.j. tých, čo NIE SÚ v Inboxe ani už zaplánované/expedované.
-5. **Inbox podiel** = `inboxRemainder × inbox_czk / (inbox_czk + pending_tpv_czk)`.
-   - Tzn. zvyšok plánu sa rozdelí pomerne medzi to, čo je už v Inboxe, a to, čo ešte v TPV čaká na schválenie.
-6. Distribuovať `Inbox podiel` medzi inbox položky proporcionálne podľa `estimated_czk` (last item absorbuje rounding remainder).
-7. Split metadáta a `split_total = N + M` zostávajú ako predtým.
-
-### Edge cases
-
-- **Žiadne pending TPV (všetko schválené alebo zrušené)**: Inbox dostane celý `inboxRemainder` — pôvodné správanie zachované, Z-2515-001 funguje rovnako.
-- **`inbox_czk + pending_tpv_czk = 0`**: skip, žiadna distribúcia.
-- **TPV položky bez ceny**: ignorujú sa v sumách.
-
-### Očakávaný výsledok pre Z-2617-001
-
-- `inbox_czk` ≈ 922k Kč (6 schválených položiek)
-- `pending_tpv_czk` ≈ ostatných ~34 položiek (väčšina cien ~50–200k) → cca 2.5–3M Kč
-- Inbox podiel z 1136 h = **~270–300 h** rozdelených medzi 6 položiek namiesto plných 1136 h
-- Zvyšok ~830 h zostane "rezervovaný" v pláne pre nezschvátlené TPV položky (žiadny Inbox/schedule záznam, plán to drží implicitne cez `hodiny_plan`)
-
-### Súbor
-
-`src/lib/midflightImportPlanVyroby.ts` — v reconciliation bloku (po midflight inserte):
-- pridať batch fetch `tpv_items` pre dané projekty (nezrušené, status ≠ "Zrušeno"),
-- spočítať `pending_tpv_czk` ako Σ ceny položiek, ktoré nie sú v `production_inbox` (match cez `item_code`) ani v `production_schedule` (match cez `item_code`),
-- prepočítať `inbox_share` namiesto použitia plného `inboxRemainder`.
-
-### Postup užívateľa
-
-1. AI nasadí kód.
-2. Klikni **📥 Midflight import** (re-distribuuje Inbox správne).
-3. Over Z-2617-001: Inbox 6 položiek ≈ 270–300 h (namiesto 1136 h).
-
+Výsledok po úprave
+- Výpočet bude konzistentne brať do úvahy `pocet`.
+- Split bude fungovať na celý bundle projektu, aj keď obsahuje rôzne kódy prvkov.
+- Ďalší split navýši celý chain na `N+1`.
+- Badge sa nestratí po presune do week sila a zostane správny aj po recalculate aj midflight.
