@@ -458,9 +458,13 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
     // Ak je položka súčasťou selekcie, aplikujeme akcie na celú selekciu
     const isInSelection = checkedItems.has(item.id) && checkedItems.size > 1;
-    const selectedItems = isInSelection
+    const itemProjectLookup = new Map<string, { item: InboxItem; project: InboxProject }>();
+    for (const p of projects) {
+      for (const it of p.items) itemProjectLookup.set(it.id, { item: it, project: p });
+    }
+    const selectedItems: { item: InboxItem; project: InboxProject }[] = isInSelection
       ? Array.from(checkedItems)
-          .map(id => allInboxItemsMap.get(id))
+          .map(id => itemProjectLookup.get(id))
           .filter((x): x is { item: InboxItem; project: InboxProject } => !!x)
       : [{ item, project }];
     const selCount = selectedItems.length;
