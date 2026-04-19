@@ -1,49 +1,40 @@
 
-## Plán: Zvýraznenie víkendov a sviatkov v grafe "Hodiny v čase"
+## Plán: Spojený výber obdobia — preset + kalendár v jednom popoveri
 
-### Cieľ
-V `BarChart` v `VykazReport.tsx` vizuálne odlíšiť dni/týždne, kedy sa neočakávajú hodiny (víkendy, české štátne sviatky, firemné sviatky), pomocou svetlosivého pozadia. Tracknuté hodiny v týchto dňoch zostanú viditeľné v popredí.
+### A. Jeden trigger (bunka) namiesto dvoch
+V `src/components/analytics/VykazReport.tsx`:
+- Odstrániť pôvodný `<Select>` aj samostatný "Vlastní" Popover.
+- Jeden `Popover` trigger button (`variant="outline" size="sm" h-8 text-xs`) s `CalendarIcon` medzi šípkami ◀ ▶.
+- **Label vždy zobrazuje konkrétny dátumový rozsah** spočítaný z `getRangeBounds(dateRange, customFrom, customTo, rangeOffset)`:
+  - Format: `"5. 3. – 12. 4. 2026"` (cez `parseAppDate` + `formatAppDate`); ak rovnaký rok, rok len raz na konci.
+  - Nikdy "Tento týden" — vždy reálne dátumy, aby sa po kliku ◀ ▶ label aktualizoval.
 
-### Implementácia
+### B. Obsah popoveru (jedna plocha, žiadne taby)
+- **Ľavá kolóna** (~180px) — preset list (vertikálne buttony, `variant="ghost"`, aktívny preset má `bg-accent`):
+  - Tento týden (`week`)
+  - Tento měsíc (`month`)
+  - Minulý týden (`prev_week`) — **nový**
+  - Minulý měsíc (`prev_month`) — **nový**
+  - Posledné 3 měsíce (`3months`)
+- **Pravá kolóna** — `Calendar` `mode="range"`, `numberOfMonths={2}`, `weekStartsOn={1}`:
+  - `selected={{ from, to }}` — vždy odráža **aktuálne aktívny rozsah** (preset alebo custom). Klik na preset → vyznačí rozsah v kalendári.
+  - `onSelect={(range) => { setDateRange("custom"); setCustomFrom(...); setCustomTo(...); setRangeOffset(0); }}` — akýkoľvek klik v kalendári automaticky prepne na custom.
+- **Footer**: `Smazat` (Trash2, vyčistí custom + vráti na `week`) vľavo, `Hotovo` (zatvorí) vpravo.
 
-**1. Detekcia non-working dní**
-- Pre denný režim (`effectiveBucket === "day"`):
-  - Víkend = `date.getDay() === 0 || 6`
-  - Český štátny sviatok = využiť existujúci hook `useCzechHolidays(year)` z `src/hooks/useWeeklyCapacity.ts` (24h cache, fallback)
-  - Firemný sviatok = `useCompanyHolidays()` z toho istého súboru (range start_date..end_date)
-- Pre týždňový režim (`effectiveBucket === "week"`):
-  - Spočítať počet pracovných dní v týždni; ak je 0 → plný šedý highlight, ak <5 → čiastočný (pomer = neWorking/5, použijeme alpha alebo skipneme)
-  - Pre jednoduchosť: označiť týždeň iba ak má **0 pracovných dní** (extrémne zriedkavé) — inak nezvýrazňovať. Hlavná hodnota featúry je v dennom režime.
+### C. Rozšírenie typov a `getRangeBounds`
+- `type DateRange = "week" | "month" | "prev_week" | "prev_month" | "3months" | "custom"`
+- `getRangeBounds`:
+  - `prev_week` → pondelok–nedeľa minulého týždňa, posun `offset * 7` dní
+  - `prev_month` → 1.–posledný deň minulého mesiaca, posun `offset` mesiacov
+- Šípky ◀ ▶ ostávajú; pre nové presety fungujú rovnako (posun o 1 jednotku periody).
 
-**2. Pridať flag do `chartData`**
-- Každý bucket dostane `isNonWorking: boolean` a `nonWorkingLabel?: string` (napr. "Víkend", "Velikonoční pondělí", "Firemní dovolená")
-
-**3. Vykreslenie šedého pozadia**
-- Použiť `<Bar>` s druhým `dataKey="bgFull"` pred hlavným barom hodín:
-  - `bgFull` = max hodnota Y pre non-working buckets, inak 0
-  - Farba `hsl(var(--muted))` s opacity ~0.4
-  - `isAnimationActive={false}`, `stackId` NEpoužívať (chceme overlay, nie stack)
-- Lepšia varianta: použiť `<ReferenceArea>` z recharts pre každý non-working bucket s `fill="hsl(var(--muted))"` a `fillOpacity={0.35}`. Toto kreslí pásik na celú výšku bez ovplyvnenia osi Y a hlavný `<Bar>` hodín ostane vykreslený **v popredí**.
-- Zvolíme `ReferenceArea` — čistejšie, nepotrebuje pomocné dáta v bare.
-
-**4. Tooltip rozšírenie**
-- Ak hover na non-working bucket → v custom tooltip pridať podtitulok napr. `"Víkend"` / `"Velikonoční pondělí"` / `"Firemní dovolená"` šedou kurzívou pod dátumom.
-- Vyžaduje custom `content` prop na `<RTooltip>` namiesto default rendereru (alebo `formatter`/`labelFormatter` pre jednoduchšiu cestu).
-
-**5. Legenda (mini)**
-- Pod nadpisom karty `"Hodiny v čase"` malý chip: `▭ Víkend / svátek` v `text-[11px] text-muted-foreground` so šedým swatchom — aby user pochopil, čo šedé pozadie znamená.
+### D. Synchronizácia šípok ↔ label
+- Label triggeru je odvodený **z `currentBounds`** (memoizované `getRangeBounds(...)`), takže kliknutie ◀ ▶ ho automaticky prepíše.
+- Kalendár vnútri popoveru tiež zobrazuje `selected={currentBounds}` → pri opätovnom otvorení vidno presne, čo je vybrané (vrátane offsetu).
 
 ### Súbor
-- `src/components/analytics/VykazReport.tsx` — jediný súbor
-- Importy navyše:
-  - `ReferenceArea` z `recharts`
-  - `useCzechHolidays`, `useCompanyHolidays` z `@/hooks/useWeeklyCapacity`
-
-### Edge cases
-- Roky pokrývajúce viacero kalendárnych rokov (3 mesiace cez Nový rok) → volať `useCzechHolidays` pre všetky relevantné roky (1–2 max), zlúčiť do `Set<string>` YYYY-MM-DD.
-- Týždňový režim: zatiaľ bez highlightu (väčšina týždňov má aspoň 1 pracovný deň). Doplníme len ak týždeň má 0 pracovných dní.
-- Lokálne dátumy (`getFullYear`/`getMonth`/`getDate`) — žiadne `toISOString` (UTC posun).
+- `src/components/analytics/VykazReport.tsx` — jediný súbor.
 
 ### Bez zmien
-- Žiadne zmeny v dátach, agregácii hodín, fetchingu, sekciách tabuľky, exporte, RLS ani v iných súboroch.
-- Žiadne nové závislosti (`recharts`, hooky už existujú).
+- `ui/calendar.tsx` ostáva bez úprav (vizuál range selekcie ladiť až keď user potvrdí).
+- Žiadne zmeny v dátach, grafe, sekciách tabuľky, exporte, RLS.
