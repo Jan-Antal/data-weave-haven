@@ -51,54 +51,58 @@ export function CancelItemDialog({
       const cancelReason = REASON_OPTIONS.find(r => r.value === reason)?.label || reason;
 
       if (cancelAll && splitGroupId) {
-        // Cancel all parts in the split group
-        // Delete from schedule
-        await supabase.from("production_schedule")
-          .delete()
-          .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
-        // Delete from inbox if any
-        await supabase.from("production_inbox")
-          .delete()
-          .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
+        // Cancel all parts in the split group — best-effort, don't block on individual errors
+        try {
+          await supabase.from("production_schedule")
+            .delete()
+            .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
+        } catch (e) { console.warn("[Cancel] schedule split delete failed:", e); }
+        try {
+          await supabase.from("production_inbox")
+            .delete()
+            .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
+        } catch (e) { console.warn("[Cancel] inbox split delete failed:", e); }
       } else {
         if (source === "schedule") {
           // Delete from production_schedule
           const { error } = await supabase.from("production_schedule").delete().eq("id", itemId);
           if (error) throw error;
 
-          // If this was a split part, renumber siblings
+          // If this was a split part, best-effort renumber siblings
           if (splitGroupId) {
-            // Check remaining siblings
-            const { data: remaining } = await supabase
-              .from("production_schedule")
-              .select("id")
-              .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
-            
-            if (remaining && remaining.length > 1) {
-              await renumberSiblings(splitGroupId);
-              // Update names
-              const { data: allParts } = await supabase
+            try {
+              const { data: remaining } = await supabase
                 .from("production_schedule")
-                .select("id, split_part, split_total, item_name")
-                .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
-                .order("scheduled_week");
-              if (allParts) {
-                const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
-                for (const p of allParts) {
-                  await supabase.from("production_schedule").update({
-                    item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
-                  }).eq("id", p.id);
+                .select("id")
+                .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
+
+              if (remaining && remaining.length > 1) {
+                await renumberSiblings(splitGroupId);
+                const { data: allParts } = await supabase
+                  .from("production_schedule")
+                  .select("id, split_part, split_total, item_name")
+                  .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
+                  .order("scheduled_week");
+                if (allParts) {
+                  const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
+                  for (const p of allParts) {
+                    await supabase.from("production_schedule").update({
+                      item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
+                    }).eq("id", p.id);
+                  }
                 }
+              } else if (remaining && remaining.length === 1) {
+                const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
+                await supabase.from("production_schedule").update({
+                  split_group_id: null,
+                  split_part: null,
+                  split_total: null,
+                  item_name: cleanName,
+                }).eq("id", remaining[0].id);
               }
-            } else if (remaining && remaining.length === 1) {
-              // Only one part left — remove split info
-              const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
-              await supabase.from("production_schedule").update({
-                split_group_id: null,
-                split_part: null,
-                split_total: null,
-                item_name: cleanName,
-              }).eq("id", remaining[0].id);
+            } catch (e) {
+              // Renumber is non-critical — delete already succeeded.
+              console.warn("[Cancel] renumber siblings failed (non-critical):", e);
             }
           }
         } else {
@@ -107,6 +111,11 @@ export function CancelItemDialog({
           if (error) throw error;
         }
       }
+
+      // Auto-sync: invalidate TPV virtual status (production-statuses cache).
+      // Status "Vyroba" v TPV List sa počíta z inbox+schedule, takže stačí refetch.
+      qc.invalidateQueries({ queryKey: ["production-statuses", projectId] });
+      qc.invalidateQueries({ queryKey: ["tpv-items", projectId] });
 
       invalidateAll();
 
