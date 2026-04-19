@@ -1055,7 +1055,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport, syncTpvRunning, onSyncTpvStatuses }: {
+function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport }: {
   visibleMonth: { month: number; year: number };
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
@@ -1083,8 +1083,6 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   searchNavGoPrev?: () => void;
   midflightRunning?: boolean;
   onMidflightImport?: () => void;
-  syncTpvRunning?: boolean;
-  onSyncTpvStatuses?: () => void;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
