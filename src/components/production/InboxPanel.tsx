@@ -1360,17 +1360,21 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
               <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
             </div>
           ))}
-          {project.items.map((item) => (
-            <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
-              onContextMenu={e => onItemContextMenu(e, item, project)}
-              isChecked={checkedItems.has(item.id)}
-              onToggleCheck={onToggleCheck}
-              checkedItems={checkedItems}
-              allInboxItemsMap={allInboxItemsMap}
-              displayMode={displayMode}
-              hourlyRate={hourlyRate}
-            />
-          ))}
+          {(() => {
+            const projectItemIds = project.items.map(i => i.id);
+            return project.items.map((item) => (
+              <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
+                onContextMenu={e => onItemContextMenu(e, item, project)}
+                isChecked={checkedItems.has(item.id)}
+                onToggleCheck={onToggleCheck}
+                checkedItems={checkedItems}
+                allInboxItemsMap={allInboxItemsMap}
+                displayMode={displayMode}
+                hourlyRate={hourlyRate}
+                projectItemIds={projectItemIds}
+              />
+            ));
+          })()}
 
           {/* Checked items footer bar */}
           {(() => {
