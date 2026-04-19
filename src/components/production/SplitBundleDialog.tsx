@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { renumberSiblings } from "./SplitItemDialog";
+import { renumberChain } from "@/lib/splitChainHelpers";
 
 interface WeekOption {
   key: string;
@@ -89,47 +89,67 @@ export function SplitBundleDialog({
       if (!user) throw new Error("Not authenticated");
 
       const toMove: BundleSplitItem[] = [];
-    const toSplit: BundleSplitItem[] = [];
+      const toSplit: BundleSplitItem[] = [];
 
-    for (const item of items) {
-      const spillHours = Math.round(item.scheduled_hours * pct / 100);
-      if (spillHours <= 0) continue;
-      if (spillHours >= item.scheduled_hours) toMove.push(item);
-      else toSplit.push(item);
-    }
-
-    if (toMove.length > 0) {
-      await Promise.all(toMove.map(item =>
-        supabase.from("production_schedule").update({ scheduled_week: targetWeek }).eq("id", item.id)
-      ));
-    }
-
-    if (toSplit.length > 0) {
-      await Promise.all(toSplit.flatMap(item => {
+      for (const item of items) {
         const spillHours = Math.round(item.scheduled_hours * pct / 100);
-        const keepHours = item.scheduled_hours - spillHours;
-        const czkPerHour = item.scheduled_hours > 0 ? item.scheduled_czk / item.scheduled_hours : 550;
-        const groupId = item.split_group_id || item.id;
-        const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
-        return [
-          supabase.from("production_schedule").update({
-            scheduled_hours: keepHours, scheduled_czk: keepHours * czkPerHour,
-            split_group_id: groupId, split_part: 1, split_total: 2,
-            item_name: `${cleanName} (1/2)`,
-          }).eq("id", item.id),
-          supabase.from("production_schedule").insert({
-            project_id: item.project_id, stage_id: item.stage_id,
-            item_name: `${cleanName} (2/2)`, item_code: item.item_code,
-            scheduled_week: targetWeek, scheduled_hours: spillHours,
-            scheduled_czk: spillHours * czkPerHour, position: 999,
-            status: "scheduled", created_by: user.id,
-            split_group_id: groupId, split_part: 2, split_total: 2,
-          }),
-        ];
-      }));
-    }
+        if (spillHours <= 0) continue;
+        if (spillHours >= item.scheduled_hours) toMove.push(item);
+        else toSplit.push(item);
+      }
 
-    const changedItems = toMove.length + toSplit.length;
+      // One shared chain id for the whole bundle. Reuse an existing group id
+      // from any selected item if present; otherwise generate a fresh uuid.
+      const sharedGroupId =
+        items.find((i) => i.split_group_id)?.split_group_id ||
+        items[0]?.id ||
+        crypto.randomUUID();
+
+      if (toMove.length > 0) {
+        await Promise.all(
+          toMove.map((item) =>
+            supabase
+              .from("production_schedule")
+              .update({
+                scheduled_week: targetWeek,
+                split_group_id: sharedGroupId,
+              })
+              .eq("id", item.id)
+          )
+        );
+      }
+
+      if (toSplit.length > 0) {
+        await Promise.all(
+          toSplit.flatMap((item) => {
+            const spillHours = Math.round(item.scheduled_hours * pct / 100);
+            const keepHours = item.scheduled_hours - spillHours;
+            const czkPerHour = item.scheduled_hours > 0 ? item.scheduled_czk / item.scheduled_hours : 550;
+            const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
+            return [
+              supabase.from("production_schedule").update({
+                scheduled_hours: keepHours,
+                scheduled_czk: keepHours * czkPerHour,
+                split_group_id: sharedGroupId,
+                item_name: cleanName,
+              }).eq("id", item.id),
+              supabase.from("production_schedule").insert({
+                project_id: item.project_id, stage_id: item.stage_id,
+                item_name: cleanName, item_code: item.item_code,
+                scheduled_week: targetWeek, scheduled_hours: spillHours,
+                scheduled_czk: spillHours * czkPerHour, position: 999,
+                status: "scheduled", created_by: user.id,
+                split_group_id: sharedGroupId,
+              }),
+            ];
+          })
+        );
+      }
+
+      // Single chain renumbering for the whole bundle (numbers all parts globally).
+      await renumberChain(sharedGroupId);
+
+      const changedItems = toMove.length + toSplit.length;
 
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
