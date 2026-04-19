@@ -89,6 +89,44 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
 
+  // Permissions panel state
+  const [expandedPermsUserId, setExpandedPermsUserId] = useState<string | null>(null);
+  const [permsDraft, setPermsDraft] = useState<Permissions | null>(null);
+  const [permsSaving, setPermsSaving] = useState(false);
+
+  const togglePermsPanel = (u: UserRow) => {
+    if (expandedPermsUserId === u.id) {
+      setExpandedPermsUserId(null);
+      setPermsDraft(null);
+      return;
+    }
+    setExpandedPermsUserId(u.id);
+    setPermsDraft(resolvePermissions(u.role, u.permissions));
+  };
+
+  const resetPermsToPreset = (u: UserRow) => {
+    if (!u.role) return;
+    setPermsDraft({ ...ROLE_PRESETS[u.role] });
+  };
+
+  const handleSavePerms = async (u: UserRow) => {
+    if (!permsDraft) return;
+    setPermsSaving(true);
+    const { error } = await supabase
+      .from("user_roles")
+      .update({ permissions: permsDraft as any })
+      .eq("user_id", u.id);
+    setPermsSaving(false);
+    if (error) {
+      toast({ title: "Chyba pri ukladaní oprávnení", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Oprávnenia uložené" });
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, permissions: permsDraft } : x)));
+    setExpandedPermsUserId(null);
+    setPermsDraft(null);
+  };
+
   const handleCopyInviteLink = async (userId: string) => {
     setCopyingLinkId(userId);
     try {
