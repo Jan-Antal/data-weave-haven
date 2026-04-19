@@ -299,68 +299,102 @@ export function VykazReport() {
   // ── Render ──────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
+      {/* Summary cards */}
+      <div className="shrink-0 px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Celkem hodin</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{formatHours(summaryStats.totalHours)}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aktivní pracovníci</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
+          <div
+            className={cn(
+              "text-2xl font-bold mt-1 tabular-nums",
+              summaryStats.unmatchedProjects > 0 ? "" : "text-muted-foreground",
+            )}
+            style={summaryStats.unmatchedProjects > 0 ? { color: "#854F0B" } : undefined}
+          >
+            {summaryStats.unmatchedProjects}
+          </div>
+        </Card>
+      </div>
+
       {/* Toolbar */}
-      <div className="shrink-0 border-b bg-card px-4 py-2 flex items-center gap-2 flex-wrap">
-        <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-          <SelectTrigger className="h-7 w-[170px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
-            <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
-            <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
-            <SelectItem value="custom" className="text-xs">Vlastní</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {dateRange === "custom" && (
-          <>
-            <input
-              type="date"
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-            />
-            <span className="text-xs text-muted-foreground">–</span>
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-            />
-          </>
-        )}
-
-        <div className="flex items-center gap-1 ml-2">
-          {([
-            { key: "projekt", label: "Projekt" },
-            { key: "osoba", label: "Osoba" },
-            { key: "cinnost", label: "Činnosť" },
-          ] as const).map((opt) => {
-            const active = groupBy === opt.key;
-            return (
-              <button
-                key={opt.key}
-                onClick={() => setGroupBy(opt.key)}
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
-                  active
-                    ? "bg-primary/15 text-primary border-primary/30"
-                    : "border-dashed border-muted-foreground/30 text-muted-foreground/60 hover:text-foreground",
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+      <div className="shrink-0 border-b bg-card px-4 py-2 flex items-center gap-3">
+        {/* Left: date range */}
+        <div className="flex items-center gap-2">
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+            <SelectTrigger className="h-8 w-[170px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
+              <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
+              <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
+              <SelectItem value="custom" className="text-xs">Vlastní</SelectItem>
+            </SelectContent>
+          </Select>
+          {dateRange === "custom" && (
+            <>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 w-[140px] text-xs"
+              />
+              <span className="text-xs text-muted-foreground">–</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 w-[140px] text-xs"
+              />
+            </>
+          )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* Center: segmented control */}
+        <div className="flex-1 flex justify-center">
+          <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
+            {([
+              { key: "projekt", label: "Projekt" },
+              { key: "osoba", label: "Osoba" },
+              { key: "cinnost", label: "Činnosť" },
+            ] as const).map((opt) => {
+              const active = groupBy === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setGroupBy(opt.key)}
+                  className={cn(
+                    "h-7 px-3 text-xs rounded-md transition-colors",
+                    active
+                      ? "bg-background shadow-sm font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: search + export */}
+        <div className="flex items-center gap-2">
           <TableSearchBar value={search} onChange={setSearch} placeholder="Hledat..." />
           <Button
             variant="outline"
             size="sm"
-            className="h-7 px-2 text-xs gap-1"
+            className="h-8 px-3 text-xs gap-1.5"
             onClick={handleExport}
             disabled={isLoading || grouped.length === 0}
           >
