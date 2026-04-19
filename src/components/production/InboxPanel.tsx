@@ -24,6 +24,7 @@ import { differenceInDays, isPast, addDays, format } from "date-fns";
 import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
 import { DeadlineWarningDialog } from "./DeadlineWarningDialog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { logActivity } from "@/lib/activityLog";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
