@@ -1,47 +1,57 @@
 
-User says "Odpracované hodiny 733" in Dílna dashboard includes overhead hours that should be excluded. Only direct production activities should count: Kompletace, Lakovna, Baleni+Expedice, Rezání, Olepování, CNC, Dyhárna, Vrtání, Masiv. Excluded: Režie, Engineering, PM, atd.
+## Plán: Oprava 2 problémov v Plán Výroby
 
-Let me check current logic.
-<lov-tool-use id="toolu_vrtx_019JgJbANWD5VG7S6xrDc5cF" name="code--search_files" integration-id="code" data="{\"query\": \"cinnost_kod\", \"include_patterns\": \"src/components/DilnaDashboard.tsx\"}">
-</lov-tool-use>
+### Trouble 1: Status TPV neodzrkadľuje stav v Inboxe/Pláne
 
-<lov-tool-use id="toolu_vrtx_01SN4zoF88WWZRn7B7uyqPKo" name="code--search_files" integration-id="code" data="{\"query\": \"cinnost_kod|Odpracovan|EXCLUDED_CINNOST|production_hours_log\", \"include_patterns\": \"src/components/DilnaDashboard.tsx,src/components/analytics/VykazReport.tsx\"}">
-</lov-tool-use>
-The user is concerned that "Odpracované hodiny 733" includes overhead hours (Režije). Currently `DilnaDashboard` already excludes TPV/ENG/PRO codes — but the user says it should ALSO exclude režijní project codes (the overhead_projects table entries). Let me verify.
-<lov-tool-use id="toolu_vrtx_0153kCy1w6qyqMRNZtX3yKZf" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/DilnaDashboard.tsx\", \"lines\": \"1-260\"}">
-</lov-tool-use>
-Now I understand. The current query excludes only `TPV/ENG/PRO` activity codes. The user wants režijní project codes (entries from `overhead_projects` table — eg. project_id like REZIE, SKLAD, MARKETING, etc.) also excluded from the "Odpracované hodiny" tile in the Dílna dashboard.
+**Problém**: Po zmazaní položky z inboxu/planu zostane v TPV List status "Vyroba" (alebo iný production status). Treba sync — ak položka NIE JE v inboxe ani v schedule (mimo midflight/historical), TPV status sa má vrátiť na **"Neodeslano"**.
 
-I have enough context to plan.
+**Riešenie**:
 
-<lov-plan>
-## Plán: Vyčistiť "Odpracované hodiny" v Dílna dashboarde od režijních hodín
+1. **Pridať context-menu akciu "↩ Vrátit do TPV"** v `InboxPanel.tsx` a `PlanVyrobyTableView.tsx`:
+   - Zobrazí sa pri pravom kliku na položku v inboxe alebo schedule cell
+   - Skrytá pre `is_midflight=true` / `is_historical=true` rows
+   - Akcia: zmaže záznam z `production_inbox` / `production_schedule` + vráti `tpv_items.status` na predošlý TPV status (napr. "Schváleno") a vyčistí `sent_date`
+   - Loguje cez `logActivity` + undo/redo support
 
-### Problém
-Karta **"Odpracované hodiny" = 733h** v Dílna dashboarde počíta všetky hodiny z `production_hours_log` mimo `cinnost_kod IN (TPV, ENG, PRO)`. Užívateľ chce, aby to ukazovalo **iba priamu výrobnú činnosť na projektoch** (Rezání, CNC, Dyhárna, Vrtání, Olepování, Lakovna, Kompletace, Balení, Expedice, Masiv) — bez režijních projektov (kódy z `overhead_projects` ako napr. REZIE, SKLAD, MARKETING…).
+2. **Auto-sync TPV status pri mazaní** — upraviť existujúce mazacie cesty:
+   - `CancelItemDialog.tsx` (existing) — po delete položky z inbox/schedule skontrolovať či ešte existuje iná inbox/schedule row pre rovnaký `(project_id, item_code)`. Ak NIE → reset `tpv_items.status` na poslednú TPV hodnotu (`Schváleno`/posledný non-production status) a vyčistiť `sent_date`.
+   - `useProductionDragDrop.ts` → `moveItemBackToInbox` a podobné delete cesty — rovnaký guard.
+   - Pravidlo: **NEMENIŤ status pre midflight/historical items** (ich TPV status zostáva — sú legacy).
 
-Aktuálne `VykazReport` aj `useAnalytics` už správne odlišujú režie cez `overheadMap` (z tabuľky `overhead_projects`), len `DilnaDashboard` ten filter nemá.
+3. **Reconciliation utility** (jednorazová "Sync TPV statuses" akcia v admin toolbar):
+   - Pre každú `tpv_items` row s `status IN ('Vyroba','Vyrobeno','Expedice','Hotovo')`:
+     - Skontrolovať `production_inbox` (status=pending) AND `production_schedule` (NOT cancelled, NOT midflight)
+     - Ak žiadny match → reset status na `Schváleno`, vyčistiť `sent_date`
+   - Tlačidlo v admin sekcii PlanVyroby vedľa "Recalculate hours" / "Midflight import"
+   - Toast s počtom opravených
 
-### Zmeny v `src/components/DilnaDashboard.tsx`
+### Trouble 2: Multisport midflight projekt — masovo zmazať bez erroru
 
-**1. Pridať fetch overhead_projects** do `Promise.all` v `useDilnaData` (paralelne s ostatnými queries):
-```ts
-supabase.from("overhead_projects").select("project_code").eq("is_active", true)
-```
+**Problém**: Midflight import vytvoril ~všetky položky z malými hodinami pre projekt Multisport. User chce zmazať všetky inbox položky pre tento projekt. Pri mazaní spadol "velký error" — pravdepodobne tým, že CancelItemDialog spúšťa N×renumber siblings + N×activity log + nahromadenie undo entries pre desiatky split-group rows naraz.
 
-**2. Postaviť `overheadSet: Set<string>`** z výsledku.
+**Riešenie**:
 
-**3. Vyfiltrovať hodiny pred agregáciou** — ihneď po načítaní `hours`:
-```ts
-const hoursFiltered = hours.filter(h => !overheadSet.has(h.ami_project_id));
-```
-A nahradiť všetky následné použitia `hours` → `hoursFiltered` (riadky ~142, 144, 145, 150, 216).
+1. **Pridať akciu "🗑 Smazat všechny položky projektu z inboxu"** do project-level context menu v `InboxPanel.tsx`:
+   - Confirm dialog s počtom položiek (napr. "Smazat 47 položek projektu Multisport z inboxu?")
+   - Bulk delete v jednej DB transakcii: 
+     ```ts
+     await supabase.from("production_inbox").delete().eq("project_id", pid).eq("status", "pending");
+     await supabase.from("production_schedule").delete().eq("project_id", pid).eq("is_midflight", true);
+     ```
+   - **Bez** per-item renumber/log — namiesto toho jeden súhrnný `data_log` záznam ("Bulk delete: 47 položek projektu X")
+   - Auto-sync TPV statuses pre dotknuté `tpv_items` (reset na `Schváleno`)
+   - Invalidate queries
 
-**4. Výsledok**: 
-- KPI tile **"Odpracované hodiny"** (`totalHoursWeek`) bude obsahovať iba projektovú výrobu
-- Karty projektov ostanú nedotknuté (boli postavené nad `hoursByProject`, ktorá je už očistená)
-- "Nespárované" karty nebudú falošne vznikať z REZIE/SKLAD kódov
-- Kód `cinnost_kod NOT IN (TPV, ENG, PRO)` filter ostáva (oba filtre sú komplementárne — režie sa filtrujú podľa `ami_project_id`, neproduktívne činnosti podľa `cinnost_kod`)
+2. **Lepší error handling** v `CancelItemDialog.handleCancel`:
+   - Try/catch okolo `renumberSiblings` — neblokuje delete ak renumber zlyhá (best-effort)
+   - Loguj konkrétnu chybu do console namiesto generického toastu
+
+### Súbory na úpravu
+- `src/components/production/CancelItemDialog.tsx` — auto-sync TPV pri delete + safer error handling
+- `src/components/production/InboxPanel.tsx` — context-menu akcie "Vrátit do TPV" (item) + "Smazat všechny" (projekt)
+- `src/components/production/PlanVyrobyTableView.tsx` — context-menu akcia "Vrátit do TPV" pre schedule cells
+- `src/pages/PlanVyroby.tsx` — admin tlačidlo "Sync TPV statuses"
+- Nový helper `src/lib/syncTpvStatuses.ts` — utility funkcia na reconciliation
 
 ### Bez zmien
-- `VykazReport`, `useAnalytics`, DB schéma, RLS — všetko ostatné funguje korektne
+- DB schéma, RLS, midflight import logika, completion/expedice flow
