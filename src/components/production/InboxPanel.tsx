@@ -1265,7 +1265,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   onSelectProject?: (projectId: string) => void;
   projectInfo?: { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null };
   checkedItems: Set<string>;
-  onToggleCheck: (itemId: string) => void;
+  onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
   onClearChecked: () => void;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   searchQuery?: string;
