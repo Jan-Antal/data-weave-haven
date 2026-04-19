@@ -1,85 +1,46 @@
 
+Visual-only refactor of `src/components/analytics/VykazReport.tsx`. No changes to data, filters, grouping, export, or expand logic.
 
-## Diagnóza: Prečo PM nevidí Správu osôb
+### 1. Summary cards row (above toolbar)
+Add 4 stat cards using existing Card style (white bg, border, shadow-sm, rounded-lg, p-4). Label `text-[11px] uppercase tracking-wide text-muted-foreground`, value `text-2xl font-bold`.
+- Celkem hodin: `formatHours(totalHours)` from existing `totalHours`
+- Aktívní pracovníci: `new Set(logs.map(l => l.zamestnanec)).size`
+- Spárované projekty: distinct `ami_project_id` where `projectsMap.has(id)`
+- Nespárováno: distinct `ami_project_id` where `!projectsMap.has(id)`; value text `#854F0B` when >0, `text-muted-foreground` when 0
+All derived via `useMemo` from existing `logs` + `projectsMap`.
 
-### Hlavná príčina (front-end gating)
-PM klikne na "Správa osob" v hlavičke → `navigate('/osoby')`. V `src/App.tsx` je route gating:
+### 2. Toolbar redesign
+Replace current toolbar with single row, three slots:
+- **Left**: existing `Select` (h-8) for date range; when `"custom"`, two `<Input type="date" className="h-8 w-[140px]">` inline (no wrap, `flex items-center gap-2`)
+- **Center**: segmented control — outer `div` bg `bg-muted` rounded-lg p-0.5, three buttons each `h-7 px-3 text-xs rounded-md`. Active: `bg-background shadow-sm font-medium text-foreground`. Inactive: `text-muted-foreground hover:text-foreground`. Wires to existing `groupBy` state.
+- **Right**: existing search `Input` (h-8 w-[200px]) + Export CSV `Button` (h-8 variant outline, Download icon)
 
-```ts
-function AdminRoute({ children }) {
-  const { isAdmin, isOwner, isVyroba } = useAuth();
-  if (!isAdmin && !isOwner && !isVyroba) return <Navigate to="/" replace />;
-  ...
-}
-<Route path="/osoby" element={<AdminRoute>...</AdminRoute>} />
-```
+### 3. Table visual
+- `<thead>`: `bg-muted/50 sticky top-0 z-10`, header cells `text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9 border-b`
+- `<tbody>` rows: `h-10 text-[13px] hover:bg-muted/50 border-b border-border/40`
+- Project ID cell: `font-mono text-primary hover:underline cursor-pointer`
+- Spárované count badge: green pill `bg-green-100 text-green-800 text-[11px] px-2 py-0.5 rounded-full`
+- For unmatched indicator inside ProjektRow when no match: amber pill `bg-amber-100 text-amber-800`
 
-PM nie je `admin/owner/vyroba` → **redirect na `/`**. Stránka sa vôbec neotvorí, žiadne RLS volanie sa nestihne urobiť. To je dôvod, prečo "sa neotvorí" Externisti.
+### 4. Expanded sub-rows
+Update `ProjektExpanded`, `OsobaRows` (sub), `CinnostRows` (sub), `SubByProject`:
+- Wrapping cell: `bg-muted/30 border-l-2 border-border pl-10 py-2`
+- Person row: `flex items-center gap-3` — name `w-40 text-[13px]`, činnosti chips `flex-1 flex flex-wrap gap-1` each `bg-secondary text-secondary-foreground text-[11px] px-2 py-0.5 rounded`, hours `w-20 text-right font-medium text-[13px]`, date range `w-[130px] text-right text-[11px] text-muted-foreground`
 
-Druhá vrstva, ktorá by ho aj tak zatvorila: dropdown v `ProductionHeader` ukazuje "Správa osob" len ak `canManageUsers || canManagePeople`. PM má `canManagePeople = true` (preset), takže sa link zobrazí — ale klik vyhodí redirect.
+### 5. Nespárované separator
+Replace current unmatched section header with full-width `<tr>` containing single `<td colSpan={...}>`:
+- `bg-[#FEF3C7] border-l-[3px] border-l-[#F59E0B] px-4 py-2`
+- Inner `flex items-center gap-2`: `<AlertTriangle className="h-4 w-4 text-[#F59E0B]" />` + label `font-semibold text-[12px] text-[#92400E]`
 
-### RLS audit (čo som overil cez `supabase--read_query`)
+### 6. Celkem footer
+Sticky bottom row in tfoot or just below table:
+- `<tfoot>` with `sticky bottom-0 bg-muted/50 border-t border-border`
+- Cells: "Celkem" label `font-semibold text-[13px]`, total hours `font-bold text-[14px] text-[#0a2e28]`
 
-| Tabuľka | RLS status | Pre PM |
-|---|---|---|
-| `people` | SELECT všetkým authenticated; INSERT/UPDATE owner/admin/pm/konstrukter; DELETE owner/admin/pm | OK — PM môže čítať aj editovať externistov |
-| `ami_employees` | SELECT všetkým authenticated; INSERT/UPDATE/DELETE iba owner/admin | PM by **nemohol editovať** zamestnancov, iba čítať (čo dáva zmysel — PM nespravuje úväzky) |
-| `position_catalogue` | INSERT/UPDATE/DELETE iba owner/admin | OK pre admin tabs (PM ich aj tak nemá vidieť) |
-| `production_capacity` / `..._employees` | INSERT/UPDATE/DELETE iba owner/admin | OK |
-| `ami_absences` | INSERT/UPDATE/DELETE iba owner/admin | OK |
-| `user_roles` | SELECT/manage iba admin/owner | OK |
-| `profiles` | SELECT/UPDATE iba admin/owner (okrem own profile) | OK |
+### Files touched
+- `src/components/analytics/VykazReport.tsx` — only this file. Add `AlertTriangle`, `Download` imports from lucide-react. Add memos for the 4 summary stats. Reuse `Card`, `Select`, `Input`, `Button` from existing UI.
 
-**Záver:** RLS pre `people` je správne nastavené pre PM. Iba route guard a viditeľnosť tabov sú zle.
-
-### Vedľajšia drobnosť (nesúlad UI vs DB)
-- `OsobyZamestnanci` má inline editovateľné polia (úväzok, pozícia atď.) — PM ich uvidí ako editovateľné, ale UPDATE na `ami_employees` mu RLS odmietne (a vyhodí toast chybu). Tab "Zaměstnanci" by mal byť pre PM read-only alebo skrytý.
-
----
-
-## Plán opravy
-
-### Zmena 1 — povoliť PM (a Konstruktérom) prístup na `/osoby`
-
-`src/App.tsx`, `AdminRoute`: rozšíriť o role, ktoré majú `canManagePeople` alebo `canManageExternisti` (PM, vedouci_pm, konstrukter, vedouci_konstrukter):
-
-```ts
-function AdminRoute({ children }) {
-  const { isAdmin, isOwner, isVyroba, isPM, isKonstrukter, canManagePeople, canManageExternisti } = useAuth();
-  const allowed = isAdmin || isOwner || isVyroba || isPM || isKonstrukter
-                  || canManagePeople || canManageExternisti;
-  if (!allowed) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-```
-
-Lepšie ešte: rozdeliť AdminRoute do dvoch — `AdminRoute` pre `/analytics` a `/vyroba`, a nový `PeopleRoute` pre `/osoby` ktorý kontroluje `canManagePeople || canManageExternisti || canManageUsers`. Ale jednoduchší fix vyššie stačí.
-
-### Zmena 2 — `Osoby.tsx` viditeľnosť tabov podľa role
-
-Aktuálne `defaultTab="zamestnanci"` a všetci tam padnú. PM by mal po príchode vidieť **Externisti** (jeho hlavný use-case). Použiť `defaultTab` podľa role:
-
-```ts
-const defaultTab = canSeeAdminTabs ? "zamestnanci" : "externisti";
-```
-
-Tab `Zaměstnanci` ponechať viditeľný (PM môže aj tak iba čítať) — alebo skryť pre non-admins, keďže väčšina interakcií je editačná. Navrhujem **skryť** pre PM:
-
-```ts
-{ key: "zamestnanci", label: "Zaměstnanci", visible: canSeeAdminTabs },
-{ key: "externisti", label: "Externisté" },  // všetci s prístupom
-```
-
-### Zmena 3 — `OsobyExternisti` rešpektovať `canManageExternisti`
-
-Tlačidlá "Přidat externistu", inline editácie a delete sú momentálne aktívne pre každého. Pridať `disabled` / skryť ak `!canManageExternisti`. Pre PM `canManageExternisti = true` (preset), takže reálne sa nič nezmení — len bezpečnostne čisté pre prípadné budúce role.
-
-### Súbory
-
-- `src/App.tsx` — rozšíriť `AdminRoute`
-- `src/pages/Osoby.tsx` — `defaultTab` podľa role + `visible` pre `zamestnanci`
-- `src/components/osoby/OsobyExternisti.tsx` — gating tlačidiel cez `canManageExternisti`
-
-### Bez DB zmien
-RLS netreba meniť. Aktuálne policies sú správne — iba front-end ich blokoval predtým, než sa stihli vyvolať.
-
+### Out of scope
+- No data/query/filter/group/export/expand logic changes
+- No changes to `Analytics.tsx` or any other file
+- No DB or RLS changes
