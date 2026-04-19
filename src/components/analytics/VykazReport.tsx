@@ -95,7 +95,7 @@ function getRangeBounds(
 }
 
 export function VykazReport() {
-  const [dateRange, setDateRange] = useState<DateRange>("month");
+  const [dateRange, setDateRangeRaw] = useState<DateRange>("month");
   const [customFrom, setCustomFrom] = useState<string>(() => toLocalDateStr(new Date()));
   const [customTo, setCustomTo] = useState<string>(() => toLocalDateStr(new Date()));
   const [groupBy, setGroupBy] = useState<GroupBy>("projekt");
@@ -104,6 +104,13 @@ export function VykazReport() {
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [bucketMode, setBucketMode] = useState<"auto" | "day" | "week">("auto");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [rangeOffset, setRangeOffset] = useState(0);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const setDateRange = useCallback((r: DateRange) => {
+    setDateRangeRaw(r);
+    setRangeOffset(0);
+  }, []);
 
   const toggleSection = useCallback((key: string) => {
     setCollapsedSections((prev) => {
@@ -115,8 +122,8 @@ export function VykazReport() {
   }, []);
 
   const { from, to } = useMemo(
-    () => getRangeBounds(dateRange, customFrom, customTo),
-    [dateRange, customFrom, customTo],
+    () => getRangeBounds(dateRange, customFrom, customTo, rangeOffset),
+    [dateRange, customFrom, customTo, rangeOffset],
   );
 
   const { data: projectsList = [] } = useProjects();
