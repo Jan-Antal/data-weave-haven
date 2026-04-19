@@ -339,20 +339,43 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
             .single();
           if (schedItem) {
             await supabase.from("production_schedule").delete().eq("id", schedItem.id);
-            // Create inbox item
+            // Create or revive inbox item — dedupe to avoid violating production_inbox_pending_unique
             if (schedItem.inbox_item_id) {
               await supabase.from("production_inbox").update({ status: "pending" }).eq("id", schedItem.inbox_item_id);
             } else {
-              await supabase.from("production_inbox").insert({
-                project_id: schedItem.project_id,
-                stage_id: schedItem.stage_id,
-                item_name: schedItem.item_name,
-                item_code: schedItem.item_code,
-                estimated_hours: schedItem.scheduled_hours,
-                estimated_czk: schedItem.scheduled_czk,
-                sent_by: user.id,
-                status: "pending",
-              });
+              // Check if a pending row with same project_id + item_code already exists
+              let existing: { id: string } | null = null;
+              if (schedItem.item_code) {
+                const { data: dup } = await supabase
+                  .from("production_inbox")
+                  .select("id")
+                  .eq("project_id", schedItem.project_id)
+                  .eq("item_code", schedItem.item_code)
+                  .eq("status", "pending")
+                  .maybeSingle();
+                existing = dup as any;
+              }
+              if (existing) {
+                await supabase.from("production_inbox").update({
+                  stage_id: schedItem.stage_id,
+                  item_name: schedItem.item_name,
+                  estimated_hours: schedItem.scheduled_hours,
+                  estimated_czk: schedItem.scheduled_czk,
+                  sent_by: user.id,
+                  sent_at: new Date().toISOString(),
+                }).eq("id", existing.id);
+              } else {
+                await supabase.from("production_inbox").insert({
+                  project_id: schedItem.project_id,
+                  stage_id: schedItem.stage_id,
+                  item_name: schedItem.item_name,
+                  item_code: schedItem.item_code,
+                  estimated_hours: schedItem.scheduled_hours,
+                  estimated_czk: schedItem.scheduled_czk,
+                  sent_by: user.id,
+                  status: "pending",
+                });
+              }
             }
           }
         }
