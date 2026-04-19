@@ -695,6 +695,7 @@ export function useProductionDragDrop() {
             estimated_czk: schedItem.scheduled_czk,
             sent_by: user.id,
             status: "pending",
+            split_group_id: schedItem.split_group_id ?? null,
           });
         if (insertErr) throw insertErr;
       }
@@ -707,6 +708,11 @@ export function useProductionDragDrop() {
         newValue: "Inbox",
         detail: JSON.stringify({ item_name: schedItem.item_name, item_code: schedItem.item_code, from_week: weekLabel(schedItem.scheduled_week) }),
       });
+
+      // Keep chain badges consistent across schedule + inbox.
+      if (schedItem.split_group_id) {
+        try { await renumberChain(schedItem.split_group_id); } catch { /* silent */ }
+      }
 
       invalidateAll();
 
