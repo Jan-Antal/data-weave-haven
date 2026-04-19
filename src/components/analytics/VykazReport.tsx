@@ -1,9 +1,11 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -224,6 +226,30 @@ export function VykazReport() {
     [grouped],
   );
 
+  // ── Summary stats (reactive to date range + filters) ────────────
+  const summaryStats = useMemo(() => {
+    const distinctProjects = new Set<string>();
+    const distinctWorkers = new Set<string>();
+    let allHours = 0;
+    for (const r of logs) {
+      distinctProjects.add(r.ami_project_id || "—");
+      if (r.zamestnanec) distinctWorkers.add(r.zamestnanec);
+      allHours += Number(r.hodiny) || 0;
+    }
+    let matched = 0;
+    let unmatched = 0;
+    for (const id of distinctProjects) {
+      if (projectsMap.has(id)) matched++;
+      else unmatched++;
+    }
+    return {
+      totalHours: allHours,
+      activeWorkers: distinctWorkers.size,
+      matchedProjects: matched,
+      unmatchedProjects: unmatched,
+    };
+  }, [logs, projectsMap]);
+
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
     const lines: string[] = [];
@@ -273,68 +299,102 @@ export function VykazReport() {
   // ── Render ──────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
+      {/* Summary cards */}
+      <div className="shrink-0 px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Celkem hodin</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{formatHours(summaryStats.totalHours)}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aktivní pracovníci</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
+          <div
+            className={cn(
+              "text-2xl font-bold mt-1 tabular-nums",
+              summaryStats.unmatchedProjects > 0 ? "" : "text-muted-foreground",
+            )}
+            style={summaryStats.unmatchedProjects > 0 ? { color: "#854F0B" } : undefined}
+          >
+            {summaryStats.unmatchedProjects}
+          </div>
+        </Card>
+      </div>
+
       {/* Toolbar */}
-      <div className="shrink-0 border-b bg-card px-4 py-2 flex items-center gap-2 flex-wrap">
-        <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-          <SelectTrigger className="h-7 w-[170px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
-            <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
-            <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
-            <SelectItem value="custom" className="text-xs">Vlastní</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {dateRange === "custom" && (
-          <>
-            <input
-              type="date"
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-            />
-            <span className="text-xs text-muted-foreground">–</span>
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-            />
-          </>
-        )}
-
-        <div className="flex items-center gap-1 ml-2">
-          {([
-            { key: "projekt", label: "Projekt" },
-            { key: "osoba", label: "Osoba" },
-            { key: "cinnost", label: "Činnosť" },
-          ] as const).map((opt) => {
-            const active = groupBy === opt.key;
-            return (
-              <button
-                key={opt.key}
-                onClick={() => setGroupBy(opt.key)}
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors cursor-pointer",
-                  active
-                    ? "bg-primary/15 text-primary border-primary/30"
-                    : "border-dashed border-muted-foreground/30 text-muted-foreground/60 hover:text-foreground",
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+      <div className="shrink-0 border-b bg-card px-4 py-2 flex items-center gap-3">
+        {/* Left: date range */}
+        <div className="flex items-center gap-2">
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
+            <SelectTrigger className="h-8 w-[170px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
+              <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
+              <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
+              <SelectItem value="custom" className="text-xs">Vlastní</SelectItem>
+            </SelectContent>
+          </Select>
+          {dateRange === "custom" && (
+            <>
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 w-[140px] text-xs"
+              />
+              <span className="text-xs text-muted-foreground">–</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 w-[140px] text-xs"
+              />
+            </>
+          )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        {/* Center: segmented control */}
+        <div className="flex-1 flex justify-center">
+          <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
+            {([
+              { key: "projekt", label: "Projekt" },
+              { key: "osoba", label: "Osoba" },
+              { key: "cinnost", label: "Činnosť" },
+            ] as const).map((opt) => {
+              const active = groupBy === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setGroupBy(opt.key)}
+                  className={cn(
+                    "h-7 px-3 text-xs rounded-md transition-colors",
+                    active
+                      ? "bg-background shadow-sm font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: search + export */}
+        <div className="flex items-center gap-2">
           <TableSearchBar value={search} onChange={setSearch} placeholder="Hledat..." />
           <Button
             variant="outline"
             size="sm"
-            className="h-7 px-2 text-xs gap-1"
+            className="h-8 px-3 text-xs gap-1.5"
             onClick={handleExport}
             disabled={isLoading || grouped.length === 0}
           >
@@ -349,30 +409,30 @@ export function VykazReport() {
         <div className="rounded-lg border bg-card flex flex-col h-full">
           <div className="flex-1 overflow-auto always-scrollbar rounded-lg">
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-card">
+              <TableHeader className="sticky top-0 z-10 bg-muted/50">
                 {groupBy === "projekt" && (
-                  <TableRow className="bg-primary/5">
-                    <TableHead className="w-[40%]">Projekt</TableHead>
-                    <TableHead>Stav</TableHead>
-                    <TableHead className="text-right">Hodiny</TableHead>
-                    <TableHead className="text-right">Záznamů</TableHead>
-                    <TableHead>Posledný záznam</TableHead>
+                  <TableRow className="hover:bg-transparent border-b">
+                    <TableHead className="w-[40%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Projekt</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Stav</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Záznamů</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Posledný záznam</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 )}
                 {groupBy === "osoba" && (
-                  <TableRow className="bg-primary/5">
-                    <TableHead className="w-[60%]">Jméno</TableHead>
-                    <TableHead className="text-right">Počet projektů</TableHead>
-                    <TableHead className="text-right">Hodiny celkem</TableHead>
+                  <TableRow className="hover:bg-transparent border-b">
+                    <TableHead className="w-[60%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Jméno</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Počet projektů</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny celkem</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 )}
                 {groupBy === "cinnost" && (
-                  <TableRow className="bg-primary/5">
-                    <TableHead className="w-[60%]">Název činnosti</TableHead>
-                    <TableHead>Kód</TableHead>
-                    <TableHead className="text-right">Hodiny</TableHead>
+                  <TableRow className="hover:bg-transparent border-b">
+                    <TableHead className="w-[60%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Název činnosti</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Kód</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 )}
@@ -416,13 +476,13 @@ export function VykazReport() {
                 )}
               </TableBody>
               {grouped.length > 0 && (
-                <tfoot className="bg-muted/40 font-bold sticky bottom-0">
-                  <TableRow>
-                    <TableCell className="text-xs">Celkem</TableCell>
+                <tfoot className="bg-muted/50 sticky bottom-0 border-t border-border">
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell className="text-[13px] font-semibold">Celkem</TableCell>
                     {groupBy === "projekt" && (
                       <>
                         <TableCell />
-                        <TableCell className="text-right text-xs tabular-nums">{formatHours(totalHours)}</TableCell>
+                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
                         <TableCell />
                         <TableCell />
                         <TableCell />
@@ -431,14 +491,14 @@ export function VykazReport() {
                     {groupBy === "osoba" && (
                       <>
                         <TableCell />
-                        <TableCell className="text-right text-xs tabular-nums">{formatHours(totalHours)}</TableCell>
+                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
                         <TableCell />
                       </>
                     )}
                     {groupBy === "cinnost" && (
                       <>
                         <TableCell />
-                        <TableCell className="text-right text-xs tabular-nums">{formatHours(totalHours)}</TableCell>
+                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
                         <TableCell />
                       </>
                     )}
@@ -490,9 +550,14 @@ function ProjektRows({
       ))}
       {unmatched.length > 0 && (
         <>
-          <TableRow className="bg-amber-500/10 hover:bg-amber-500/15">
-            <TableCell colSpan={6} className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-              Nespárované záznamy z Alvena · {unmatched.length} {unmatched.length === 1 ? "projekt" : "projektů"}
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={6} className="p-0">
+              <div className="bg-[#FEF3C7] border-l-[3px] border-l-[#F59E0B] px-4 py-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
+                <span className="font-semibold text-[12px] text-[#92400E]">
+                  Nespárované záznamy z Alvena · {unmatched.length} {unmatched.length === 1 ? "projekt" : "projektů"}
+                </span>
+              </div>
             </TableCell>
           </TableRow>
           {unmatched.map((g) => (
@@ -590,21 +655,21 @@ function ProjektExpanded({ rows }: { rows: LogRow[] }) {
   }, [rows]);
 
   return (
-    <TableRow className="bg-muted/30 hover:bg-muted/30">
+    <TableRow className="hover:bg-transparent">
       <TableCell colSpan={6} className="p-0">
-        <div className="pl-8 pr-4 py-2 space-y-1">
+        <div className="bg-muted/30 border-l-2 border-border pl-10 pr-4 py-2 space-y-1">
           {byPerson.map(([name, g]) => (
-            <div key={name} className="flex items-center gap-2 text-xs">
-              <span className="font-medium w-40 truncate">{name}</span>
+            <div key={name} className="flex items-center gap-3">
+              <span className="font-medium w-40 truncate text-[13px]">{name}</span>
               <div className="flex-1 flex flex-wrap gap-1">
                 {Array.from(g.cinnosti).map((c) => (
-                  <span key={c} className="px-1.5 py-0.5 rounded bg-background border text-[10px] text-muted-foreground">
+                  <span key={c} className="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-[11px]">
                     {c}
                   </span>
                 ))}
               </div>
-              <span className="tabular-nums font-medium w-20 text-right">{formatHours(g.hodiny)}</span>
-              <span className="text-muted-foreground tabular-nums w-32 text-right">
+              <span className="tabular-nums font-medium w-20 text-right text-[13px]">{formatHours(g.hodiny)}</span>
+              <span className="text-muted-foreground tabular-nums w-[130px] text-right text-[11px]">
                 {formatDate(g.min)}–{formatDate(g.max)}
               </span>
             </div>
@@ -715,23 +780,23 @@ function SubByProject({
   }, [rows, projectsMap]);
 
   return (
-    <TableRow className="bg-muted/30 hover:bg-muted/30">
+    <TableRow className="hover:bg-transparent">
       <TableCell colSpan={colSpan} className="p-0">
-        <div className="pl-8 pr-4 py-2 space-y-1">
+        <div className="bg-muted/30 border-l-2 border-border pl-10 pr-4 py-2 space-y-1">
           {byProject.map((p) => (
-            <div key={p.id} className="flex items-center gap-2 text-xs">
+            <div key={p.id} className="flex items-center gap-3">
               {p.matched ? (
                 <button
                   onClick={() => onOpenDetail(p.id)}
-                  className="font-mono text-xs text-primary hover:underline"
+                  className="font-mono text-[13px] text-primary hover:underline"
                 >
                   {p.id}
                 </button>
               ) : (
-                <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
+                <span className="font-mono text-[13px] text-muted-foreground">{p.id}</span>
               )}
-              <span className="flex-1 truncate" title={p.name}>{p.name}</span>
-              <span className="tabular-nums font-medium w-20 text-right">{formatHours(p.hodiny)}</span>
+              <span className="flex-1 truncate text-[13px]" title={p.name}>{p.name}</span>
+              <span className="tabular-nums font-medium w-20 text-right text-[13px]">{formatHours(p.hodiny)}</span>
             </div>
           ))}
         </div>
