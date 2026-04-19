@@ -303,10 +303,18 @@ export function VykazReport() {
     const distinctProjects = new Set<string>();
     const distinctWorkers = new Set<string>();
     let allHours = 0;
+    let projektHours = 0;
+    let rezijneHours = 0;
+    let nesparovaneHours = 0;
     for (const r of logs) {
-      distinctProjects.add(r.ami_project_id || "—");
+      const id = r.ami_project_id || "—";
+      distinctProjects.add(id);
       if (r.zamestnanec) distinctWorkers.add(r.zamestnanec);
-      allHours += Number(r.hodiny) || 0;
+      const h = Number(r.hodiny) || 0;
+      allHours += h;
+      if (projectsMap.has(id)) projektHours += h;
+      else if (overheadMap.has(id)) rezijneHours += h;
+      else nesparovaneHours += h;
     }
     let matched = 0;
     let unmatched = 0;
@@ -314,11 +322,16 @@ export function VykazReport() {
       if (projectsMap.has(id) || overheadMap.has(id)) matched++;
       else unmatched++;
     }
+    const utilization = allHours > 0 ? ((allHours - rezijneHours) / allHours) * 100 : 0;
     return {
       totalHours: allHours,
       activeWorkers: distinctWorkers.size,
       matchedProjects: matched,
       unmatchedProjects: unmatched,
+      projektHours,
+      rezijneHours,
+      nesparovaneHours,
+      utilization,
     };
   }, [logs, projectsMap, overheadMap]);
 
