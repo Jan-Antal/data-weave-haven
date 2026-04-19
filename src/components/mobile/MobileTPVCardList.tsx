@@ -125,6 +125,8 @@ export function MobileTPVCardList({
             const isExpanded = expandedId === item.id;
             const vyrobaStatuses = productionStatusMap.get(item.item_code || item.nazev || "") || [];
             const vyrobaLabel = vyrobaStatuses[0]?.label || "";
+            const stage = item.stage_id ? stages.find(s => s.id === item.stage_id) : null;
+            const stageLabel = stage ? (stage.display_name || stage.stage_name) : "";
 
             return (
               <button
