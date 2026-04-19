@@ -418,7 +418,16 @@ export function VykazReport() {
       {/* Toolbar */}
       <div className="shrink-0 border-b bg-card px-4 py-2 flex items-center gap-3">
         {/* Left: date range */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setRangeOffset((o) => o - 1)}
+            title="Předchozí období"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
           <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
             <SelectTrigger className="h-8 w-[170px] text-xs">
               <SelectValue />
@@ -430,22 +439,86 @@ export function VykazReport() {
               <SelectItem value="custom" className="text-xs">Vlastní</SelectItem>
             </SelectContent>
           </Select>
-          {dateRange === "custom" && (
-            <>
-              <Input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-8 w-[140px] text-xs"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setRangeOffset((o) => o + 1)}
+            title="Další období"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-8 px-3 text-xs gap-1.5",
+                  dateRange !== "custom" && "text-muted-foreground",
+                )}
+                onClick={() => {
+                  if (dateRange !== "custom") setDateRangeRaw("custom");
+                }}
+              >
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {dateRange === "custom" && customFrom && customTo ? (
+                  <span>
+                    {formatAppDate(new Date(customFrom + "T00:00:00"))}
+                    {" – "}
+                    {formatAppDate(new Date(customTo + "T00:00:00"))}
+                  </span>
+                ) : (
+                  <span>Vyberte rozsah</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                weekStartsOn={1}
+                defaultMonth={customFrom ? new Date(customFrom + "T00:00:00") : new Date()}
+                selected={{
+                  from: customFrom ? new Date(customFrom + "T00:00:00") : undefined,
+                  to: customTo ? new Date(customTo + "T00:00:00") : undefined,
+                }}
+                onSelect={(range: any) => {
+                  setRangeOffset(0);
+                  setCustomFrom(range?.from ? toLocalDateStr(range.from) : "");
+                  setCustomTo(range?.to ? toLocalDateStr(range.to) : "");
+                }}
+                className="p-3 pointer-events-auto"
               />
-              <span className="text-xs text-muted-foreground">–</span>
-              <Input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="h-8 w-[140px] text-xs"
-              />
-            </>
+              <div className="flex items-center justify-between border-t p-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1.5 text-muted-foreground"
+                  onClick={() => {
+                    setCustomFrom("");
+                    setCustomTo("");
+                    setRangeOffset(0);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Smazat
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setCalendarOpen(false)}
+                >
+                  Hotovo
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          {rangeOffset !== 0 && (
+            <span className="text-[11px] text-muted-foreground tabular-nums ml-1">
+              {formatAppDate(new Date(from + "T00:00:00"))} – {formatAppDate(new Date(to + "T00:00:00"))}
+            </span>
           )}
         </div>
 
