@@ -184,11 +184,20 @@ function getMondayKey(datum: string): string {
   return toLocalDateStr(monday);
 }
 
+export interface AbsencesForYearResult {
+  /** Map<weekStartMonday(YYYY-MM-DD), total absence hours that week>. */
+  weekTotals: Map<string, number>;
+  /** Map<weekStartMonday, Map<employee_id, absence hours>>. */
+  perEmployee: Map<string, Map<string, number>>;
+}
+
 export function useAbsencesForYear(year: number, employees: EmployeeRow[]) {
-  return useQuery({
+  return useQuery<AbsencesForYearResult>({
     queryKey: ["absences-year", year, employees.length],
     queryFn: async () => {
-      if (employees.length === 0) return new Map<string, number>();
+      if (employees.length === 0) {
+        return { weekTotals: new Map(), perEmployee: new Map() };
+      }
       const employeeIds = employees.map(e => e.id);
       const empMap = new Map(employees.map(e => [e.id, e]));
       const { data, error } = await supabase
@@ -198,14 +207,19 @@ export function useAbsencesForYear(year: number, employees: EmployeeRow[]) {
         .lte("datum", `${year}-12-31`)
         .in("employee_id", employeeIds);
       if (error) throw error;
-      const result = new Map<string, number>();
+      const weekTotals = new Map<string, number>();
+      const perEmployee = new Map<string, Map<string, number>>();
       for (const row of (data || [])) {
         const key = getMondayKey(row.datum);
         const emp = empMap.get(row.employee_id);
         const hours = emp?.uvazok_hodiny ?? 8;
-        result.set(key, (result.get(key) || 0) + hours);
+        weekTotals.set(key, (weekTotals.get(key) || 0) + hours);
+        if (!row.employee_id) continue;
+        let inner = perEmployee.get(key);
+        if (!inner) { inner = new Map(); perEmployee.set(key, inner); }
+        inner.set(row.employee_id, (inner.get(row.employee_id) || 0) + hours);
       }
-      return result;
+      return { weekTotals, perEmployee };
     },
     enabled: employees.length > 0,
     staleTime: 2 * 60 * 1000,
