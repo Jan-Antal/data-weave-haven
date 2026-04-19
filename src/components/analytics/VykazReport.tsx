@@ -263,6 +263,64 @@ export function VykazReport() {
     };
   }, [logs, projectsMap, overheadMap]);
 
+  // ── Chart data (hours per day/week) ─────────────────────────────
+  const { chartData, effectiveBucket } = useMemo(() => {
+    const fromD = new Date(from + "T00:00:00");
+    const toD = new Date(to + "T00:00:00");
+    const spanDays = Math.max(1, Math.round((toD.getTime() - fromD.getTime()) / 86400000) + 1);
+    const eff: "day" | "week" =
+      bucketMode === "auto" ? (spanDays <= 31 ? "day" : "week") : bucketMode;
+
+    const isoWeek = (d: Date): { year: number; week: number; monday: Date } => {
+      const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = date.getUTCDay() || 7;
+      date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+      const week = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      const monday = new Date(d);
+      const md = monday.getDay() || 7;
+      monday.setDate(monday.getDate() + 1 - md);
+      monday.setHours(0, 0, 0, 0);
+      return { year: date.getUTCFullYear(), week, monday };
+    };
+
+    const buckets = new Map<string, { label: string; sortKey: string; hodiny: number }>();
+
+    if (eff === "day") {
+      for (let i = 0; i < spanDays; i++) {
+        const d = new Date(fromD);
+        d.setDate(fromD.getDate() + i);
+        const key = toLocalDateStr(d);
+        const label = `${d.getDate()}.${d.getMonth() + 1}.`;
+        buckets.set(key, { label, sortKey: key, hodiny: 0 });
+      }
+      for (const r of logs) {
+        const b = buckets.get(r.datum_sync);
+        if (b) b.hodiny += Number(r.hodiny) || 0;
+      }
+    } else {
+      const cursor = new Date(fromD);
+      while (cursor.getTime() <= toD.getTime()) {
+        const { year, week, monday } = isoWeek(cursor);
+        const key = `${year}-W${String(week).padStart(2, "0")}`;
+        if (!buckets.has(key)) {
+          buckets.set(key, { label: `T${week}`, sortKey: toLocalDateStr(monday), hodiny: 0 });
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      for (const r of logs) {
+        const d = new Date(r.datum_sync + "T00:00:00");
+        const { year, week } = isoWeek(d);
+        const key = `${year}-W${String(week).padStart(2, "0")}`;
+        const b = buckets.get(key);
+        if (b) b.hodiny += Number(r.hodiny) || 0;
+      }
+    }
+
+    const arr = Array.from(buckets.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    return { chartData: arr.map(({ label, hodiny }) => ({ label, hodiny: Math.round(hodiny * 10) / 10 })), effectiveBucket: eff };
+  }, [logs, from, to, bucketMode]);
+
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
     const lines: string[] = [];
