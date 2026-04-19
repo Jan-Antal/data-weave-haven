@@ -1,9 +1,11 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
