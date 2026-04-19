@@ -76,16 +76,39 @@ export function CompletionDialog({
         }
       }
 
-      // Complete full items
+      // Helper: decide if item is an intermediate split part (not last)
+      // Intermediate splits → virtual "completed" (expediced_at SET)
+      // Last/non-split → virtual "expedice" (expediced_at NULL, awaiting shipment)
+      const isIntermediateSplit = (it: { split_group_id: string | null; split_part: number | null; split_total: number | null }) =>
+        !!it.split_group_id && it.split_part != null && it.split_total != null && it.split_part < it.split_total;
+
+      const nowIso = new Date().toISOString();
+
+      // Complete full items → insert into production_expedice
       if (fullCompleteIds.length > 0) {
-        const { error } = await supabase
+        // Mark schedule rows with completed_at/by metadata (status stays scheduled/in_progress per DB trigger)
+        await supabase
           .from("production_schedule")
-          .update({
-            status: "expedice",
-            completed_at: new Date().toISOString(),
-            completed_by: user.id,
-          })
+          .update({ completed_at: nowIso, completed_by: user.id })
           .in("id", fullCompleteIds);
+
+        const expediceRows = fullCompleteIds.map(id => {
+          const it = items.find(i => i.id === id)!;
+          const intermediate = isIntermediateSplit(it);
+          return {
+            project_id: it.project_id,
+            item_name: it.item_name,
+            item_code: it.item_code || null,
+            source_schedule_id: it.id,
+            stage_id: it.stage_id || null,
+            manufactured_at: nowIso,
+            // Intermediate split → expediced_at SET → virtual status "completed"
+            // Last/non-split → expediced_at NULL → virtual status "expedice"
+            expediced_at: intermediate ? nowIso : null,
+            is_midflight: false,
+          };
+        });
+        const { error } = await (supabase.from("production_expedice") as any).insert(expediceRows);
         if (error) throw error;
       }
 
@@ -97,12 +120,11 @@ export function CompletionDialog({
         const groupId = item.split_group_id || item.id;
         const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
 
-        // Update original → completed with reduced hours
+        // Update original → reduced hours, mark completed metadata, link split group
         await supabase.from("production_schedule").update({
           scheduled_hours: doneHours,
           scheduled_czk: doneHours * czkPerHour,
-          status: "expedice",
-          completed_at: new Date().toISOString(),
+          completed_at: nowIso,
           completed_by: user.id,
           split_group_id: groupId,
         }).eq("id", item.id);
@@ -125,19 +147,36 @@ export function CompletionDialog({
         // Renumber all siblings
         await renumberSiblings(groupId);
 
-        // Update names
+        // Update names + fetch fresh split_part/split_total to decide expedice marker
         const { data: allParts } = await supabase
           .from("production_schedule")
           .select("id, split_part, split_total")
           .or(`split_group_id.eq.${groupId},id.eq.${groupId}`)
           .order("scheduled_week");
+        let originalPart: { split_part: number | null; split_total: number | null } | null = null;
         if (allParts) {
           for (const p of allParts) {
             await supabase.from("production_schedule").update({
               item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
             }).eq("id", p.id);
+            if (p.id === item.id) originalPart = { split_part: p.split_part, split_total: p.split_total };
           }
         }
+
+        // Insert expedice marker for the just-completed (original) part
+        // Splitting at completion always creates ≥1 remaining sibling → original is intermediate
+        const intermediate = !originalPart
+          || (originalPart.split_part != null && originalPart.split_total != null && originalPart.split_part < originalPart.split_total);
+        await (supabase.from("production_expedice") as any).insert({
+          project_id: item.project_id,
+          item_name: `${cleanName}${originalPart ? ` (${originalPart.split_part}/${originalPart.split_total})` : ""}`,
+          item_code: item.item_code || null,
+          source_schedule_id: item.id,
+          stage_id: item.stage_id || null,
+          manufactured_at: nowIso,
+          expediced_at: intermediate ? nowIso : null,
+          is_midflight: false,
+        });
       }
 
       // Auto-recalc project completion %
