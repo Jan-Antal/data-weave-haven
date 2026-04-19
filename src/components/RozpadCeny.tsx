@@ -85,7 +85,7 @@ export function RozpadCeny({ projectId, prodejniCena, marze, costValues, onChang
   const total = Object.values(pctValues).reduce((s, v) => s + v, 0);
 
   // Cost and margin calculations — unified with computePlanHours
-  const marzeRaw = marze != null ? marze : 15;
+  const marzeRaw = marze != null ? marze : (settings?.default_margin_pct ?? 15);
   // Normalize: values > 1 are percentages (e.g. 25 → 0.25), values ≤ 1 are already decimal
   const marzeDecimal = marzeRaw > 1 ? marzeRaw / 100 : marzeRaw;
   const marzeDisplay = Math.round(marzeDecimal * 100); // for UI display as whole %
