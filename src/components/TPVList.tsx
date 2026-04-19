@@ -1003,6 +1003,27 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                           </TableCell>
                         );
                       }
+                      if (key === "stage_id") {
+                        const sid = (item as any).stage_id || "";
+                        const stageOptions = projectStages.map((s) => s.display_name || s.stage_name);
+                        const idByLabel = new Map(projectStages.map((s) => [s.display_name || s.stage_name, s.id]));
+                        const labelById = new Map(projectStages.map((s) => [s.id, s.display_name || s.stage_name]));
+                        const currentLabel = sid ? (labelById.get(sid) || "") : "";
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={currentLabel}
+                              type="select"
+                              options={stageOptions}
+                              onSave={(v) => {
+                                const newId = v ? (idByLabel.get(v) || null) : null;
+                                saveField(item.id, "stage_id", newId, sid);
+                              }}
+                              readOnly={!canManageTPV || projectStages.length === 0}
+                            />
+                          </TableCell>
+                        );
+                      }
                       // remaining columns: sent_date, accepted_date, notes, pocet, cena, custom fields
                       if (key === "sent_date")
                         return (
