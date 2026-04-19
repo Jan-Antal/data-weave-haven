@@ -406,9 +406,16 @@ export function OsobyZamestnanci() {
                               return (
                                 <Popover>
                                   <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm" className="h-8 text-xs justify-start font-normal w-full">
-                                      {summary}
-                                    </Button>
+                                    <button
+                                      type="button"
+                                      className={cn(
+                                        INLINE_TRIGGER,
+                                        "flex items-center text-left truncate",
+                                        selected.length === 0 && "text-muted-foreground",
+                                      )}
+                                    >
+                                      <span className="truncate">{summary}</span>
+                                    </button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-48 p-2" align="start">
                                     <div className="space-y-1.5">
@@ -433,7 +440,7 @@ export function OsobyZamestnanci() {
                               value={String(emp.uvazok_hodiny ?? 8)}
                               onValueChange={(v) => handleUvazek(emp, Number(v))}
                             >
-                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectTrigger className={INLINE_TRIGGER}><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 {UVAZEK_OPTIONS.map((d) => (
                                   <SelectItem key={d} value={String(d)}>{d * 5} h/týd</SelectItem>
