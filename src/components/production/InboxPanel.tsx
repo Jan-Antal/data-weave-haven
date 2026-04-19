@@ -435,7 +435,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     // Vrátit do TPV — dostupné pre všetky inbox položky (vrátane midflight, kvôli cleanup)
     actions.push({
-      label: "↩ Vrátit do TPV", icon: "↩", dividerBefore: true,
+      label: "Vrátit do TPV", icon: "↩", dividerBefore: true,
       onClick: async () => {
         try {
           const { error } = await supabase.from("production_inbox").delete().eq("id", item.id);
