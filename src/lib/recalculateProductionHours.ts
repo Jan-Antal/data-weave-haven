@@ -242,66 +242,103 @@ export async function recalculateProductionHours(
         }
       }
 
-      // Inbox
-      const inboxItems = inboxByProject.get(proj.project_id) || [];
-      const inboxSplitGroupTotals: Record<string, number> = {};
+      // ===== INBOX: proportional redistribution to guarantee
+      //   Σ inbox.estimated_hours + Σ schedule.scheduled_hours == hodiny_plan
+      // First refresh estimated_czk from TPV (so CZK stays accurate),
+      // then distribute the remainder of plan hours proportionally to estimated_czk.
+      const inboxItemsAll = inboxByProject.get(proj.project_id) || [];
+      const inboxItems = inboxItemsAll.filter((it: any) => !it.item_code?.startsWith('HIST_'));
+
+      // 1) Refresh estimated_czk per item from TPV when available.
+      const refreshedCzk = new Map<string, number>();
       for (const item of inboxItems) {
-        if (item.split_group_id) {
-          inboxSplitGroupTotals[item.split_group_id] = (inboxSplitGroupTotals[item.split_group_id] || 0) + Number(item.estimated_hours);
+        const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
+        if (tpv) {
+          const rawCena = Number(tpv.cena) || 0;
+          const correctCzk = Math.floor(evaluateFormula(
+            formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
+            { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
+          ));
+          // Account for split: if item is part of a split, scale CZK by its part fraction
+          const splitDivisor = Number(item.split_total) || 1;
+          refreshedCzk.set(item.id, Math.floor(correctCzk / splitDivisor));
+        } else {
+          refreshedCzk.set(item.id, Number(item.estimated_czk) || 0);
         }
       }
 
+      // 2) Compute schedule active hours already locked-in for this project (post-week filter applied earlier may exclude past;
+      //    here we want the FULL active total to know the true remainder).
+      // Re-derive from full schedule list (not the filtered one above).
+      const fullSchedForProject = allSched.filter((s: any) => s.project_id === proj.project_id);
+      const scheduleActiveHours = fullSchedForProject.reduce(
+        (sum: number, s: any) => sum + (Number(s.scheduled_hours) || 0),
+        0,
+      );
+
+      // 3) Group inbox items by stage_id (null bucket = project-level)
+      const stageBuckets = new Map<string, any[]>();
       for (const item of inboxItems) {
-        if (item.item_code?.startsWith('HIST_')) continue;
-        const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
+        const key = item.stage_id || '__project__';
+        const arr = stageBuckets.get(key) || [];
+        arr.push(item);
+        stageBuckets.set(key, arr);
+      }
 
-        // Fallback: if no matching TPV (or hours look wrong vs stored CZK),
-        // recompute estimated_hours from stored estimated_czk.
-        if (!tpv) {
-          const storedCzk = Number(item.estimated_czk) || 0;
-          if (storedCzk <= 0) continue;
-          const correctHoursFromCzk = Math.floor(evaluateFormula(
-            formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
-            { itemCostCzk: storedCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
-          ));
-          const splitDivisor = Number(item.split_total) || 1;
-          const finalHours = Math.floor(correctHoursFromCzk / splitDivisor);
-          if (Math.abs(finalHours - Number(item.estimated_hours)) > 0.5) {
-            inboxUpdates.push({ id: item.id, estimated_hours: finalHours, estimated_czk: storedCzk });
-            updated++;
-          }
-          continue;
+      // For now: stage-specific hodiny_plan is not separately computed here.
+      // We distribute the project-level remainder across ALL inbox items proportionally,
+      // regardless of stage_id. (Per-stage refinement can be added when project_stages
+      // become first-class in computePlanHours.)
+      const planRemainder = Math.max(0, (result.hodiny_plan || 0) - scheduleActiveHours);
+
+      // Sort by sent_at to identify "last item" deterministically
+      const sortedInbox = [...inboxItems].sort((a: any, b: any) => {
+        const ta = a.sent_at ? new Date(a.sent_at).getTime() : 0;
+        const tb = b.sent_at ? new Date(b.sent_at).getTime() : 0;
+        return ta - tb;
+      });
+
+      const totalInboxCzk = sortedInbox.reduce(
+        (sum, it) => sum + (refreshedCzk.get(it.id) || 0),
+        0,
+      );
+
+      const newHoursById = new Map<string, number>();
+
+      if (sortedInbox.length === 0) {
+        // nothing to do
+      } else if (planRemainder <= 0 || (result.hodiny_plan || 0) <= 0) {
+        for (const it of sortedInbox) newHoursById.set(it.id, 0);
+      } else if (totalInboxCzk <= 0) {
+        // Distribute equally
+        const base = Math.floor(planRemainder / sortedInbox.length);
+        let assigned = 0;
+        for (let i = 0; i < sortedInbox.length - 1; i++) {
+          newHoursById.set(sortedInbox[i].id, base);
+          assigned += base;
         }
+        newHoursById.set(sortedInbox[sortedInbox.length - 1].id, planRemainder - assigned);
+      } else {
+        let assigned = 0;
+        for (let i = 0; i < sortedInbox.length - 1; i++) {
+          const it = sortedInbox[i];
+          const share = Math.floor(planRemainder * (refreshedCzk.get(it.id) || 0) / totalInboxCzk);
+          newHoursById.set(it.id, share);
+          assigned += share;
+        }
+        // Last item carries the remainder so the total is exact
+        const last = sortedInbox[sortedInbox.length - 1];
+        newHoursById.set(last.id, planRemainder - assigned);
+      }
 
-        const rawCena = Number(tpv.cena) || 0;
-        const cenaCzk = isEur ? rawCena * eurRate : rawCena;
-        const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-        const correctCzk = Math.floor(evaluateFormula(
-          formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
-          { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
-        ));
-        const rawTotalHours =
-          itemCostCzk > 0
-            ? Math.floor(evaluateFormula(
-                formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
-                { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
-              ))
-            : 0;
-        const totalHours = Math.floor(rawTotalHours * scaleRatio);
-        const splitGroupId = item.split_group_id;
-        const correctHours = (() => {
-          if (!splitGroupId || !inboxSplitGroupTotals[splitGroupId]) {
-            return Math.floor(totalHours / (Number(item.split_total) || 1));
-          }
-          const ratio = Number(item.estimated_hours) / inboxSplitGroupTotals[splitGroupId];
-          return Math.floor(totalHours * ratio);
-        })();
-
+      for (const item of sortedInbox) {
+        const newCzk = refreshedCzk.get(item.id) ?? Number(item.estimated_czk) ?? 0;
+        const newHours = newHoursById.get(item.id) ?? 0;
         if (
-          correctCzk !== Number(item.estimated_czk) ||
-          correctHours !== Number(item.estimated_hours)
+          newCzk !== Number(item.estimated_czk) ||
+          newHours !== Number(item.estimated_hours)
         ) {
-          inboxUpdates.push({ id: item.id, estimated_hours: correctHours, estimated_czk: correctCzk });
+          inboxUpdates.push({ id: item.id, estimated_hours: newHours, estimated_czk: newCzk });
           updated++;
         }
       }
