@@ -78,28 +78,28 @@ const GROUPS: Group[] = [
     icon: { bg: "#E6F1FB", color: "#0C447C" },
     rows: [
       {
-        kind: "tri",
+        kind: "bin",
         label: "Project Info",
         desc: "Základní info, finance, dokumenty",
-        write: "canEdit",
+        flags: ["canEdit"],
       },
       {
-        kind: "tri",
+        kind: "bin",
         label: "PM Status",
         desc: "Riadenie projektu, milníky",
-        write: "canEdit",
+        flags: ["canEdit"],
       },
       {
-        kind: "tri",
+        kind: "bin",
         label: "TPV Status",
         desc: "Prehľad TPV položiek",
-        write: "canEdit",
+        flags: ["canEdit"],
       },
       {
-        kind: "tri",
+        kind: "bin",
         label: "TPV List",
         desc: "Položky, ceny, odoslanie do výroby",
-        write: "canManageTPV",
+        flags: ["canManageTPV"],
       },
       { kind: "bin", label: "Vytvořit projekt", flags: ["canCreateProject"] },
       { kind: "bin", label: "Smazat projekt", flags: ["canDeleteProject"] },
@@ -148,10 +148,10 @@ const GROUPS: Group[] = [
     icon: { bg: "#FAEEDA", color: "#633806" },
     rows: [
       {
-        kind: "tri",
+        kind: "bin",
         label: "Modul výroba",
         desc: "Bundles, QC tracking",
-        write: "canManageProduction",
+        flags: ["canManageProduction"],
       },
       {
         kind: "bin",
@@ -178,10 +178,10 @@ const GROUPS: Group[] = [
     icon: { bg: "#F1EFE8", color: "#5F5E5A" },
     rows: [
       {
-        kind: "tri",
+        kind: "bin",
         label: "Správa osob",
         desc: "Zamestnanci, externisti, kapacita",
-        write: "canManagePeople",
+        flags: ["canManagePeople"],
       },
       { kind: "bin", label: "Externisti", flags: ["canManageExternisti"] },
       {
@@ -608,24 +608,24 @@ export function OsobyOpravneni() {
 
           {/* Permissions */}
           {GROUPS.map((g) => (
-            <section key={g.title}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 pb-1.5 border-b border-border/40 flex items-center gap-2">
-                {g.icon && (
-                  <span
-                    aria-hidden
-                    className="inline-block"
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 4,
-                      background: g.icon.bg,
-                      color: g.icon.color,
-                    }}
-                  />
-                )}
+            <section
+              key={g.title}
+              className="rounded-md overflow-hidden border border-border/40"
+              style={{
+                borderLeft: g.icon ? `3px solid ${g.icon.color}` : undefined,
+                background: g.icon ? `${g.icon.bg}40` : undefined,
+              }}
+            >
+              <h3
+                className="text-[12px] font-semibold uppercase tracking-wider px-3 py-2"
+                style={{
+                  background: g.icon?.bg,
+                  color: g.icon?.color,
+                }}
+              >
                 {g.title}
               </h3>
-              <div className="divide-y divide-border/40">
+              <div className="divide-y divide-border/40 px-3">
                 {g.rows.map((row, i) => (
                   <div
                     key={i}
@@ -735,10 +735,10 @@ function SegBtn({
 }) {
   const styles = selected
     ? variant === "read"
-      ? "bg-[#E6F1FB] text-[#0C447C] border-[#85B7EB]"
+      ? "bg-[#FFF1E0] text-[#9A4A00] border-[#F4B66A]"
       : variant === "write"
       ? "bg-[#EAF3DE] text-[#27500A] border-[#97C459]"
-      : "bg-background text-foreground border-border"
+      : "bg-[#FDECEC] text-[#B42318] border-[#F4A6A0]"
     : "bg-transparent text-muted-foreground border-transparent hover:text-foreground";
   return (
     <button
