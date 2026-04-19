@@ -170,12 +170,18 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     () => new Set(TPV_LIST_COLUMNS.filter((c) => c.defaultHidden).map((c) => c.key)),
     [],
   );
+  const hasMultipleStages = projectStages.length >= 2;
   const isColVisible = useCallback(
     (key: string) => {
+      // Etapa: auto-show only when project has 2+ stages (still respects explicit user toggle)
+      if (key === "stage_id") {
+        if (visMap[key] === undefined) return hasMultipleStages;
+        return visMap[key] !== false;
+      }
       if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
       return visMap[key] !== false;
     },
-    [visMap, DEFAULT_HIDDEN_KEYS],
+    [visMap, DEFAULT_HIDDEN_KEYS, hasMultipleStages],
   );
   const toggleColVis = useCallback(
     (key: string) => {
