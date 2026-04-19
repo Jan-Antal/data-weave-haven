@@ -94,7 +94,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes] = await Promise.all([
+      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
