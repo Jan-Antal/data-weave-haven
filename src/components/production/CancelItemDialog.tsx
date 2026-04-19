@@ -131,10 +131,15 @@ export function CancelItemDialog({
       toast({ title: `✕ Položka zrušena: ${cancelReason}` });
       onOpenChange(false);
     } catch (err: any) {
-      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      console.error("[Cancel] handleCancel error:", err);
+      toast({
+        title: "Chyba při rušení položky",
+        description: err?.message || String(err),
+        variant: "destructive",
+      });
     }
     setSubmitting(false);
-  }, [reason, itemId, source, splitGroupId, cancelAll, invalidateAll, onOpenChange, itemName]);
+  }, [reason, itemId, source, splitGroupId, cancelAll, invalidateAll, onOpenChange, itemName, projectId, itemCode, qc]);
 
   const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
 
