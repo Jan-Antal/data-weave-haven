@@ -28,6 +28,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
 import { DilnaDashboard, getISOWeekForOffset } from "@/components/DilnaDashboard";
+import { VykazReport } from "@/components/analytics/VykazReport";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
