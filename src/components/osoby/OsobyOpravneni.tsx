@@ -609,7 +609,20 @@ export function OsobyOpravneni() {
           {/* Permissions */}
           {GROUPS.map((g) => (
             <section key={g.title}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 pb-1.5 border-b border-border/40">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 pb-1.5 border-b border-border/40 flex items-center gap-2">
+                {g.icon && (
+                  <span
+                    aria-hidden
+                    className="inline-block"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 4,
+                      background: g.icon.bg,
+                      color: g.icon.color,
+                    }}
+                  />
+                )}
                 {g.title}
               </h3>
               <div className="divide-y divide-border/40">
