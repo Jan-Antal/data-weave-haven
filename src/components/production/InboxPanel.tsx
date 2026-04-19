@@ -381,6 +381,29 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     if (onOpenProjectDetail) {
       actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
     }
+    // Vrátit všechny položky projektu do TPV (hromadne)
+    if (itemCount > 0) {
+      actions.push({
+        label: `Vrátit vše do TPV (${itemCount})`,
+        icon: "↩", dividerBefore: true,
+        onClick: async () => {
+          if (!confirm(`Vrátit ${itemCount} položek projektu ${project.project_name} do TPV?`)) return;
+          try {
+            const ids = project.items.map(i => i.id);
+            const { error } = await supabase.from("production_inbox").delete().in("id", ids);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["production-inbox"] });
+            qc.invalidateQueries({ queryKey: ["production-progress"] });
+            qc.invalidateQueries({ queryKey: ["production-statuses", project.project_id] });
+            qc.invalidateQueries({ queryKey: ["tpv-items", project.project_id] });
+            toast({ title: `↩ Vráceno ${itemCount} položek do TPV` });
+          } catch (err: any) {
+            console.error("[Bulk Vrátit do TPV] failed:", err);
+            toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+          }
+        },
+      });
+    }
     // Bulk: smazat všechny inbox položky projektu (pre cleanup midflight Multisport-style)
     if (itemCount > 0) {
       actions.push({
