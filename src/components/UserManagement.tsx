@@ -11,21 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff, Pencil, Check, X, ChevronDown, ChevronRight, Shield } from "lucide-react";
+import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff, Pencil, Check, X } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { TestModeBanner } from "./TestModeBanner";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
-import {
-  PERMISSION_FLAGS,
-  PERMISSION_LABELS,
-  ROLE_LABELS,
-  ROLE_PRESETS,
-  resolvePermissions,
-  type Permissions,
-} from "@/lib/permissionPresets";
+import { ROLE_LABELS, type Permissions } from "@/lib/permissionPresets";
 
 interface UserRow {
   id: string;
@@ -88,44 +81,6 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
 
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
-
-  // Permissions panel state
-  const [expandedPermsUserId, setExpandedPermsUserId] = useState<string | null>(null);
-  const [permsDraft, setPermsDraft] = useState<Permissions | null>(null);
-  const [permsSaving, setPermsSaving] = useState(false);
-
-  const togglePermsPanel = (u: UserRow) => {
-    if (expandedPermsUserId === u.id) {
-      setExpandedPermsUserId(null);
-      setPermsDraft(null);
-      return;
-    }
-    setExpandedPermsUserId(u.id);
-    setPermsDraft(resolvePermissions(u.role, u.permissions));
-  };
-
-  const resetPermsToPreset = (u: UserRow) => {
-    if (!u.role) return;
-    setPermsDraft({ ...ROLE_PRESETS[u.role] });
-  };
-
-  const handleSavePerms = async (u: UserRow) => {
-    if (!permsDraft) return;
-    setPermsSaving(true);
-    const { error } = await supabase
-      .from("user_roles")
-      .update({ permissions: permsDraft as any })
-      .eq("user_id", u.id);
-    setPermsSaving(false);
-    if (error) {
-      toast({ title: "Chyba pri ukladaní oprávnení", description: error.message, variant: "destructive" });
-      return;
-    }
-    toast({ title: "Oprávnenia uložené" });
-    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, permissions: permsDraft } : x)));
-    setExpandedPermsUserId(null);
-    setPermsDraft(null);
-  };
 
   const handleCopyInviteLink = async (userId: string) => {
     setCopyingLinkId(userId);
@@ -374,10 +329,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => {
-                    const isExpanded = expandedPermsUserId === u.id;
-                    return (
-                    <>
+                  users.map((u) => (
                     <TableRow key={u.id}>
                       <TableCell className="text-sm">
                         {editingNameId === u.id ? (
@@ -409,18 +361,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                       <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                       <TableCell>
                         {isOwner(u) ? (
-                          <span className="inline-flex items-center h-8 px-3 text-xs font-semibold text-primary">Owner</span>
+                          <Badge variant="default" className="font-normal text-[10px]">Owner</Badge>
                         ) : (
-                          <Select value={u.role ?? ""} onValueChange={(v) => handleUpdateRole(u.id, v as AppRole)}>
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ASSIGNABLE_ROLES.map((r) => (
-                                <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Badge variant="secondary" className="font-normal text-[10px]">
+                            {u.role ? ROLE_LABELS[u.role] : "—"}
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -447,13 +392,6 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                         )}
                       </TableCell>
                       <TableCell className="flex gap-1">
-                        <button
-                          onClick={() => togglePermsPanel(u)}
-                          className={`transition-colors ${isExpanded ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                          title="Oprávnenia"
-                        >
-                          <Shield className="h-4 w-4" />
-                        </button>
                         <button
                           onClick={() => handleCopyInviteLink(u.id)}
                           className="text-muted-foreground hover:text-foreground transition-colors"
@@ -487,53 +425,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                         )}
                       </TableCell>
                     </TableRow>
-                    {isExpanded && permsDraft && (
-                      <TableRow key={`${u.id}-perms`} className="bg-muted/20 hover:bg-muted/20">
-                        <TableCell colSpan={6} className="p-0">
-                          <div className="p-4 border-l-4 border-primary">
-                            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                              <div className="flex items-center gap-2">
-                                <Shield className="h-4 w-4 text-primary" />
-                                <span className="font-semibold text-sm">Oprávnenia</span>
-                                <Badge variant="secondary" className="text-[10px]">
-                                  Preset: {u.role ? ROLE_LABELS[u.role] : "—"}
-                                </Badge>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resetPermsToPreset(u)}>
-                                  Resetovat na preset
-                                </Button>
-                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setExpandedPermsUserId(null); setPermsDraft(null); }}>
-                                  Zrušit
-                                </Button>
-                                <Button size="sm" className="h-7 text-xs" onClick={() => handleSavePerms(u)} disabled={permsSaving}>
-                                  {permsSaving ? "Ukládám..." : "Uložiť"}
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
-                              {PERMISSION_FLAGS.map((flag) => (
-                                <label
-                                  key={flag}
-                                  className="flex items-center gap-2 text-xs cursor-pointer hover:text-foreground text-muted-foreground"
-                                >
-                                  <Checkbox
-                                    checked={!!permsDraft[flag]}
-                                    onCheckedChange={(v) =>
-                                      setPermsDraft((prev) => (prev ? { ...prev, [flag]: v === true } : prev))
-                                    }
-                                  />
-                                  <span>{PERMISSION_LABELS[flag]}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    </>
-                    );
-                  })
+                  ))
                 )}
               </TableBody>
             </Table>
