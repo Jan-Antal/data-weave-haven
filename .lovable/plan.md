@@ -1,53 +1,74 @@
 
 
-## Plan: Vykaz hours-per-period chart + toolbar repositioning
+## Plán: Vizuálny redesign Výkazu — 3 sekcie ako Zaměstnanci + reorganizácia
 
-### 1. New chart "Hodiny v čase" (visual import sanity check)
+### 1. Reorganizácia poradia (zhora dole)
+Aktuálne: Toolbar → Graf → Summary cards → Tabuľka  
+Nové: **Toolbar → Summary cards (4 dashboardy) → Graf → Tabuľka**
 
-Add a chart card directly under the **Vykaz** tab heading (above the toolbar/summary cards). Uses existing `recharts` (already used in `DashboardStats.tsx`).
+Summary cards (Hodiny, Pracovníci, Spárované, Nespárované) idú **nad graf** ako požaduje user.
 
-**Auto-bucketing logic** (computed via `useMemo` from `logs` + `from`/`to`):
-- Span ≤ **31 days** → bucket = **day** (label: `15.4.`)
-- Span > **31 days** → bucket = **week** (label: `T16` — ISO week, monday-anchored, using existing `toLocalDateStr` helper)
+### 2. Tabuľka rozdelená do 3 samostatných karet (groupBy = "projekt")
 
-Each bucket sums `hodiny` across all logs in range. Empty buckets are filled with 0 so gaps are visible (a missing day jumps out as a hole = clear import-failure signal).
+Namiesto jednej tabuľky s farebnými oddeľovacími riadkami (aktuálny stav) vytvoriť **tri samostatné `<section>` karty** v štýle `OsobyZamestnanci.tsx`:
 
-**Visual:**
-- BarChart, height `h-[180px]`, full-width inside a `Card` (white bg, border, shadow-sm, rounded-lg, p-4)
-- Title row: left = `"Hodiny v čase"` (text-sm font-semibold) + small muted subtitle showing bucket mode (`"per den"` / `"per týden"`); right = mini segmented toggle **Auto | Den | Týden** (default "Auto", lets user override). Same segmented style as existing groupBy control.
-- Bars: brand primary color (`hsl(var(--primary))`), rounded top corners, hover tooltip showing bucket label + `formatHours(value)`
-- X-axis: 11px muted ticks, no gridlines on X
-- Y-axis: 11px muted ticks, light dashed gridlines (`strokeDasharray="3 3"`, `stroke-border/40`)
-- Empty state (no logs): show muted centered text `"Žádné záznamy v období"`
+```
+┌─ Card 1: "Projekty" ──────────────────┐
+│ Header strip (badge + count + h/týd) │
+│ ─────────────────────────────────────│
+│ Table header (UPPERCASE 11px)        │
+│ Riadky projektov...                  │
+└──────────────────────────────────────┘
 
-**State:**
-- Add `bucketMode: "auto" | "day" | "week"` (default `"auto"`)
-- Memo `chartData: { label: string; hodiny: number }[]` — resolves effective bucket from mode + span
+┌─ Card 2: "Režie" ─────────────────────┐
+│ Header strip — fialový pruh           │
+│ Table header                          │
+│ Riadky overhead projektov...          │
+└──────────────────────────────────────┘
 
-### 2. Layout reorder
+┌─ Card 3: "Nespárované" ───────────────┐
+│ Header strip — amber pruh + ikona ⚠   │
+│ Table header                          │
+│ Riadky unmatched s amber border-l     │
+└──────────────────────────────────────┘
+```
 
-Current order: Summary cards → Toolbar → Table  
-New order:
-1. **Toolbar** (date range + groupBy segmented + search + export) — moved to **top**, immediately under tab header
-2. **Chart "Hodiny v čase"**
-3. **Summary cards** (4 stat cards)
-4. **Table**
+**Vizuálny jazyk presne ako Zaměstnanci:**
+- `<section className="rounded-lg border shadow-sm overflow-hidden bg-card {colorBorder}">`
+- Klikateľný header: `w-full flex items-center justify-between px-3 py-2 border-b {colorHeader}` + collapse chevron
+- V headeri: `Badge` s farbou sekcie + počet projektov + súčet hodín
+- Tabuľka: `Table` s `TableHeader` `bg-muted/30` a `text-[11px] uppercase tracking-wide`, riadky `h-9 hover:bg-muted/50`
+- Collapse stav per sekcia (Set<string> alebo 3 boolean states)
 
-This gives the user filters first (control), then visual (chart), then numbers (cards), then detail (table) — top-down information hierarchy.
+**Farby sekcií** (zladené s app paletou):
+- **Projekty**: `border-green-200`, header `bg-green-50/80`, badge zelený (ako "direct" v Zaměstnanci)
+- **Režie**: `border-purple-200`, header `bg-purple-50/80`, badge fialový (ako "provoz")
+- **Nespárované**: `border-[#F5A971]`, header `bg-[#FDE2C7]/60`, badge amber + `AlertTriangle` ikona
 
-The toolbar keeps its current visual styling (border-b, h-12-ish, bg-card, px-4 py-2). Summary-cards section padding adjusts (`pt-2` instead of `pt-4`) since they're no longer the topmost element.
+### 3. Footer "Celkem"
+Sticky tfoot odstrániť (lebo už nie je jedna tabuľka). Namiesto toho na konci pod 3 kartami pridať jednoduchý sumárny riadok: `"Celkem: X h"` v `bg-muted/50` Card s rovnakým štýlom ako footer v Zaměstnanci.
 
-### 3. Files touched
+### 4. Skupinové režimy "Osoba" a "Činnosť"
+Nezdieľajú projekty/režie/nespárované rozdelenie — ostávajú v **jednej karte** (rovnaký vizuál ako sekcie vyššie, len jedna), bez pruhov.
 
-- `src/components/analytics/VykazReport.tsx` only
-  - Add imports: `BarChart`, `Bar`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer` from `recharts`
-  - Add `bucketMode` state
-  - Add `chartData` + `effectiveBucket` memos (ISO-week helper inline)
-  - Reorder JSX: Toolbar → Chart card → Summary cards → Table
-  - No changes to data fetching, grouping, filtering, export, RLS
+### 5. Hover/font/typografia konzistentná s Zaměstnanci
+- Header strip: `text-[11px] font-semibold` pre badge, `text-[12px] font-medium` pre count, `text-[11px] text-muted-foreground` pre meta
+- Table head: `h-9 text-[11px] uppercase tracking-wide`
+- Riadky: `text-xs` (13px efektívne na hlavnom obsahu, 11px na meta)
+- Project ID: `font-mono text-xs text-primary` (zachovať klikateľnosť)
+- Stav badge: zachovať existujúce (Spárováno zelený, Nespárováno amber)
 
-### Out of scope
-- No DB / RLS changes
-- No changes to summary stats math, table rendering, expand/collapse, or CSV export
-- No new dependencies
+### 6. Súbor
+- `src/components/analytics/VykazReport.tsx` — len tento súbor
+  - Reorder JSX (summary nad graf)
+  - Nahradiť `<ProjektRows>` jednou tabuľkou trojicou samostatných `<section>` cards
+  - Pridať `collapsedSections` state (Set: `"projekty" | "rezie" | "nesparovane"`)
+  - Extrahovať helper `<VykazSection>` pre opakovateľný card layout
+  - Odstrániť sticky tfoot, nahradiť jednoduchým "Celkem" riadkom pod kartami
+
+### Bez zmien
+- Žiadne zmeny v dátach, fetchingu, filtroch, grouping logike, exporte CSV, expand/collapse riadkov
+- Žiadne zmeny v DB / RLS
+- Žiadne zmeny v iných súboroch
+- Graf "Hodiny v čase" zostáva nezmenený (len presunutý)
 
