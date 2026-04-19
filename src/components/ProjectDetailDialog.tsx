@@ -1976,6 +1976,34 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
         });
       }}
     />
+    {/* Single file delete confirmation */}
+    <ConfirmDialog
+      open={!!deletingFile}
+      onConfirm={() => { if (deletingFile) handleDeleteFile(deletingFile.categoryKey, deletingFile.fileName); }}
+      onCancel={() => setDeletingFile(null)}
+      title="Smazat soubor?"
+      description={deletingFile?.fileName ?? ""}
+      confirmLabel="Smazat"
+      cancelLabel="Zrušit"
+      variant="destructive"
+    />
+    {/* Bulk delete confirmation */}
+    <ConfirmDialog
+      open={!!bulkDeleteConfirm}
+      onConfirm={() => { if (bulkDeleteConfirm) handleDeleteMany(bulkDeleteConfirm.categoryKey, bulkDeleteConfirm.files); }}
+      onCancel={() => setBulkDeleteConfirm(null)}
+      title={`Smazat ${bulkDeleteConfirm?.files.length ?? 0} ${(bulkDeleteConfirm?.files.length ?? 0) === 1 ? "soubor" : (bulkDeleteConfirm?.files.length ?? 0) < 5 ? "soubory" : "souborů"}?`}
+      description={
+        <ul className="mt-1 max-h-48 overflow-y-auto list-disc pl-5 space-y-0.5 text-xs">
+          {bulkDeleteConfirm?.files.map((f) => (
+            <li key={f.itemId} className="truncate">{f.name}</li>
+          ))}
+        </ul>
+      }
+      confirmLabel="Smazat vybrané"
+      cancelLabel="Zrušit"
+      variant="destructive"
+    />
     </>
   );
 }
