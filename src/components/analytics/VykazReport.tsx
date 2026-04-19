@@ -51,22 +51,47 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function getRangeBounds(range: DateRange, customFrom: string, customTo: string): { from: string; to: string } {
+function addDays(d: Date, days: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+}
+
+function addMonths(d: Date, months: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + months, d.getDate());
+}
+
+function getRangeBounds(
+  range: DateRange,
+  customFrom: string,
+  customTo: string,
+  offset: number,
+): { from: string; to: string } {
   const now = new Date();
   if (range === "custom") {
-    return { from: customFrom || toLocalDateStr(now), to: customTo || toLocalDateStr(now) };
+    const f = customFrom ? new Date(customFrom + "T00:00:00") : now;
+    const t = customTo ? new Date(customTo + "T00:00:00") : now;
+    const spanDays = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
+    const shifted = offset * spanDays;
+    return { from: toLocalDateStr(addDays(f, shifted)), to: toLocalDateStr(addDays(t, shifted)) };
   }
   let start: Date;
+  let end: Date = now;
   if (range === "week") {
     const day = now.getDay();
     const diff = day === 0 ? 6 : day - 1;
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+    end = addDays(start, 6);
+    if (offset !== 0) {
+      start = addDays(start, offset * 7);
+      end = addDays(end, offset * 7);
+    }
   } else if (range === "month") {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
   } else {
-    start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    start = new Date(now.getFullYear(), now.getMonth() - 3 + offset * 3, now.getDate());
+    end = offset === 0 ? now : addMonths(start, 3);
   }
-  return { from: toLocalDateStr(start), to: toLocalDateStr(now) };
+  return { from: toLocalDateStr(start), to: toLocalDateStr(end) };
 }
 
 export function VykazReport() {
