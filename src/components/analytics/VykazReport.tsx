@@ -409,30 +409,30 @@ export function VykazReport() {
         <div className="rounded-lg border bg-card flex flex-col h-full">
           <div className="flex-1 overflow-auto always-scrollbar rounded-lg">
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-card">
+              <TableHeader className="sticky top-0 z-10 bg-muted/50">
                 {groupBy === "projekt" && (
-                  <TableRow className="bg-primary/5">
-                    <TableHead className="w-[40%]">Projekt</TableHead>
-                    <TableHead>Stav</TableHead>
-                    <TableHead className="text-right">Hodiny</TableHead>
-                    <TableHead className="text-right">Záznamů</TableHead>
-                    <TableHead>Posledný záznam</TableHead>
+                  <TableRow className="hover:bg-transparent border-b">
+                    <TableHead className="w-[40%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Projekt</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Stav</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Záznamů</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Posledný záznam</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 )}
                 {groupBy === "osoba" && (
-                  <TableRow className="bg-primary/5">
-                    <TableHead className="w-[60%]">Jméno</TableHead>
-                    <TableHead className="text-right">Počet projektů</TableHead>
-                    <TableHead className="text-right">Hodiny celkem</TableHead>
+                  <TableRow className="hover:bg-transparent border-b">
+                    <TableHead className="w-[60%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Jméno</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Počet projektů</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny celkem</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 )}
                 {groupBy === "cinnost" && (
-                  <TableRow className="bg-primary/5">
-                    <TableHead className="w-[60%]">Název činnosti</TableHead>
-                    <TableHead>Kód</TableHead>
-                    <TableHead className="text-right">Hodiny</TableHead>
+                  <TableRow className="hover:bg-transparent border-b">
+                    <TableHead className="w-[60%] text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Název činnosti</TableHead>
+                    <TableHead className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Kód</TableHead>
+                    <TableHead className="text-right text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9">Hodiny</TableHead>
                     <TableHead className="w-8" />
                   </TableRow>
                 )}
