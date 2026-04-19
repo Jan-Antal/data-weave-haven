@@ -13,7 +13,7 @@ export default function Osoby() {
 
   const tabs: ShellTabDef[] = [
     { key: "zamestnanci", label: "Zaměstnanci" },
-    { key: "externisti", label: "Externisti" },
+    { key: "externisti", label: "Externisté" },
     { key: "uzivatele", label: "Uživatelé", visible: canManageUsers },
     { key: "katalog", label: "Pozice & číselníky", visible: canSeeAdminTabs },
     { key: "kapacita", label: "Kapacita", visible: canSeeAdminTabs },
