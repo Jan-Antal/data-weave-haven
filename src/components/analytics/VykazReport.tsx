@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSearchBar } from "@/components/TableSearchBar";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
+import { useOverheadProjects } from "@/hooks/useOverheadProjects";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 
@@ -85,6 +86,13 @@ export function VykazReport() {
     return m;
   }, [projectsList]);
 
+  const { data: overheadList = [] } = useOverheadProjects();
+  const overheadMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of overheadList) if (o.is_active) m.set(o.project_code, o.label);
+    return m;
+  }, [overheadList]);
+
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["vykaz-log", from, to],
     queryFn: async (): Promise<LogRow[]> => {
@@ -125,6 +133,7 @@ export function VykazReport() {
         projectId: string;
         projectName: string;
         matched: boolean;
+        isOverhead: boolean;
         hodiny: number;
         records: number;
         last: string;
@@ -135,11 +144,13 @@ export function VykazReport() {
         let g = map.get(id);
         if (!g) {
           const matchedName = projectsMap.get(id);
+          const overheadLabel = overheadMap.get(id);
           g = {
             key: id,
             projectId: id,
-            projectName: matchedName ?? id,
-            matched: !!matchedName,
+            projectName: matchedName ?? overheadLabel ?? id,
+            matched: !!matchedName || !!overheadLabel,
+            isOverhead: !!overheadLabel,
             hodiny: 0,
             records: 0,
             last: r.datum_sync,
@@ -219,7 +230,7 @@ export function VykazReport() {
     }
     arr.sort((a, b) => b.hodiny - a.hodiny);
     return arr;
-  }, [logs, groupBy, search, projectsMap]);
+  }, [logs, groupBy, search, projectsMap, overheadMap]);
 
   const totalHours = useMemo(
     () => (grouped as any[]).reduce((s, g) => s + g.hodiny, 0),
@@ -239,7 +250,7 @@ export function VykazReport() {
     let matched = 0;
     let unmatched = 0;
     for (const id of distinctProjects) {
-      if (projectsMap.has(id)) matched++;
+      if (projectsMap.has(id) || overheadMap.has(id)) matched++;
       else unmatched++;
     }
     return {
@@ -248,7 +259,7 @@ export function VykazReport() {
       matchedProjects: matched,
       unmatchedProjects: unmatched,
     };
-  }, [logs, projectsMap]);
+  }, [logs, projectsMap, overheadMap]);
 
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
@@ -463,6 +474,7 @@ export function VykazReport() {
                     expanded={expanded}
                     toggleExpand={toggleExpand}
                     projectsMap={projectsMap}
+                    overheadMap={overheadMap}
                     onOpenDetail={setDetailProjectId}
                   />
                 ) : (
@@ -471,6 +483,7 @@ export function VykazReport() {
                     expanded={expanded}
                     toggleExpand={toggleExpand}
                     projectsMap={projectsMap}
+                    overheadMap={overheadMap}
                     onOpenDetail={setDetailProjectId}
                   />
                 )}
@@ -527,19 +540,20 @@ function ProjektRows({
   onOpenDetail,
 }: {
   grouped: Array<{
-    key: string; projectId: string; projectName: string; matched: boolean;
+    key: string; projectId: string; projectName: string; matched: boolean; isOverhead: boolean;
     hodiny: number; records: number; last: string; rows: LogRow[];
   }>;
   expanded: Set<string>;
   toggleExpand: (k: string) => void;
   onOpenDetail: (id: string) => void;
 }) {
-  const matched = grouped.filter((g) => g.matched);
+  const realProjects = grouped.filter((g) => g.matched && !g.isOverhead);
+  const overheadProjects = grouped.filter((g) => g.isOverhead);
   const unmatched = grouped.filter((g) => !g.matched);
 
   return (
     <>
-      {matched.map((g) => (
+      {realProjects.map((g) => (
         <ProjektRow
           key={g.key}
           g={g}
@@ -548,6 +562,28 @@ function ProjektRows({
           onOpenDetail={onOpenDetail}
         />
       ))}
+      {overheadProjects.length > 0 && (
+        <>
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={6} className="p-0">
+              <div className="bg-secondary border-l-[3px] border-l-primary px-4 py-2 flex items-center gap-2">
+                <span className="font-semibold text-[12px] text-foreground">
+                  Režie · {overheadProjects.length} {overheadProjects.length === 1 ? "projekt" : "projektů"}
+                </span>
+              </div>
+            </TableCell>
+          </TableRow>
+          {overheadProjects.map((g) => (
+            <ProjektRow
+              key={g.key}
+              g={g}
+              expanded={expanded.has(g.key)}
+              onToggle={() => toggleExpand(g.key)}
+              onOpenDetail={onOpenDetail}
+            />
+          ))}
+        </>
+      )}
       {unmatched.length > 0 && (
         <>
           <TableRow className="hover:bg-transparent">
@@ -682,12 +718,13 @@ function ProjektExpanded({ rows }: { rows: LogRow[] }) {
 
 // ── Osoba rows ─────────────────────────────────────────────────────
 function OsobaRows({
-  grouped, expanded, toggleExpand, projectsMap, onOpenDetail,
+  grouped, expanded, toggleExpand, projectsMap, overheadMap, onOpenDetail,
 }: {
   grouped: Array<{ key: string; zamestnanec: string; hodiny: number; projects: Set<string>; rows: LogRow[] }>;
   expanded: Set<string>;
   toggleExpand: (k: string) => void;
   projectsMap: Map<string, string>;
+  overheadMap: Map<string, string>;
   onOpenDetail: (id: string) => void;
 }) {
   return (
@@ -711,7 +748,7 @@ function OsobaRows({
             <TableCell />
           </TableRow>
           {expanded.has(g.key) && (
-            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} onOpenDetail={onOpenDetail} />
+            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} overheadMap={overheadMap} onOpenDetail={onOpenDetail} />
           )}
         </Fragment>
       ))}
@@ -721,12 +758,13 @@ function OsobaRows({
 
 // ── Cinnost rows ────────────────────────────────────────────────────
 function CinnostRows({
-  grouped, expanded, toggleExpand, projectsMap, onOpenDetail,
+  grouped, expanded, toggleExpand, projectsMap, overheadMap, onOpenDetail,
 }: {
   grouped: Array<{ key: string; cinnost_kod: string; cinnost_nazov: string; hodiny: number; rows: LogRow[] }>;
   expanded: Set<string>;
   toggleExpand: (k: string) => void;
   projectsMap: Map<string, string>;
+  overheadMap: Map<string, string>;
   onOpenDetail: (id: string) => void;
 }) {
   return (
@@ -750,7 +788,7 @@ function CinnostRows({
             <TableCell />
           </TableRow>
           {expanded.has(g.key) && (
-            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} onOpenDetail={onOpenDetail} />
+            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} overheadMap={overheadMap} onOpenDetail={onOpenDetail} />
           )}
         </Fragment>
       ))}
@@ -759,25 +797,30 @@ function CinnostRows({
 }
 
 function SubByProject({
-  rows, colSpan, projectsMap, onOpenDetail,
+  rows, colSpan, projectsMap, overheadMap, onOpenDetail,
 }: {
   rows: LogRow[];
   colSpan: number;
   projectsMap: Map<string, string>;
+  overheadMap: Map<string, string>;
   onOpenDetail: (id: string) => void;
 }) {
   const byProject = useMemo(() => {
-    const map = new Map<string, { hodiny: number; matched: boolean }>();
+    const map = new Map<string, { hodiny: number; matched: boolean; isOverhead: boolean }>();
     for (const r of rows) {
       const k = r.ami_project_id || "—";
       let g = map.get(k);
-      if (!g) { g = { hodiny: 0, matched: projectsMap.has(k) }; map.set(k, g); }
+      if (!g) {
+        const isOverhead = overheadMap.has(k);
+        g = { hodiny: 0, matched: projectsMap.has(k) || isOverhead, isOverhead };
+        map.set(k, g);
+      }
       g.hodiny += Number(r.hodiny) || 0;
     }
     return Array.from(map.entries())
-      .map(([id, g]) => ({ id, ...g, name: projectsMap.get(id) ?? id }))
+      .map(([id, g]) => ({ id, ...g, name: projectsMap.get(id) ?? overheadMap.get(id) ?? id }))
       .sort((a, b) => b.hodiny - a.hodiny);
-  }, [rows, projectsMap]);
+  }, [rows, projectsMap, overheadMap]);
 
   return (
     <TableRow className="hover:bg-transparent">
