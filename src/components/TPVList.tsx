@@ -695,7 +695,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       ],
       defaultVisibleKeys: renderKeys,
     }),
-    [renderKeys, sortedItems, getLabel, productionStatusMap, currency],
+    [renderKeys, sortedItems, getLabel, productionStatusMap, projectStages],
   );
 
   useEffect(() => {
