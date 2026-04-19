@@ -308,7 +308,7 @@ export function VykazReport() {
     let projektHours = 0;
     let rezijneHours = 0;
     let nesparovaneHours = 0;
-    for (const r of logs) {
+    for (const r of filteredLogs) {
       const id = r.ami_project_id || "—";
       distinctProjects.add(id);
       if (r.zamestnanec) distinctWorkers.add(r.zamestnanec);
@@ -335,7 +335,7 @@ export function VykazReport() {
       nesparovaneHours,
       utilization,
     };
-  }, [logs, projectsMap, overheadMap]);
+  }, [filteredLogs, projectsMap, overheadMap]);
 
   // ── Holidays for non-working highlight ──────────────────────────
   const fromYear = useMemo(() => new Date(from + "T00:00:00").getFullYear(), [from]);
