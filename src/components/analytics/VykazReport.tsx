@@ -702,6 +702,13 @@ export function VykazReport() {
               (celkem − režie) / celkem
             </div>
           </Card>
+          <Card className="p-4 shadow-sm">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárované projekty</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.unmatchedProjects}</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              chybí v evidenci
+            </div>
+          </Card>
         </div>
 
         {/* Chart: Hodiny v čase */}
