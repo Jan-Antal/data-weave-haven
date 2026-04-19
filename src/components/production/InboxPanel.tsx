@@ -321,16 +321,31 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
   const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
 
-  const toggleCheckItem = useCallback((itemId: string) => {
+  const lastClickedItemRef = useRef<{ projectId: string; itemId: string } | null>(null);
+
+  const toggleCheckItem = useCallback((itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => {
     setCheckedItems(prev => {
       const next = new Set(prev);
+      // Shift+click range select within same project
+      if (opts?.shiftKey && opts.projectItemIds && opts.projectId
+          && lastClickedItemRef.current?.projectId === opts.projectId) {
+        const ids = opts.projectItemIds;
+        const lastIdx = ids.indexOf(lastClickedItemRef.current.itemId);
+        const curIdx = ids.indexOf(itemId);
+        if (lastIdx >= 0 && curIdx >= 0) {
+          const [from, to] = lastIdx < curIdx ? [lastIdx, curIdx] : [curIdx, lastIdx];
+          for (let i = from; i <= to; i++) next.add(ids[i]);
+          return next;
+        }
+      }
       if (next.has(itemId)) next.delete(itemId);
       else next.add(itemId);
       return next;
     });
+    if (opts?.projectId) lastClickedItemRef.current = { projectId: opts.projectId, itemId };
   }, []);
 
-  const clearCheckedItems = useCallback(() => setCheckedItems(new Set()), []);
+  const clearCheckedItems = useCallback(() => { setCheckedItems(new Set()); lastClickedItemRef.current = null; }, []);
 
   // Build a lookup of all inbox items for batch drag data
   const allInboxItemsMap = useMemo(() => {
@@ -365,6 +380,29 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     if (onOpenProjectDetail) {
       actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
+    }
+    // Vrátit všechny položky projektu do TPV (hromadne)
+    if (itemCount > 0) {
+      actions.push({
+        label: `Vrátit vše do TPV (${itemCount})`,
+        icon: "↩", dividerBefore: true,
+        onClick: async () => {
+          if (!confirm(`Vrátit ${itemCount} položek projektu ${project.project_name} do TPV?`)) return;
+          try {
+            const ids = project.items.map(i => i.id);
+            const { error } = await supabase.from("production_inbox").delete().in("id", ids);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["production-inbox"] });
+            qc.invalidateQueries({ queryKey: ["production-progress"] });
+            qc.invalidateQueries({ queryKey: ["production-statuses", project.project_id] });
+            qc.invalidateQueries({ queryKey: ["tpv-items", project.project_id] });
+            toast({ title: `↩ Vráceno ${itemCount} položek do TPV` });
+          } catch (err: any) {
+            console.error("[Bulk Vrátit do TPV] failed:", err);
+            toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+          }
+        },
+      });
     }
     // Bulk: smazat všechny inbox položky projektu (pre cleanup midflight Multisport-style)
     if (itemCount > 0) {
@@ -435,7 +473,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     // Vrátit do TPV — dostupné pre všetky inbox položky (vrátane midflight, kvôli cleanup)
     actions.push({
-      label: "↩ Vrátit do TPV", icon: "↩", dividerBefore: true,
+      label: "Vrátit do TPV", icon: "↩", dividerBefore: true,
       onClick: async () => {
         try {
           const { error } = await supabase.from("production_inbox").delete().eq("id", item.id);
@@ -1250,7 +1288,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   onSelectProject?: (projectId: string) => void;
   projectInfo?: { datum_smluvni: string | null; status: string | null; expedice: string | null; montaz: string | null };
   checkedItems: Set<string>;
-  onToggleCheck: (itemId: string) => void;
+  onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
   onClearChecked: () => void;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   searchQuery?: string;
@@ -1345,17 +1383,21 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
               <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>{si.week_label}</span>
             </div>
           ))}
-          {project.items.map((item) => (
-            <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
-              onContextMenu={e => onItemContextMenu(e, item, project)}
-              isChecked={checkedItems.has(item.id)}
-              onToggleCheck={onToggleCheck}
-              checkedItems={checkedItems}
-              allInboxItemsMap={allInboxItemsMap}
-              displayMode={displayMode}
-              hourlyRate={hourlyRate}
-            />
-          ))}
+          {(() => {
+            const projectItemIds = project.items.map(i => i.id);
+            return project.items.map((item) => (
+              <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
+                onContextMenu={e => onItemContextMenu(e, item, project)}
+                isChecked={checkedItems.has(item.id)}
+                onToggleCheck={onToggleCheck}
+                checkedItems={checkedItems}
+                allInboxItemsMap={allInboxItemsMap}
+                displayMode={displayMode}
+                hourlyRate={hourlyRate}
+                projectItemIds={projectItemIds}
+              />
+            ));
+          })()}
 
           {/* Checked items footer bar */}
           {(() => {
@@ -1394,13 +1436,14 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550 }: {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550, projectItemIds }: {
   item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
-  isChecked: boolean; onToggleCheck: (itemId: string) => void;
+  isChecked: boolean; onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
   checkedItems: Set<string>;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   displayMode?: DisplayMode;
   hourlyRate?: number;
+  projectItemIds: string[];
 }) {
   const [hovered, setHovered] = useState(false);
   const adhocBadge = getAdhocBadge((item as any).adhoc_reason);
@@ -1464,7 +1507,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
         <div
           className="shrink-0 flex items-center justify-center"
           style={{ width: 14, height: 14 }}
-          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id); }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id, { shiftKey: e.shiftKey, projectId: item.project_id, projectItemIds }); }}
           onPointerDown={(e) => { e.stopPropagation(); }}
         >
           <div style={{
