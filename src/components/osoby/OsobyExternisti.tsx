@@ -25,7 +25,6 @@ const ROLE_FLAGS = [
 const ARCHITEKT_LABEL = "Architekt";
 
 /** Externisti color theme — teal/cyan to distinguish from interní bloky. */
-const EXTERNAL_THEME = "bg-cyan-50 text-cyan-900 border-cyan-200";
 const EXTERNAL_BADGE = "bg-cyan-100 text-cyan-800 border-cyan-300";
 
 interface ExternalRow {
