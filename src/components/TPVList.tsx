@@ -81,6 +81,8 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
       return { minWidth: 140 };
     case "vyroba_status":
       return { minWidth: 140, maxWidth: 200 };
+    case "stage_id":
+      return { minWidth: 140, maxWidth: 200 };
     case "konstrukter":
       return {
         minWidth: 124,
