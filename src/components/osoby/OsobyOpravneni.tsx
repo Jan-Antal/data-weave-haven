@@ -70,21 +70,34 @@ type BinRow = {
   flags: PermissionFlag[]; // toggled together
 };
 type Row = TriRow | BinRow;
-type Group = { title: string; rows: Row[] };
+type Group = { title: string; icon?: { bg: string; color: string }; rows: Row[] };
 
 const GROUPS: Group[] = [
   {
-    title: "Projekty & TPV",
+    title: "Project Info",
+    icon: { bg: "#E6F1FB", color: "#0C447C" },
     rows: [
       {
         kind: "tri",
-        label: "Projekty",
-        desc: "Zoznam projektov, detail, dokumenty",
+        label: "Project Info",
+        desc: "Základní info, finance, dokumenty",
         write: "canEdit",
       },
       {
         kind: "tri",
-        label: "TPV list",
+        label: "PM Status",
+        desc: "Riadenie projektu, milníky",
+        write: "canEdit",
+      },
+      {
+        kind: "tri",
+        label: "TPV Status",
+        desc: "Prehľad TPV položiek",
+        write: "canEdit",
+      },
+      {
+        kind: "tri",
+        label: "TPV List",
         desc: "Položky, ceny, odoslanie do výroby",
         write: "canManageTPV",
       },
@@ -92,45 +105,97 @@ const GROUPS: Group[] = [
       { kind: "bin", label: "Smazat projekt", flags: ["canDeleteProject"] },
       {
         kind: "bin",
-        label: "Upravit kód / termín",
+        label: "Upravit kód / smluvní termín",
         flags: ["canEditProjectCode", "canEditSmluvniTermin"],
       },
-      { kind: "bin", label: "Vidět ceny", flags: ["canSeePrices"] },
+      { kind: "bin", label: "Vidět ceny & marže", flags: ["canSeePrices"] },
+      { kind: "bin", label: "Réžijné projekty", flags: ["canManageExchangeRates"] },
     ],
   },
   {
-    title: "Výroba",
+    title: "Plán výroby",
+    icon: { bg: "#EAF3DE", color: "#27500A" },
     rows: [
       {
         kind: "tri",
-        label: "Plán výroby",
-        desc: "Kanban, plánovanie, Midflight",
+        label: "Plán výroby — Kanban / Tabulka",
+        desc: "Zobrazenie a editácia plánovaných blokov",
         read: "canAccessPlanVyroby",
         write: "canWritePlanVyroby",
       },
       {
         kind: "bin",
-        label: "Modul výroba",
-        desc: "Bundles, QC tracking, Daylog",
-        flags: ["canManageProduction"],
+        label: "Midflight",
+        desc: "Import histórie do plánu",
+        flags: ["canWritePlanVyroby"],
       },
-      { kind: "bin", label: "Daylog", flags: ["canAccessDaylog"] },
-      { kind: "bin", label: "Pouze QC", flags: ["canQCOnly"] },
+      {
+        kind: "bin",
+        label: "Forecast",
+        desc: "Generovanie a potvrdenie forecastu",
+        flags: ["canWritePlanVyroby"],
+      },
+      {
+        kind: "bin",
+        label: "Daylog",
+        desc: "Denný záznam progressu",
+        flags: ["canAccessDaylog"],
+      },
     ],
   },
   {
-    title: "Analytika & správa",
+    title: "Modul výroba",
+    icon: { bg: "#FAEEDA", color: "#633806" },
     rows: [
-      { kind: "bin", label: "Analytics", flags: ["canAccessAnalytics"] },
+      {
+        kind: "tri",
+        label: "Modul výroba",
+        desc: "Bundles, QC tracking",
+        write: "canManageProduction",
+      },
+      {
+        kind: "bin",
+        label: "Pouze QC",
+        desc: "Len označenie hotovo / QC",
+        flags: ["canQCOnly"],
+      },
+    ],
+  },
+  {
+    title: "Analytics",
+    icon: { bg: "#EEEDFE", color: "#3C3489" },
+    rows: [
+      {
+        kind: "bin",
+        label: "Analytics",
+        desc: "Projektová analýza, Dílna, Výkaz",
+        flags: ["canAccessAnalytics"],
+      },
+    ],
+  },
+  {
+    title: "Správa osob & Nastavenia",
+    icon: { bg: "#F1EFE8", color: "#5F5E5A" },
+    rows: [
       {
         kind: "tri",
         label: "Správa osob",
-        desc: "Zamestnanci, externisti",
+        desc: "Zamestnanci, externisti, kapacita",
         write: "canManagePeople",
       },
       { kind: "bin", label: "Externisti", flags: ["canManageExternisti"] },
-      { kind: "bin", label: "Nastavenia", flags: ["canAccessSettings"] },
-      { kind: "bin", label: "Správa uživatelů", flags: ["canManageUsers"] },
+      {
+        kind: "bin",
+        label: "Oprávnění",
+        desc: "Správa rolí a oprávnení",
+        flags: ["canManageUsers"],
+      },
+      {
+        kind: "bin",
+        label: "Nastavenia",
+        desc: "Číselníky, kurzy, réžia, statusy",
+        flags: ["canAccessSettings"],
+      },
     ],
   },
 ];
@@ -544,7 +609,20 @@ export function OsobyOpravneni() {
           {/* Permissions */}
           {GROUPS.map((g) => (
             <section key={g.title}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 pb-1.5 border-b border-border/40">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 pb-1.5 border-b border-border/40 flex items-center gap-2">
+                {g.icon && (
+                  <span
+                    aria-hidden
+                    className="inline-block"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 4,
+                      background: g.icon.bg,
+                      color: g.icon.color,
+                    }}
+                  />
+                )}
                 {g.title}
               </h3>
               <div className="divide-y divide-border/40">
@@ -689,7 +767,7 @@ function TriToggle({
         variant="neutral"
         onClick={() => onChange("none")}
       >
-        –
+        Ne
       </SegBtn>
       <SegBtn
         selected={value === "read"}
@@ -723,7 +801,7 @@ function BinToggle({
         variant="neutral"
         onClick={() => onChange(false)}
       >
-        –
+        Ne
       </SegBtn>
       <SegBtn
         selected={value}
