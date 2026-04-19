@@ -276,6 +276,110 @@ export async function midflightImportPlanVyroby(
     }
   }
 
+  // ━━━ INBOX RECONCILIATION (per project) ━━━
+  // Bundle = project: midflight (N weeks) + pending inbox (M items) → split_total = N+M.
+  // Inbox items: shared split_group_id (= firstBundleId), split_part = N+1..N+M,
+  // estimated_hours redistributed proportionally to estimated_czk so
+  // Σ inbox + Σ midflight = hodiny_plan exactly. Items are never deleted.
+  onProgress?.("[midflight] Dorovnávam Inbox per projekt...");
+
+  const projectIds = [...projectWeeklyHours.keys()];
+  if (projectIds.length > 0) {
+    const { data: planRows } = await (supabaseClient as any)
+      .from("project_plan_hours")
+      .select("project_id, hodiny_plan")
+      .in("project_id", projectIds);
+    const planMap = new Map<string, number>();
+    for (const r of planRows || []) planMap.set(r.project_id, Number(r.hodiny_plan) || 0);
+
+    const { data: inboxRows } = await (supabaseClient as any)
+      .from("production_inbox")
+      .select("id, project_id, estimated_czk, sent_at")
+      .in("project_id", projectIds)
+      .eq("status", "pending")
+      .order("sent_at", { ascending: true });
+
+    const { data: mfRows } = await (supabaseClient as any)
+      .from("production_schedule")
+      .select("id, project_id, split_group_id")
+      .eq("is_midflight", true)
+      .in("project_id", projectIds);
+
+    const inboxByProject = new Map<string, any[]>();
+    for (const r of inboxRows || []) {
+      if (!inboxByProject.has(r.project_id)) inboxByProject.set(r.project_id, []);
+      inboxByProject.get(r.project_id)!.push(r);
+    }
+    const mfByProject = new Map<string, any[]>();
+    for (const r of mfRows || []) {
+      if (!mfByProject.has(r.project_id)) mfByProject.set(r.project_id, []);
+      mfByProject.get(r.project_id)!.push(r);
+    }
+
+    for (const projectId of projectIds) {
+      const mfList = mfByProject.get(projectId) || [];
+      const inboxList = inboxByProject.get(projectId) || [];
+      if (mfList.length === 0) continue;
+
+      const head = mfList.find((r) => !r.split_group_id) || mfList[0];
+      const firstBundleId: string = head.id;
+      const N = mfList.length;
+      const M = inboxList.length;
+      const newTotal = N + M;
+
+      const { error: mfUpdErr } = await (supabaseClient as any)
+        .from("production_schedule")
+        .update({ split_total: newTotal })
+        .eq("is_midflight", true)
+        .eq("project_id", projectId);
+      if (mfUpdErr) errors.push(`MF split_total update (${projectId}): ${mfUpdErr.message}`);
+
+      if (M === 0) continue;
+
+      const hodinyPlan = planMap.get(projectId) || 0;
+      const mfHours = [...projectWeeklyHours.get(projectId)!.values()].reduce((a, b) => a + b, 0);
+      const inboxRemainder = Math.max(0, hodinyPlan - mfHours);
+      const totalCzk = inboxList.reduce((s, r) => s + (Number(r.estimated_czk) || 0), 0);
+
+      const perItem: { id: string; hours: number }[] = [];
+      let allocated = 0;
+      for (let i = 0; i < inboxList.length; i++) {
+        const r = inboxList[i];
+        const isLast = i === inboxList.length - 1;
+        let h: number;
+        if (isLast) {
+          h = Math.max(0, Math.round((inboxRemainder - allocated) * 10) / 10);
+        } else if (inboxRemainder === 0) {
+          h = 0;
+        } else if (totalCzk > 0) {
+          const share = (Number(r.estimated_czk) || 0) / totalCzk;
+          h = Math.round(inboxRemainder * share * 10) / 10;
+        } else {
+          h = Math.round((inboxRemainder / inboxList.length) * 10) / 10;
+        }
+        allocated += h;
+        perItem.push({ id: r.id, hours: h });
+      }
+
+      for (let i = 0; i < perItem.length; i++) {
+        const { id, hours } = perItem[i];
+        const { error: upErr } = await (supabaseClient as any)
+          .from("production_inbox")
+          .update({
+            estimated_hours: hours,
+            split_group_id: firstBundleId,
+            split_part: N + i + 1,
+            split_total: newTotal,
+          })
+          .eq("id", id);
+        if (upErr) errors.push(`Inbox update ${id}: ${upErr.message}`);
+      }
+
+      onProgress?.(`[midflight] ${projectId}: Inbox ${M}p dorovnaný (${inboxRemainder}h, ${N + 1}..${newTotal}/${newTotal})`);
+    }
+  }
+  // ━━━ END INBOX RECONCILIATION ━━━
+
   // ━━━ Expedice/Dokončeno markers (isolated to production_expedice with is_midflight=true) ━━━
   const expediceMarkerStatuses = new Set(["expedice", "montáž", "dokončeno", "fakturace"]);
   const activeExpediceStatuses = new Set(["expedice", "montáž"]);
