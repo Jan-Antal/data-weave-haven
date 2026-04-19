@@ -789,8 +789,8 @@ export function VykazReport() {
                         const total = (item.projekty || 0) + (item.rezije || 0) + (item.nesparovane || 0);
                         const rows: Array<{ key: string; name: string; value: number; color: string }> = [
                           { key: "projekty", name: "Projekty", value: item.projekty || 0, color: "hsl(var(--primary))" },
-                          { key: "rezije", name: "Režie", value: item.rezije || 0, color: "hsl(var(--accent))" },
-                          { key: "nesparovane", name: "Nespárované", value: item.nesparovane || 0, color: "hsl(var(--muted-foreground))" },
+                          { key: "rezije", name: "Režie", value: item.rezije || 0, color: "hsl(var(--primary) / 0.55)" },
+                          { key: "nesparovane", name: "Nespárované", value: item.nesparovane || 0, color: "hsl(var(--accent))" },
                         ];
                         return (
                           <div className="rounded-lg border bg-background px-2.5 py-1.5 shadow-md" style={{ fontSize: 12 }}>
