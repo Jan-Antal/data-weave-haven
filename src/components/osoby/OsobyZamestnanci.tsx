@@ -116,6 +116,14 @@ export function OsobyZamestnanci() {
   const [absenceFor, setAbsenceFor] = useState<EmployeeRow | null>(null);
   const [terminateFor, setTerminateFor] = useState<{ id: string; name: string } | null>(null);
   const [deleteFor, setDeleteFor] = useState<{ id: string; name: string } | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapsed = (key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const usekOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -589,6 +597,7 @@ export function OsobyZamestnanci() {
                   })}
                 </TableBody>
               </Table>
+              )}
             </section>
           );
         })}
