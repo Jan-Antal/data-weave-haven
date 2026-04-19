@@ -7,6 +7,7 @@ export interface ProductionSettings {
   monthly_capacity_hours: number;
   hourly_rate: number;
   utilization_pct: number;
+  default_margin_pct: number;
   updated_at: string;
   updated_by: string | null;
 }
@@ -29,7 +30,7 @@ export function useProductionSettings() {
 export function useUpdateProductionSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (updates: Partial<Pick<ProductionSettings, "weekly_capacity_hours" | "monthly_capacity_hours" | "hourly_rate" | "utilization_pct">>) => {
+    mutationFn: async (updates: Partial<Pick<ProductionSettings, "weekly_capacity_hours" | "monthly_capacity_hours" | "hourly_rate" | "utilization_pct" | "default_margin_pct">>) => {
       const { data: settings } = await supabase
         .from("production_settings")
         .select("id")

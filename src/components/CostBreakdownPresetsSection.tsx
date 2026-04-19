@@ -163,11 +163,11 @@ export function CostBreakdownPresetsSection({ readOnly = false }: { readOnly?: b
   const updateSettings = useUpdateProductionSettings();
 
   const [hourlyRate, setHourlyRate] = useState<string>("");
-  const [monthlyCapacity, setMonthlyCapacity] = useState<string>("");
+  const [defaultMargin, setDefaultMargin] = useState<string>("");
 
   // Sync from settings
   const rateVal = hourlyRate || String(settings?.hourly_rate ?? 550);
-  const capVal = monthlyCapacity || String(settings?.monthly_capacity_hours ?? 3500);
+  const marginVal = defaultMargin || String(settings?.default_margin_pct ?? 15);
 
   const handleAddPreset = () => {
     upsertPreset.mutate(
@@ -191,7 +191,7 @@ export function CostBreakdownPresetsSection({ readOnly = false }: { readOnly?: b
     setDefaultPreset.mutate(id);
   };
 
-  const handleSaveSettings = (field: "hourly_rate" | "monthly_capacity_hours", value: string) => {
+  const handleSaveSettings = (field: "hourly_rate" | "monthly_capacity_hours" | "default_margin_pct", value: string) => {
     const num = parseFloat(value);
     if (!isNaN(num) && num > 0) {
       updateSettings.mutate({ [field]: num });
@@ -219,17 +219,18 @@ export function CostBreakdownPresetsSection({ readOnly = false }: { readOnly?: b
           </div>
         </div>
         <div>
-          <Label className="text-xs">Měsíční kapacita</Label>
+          <Label className="text-xs">Výchozí marže</Label>
           <div className="relative">
             <Input
               type="number"
+              step="0.1"
               className="h-8 text-sm pr-6 no-spinners"
-              value={capVal}
-              onChange={(e) => setMonthlyCapacity(e.target.value)}
-              onBlur={() => handleSaveSettings("monthly_capacity_hours", capVal)}
+              value={marginVal}
+              onChange={(e) => setDefaultMargin(e.target.value)}
+              onBlur={() => handleSaveSettings("default_margin_pct", marginVal)}
               disabled={readOnly}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">h</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">%</span>
           </div>
         </div>
       </div>
