@@ -735,10 +735,10 @@ function SegBtn({
 }) {
   const styles = selected
     ? variant === "read"
-      ? "bg-[#E6F1FB] text-[#0C447C] border-[#85B7EB]"
+      ? "bg-[#FFF1E0] text-[#9A4A00] border-[#F4B66A]"
       : variant === "write"
       ? "bg-[#EAF3DE] text-[#27500A] border-[#97C459]"
-      : "bg-background text-foreground border-border"
+      : "bg-[#FDECEC] text-[#B42318] border-[#F4A6A0]"
     : "bg-transparent text-muted-foreground border-transparent hover:text-foreground";
   return (
     <button
