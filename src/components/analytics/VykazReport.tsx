@@ -308,6 +308,31 @@ export function VykazReport() {
     };
   }, [logs, projectsMap, overheadMap]);
 
+  // ── Holidays for non-working highlight ──────────────────────────
+  const fromYear = useMemo(() => new Date(from + "T00:00:00").getFullYear(), [from]);
+  const toYear = useMemo(() => new Date(to + "T00:00:00").getFullYear(), [to]);
+  const { data: holidaysY1 } = useCzechHolidays(fromYear);
+  const { data: holidaysY2 } = useCzechHolidays(toYear);
+  const { data: companyHolidays } = useCompanyHolidays();
+
+  const holidayMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const h of holidaysY1 || []) m.set(h.date, h.localName);
+    if (toYear !== fromYear) for (const h of holidaysY2 || []) m.set(h.date, h.localName);
+    return m;
+  }, [holidaysY1, holidaysY2, fromYear, toYear]);
+
+  const findCompanyHoliday = useCallback(
+    (dateStr: string): string | null => {
+      if (!companyHolidays) return null;
+      for (const ch of companyHolidays) {
+        if (dateStr >= ch.start_date && dateStr <= ch.end_date) return ch.name;
+      }
+      return null;
+    },
+    [companyHolidays],
+  );
+
   // ── Chart data (hours per day/week) ─────────────────────────────
   const { chartData, effectiveBucket } = useMemo(() => {
     const fromD = new Date(from + "T00:00:00");
@@ -329,7 +354,14 @@ export function VykazReport() {
       return { year: date.getUTCFullYear(), week, monday };
     };
 
-    const buckets = new Map<string, { label: string; sortKey: string; hodiny: number }>();
+    type Bucket = {
+      label: string;
+      sortKey: string;
+      hodiny: number;
+      isNonWorking: boolean;
+      nonWorkingLabel?: string;
+    };
+    const buckets = new Map<string, Bucket>();
 
     if (eff === "day") {
       for (let i = 0; i < spanDays; i++) {
@@ -337,7 +369,24 @@ export function VykazReport() {
         d.setDate(fromD.getDate() + i);
         const key = toLocalDateStr(d);
         const label = `${d.getDate()}.${d.getMonth() + 1}.`;
-        buckets.set(key, { label, sortKey: key, hodiny: 0 });
+        const dow = d.getDay();
+        const isWeekend = dow === 0 || dow === 6;
+        const stateHoliday = holidayMap.get(key);
+        const companyHol = findCompanyHoliday(key);
+        const nonWorkingLabel = companyHol
+          ? `Firemní volno: ${companyHol}`
+          : stateHoliday
+          ? stateHoliday
+          : isWeekend
+          ? "Víkend"
+          : undefined;
+        buckets.set(key, {
+          label,
+          sortKey: key,
+          hodiny: 0,
+          isNonWorking: !!nonWorkingLabel,
+          nonWorkingLabel,
+        });
       }
       for (const r of logs) {
         const b = buckets.get(r.datum_sync);
@@ -349,7 +398,12 @@ export function VykazReport() {
         const { year, week, monday } = isoWeek(cursor);
         const key = `${year}-W${String(week).padStart(2, "0")}`;
         if (!buckets.has(key)) {
-          buckets.set(key, { label: `T${week}`, sortKey: toLocalDateStr(monday), hodiny: 0 });
+          buckets.set(key, {
+            label: `T${week}`,
+            sortKey: toLocalDateStr(monday),
+            hodiny: 0,
+            isNonWorking: false,
+          });
         }
         cursor.setDate(cursor.getDate() + 1);
       }
@@ -363,8 +417,16 @@ export function VykazReport() {
     }
 
     const arr = Array.from(buckets.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-    return { chartData: arr.map(({ label, hodiny }) => ({ label, hodiny: Math.round(hodiny * 10) / 10 })), effectiveBucket: eff };
-  }, [logs, from, to, bucketMode]);
+    return {
+      chartData: arr.map(({ label, hodiny, isNonWorking, nonWorkingLabel }) => ({
+        label,
+        hodiny: Math.round(hodiny * 10) / 10,
+        isNonWorking,
+        nonWorkingLabel,
+      })),
+      effectiveBucket: eff,
+    };
+  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday]);
 
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
