@@ -557,6 +557,7 @@ export function VykazReport() {
                   mode="range"
                   numberOfMonths={2}
                   weekStartsOn={1}
+                  showOutsideDays={false}
                   defaultMonth={new Date(from + "T00:00:00")}
                   selected={{
                     from: new Date(from + "T00:00:00"),
