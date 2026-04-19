@@ -74,6 +74,7 @@ export function VykazReport() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [bucketMode, setBucketMode] = useState<"auto" | "day" | "week">("auto");
 
   const { from, to } = useMemo(
     () => getRangeBounds(dateRange, customFrom, customTo),
