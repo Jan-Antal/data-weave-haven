@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/currency";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 import { getProjectColor } from "@/lib/projectColors";
 import type { ProductionStatus } from "@/hooks/useProductionStatuses";
+import type { ProjectStage } from "@/hooks/useProjectStages";
 
 interface TPVItem {
   id: string;
@@ -22,6 +23,7 @@ interface TPVItem {
   sent_date: string | null;
   accepted_date: string | null;
   custom_fields: any;
+  stage_id?: string | null;
 }
 
 interface MobileTPVCardListProps {
@@ -30,6 +32,7 @@ interface MobileTPVCardListProps {
   projectName: string;
   currency: string;
   productionStatusMap: Map<string, ProductionStatus[]>;
+  stages?: ProjectStage[];
   onBack: () => void;
   onOpenDetail: () => void;
   onAddItem: (name: string) => void;
@@ -43,6 +46,7 @@ export function MobileTPVCardList({
   projectName,
   currency,
   productionStatusMap,
+  stages = [],
   onBack,
   onOpenDetail,
   onAddItem,
@@ -121,6 +125,8 @@ export function MobileTPVCardList({
             const isExpanded = expandedId === item.id;
             const vyrobaStatuses = productionStatusMap.get(item.item_code || item.nazev || "") || [];
             const vyrobaLabel = vyrobaStatuses[0]?.label || "";
+            const stage = item.stage_id ? stages.find(s => s.id === item.stage_id) : null;
+            const stageLabel = stage ? (stage.display_name || stage.stage_name) : "";
 
             return (
               <button
@@ -160,6 +166,9 @@ export function MobileTPVCardList({
                     {vyrobaLabel && (
                       <Badge variant="secondary" className="text-[10px] h-5">{vyrobaLabel}</Badge>
                     )}
+                    {stageLabel && (
+                      <Badge variant="outline" className="text-[10px] h-5 border-primary/40 text-primary">{stageLabel}</Badge>
+                    )}
                   </div>
                 </div>
 
@@ -194,6 +203,12 @@ export function MobileTPVCardList({
                       <div>
                         <span className="text-[10px] text-muted-foreground uppercase">Výroba</span>
                         <Badge variant="secondary" className="text-[10px] h-5 ml-1">{vyrobaLabel}</Badge>
+                      </div>
+                    )}
+                    {stageLabel && (
+                      <div>
+                        <span className="text-[10px] text-muted-foreground uppercase">Etapa</span>
+                        <Badge variant="outline" className="text-[10px] h-5 ml-1 border-primary/40 text-primary">{stageLabel}</Badge>
                       </div>
                     )}
                   </div>

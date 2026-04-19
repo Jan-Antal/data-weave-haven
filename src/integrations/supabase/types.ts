@@ -1565,6 +1565,7 @@ export type Database = {
           popis: string | null
           project_id: string
           sent_date: string | null
+          stage_id: string | null
           status: string | null
           updated_at: string
         }
@@ -1587,6 +1588,7 @@ export type Database = {
           popis?: string | null
           project_id: string
           sent_date?: string | null
+          stage_id?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -1609,6 +1611,7 @@ export type Database = {
           popis?: string | null
           project_id?: string
           sent_date?: string | null
+          stage_id?: string | null
           status?: string | null
           updated_at?: string
         }

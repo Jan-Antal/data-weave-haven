@@ -43,6 +43,7 @@ import { logActivity } from "@/lib/activityLog";
 import { TPVExtractor } from "./assistant/TPVExtractor";
 import { useCNDiff } from "@/hooks/useCNDiff";
 import { CNDiffDialog } from "./CNDiffDialog";
+import { useProjectStages } from "@/hooks/useProjectStages";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_code", label: "Kód prvku" },
@@ -51,6 +52,7 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultH
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
   { key: "vyroba_status", label: "Výroba" },
+  { key: "stage_id", label: "Etapa", defaultHidden: true },
   { key: "sent_date", label: "Odesláno" },
   { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
@@ -78,6 +80,8 @@ function getTPVListColumnStyle(key: string, customWidth?: number | null): React.
     case "status":
       return { minWidth: 140 };
     case "vyroba_status":
+      return { minWidth: 140, maxWidth: 200 };
+    case "stage_id":
       return { minWidth: 140, maxWidth: 200 };
     case "konstrukter":
       return {
@@ -119,6 +123,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map((o) => o.label);
   const { data: allProjects = [] } = useProjects();
+  const { data: projectStages = [] } = useProjectStages(projectId);
   const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
   const [extractorOpen, setExtractorOpen] = useState(false);
@@ -167,12 +172,18 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
     () => new Set(TPV_LIST_COLUMNS.filter((c) => c.defaultHidden).map((c) => c.key)),
     [],
   );
+  const hasMultipleStages = projectStages.length >= 2;
   const isColVisible = useCallback(
     (key: string) => {
+      // Etapa: auto-show only when project has 2+ stages (still respects explicit user toggle)
+      if (key === "stage_id") {
+        if (visMap[key] === undefined) return hasMultipleStages;
+        return visMap[key] !== false;
+      }
       if (visMap[key] === undefined) return !DEFAULT_HIDDEN_KEYS.has(key);
       return visMap[key] !== false;
     },
-    [visMap, DEFAULT_HIDDEN_KEYS],
+    [visMap, DEFAULT_HIDDEN_KEYS, hasMultipleStages],
   );
   const toggleColVis = useCallback(
     (key: string) => {
@@ -662,6 +673,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               if (!statuses || statuses.length === 0) return "Neodesláno";
               return statuses.map((s: any) => s.label).join(", ");
             }
+            if (k === "stage_id") {
+              const sid = (item as any).stage_id;
+              if (!sid) return "";
+              const st = projectStages.find((s) => s.id === sid);
+              return st ? (st.display_name || st.stage_name) : "";
+            }
             if (k === "cena") return (item as any).cena != null ? Number((item as any).cena) : "";
             if (k.startsWith("custom_")) {
               const cf = (item as any).custom_fields || {};
@@ -678,7 +695,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       ],
       defaultVisibleKeys: renderKeys,
     }),
-    [renderKeys, sortedItems, getLabel, productionStatusMap, currency],
+    [renderKeys, sortedItems, getLabel, productionStatusMap, projectStages],
   );
 
   useEffect(() => {
@@ -699,6 +716,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           projectName={projectName}
           currency={currency}
           productionStatusMap={productionStatusMap}
+          stages={projectStages}
           onBack={onBack}
           onOpenDetail={() => setDetailOpen(true)}
           onAddItem={(name) => addItem.mutate({ project_id: projectId, item_code: name })}
@@ -983,6 +1001,27 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                                 </span>
                               )}
                             </div>
+                          </TableCell>
+                        );
+                      }
+                      if (key === "stage_id") {
+                        const sid = (item as any).stage_id || "";
+                        const stageOptions = projectStages.map((s) => s.display_name || s.stage_name);
+                        const idByLabel = new Map(projectStages.map((s) => [s.display_name || s.stage_name, s.id]));
+                        const labelById = new Map(projectStages.map((s) => [s.id, s.display_name || s.stage_name]));
+                        const currentLabel = sid ? (labelById.get(sid) || "") : "";
+                        return (
+                          <TableCell key={key} style={cellStyle}>
+                            <InlineEditableCell
+                              value={currentLabel}
+                              type="select"
+                              options={stageOptions}
+                              onSave={(v) => {
+                                const newId = v ? (idByLabel.get(v) || null) : null;
+                                saveField(item.id, "stage_id", newId, sid);
+                              }}
+                              readOnly={!canManageTPV || projectStages.length === 0}
+                            />
                           </TableCell>
                         );
                       }
