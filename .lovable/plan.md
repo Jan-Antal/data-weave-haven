@@ -1,61 +1,81 @@
 
-## Plán: Sjednocení osob přes ami_employees + people (cache)
+Cíl: opravit výpočet kapacit v záložce Kapacita tak, aby správně zohledňoval absence, aktivaci/deaktivaci zaměstnanců a aby „Složení výrobní kapacity“ ukazovalo skutečně dostupné lidi a hodiny pro vybraný týden.
 
-### Stav DB (zjištěno)
-- `people`: 19 řádků (15 employee, 4 external), booly `is_pm/is_kalkulant/is_konstrukter` existují a částečně vyplněné. **`employee_id` je všude NULL** → interní nejsou linkované.
-- `ami_employees`: **chybí** `is_pm/is_kalkulant/is_konstrukter`.
-- `is_external` v `people` je nekonzistentní (ignorovat, autoritativní je `source`).
+1. Co jsem ověřil
+- V DB je pro T16/2026 v `production_capacity` uložené:
+  - `capacity_hours = 830`
+  - `absence_days = 0`
+  - `total_employees = 26`
+  - `usek_breakdown.Kompletace = 580`
+- Ale v `ami_absences` pro týden 13. 4. – 17. 4. 2026 reálně jsou absence:
+  - Kompletace: 2 lidi celý týden off (`RD`, `NEM`) + další dovolená
+  - Lakovna: 1 člověk celý týden `NEM`
+  - Strojová dílna: 1 člověk celý týden `NEM` + další dny `DOV`
+  - další absence i v jiných úsecích
+- To potvrzuje, že současný výpočet je špatně a user report je validní.
 
-### Krok 1 — DB schema migrace
-```sql
-ALTER TABLE ami_employees
-  ADD COLUMN is_pm BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN is_kalkulant BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN is_konstrukter BOOLEAN NOT NULL DEFAULT false;
+2. Hlavní root cause
+- Kritická chyba je v práci s `week_start`:
+  - `useWeeklyCapacity.ts` ukládá `week_start` přes `toISOString().split("T")[0]`
+  - v CZ timezone se Monday posouvá na Sunday
+  - takže např. T16 je v DB `2026-04-12`, ale absence jsou agregované na Monday key `2026-04-13`
+  - výsledok: `absMap.get(weekStart)` vrací 0 a absence sa vôbec neodčítajú
+- Druhá chyba:
+  - `getActiveWorkingDays()` řeší jen `deactivated_at`, ignoruje `activated_at` a `deactivated_date`
+- Třetí chyba:
+  - breakdown tabulka i `usek_breakdown` počítají hrubé hodiny na zaměstnance, ne netto po absencích
+  - proto dnes vidíš Kompletace 15/15 místo očekávaných 13/15
 
--- partial unique index na linkage
-CREATE UNIQUE INDEX IF NOT EXISTS people_employee_id_unique
-  ON people(employee_id) WHERE employee_id IS NOT NULL;
-```
-(`source`, `employee_id`, `is_pm/is_kalkulant/is_konstrukter` v `people` už existují.)
+3. Implementační plán
+- `src/hooks/useWeeklyCapacity.ts`
+  - nahradit všechny UTC/ISO převody lokálním date helperem
+  - sjednotit generování `week_start` na lokální pondělí
+  - tím se opraví match mezi `production_capacity.week_start` a absencemi
+- `src/hooks/useCapacityCalc.ts`
+  - rozšířit logiku aktivity zaměstnance:
+    - zohlednit `activated_at`
+    - zohlednit `deactivated_at` i `deactivated_date`
+  - místo pouhého týdenního součtu absencí připravit per-employee/per-week absence mapu
+  - přepočet dělat na úrovni jednotlivého člověka:
+    - brutto hodiny týdne
+    - mínus absence konkrétního zaměstnance
+    - netto hodiny zaměstnance pro daný týden
+  - `computeWeekCapacity()` upravit tak, aby:
+    - `byUsek` bylo netto po absencích
+    - `totalEmployees` znamenalo skutečně dostupné lidi v týdnu (hodiny > 0)
+    - absence nešla jen globálně odečtem na konci
+- `src/components/production/CapacitySettings.tsx`
+  - summary cards navázat na nový jednotný per-week výpočet
+  - „Složení výrobní kapacity“ přepnout na netto data:
+    - Kompletace v T16 má ukázat 13/15, ne 15/15
+    - zaměstnanec s celotýdenní `NEM`/`RD` nebude počítaný jako aktivní
+    - částečné absence sníží hodiny, ale člověk zůstane viditelný
+  - tooltipy barů a live graf brát ze stejného zdroje pravdy
+  - `absence_days` už nepočítat přes hrubé `hours / 8`, ale z reálných absence rows / person-days
+- Persistovaná data
+  - po opravě výpočtu přegenerovat uložené řádky v `production_capacity`, hlavně:
+    - `week_start`
+    - `capacity_hours`
+    - `absence_days`
+    - `total_employees`
+    - `usek_breakdown`
 
-### Krok 2 — Data backfill (insert tool)
-1. **Sjednotit `is_external` s `source`**: `UPDATE people SET is_external = (source='external')`.
-2. **Auto-populate flagů na `ami_employees`** podle úseku (jen kde flag ještě není nastaven):
-   - `usek_nazov='Project Management'` → `is_pm=true`
-   - `usek_nazov IN ('Konstrukce/TPV')` → `is_konstrukter=true`
-   - `usek_nazov IN ('Obchod/Kalkulace')` → `is_kalkulant=true`
-3. **Linkovat existující `people(source='employee')` → `ami_employees`** přes match podle jména (case/diakritika tolerant). Sync flagů z `people` do `ami_employees` (pokud má řádek v people flag, má ho i ami_employees).
-4. **Doplnit chybějící cache řádky**: pro každého `ami_employees` který má aspoň jeden flag a nemá řádek v `people`, vytvořit (`source='employee'`, `employee_id`, `name=meno`, příslušné flagy, `is_active=aktivny`).
+4. Co se nebude měnit
+- UI struktura tabu Kapacita
+- manuální override sekce
+- navigace grafu
+- scope zůstává jen `Výroba Direct` a členění po `usek_nazov`
 
-### Krok 3 — UI změny
+5. Očekávaný výsledok po opravě
+- graf už nebude „flat 830“, ale sníží se v týdnech s absencemi
+- T16 bude mít správně odečtené NEM/RD/DOV
+- summary cards nahoře budou odpovídat vybranému týdnu
+- breakdown tabulka bude ukazovat skutečně dostupné lidi a hodiny po úsecích
+- uložené hodnoty v `production_capacity` budou konečně konzistentní s absencemi
 
-**3a. `src/components/osoby/OsobyZamestnanci.tsx`**
-- Přidat sloupec **„Role na projektu"** se 3 inline checkboxy (PM / Kalkulant / Konštruktér).
-- Toggle: update `ami_employees` flagu + upsert `people` (klíč `employee_id`):
-  - Aspoň 1 flag true → `is_active=true`, sync flagů, `name=meno`, `source='employee'`.
-  - Všechny false → `is_active=false` (řádek zachovat).
-
-**3b. `src/components/osoby/OsobyExternisti.tsx`**
-- Stávající `Select` role nahradit **multi-select popoverem** s checkboxy: PM / Kalkulant / Konštruktér / Architekt.
-- PM/Kalk/Konst → booly. Architekt → uložit `'Architekt'` do existujícího `role` sloupce.
-- Display: čip s aktivními rolemi (např. „PM, Architekt").
-
-**3c. `src/hooks/usePeople.ts`**
-- Přepsat `usePeople(role)` aby filtroval podle bool sloupců místo `role` stringu:
-  - `"PM"` → `is_pm=true`, `"Konstruktér"` → `is_konstrukter=true`, `"Kalkulant"` → `is_kalkulant=true`
-- Číst pouze z `people` kde `is_active=true`. Odstranit merge logiku přes `position_catalogue` + `ami_employees` (cache už drží sync).
-- `useAllPeople`/`useAllPeopleIncludingInactive` beze změny.
-
-**3d. `UserManagement.tsx` (Uživatelé)**
-- Žádná změna — už čte `people` kde `is_active=true`.
-
-### Co NEMĚNIT
-`user_roles`, auth, ostatní stránky, legacy `PeopleManagement` modal, `position_catalogue`, `role` string sloupec v `people` (zůstává pro Architekta).
-
-### Soubory
-- 1× schema migrace
-- 1× data backfill (insert tool, 4 SQL bloky)
-- `src/components/osoby/OsobyZamestnanci.tsx`
-- `src/components/osoby/OsobyExternisti.tsx`
-- `src/hooks/usePeople.ts`
+6. Technické detaily
+- Největší bug není v samotné DB absencí, ale v nesouladu klíčů týdne:
+  - DB capacity: Sunday key
+  - absence map: Monday key
+- Bez opravy `week_start` budou absence dál mizet i kdyby byla zbylá logika správná.
+- Nepředpokládám novou tabulku ani schema změnu; stačí oprava výpočtu + přepočet existujících řádků.
