@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 import { formatAppDate } from "@/lib/dateFormat";
 
-type DateRange = "week" | "month" | "3months" | "custom";
+type DateRange = "week" | "month" | "prev_week" | "prev_month" | "3months" | "custom";
 type GroupBy = "projekt" | "osoba" | "cinnost";
 
 const EXCLUDED_CINNOST = new Set(["TPV", "ENG", "PRO"]);
@@ -75,18 +75,22 @@ function getRangeBounds(
   }
   let start: Date;
   let end: Date = now;
-  if (range === "week") {
+  if (range === "week" || range === "prev_week") {
     const day = now.getDay();
     const diff = day === 0 ? 6 : day - 1;
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
     end = addDays(start, 6);
-    if (offset !== 0) {
-      start = addDays(start, offset * 7);
-      end = addDays(end, offset * 7);
+    const baseOffset = range === "prev_week" ? -1 : 0;
+    const total = baseOffset + offset;
+    if (total !== 0) {
+      start = addDays(start, total * 7);
+      end = addDays(end, total * 7);
     }
-  } else if (range === "month") {
-    start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  } else if (range === "month" || range === "prev_month") {
+    const baseOffset = range === "prev_month" ? -1 : 0;
+    const total = baseOffset + offset;
+    start = new Date(now.getFullYear(), now.getMonth() + total, 1);
+    end = new Date(now.getFullYear(), now.getMonth() + total + 1, 0);
   } else {
     start = new Date(now.getFullYear(), now.getMonth() - 3 + offset * 3, now.getDate());
     end = offset === 0 ? now : addMonths(start, 3);
