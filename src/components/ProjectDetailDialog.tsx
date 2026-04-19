@@ -1663,7 +1663,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     files={files}
                                     maxHeight="260px"
                                     canDelete={canUploadDocuments}
-                                    onDelete={(f) => { handleDeleteFile("fotky", f.name); }}
+                                    onDelete={(f) => setDeletingFile({ categoryKey: "fotky", fileName: f.name })}
                                     onOpenLightbox={(index) => {
                                       const imageFiles = files.filter((f) => isImageFile(f.name));
                                       if (imageFiles[index]) {
@@ -1685,6 +1685,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       currentCategory="fotky"
                                       onMoveTo={handleSelectionBarMove}
                                       onClear={fileSelection.clearSelection}
+                                      onDeleteSelected={canUploadDocuments ? () => {
+                                        const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
+                                        if (selectedFiles.length > 0) setBulkDeleteConfirm({ categoryKey: "fotky", files: selectedFiles });
+                                      } : undefined}
                                     />
                                   )}
                                   </>
@@ -1695,21 +1699,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     if (e.target === e.currentTarget) fileSelection.clearSelection();
                                   }}>
                                     {files.map((f) => {
-                                      const fileKey = `${cat.key}:${f.name}`;
-                                      const isDeleting = deletingFile === fileKey;
                                       const isFileSelected = fileSelection.isSelected(f.itemId);
                                       const isBeingDragged = fileDragActive && isFileSelected && fileDragSourceCat === cat.key;
-                                      
-                                      if (isDeleting) {
-                                        return (
-                                          <div key={f.name} className="flex items-center gap-2 py-1 px-1 rounded bg-accent/50 text-xs">
-                                            <span className="text-muted-foreground">Smazat soubor?</span>
-                                            <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeletingFile(null)}>Zrušit</button>
-                                            <button type="button" className="text-muted-foreground font-medium hover:underline" onClick={() => handleDeleteFile(cat.key, f.name)}>Smazat</button>
-                                          </div>
-                                        );
-                                      }
-                                      
+
                                       return (
                                         <div
                                           key={f.name}
@@ -1734,7 +1726,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                             }
                                           }}
                                         >
-                                          {/* Selection checkbox */}
+                                          {/* Selection checkbox — always visible if any selection, else on hover */}
                                           {canUploadDocuments && !isMobile && (
                                             <button
                                               type="button"
@@ -1762,10 +1754,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                           {canUploadDocuments && (
                                             <button
                                               type="button"
-                                              className="hidden group-hover:block shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors"
-                                              onClick={(e) => { e.stopPropagation(); setDeletingFile(fileKey); }}
+                                              className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-0.5 -m-0.5 rounded"
+                                              onClick={(e) => { e.stopPropagation(); setDeletingFile({ categoryKey: cat.key, fileName: f.name }); }}
+                                              title="Smazat soubor"
+                                              aria-label="Smazat soubor"
                                             >
-                                              <Trash2 className="h-3.5 w-3.5" />
+                                              <Trash2 className="h-4 w-4" />
                                             </button>
                                           )}
                                         </div>
@@ -1780,6 +1774,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       currentCategory={cat.key}
                                       onMoveTo={handleSelectionBarMove}
                                       onClear={fileSelection.clearSelection}
+                                      onDeleteSelected={canUploadDocuments ? () => {
+                                        const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
+                                        if (selectedFiles.length > 0) setBulkDeleteConfirm({ categoryKey: cat.key, files: selectedFiles });
+                                      } : undefined}
                                     />
                                   )}
                                 </>
