@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { X, MoveRight, Check } from "lucide-react";
+import { X, MoveRight, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { SPFile } from "@/hooks/useSharePointDocs";
