@@ -538,19 +538,20 @@ function ProjektRows({
   onOpenDetail,
 }: {
   grouped: Array<{
-    key: string; projectId: string; projectName: string; matched: boolean;
+    key: string; projectId: string; projectName: string; matched: boolean; isOverhead: boolean;
     hodiny: number; records: number; last: string; rows: LogRow[];
   }>;
   expanded: Set<string>;
   toggleExpand: (k: string) => void;
   onOpenDetail: (id: string) => void;
 }) {
-  const matched = grouped.filter((g) => g.matched);
+  const realProjects = grouped.filter((g) => g.matched && !g.isOverhead);
+  const overheadProjects = grouped.filter((g) => g.isOverhead);
   const unmatched = grouped.filter((g) => !g.matched);
 
   return (
     <>
-      {matched.map((g) => (
+      {realProjects.map((g) => (
         <ProjektRow
           key={g.key}
           g={g}
@@ -559,6 +560,28 @@ function ProjektRows({
           onOpenDetail={onOpenDetail}
         />
       ))}
+      {overheadProjects.length > 0 && (
+        <>
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={6} className="p-0">
+              <div className="bg-secondary border-l-[3px] border-l-primary px-4 py-2 flex items-center gap-2">
+                <span className="font-semibold text-[12px] text-foreground">
+                  Režie · {overheadProjects.length} {overheadProjects.length === 1 ? "projekt" : "projektů"}
+                </span>
+              </div>
+            </TableCell>
+          </TableRow>
+          {overheadProjects.map((g) => (
+            <ProjektRow
+              key={g.key}
+              g={g}
+              expanded={expanded.has(g.key)}
+              onToggle={() => toggleExpand(g.key)}
+              onOpenDetail={onOpenDetail}
+            />
+          ))}
+        </>
+      )}
       {unmatched.length > 0 && (
         <>
           <TableRow className="hover:bg-transparent">
