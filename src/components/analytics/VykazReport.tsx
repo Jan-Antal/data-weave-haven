@@ -655,21 +655,21 @@ function ProjektExpanded({ rows }: { rows: LogRow[] }) {
   }, [rows]);
 
   return (
-    <TableRow className="bg-muted/30 hover:bg-muted/30">
+    <TableRow className="hover:bg-transparent">
       <TableCell colSpan={6} className="p-0">
-        <div className="pl-8 pr-4 py-2 space-y-1">
+        <div className="bg-muted/30 border-l-2 border-border pl-10 pr-4 py-2 space-y-1">
           {byPerson.map(([name, g]) => (
-            <div key={name} className="flex items-center gap-2 text-xs">
-              <span className="font-medium w-40 truncate">{name}</span>
+            <div key={name} className="flex items-center gap-3">
+              <span className="font-medium w-40 truncate text-[13px]">{name}</span>
               <div className="flex-1 flex flex-wrap gap-1">
                 {Array.from(g.cinnosti).map((c) => (
-                  <span key={c} className="px-1.5 py-0.5 rounded bg-background border text-[10px] text-muted-foreground">
+                  <span key={c} className="px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-[11px]">
                     {c}
                   </span>
                 ))}
               </div>
-              <span className="tabular-nums font-medium w-20 text-right">{formatHours(g.hodiny)}</span>
-              <span className="text-muted-foreground tabular-nums w-32 text-right">
+              <span className="tabular-nums font-medium w-20 text-right text-[13px]">{formatHours(g.hodiny)}</span>
+              <span className="text-muted-foreground tabular-nums w-[130px] text-right text-[11px]">
                 {formatDate(g.min)}–{formatDate(g.max)}
               </span>
             </div>
