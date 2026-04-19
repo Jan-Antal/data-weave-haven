@@ -370,34 +370,6 @@ export function VykazReport() {
   // ── Render ──────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
-      {/* Summary cards */}
-      <div className="shrink-0 px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Celkem hodin</div>
-          <div className="text-2xl font-bold mt-1 tabular-nums">{formatHours(summaryStats.totalHours)}</div>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aktivní pracovníci</div>
-          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
-          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
-        </Card>
-        <Card className="p-4 shadow-sm">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
-          <div
-            className={cn(
-              "text-2xl font-bold mt-1 tabular-nums",
-              summaryStats.unmatchedProjects > 0 ? "" : "text-muted-foreground",
-            )}
-            style={summaryStats.unmatchedProjects > 0 ? { color: "#854F0B" } : undefined}
-          >
-            {summaryStats.unmatchedProjects}
-          </div>
-        </Card>
-      </div>
-
       {/* Toolbar */}
       <div className="shrink-0 border-b bg-card px-4 py-2 flex items-center gap-3">
         {/* Left: date range */}
@@ -473,6 +445,106 @@ export function VykazReport() {
             Export CSV
           </Button>
         </div>
+      </div>
+
+      {/* Chart: Hodiny v čase */}
+      <div className="shrink-0 px-4 pt-4">
+        <Card className="p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-sm font-semibold">Hodiny v čase</h3>
+              <span className="text-[11px] text-muted-foreground">
+                {effectiveBucket === "day" ? "per den" : "per týden"}
+              </span>
+            </div>
+            <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
+              {([
+                { key: "auto", label: "Auto" },
+                { key: "day", label: "Den" },
+                { key: "week", label: "Týden" },
+              ] as const).map((opt) => {
+                const active = bucketMode === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    onClick={() => setBucketMode(opt.key)}
+                    className={cn(
+                      "h-6 px-2.5 text-[11px] rounded-md transition-colors",
+                      active
+                        ? "bg-background shadow-sm font-medium text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {chartData.length === 0 || chartData.every((d) => d.hodiny === 0) ? (
+            <div className="h-[180px] flex items-center justify-center text-xs text-muted-foreground">
+              Žádné záznamy v období
+            </div>
+          ) : (
+            <div className="h-[180px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/40" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <RTooltip
+                    cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
+                    contentStyle={{
+                      background: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(value: number) => [formatHours(value), "Hodiny"]}
+                  />
+                  <Bar dataKey="hodiny" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Summary cards */}
+      <div className="shrink-0 px-4 pt-2 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Celkem hodin</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{formatHours(summaryStats.totalHours)}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Aktivní pracovníci</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
+          <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
+        </Card>
+        <Card className="p-4 shadow-sm">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
+          <div
+            className={cn(
+              "text-2xl font-bold mt-1 tabular-nums",
+              summaryStats.unmatchedProjects > 0 ? "" : "text-muted-foreground",
+            )}
+            style={summaryStats.unmatchedProjects > 0 ? { color: "#854F0B" } : undefined}
+          >
+            {summaryStats.unmatchedProjects}
+          </div>
+        </Card>
       </div>
 
       {/* Table */}
