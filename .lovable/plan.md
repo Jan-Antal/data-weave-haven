@@ -1,63 +1,45 @@
 
-## Plán: 3 opravy — chýbajúce dni v grafe, geometria range selekcie, skrytie outside dní
+Plán: Nahradiť pole "Měsíční kapacita" za "Výchozí marže" v Rozpad ceny nastaveniach
 
-### 1) Chýbajúce dni v grafe "Hodiny v čase" — Supabase row cap
+### Kontext
+V sekcii Rozpad ceny (CostBreakdownPresetsSection) sú aktuálne dve polia: **Hodinová sazba** a **Měsíční kapacita**. Pole "Měsíční kapacita" sa nikde reálne nepoužíva pre výpočty plánu hodín — namiesto toho chceme tam mať **Výchozí marže (%)**, ktorú bude `computePlanHours` používať ako fallback keď projekt nemá vlastnú maržu (namiesto hardcoded 15%).
 
-**Príčina**: Query v `useQuery(["vykaz-log", ...])` používa `.range(0, 99999)` ale Supabase REST API má server-side hard cap (typicky 1000 riadkov per request). Pre marec 2026 existuje 1682 riadkov v `production_hours_log` → vráti len prvých 1000 (chronologicky skôr) a posledné dni v mesiaci vypadnú. Rovnaký pattern v každom mesiaci s viac ako ~1000 záznamami.
+### Stav z prerušeného behu
+Posledná migrácia + zmeny boli čiastočne spravené (prerušené užívateľom). Diff ukazuje že migrácia `default_margin_pct numeric NOT NULL DEFAULT 15` na `production_settings` bola nahratá, a `useProductionSettings.ts`, `CostBreakdownPresetsSection.tsx`, `computePlanHours.ts` boli upravené. Treba overiť že všetko sedí a doplniť čo chýba.
 
-**Riešenie**: Stránkované načítanie v cykle (po 1000 riadkov, kým server vráti plný batch), s ORDER BY `datum_sync` aby sa pagination chovala deterministicky.
+### Zmeny
 
-```ts
-// Pseudo-implementácia v queryFn:
-const PAGE = 1000;
-let all: LogRow[] = [];
-let offset = 0;
-while (true) {
-  const { data, error } = await supabase
-    .from("production_hours_log")
-    .select("ami_project_id,zamestnanec,cinnost_kod,cinnost_nazov,hodiny,datum_sync")
-    .gte("datum_sync", from)
-    .lte("datum_sync", to)
-    .order("datum_sync", { ascending: true })
-    .range(offset, offset + PAGE - 1);
-  if (error) throw error;
-  if (!data?.length) break;
-  all = all.concat(data as LogRow[]);
-  if (data.length < PAGE) break;
-  offset += PAGE;
-}
-return all.filter((r) => !r.cinnost_kod || !EXCLUDED_CINNOST.has(r.cinnost_kod));
-```
+**1. DB migrácia** (už hotové podľa diffu):
+- `production_settings.default_margin_pct numeric NOT NULL DEFAULT 15` ✅
 
-### 2) Geometria range selekcie v kalendári (kontinuálny pill)
+**2. `src/hooks/useProductionSettings.ts`**:
+- Pridať `default_margin_pct: number` do interface
+- Povoliť update tohto poľa v mutation
 
-**Súčasný stav** (screenshot 1): každý vybraný deň má vlastný oranžový bubble s roundingom zo všetkých strán → vyzerá ako separátne bunky.
+**3. `src/components/CostBreakdownPresetsSection.tsx`**:
+- Nahradiť pole "Měsíční kapacita" (h) za "Výchozí marže" (%)
+- Label: "Výchozí marže"
+- Suffix: "%", step="0.1"
+- Bind na `settings.default_margin_pct`, save cez `handleSaveSettings("default_margin_pct", value)`
 
-**Cieľ** (screenshot 3 — fialová referencia): súvislá pill-tvarovaná lišta cez celý riadok. Začiatok riadka rounded vľavo, koniec rounded vpravo, stred bez radiusu, jeden súvislý fill.
+**4. `src/lib/computePlanHours.ts`**:
+- Pridať `defaultMarginPct?: number` do `PlanHoursInput`
+- Použiť ho ako fallback namiesto hardcoded `0.15` keď `project.marze` je prázdne/0
+- Konverzia: hodnota >1 → /100 (napr. 15 → 0.15)
 
-**Zmeny v `src/components/ui/calendar.tsx` → `classNames`**:
-- `cell`: pridať `[&:has([aria-selected])]:bg-primary/15` (kontinuálne pozadie cez celú šírku bunky bez gapov medzi dňami) a odstrániť/úpraviť pôvodné `[&:has([aria-selected])]:bg-transparent`
-- `day_range_start`: `bg-primary text-primary-foreground rounded-l-md rounded-r-none`
-- `day_range_end`: `bg-primary text-primary-foreground rounded-r-md rounded-l-none`
-- `day_range_middle`: `bg-transparent text-foreground rounded-none hover:bg-primary/25` (parent `cell` poskytuje fill)
-- `day_selected` (single = `from === to` alebo iba `from`): ponechať `rounded-md bg-primary` — react-day-picker aplikuje `day_selected` aj na single dátum
-- `first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md` — ponechať (zaobľuje okraje riadka keď selekcia pokračuje cez koniec týždňa)
+**5. `src/lib/recalculateProductionHours.ts`**:
+- Načítať `default_margin_pct` zo settings a posielať do `computePlanHours` ako `defaultMarginPct`
 
-⚠️ Toto je shared `ui/calendar.tsx`, ovplyvní aj iné dialogy (PlanDateEditDialog, StageDateEditDialog) — vizuálne zlepšenie konzistentné s brand štýlom.
+**6. Volacie miesta `computePlanHours`** (nájsť všetky):
+- Skontrolovať či sa volá aj inde mimo recalculate (napr. `useAnalytics`, `RozpadCeny`) a doplniť `defaultMarginPct` zo settings
 
-### 3) Skryť outside-month dni v kalendári
-
-**Súčasný stav** (screenshot 1): dni z predchádzajúceho/nasledujúceho mesiaca (napr. "30, 31" v aprílovom paneli pre prev_month=marec) sú zobrazené šedo a niekedy s fill, čo pôsobí chaoticky.
-
-**Cieľ**: outside dni úplne skryť (prázdne bunky), aby každý mesiac mal jasne vymedzený rámec.
-
-**Zmeny len v inštancii `Calendar` v `VykazReport.tsx`** (nie globálne — iné dialogy môžu chcieť outside dni):
-- Pridať prop `showOutsideDays={false}` (DayPicker default je true; náš wrapper ho explicitne odovzdáva, takže `false` zafunguje).
-
-### Súbory
-- `src/components/analytics/VykazReport.tsx` — query pagination + `showOutsideDays={false}` na Calendar
-- `src/components/ui/calendar.tsx` — úpravy `classNames` pre kontinuálny range pill
+### Súbory na overenie / úpravu
+- `src/hooks/useProductionSettings.ts`
+- `src/components/CostBreakdownPresetsSection.tsx`
+- `src/lib/computePlanHours.ts`
+- `src/lib/recalculateProductionHours.ts`
+- ďalšie volacie miesta `computePlanHours` (search)
 
 ### Bez zmien
-- Žiadne zmeny v dátach, RLS, agregácii, exporte, iných sekciách
-- Žiadne nové závislosti
+- `monthly_capacity_hours` zostáva v DB (nemažeme — nepoužívané, ale nech zostane pre prípadné budúce použitie)
+- Žiadne zmeny v RLS, ani v iných UI sekciách
