@@ -189,114 +189,111 @@ export function VykazReport() {
     return (projectsList as any[]).find((p) => p.project_id === detailProjectId) || null;
   }, [detailProjectId, projectsList]);
 
-  // ── Aggregation ─────────────────────────────────────────────────
-  const grouped = useMemo(() => {
-    const q = search ? normalizeSearch(search) : null;
+  // ── Filtered logs (multi-select filters) ────────────────────────
+  const filteredLogs = useMemo(() => {
+    if (!projectFilter && !personFilter && !activityFilter) return logs;
+    return logs.filter((r) =>
+      (!projectFilter || projectFilter.has(r.ami_project_id || "—")) &&
+      (!personFilter || personFilter.has(r.zamestnanec || "—")) &&
+      (!activityFilter || activityFilter.has(r.cinnost_kod || "—")),
+    );
+  }, [logs, projectFilter, personFilter, activityFilter]);
 
-    if (groupBy === "projekt") {
-      const map = new Map<string, {
-        key: string;
-        projectId: string;
-        projectName: string;
-        matched: boolean;
-        isOverhead: boolean;
-        hodiny: number;
-        records: number;
-        last: string;
-        rows: LogRow[];
-      }>();
-      for (const r of logs) {
-        const id = r.ami_project_id || "—";
-        let g = map.get(id);
-        if (!g) {
-          const matchedName = projectsMap.get(id);
-          const overheadLabel = overheadMap.get(id);
-          g = {
-            key: id,
-            projectId: id,
-            projectName: matchedName ?? overheadLabel ?? id,
-            matched: !!matchedName || !!overheadLabel,
-            isOverhead: !!overheadLabel,
-            hodiny: 0,
-            records: 0,
-            last: r.datum_sync,
-            rows: [],
-          };
-          map.set(id, g);
-        }
-        g.hodiny += Number(r.hodiny) || 0;
-        g.records += 1;
-        if (r.datum_sync > g.last) g.last = r.datum_sync;
-        g.rows.push(r);
+  // ── Available filter options (always from raw logs) ─────────────
+  const availableProjects = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; hodiny: number }>();
+    for (const r of logs) {
+      const id = r.ami_project_id || "—";
+      let g = map.get(id);
+      if (!g) {
+        const name = projectsMap.get(id) ?? overheadMap.get(id) ?? id;
+        g = { id, name, hodiny: 0 };
+        map.set(id, g);
       }
-      let arr = Array.from(map.values());
-      if (q) {
-        arr = arr.filter(
-          (g) => normalizedIncludes(g.projectId, q) || normalizedIncludes(g.projectName, q),
-        );
-      }
-      arr.sort((a, b) => b.hodiny - a.hodiny);
-      return arr;
+      g.hodiny += Number(r.hodiny) || 0;
     }
+    return Array.from(map.values()).sort((a, b) => b.hodiny - a.hodiny);
+  }, [logs, projectsMap, overheadMap]);
 
-    if (groupBy === "osoba") {
-      const map = new Map<string, {
-        key: string;
-        zamestnanec: string;
-        hodiny: number;
-        projects: Set<string>;
-        rows: LogRow[];
-      }>();
-      for (const r of logs) {
-        const k = r.zamestnanec || "—";
-        let g = map.get(k);
-        if (!g) {
-          g = { key: k, zamestnanec: k, hodiny: 0, projects: new Set(), rows: [] };
-          map.set(k, g);
-        }
-        g.hodiny += Number(r.hodiny) || 0;
-        g.projects.add(r.ami_project_id);
-        g.rows.push(r);
-      }
-      let arr = Array.from(map.values());
-      if (q) arr = arr.filter((g) => normalizedIncludes(g.zamestnanec, q));
-      arr.sort((a, b) => b.hodiny - a.hodiny);
-      return arr;
+  const availablePersons = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of logs) {
+      const k = r.zamestnanec || "—";
+      map.set(k, (map.get(k) || 0) + (Number(r.hodiny) || 0));
     }
+    return Array.from(map.entries())
+      .map(([name, hodiny]) => ({ name, hodiny }))
+      .sort((a, b) => b.hodiny - a.hodiny);
+  }, [logs]);
 
-    // cinnost
-    const map = new Map<string, {
-      key: string;
-      cinnost_kod: string;
-      cinnost_nazov: string;
-      hodiny: number;
-      rows: LogRow[];
-    }>();
+  const availableActivities = useMemo(() => {
+    const map = new Map<string, { kod: string; nazov: string; hodiny: number }>();
     for (const r of logs) {
       const k = r.cinnost_kod || "—";
       let g = map.get(k);
       if (!g) {
-        g = {
-          key: k,
-          cinnost_kod: k,
-          cinnost_nazov: r.cinnost_nazov ?? "—",
-          hodiny: 0,
-          rows: [],
-        };
+        g = { kod: k, nazov: r.cinnost_nazov ?? "—", hodiny: 0 };
         map.set(k, g);
       }
       g.hodiny += Number(r.hodiny) || 0;
+    }
+    return Array.from(map.values()).sort((a, b) => b.hodiny - a.hodiny);
+  }, [logs]);
+
+  const hasActiveFilter = projectFilter !== null || personFilter !== null || activityFilter !== null;
+  const resetFilters = useCallback(() => {
+    setProjectFilter(null);
+    setPersonFilter(null);
+    setActivityFilter(null);
+  }, []);
+
+  // ── Aggregation (project grouping only) ─────────────────────────
+  const grouped = useMemo(() => {
+    const q = search ? normalizeSearch(search) : null;
+    const map = new Map<string, {
+      key: string;
+      projectId: string;
+      projectName: string;
+      matched: boolean;
+      isOverhead: boolean;
+      hodiny: number;
+      records: number;
+      last: string;
+      rows: LogRow[];
+    }>();
+    for (const r of filteredLogs) {
+      const id = r.ami_project_id || "—";
+      let g = map.get(id);
+      if (!g) {
+        const matchedName = projectsMap.get(id);
+        const overheadLabel = overheadMap.get(id);
+        g = {
+          key: id,
+          projectId: id,
+          projectName: matchedName ?? overheadLabel ?? id,
+          matched: !!matchedName || !!overheadLabel,
+          isOverhead: !!overheadLabel,
+          hodiny: 0,
+          records: 0,
+          last: r.datum_sync,
+          rows: [],
+        };
+        map.set(id, g);
+      }
+      g.hodiny += Number(r.hodiny) || 0;
+      g.records += 1;
+      if (r.datum_sync > g.last) g.last = r.datum_sync;
       g.rows.push(r);
     }
     let arr = Array.from(map.values());
     if (q) {
       arr = arr.filter(
-        (g) => normalizedIncludes(g.cinnost_nazov, q) || normalizedIncludes(g.cinnost_kod, q),
+        (g) => normalizedIncludes(g.projectId, q) || normalizedIncludes(g.projectName, q),
       );
     }
     arr.sort((a, b) => b.hodiny - a.hodiny);
     return arr;
-  }, [logs, groupBy, search, projectsMap, overheadMap]);
+  }, [filteredLogs, search, projectsMap, overheadMap]);
 
   const totalHours = useMemo(
     () => (grouped as any[]).reduce((s, g) => s + g.hodiny, 0),
