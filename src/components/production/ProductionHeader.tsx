@@ -9,6 +9,9 @@ import { NotificationPanel } from "@/components/NotificationPanel";
 import { useNotifications } from "@/hooks/useNotifications";
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ROLE_LABELS as ALL_ROLE_LABELS } from "@/lib/permissionPresets";
+import type { AppRole } from "@/hooks/useAuth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserManagement } from "@/components/UserManagement";
 import { AccountSettings } from "@/components/AccountSettings";
@@ -351,18 +354,28 @@ export function ProductionHeader({
                     <>
                       <DropdownMenuSeparator />
                       <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Zobrazit jako</div>
-                      {(["admin", "pm", "konstrukter", "vyroba", "viewer"] as const).map((r) => (
-                        <DropdownMenuItem
-                          key={r}
-                          onClick={() => setSimulatedRole(r === "admin" ? null : r)}
-                          className="flex items-center justify-between"
+                      <div className="px-2 pb-2 pt-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                        <Select
+                          value={simulatedRole ?? "__real__"}
+                          onValueChange={(v) => setSimulatedRole(v === "__real__" ? null : (v as AppRole))}
                         >
-                          <span>{ROLE_LABELS[r]}</span>
-                          {((r === "admin" && !simulatedRole) || simulatedRole === r) && (
-                            <Check className="h-4 w-4 text-green-600" />
-                          )}
-                        </DropdownMenuItem>
-                      ))}
+                          <SelectTrigger className="h-8 w-full text-xs">
+                            <SelectValue placeholder="Vlastná rola" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__real__" className="text-xs">
+                              Vlastná rola (Owner)
+                            </SelectItem>
+                            {(Object.keys(ALL_ROLE_LABELS) as AppRole[])
+                              .filter((r) => r !== "owner")
+                              .map((r) => (
+                                <SelectItem key={r} value={r} className="text-xs">
+                                  {ALL_ROLE_LABELS[r]}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </>
                   )}
                 </DropdownMenuContent>
