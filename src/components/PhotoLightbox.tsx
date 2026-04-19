@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type { SPFile } from "@/hooks/useSharePointDocs";
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -281,7 +282,7 @@ interface LazyThumbnailProps {
   hasAnySelection?: boolean;
 }
 
-function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isBeingDragged, isSelected, onToggleSelect, hasAnySelection }: LazyThumbnailProps) {
+function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isBeingDragged, isSelected, onToggleSelect, hasAnySelection, onDelete, canDelete }: LazyThumbnailProps & { onDelete?: (file: SPFile) => void; canDelete?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [loaded, setLoaded] = useState(() => thumbCache.has(file.itemId));
