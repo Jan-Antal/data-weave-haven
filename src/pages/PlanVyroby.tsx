@@ -226,32 +226,6 @@ export default function PlanVyroby() {
 
   const [midflightRunning, setMidflightRunning] = useState(false);
   const [midflightConfirmOpen, setMidflightConfirmOpen] = useState(false);
-  const [syncTpvRunning, setSyncTpvRunning] = useState(false);
-
-  const handleSyncTpvStatuses = useCallback(async () => {
-    setSyncTpvRunning(true);
-    try {
-      const { syncTpvStatuses } = await import("@/lib/syncTpvStatuses");
-      const result = await syncTpvStatuses(supabase);
-      qc.invalidateQueries({ queryKey: ["production-inbox"] });
-      qc.invalidateQueries({ queryKey: ["production-schedule"] });
-      qc.invalidateQueries({ queryKey: ["production-progress"] });
-      // Invalidate TPV statuses for affected projects
-      for (const pid of result.affectedProjectIds) {
-        qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
-        qc.invalidateQueries({ queryKey: ["tpv-items", pid] });
-      }
-      toast({
-        title: `✓ Sync TPV: ${result.inboxRemoved + result.scheduleRemoved} osirelých záznamů smazáno`,
-        description: `Inbox: ${result.inboxRemoved}, Schedule: ${result.scheduleRemoved} · ${result.affectedProjectIds.length} projektů aktualizováno`,
-      });
-    } catch (err: any) {
-      console.error("Sync TPV error:", err);
-      toast({ title: "Chyba sync TPV", description: err?.message, variant: "destructive" });
-    } finally {
-      setSyncTpvRunning(false);
-    }
-  }, [qc]);
 
   const handleMidflightImport = useCallback(async () => {
     setMidflightRunning(true);
@@ -834,8 +808,6 @@ export default function PlanVyroby() {
           onRecalculateHours={() => setRecalcDialogOpen(true)}
           midflightRunning={midflightRunning}
           onMidflightImport={() => setMidflightConfirmOpen(true)}
-          syncTpvRunning={syncTpvRunning}
-          onSyncTpvStatuses={handleSyncTpvStatuses}
         />
         )}
 
