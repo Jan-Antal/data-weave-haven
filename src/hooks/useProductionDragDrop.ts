@@ -207,6 +207,9 @@ export function useProductionDragDrop() {
             scheduled_week: weekDate, scheduled_hours: item.estimated_hours,
             scheduled_czk: item.estimated_czk, position: i, status: "scheduled" as const,
             created_by: u?.id || user.id, inbox_item_id: item.id,
+            split_group_id: item.split_group_id ?? null,
+            split_part: item.split_part ?? null,
+            split_total: item.split_total ?? null,
           }));
           await supabase.from("production_schedule").insert(rows);
           await supabase.from("production_inbox").update({ status: "scheduled" }).in("id", ids);
