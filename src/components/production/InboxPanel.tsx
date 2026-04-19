@@ -1409,13 +1409,14 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550 }: {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550, projectItemIds }: {
   item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
-  isChecked: boolean; onToggleCheck: (itemId: string) => void;
+  isChecked: boolean; onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
   checkedItems: Set<string>;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   displayMode?: DisplayMode;
   hourlyRate?: number;
+  projectItemIds: string[];
 }) {
   const [hovered, setHovered] = useState(false);
   const adhocBadge = getAdhocBadge((item as any).adhoc_reason);
@@ -1479,7 +1480,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
         <div
           className="shrink-0 flex items-center justify-center"
           style={{ width: 14, height: 14 }}
-          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id); }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleCheck(item.id, { shiftKey: e.shiftKey, projectId: item.project_id, projectItemIds }); }}
           onPointerDown={(e) => { e.stopPropagation(); }}
         >
           <div style={{
