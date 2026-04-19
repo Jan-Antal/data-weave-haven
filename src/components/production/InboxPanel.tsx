@@ -24,6 +24,7 @@ import { differenceInDays, isPast, addDays, format } from "date-fns";
 import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
 import { DeadlineWarningDialog } from "./DeadlineWarningDialog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { logActivity } from "@/lib/activityLog";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -348,6 +349,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       id: i.id, item_name: i.item_name, item_code: i.item_code,
       estimated_hours: i.estimated_hours, estimated_czk: i.estimated_czk, stage_id: i.stage_id,
     }));
+    const itemCount = project.items.length;
     const actions: ContextMenuAction[] = [
       {
         label: "Naplánovat výrobu...", icon: "📅",
@@ -364,6 +366,52 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     if (onOpenProjectDetail) {
       actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
     }
+    // Bulk: smazat všechny inbox položky projektu (pre cleanup midflight Multisport-style)
+    if (itemCount > 0) {
+      actions.push({
+        label: `🗑 Smazat všechny (${itemCount}) z inboxu`,
+        icon: "🗑", danger: true, dividerBefore: true,
+        onClick: async () => {
+          if (!confirm(`Smazat ${itemCount} položek projektu ${project.project_name} z inboxu?\n\nPoužívejte pro cleanup midflight importu — položky lze znovu importovat.`)) return;
+          try {
+            // Bulk delete: jeden DB call pre inbox + jeden pre midflight schedule
+            const { error: e1 } = await supabase
+              .from("production_inbox")
+              .delete()
+              .eq("project_id", project.project_id)
+              .eq("status", "pending");
+            if (e1) throw e1;
+            // Tiež zmazať midflight schedule rows (osirelé "Naplánováno" markery)
+            await supabase
+              .from("production_schedule")
+              .delete()
+              .eq("project_id", project.project_id)
+              .eq("is_midflight", true);
+
+            // Single bulk activity log
+            try {
+              await logActivity({
+                projectId: project.project_id,
+                actionType: "item_cancelled",
+                oldValue: "Inbox",
+                newValue: "Hromadně smazáno",
+                detail: JSON.stringify({ bulk_delete: true, item_count: itemCount, project_name: project.project_name }),
+              });
+            } catch (e) { console.warn("Activity log failed:", e); }
+
+            qc.invalidateQueries({ queryKey: ["production-inbox"] });
+            qc.invalidateQueries({ queryKey: ["production-schedule"] });
+            qc.invalidateQueries({ queryKey: ["production-progress"] });
+            qc.invalidateQueries({ queryKey: ["production-statuses", project.project_id] });
+            qc.invalidateQueries({ queryKey: ["tpv-items", project.project_id] });
+            toast({ title: `🗑 Smazáno ${itemCount} položek projektu ${project.project_name}` });
+          } catch (err: any) {
+            console.error("[Bulk delete inbox] failed:", err);
+            toast({ title: "Chyba při hromadném mazání", description: err?.message, variant: "destructive" });
+          }
+        },
+      });
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
 
@@ -373,6 +421,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       id: item.id, item_name: item.item_name, item_code: item.item_code,
       estimated_hours: item.estimated_hours, estimated_czk: item.estimated_czk, stage_id: item.stage_id,
     };
+    const isMidflight = !!item.adhoc_reason && (item.adhoc_reason.startsWith("midflight") || item.adhoc_reason.startsWith("recon"));
     const actions: ContextMenuAction[] = [
       {
         label: "Naplánovat...", icon: "📅",
@@ -384,6 +433,26 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     if (onOpenProjectDetail) {
       actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
+    }
+    // Vrátit do TPV — len pre normálne (nie midflight/recon) položky
+    if (!isMidflight) {
+      actions.push({
+        label: "↩ Vrátit do TPV", icon: "↩", dividerBefore: true,
+        onClick: async () => {
+          try {
+            const { error } = await supabase.from("production_inbox").delete().eq("id", item.id);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["production-inbox"] });
+            qc.invalidateQueries({ queryKey: ["production-progress"] });
+            qc.invalidateQueries({ queryKey: ["production-statuses", project.project_id] });
+            qc.invalidateQueries({ queryKey: ["tpv-items", project.project_id] });
+            toast({ title: "↩ Vráceno do TPV" });
+          } catch (err: any) {
+            console.error("[Vrátit do TPV] failed:", err);
+            toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+          }
+        },
+      });
     }
     actions.push({
       label: "Zrušit položku", icon: "✕", danger: true, dividerBefore: true,

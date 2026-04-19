@@ -1081,6 +1081,28 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       if (onNavigateToTPV) actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(item.project_id, item.item_code) });
       if (onOpenProjectDetail) actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(item.project_id) });
       actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
+      // Vrátit do TPV — len pre nie-midflight/historical
+      const itemAny = item as any;
+      const isMidflight = !!itemAny.is_midflight || !!itemAny.is_historical;
+      if (!isMidflight) {
+        actions.push({
+          label: "↩ Vrátit do TPV", icon: "↩",
+          onClick: async () => {
+            try {
+              const { error } = await supabase.from("production_schedule").delete().eq("id", item.id);
+              if (error) throw error;
+              qc.invalidateQueries({ queryKey: ["production-schedule"] });
+              qc.invalidateQueries({ queryKey: ["production-progress"] });
+              qc.invalidateQueries({ queryKey: ["production-statuses", item.project_id] });
+              qc.invalidateQueries({ queryKey: ["tpv-items", item.project_id] });
+              toast({ title: "↩ Vráceno do TPV" });
+            } catch (err: any) {
+              console.error("[Vrátit do TPV] failed:", err);
+              toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+            }
+          },
+        });
+      }
       actions.push({ label: "Pozastavit", icon: "⏸", onClick: () => setPauseState({ itemId: item.id, itemName: item.item_name, itemCode: item.item_code, source: "schedule" }) });
       if (item.split_group_id) {
         const sameWeekSiblings = findSameWeekSiblings(item, weekKey);

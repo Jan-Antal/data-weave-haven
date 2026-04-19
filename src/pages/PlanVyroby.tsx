@@ -217,7 +217,32 @@ export default function PlanVyroby() {
 
   const [midflightRunning, setMidflightRunning] = useState(false);
   const [midflightConfirmOpen, setMidflightConfirmOpen] = useState(false);
-  
+  const [syncTpvRunning, setSyncTpvRunning] = useState(false);
+
+  const handleSyncTpvStatuses = useCallback(async () => {
+    setSyncTpvRunning(true);
+    try {
+      const { syncTpvStatuses } = await import("@/lib/syncTpvStatuses");
+      const result = await syncTpvStatuses(supabase);
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
+      qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-progress"] });
+      // Invalidate TPV statuses for affected projects
+      for (const pid of result.affectedProjectIds) {
+        qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
+        qc.invalidateQueries({ queryKey: ["tpv-items", pid] });
+      }
+      toast({
+        title: `✓ Sync TPV: ${result.inboxRemoved + result.scheduleRemoved} osirelých záznamů smazáno`,
+        description: `Inbox: ${result.inboxRemoved}, Schedule: ${result.scheduleRemoved} · ${result.affectedProjectIds.length} projektů aktualizováno`,
+      });
+    } catch (err: any) {
+      console.error("Sync TPV error:", err);
+      toast({ title: "Chyba sync TPV", description: err?.message, variant: "destructive" });
+    } finally {
+      setSyncTpvRunning(false);
+    }
+  }, [qc]);
 
   const handleMidflightImport = useCallback(async () => {
     setMidflightRunning(true);
@@ -800,6 +825,8 @@ export default function PlanVyroby() {
           onRecalculateHours={() => setRecalcDialogOpen(true)}
           midflightRunning={midflightRunning}
           onMidflightImport={() => setMidflightConfirmOpen(true)}
+          syncTpvRunning={syncTpvRunning}
+          onSyncTpvStatuses={handleSyncTpvStatuses}
         />
         )}
 
@@ -1046,7 +1073,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport }: {
+function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport, syncTpvRunning, onSyncTpvStatuses }: {
   visibleMonth: { month: number; year: number };
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
@@ -1074,6 +1101,8 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   searchNavGoPrev?: () => void;
   midflightRunning?: boolean;
   onMidflightImport?: () => void;
+  syncTpvRunning?: boolean;
+  onSyncTpvStatuses?: () => void;
 }) {
   const { data: settings } = useProductionSettings();
   const { data: scheduleData } = useProductionSchedule();
@@ -1302,6 +1331,20 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
         >
           {midflightRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-[12px]">📥</span>}
           Midflight
+        </button>
+      )}
+
+      {/* Sync TPV statuses — admin only */}
+      {isAdmin && !forecastActive && onSyncTpvStatuses && (
+        <button
+          onClick={onSyncTpvStatuses}
+          disabled={syncTpvRunning}
+          title="Vyčistit osirelé inbox/schedule záznamy a aktualizovat TPV statusy"
+          className="inline-flex items-center gap-1 px-2.5 py-1 h-8 text-[12px] font-medium rounded-md border transition-colors hover:bg-muted disabled:opacity-50"
+          style={{ borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
+        >
+          {syncTpvRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-[12px]">🔄</span>}
+          Sync TPV
         </button>
       )}
 
