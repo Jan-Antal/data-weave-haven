@@ -694,18 +694,12 @@ export function VykazReport() {
             <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
           </Card>
           <Card className="p-4 shadow-sm">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
-          </Card>
-          <Card className="p-4 shadow-sm">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
-            <div
-              className={cn(
-                "text-2xl font-bold mt-1 tabular-nums",
-                summaryStats.unmatchedProjects > 0 ? "text-amber-700" : "text-muted-foreground",
-              )}
-            >
-              {summaryStats.unmatchedProjects}
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Utilizace</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">
+              {summaryStats.utilization.toFixed(1).replace(".", ",")} %
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              (celkem − režie) / celkem
             </div>
           </Card>
         </div>
