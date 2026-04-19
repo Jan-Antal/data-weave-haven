@@ -96,6 +96,14 @@ export async function midflightImportPlanVyroby(
     .like("item_code", "HIST_%");
   if (err3) console.warn("Cleanup HIST_ fallback failed:", err3.message);
 
+  // Clear midflight split metadata from pending Inbox items (so re-import starts clean).
+  // Only touches pending rows; never deletes inbox content.
+  const { error: errInboxClear } = await (supabaseClient as any)
+    .from("production_inbox")
+    .update({ split_group_id: null, split_part: null, split_total: null })
+    .eq("status", "pending");
+  if (errInboxClear) console.warn("Clear inbox split metadata failed:", errInboxClear.message);
+
   onProgress?.("[midflight] Reset hotový. Spúšťam import...");
   // ━━━ END RESET ━━━
 
