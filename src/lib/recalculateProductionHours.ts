@@ -21,7 +21,22 @@ async function chunkedUpsert(
 ) {
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    await supabaseClient.from(table).upsert(chunk, { onConflict: "id" });
+
+    // production_inbox / production_schedule updates are partial payloads keyed by id.
+    // Using upsert here can silently fail on NOT NULL columns not included in the payload.
+    if (table === "production_inbox" || table === "production_schedule") {
+      const results = await Promise.all(
+        chunk.map(async ({ id, ...changes }) => {
+          const { error } = await supabaseClient.from(table).update(changes).eq("id", id);
+          if (error) throw error;
+        }),
+      );
+      await Promise.all(results);
+      continue;
+    }
+
+    const { error } = await supabaseClient.from(table).upsert(chunk, { onConflict: "id" });
+    if (error) throw error;
   }
 }
 
