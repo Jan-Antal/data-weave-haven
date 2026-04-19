@@ -750,25 +750,27 @@ export const PhotoLightbox = memo(function PhotoLightbox({
           </Button>
         )}
         {canDelete && onDelete && (
-          confirmDelete ? (
-            <div className="flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5">
-              <span className="text-white/80 text-xs">Smazat tuto fotku?</span>
-              <button type="button" className="text-red-400 text-xs font-medium hover:underline" onClick={handleDelete}>Smazat</button>
-              <button type="button" className="text-white/50 text-xs hover:underline" onClick={() => setConfirmDelete(false)}>Zrušit</button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-xs text-white/60 hover:text-red-400 hover:bg-white/10"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1" />
-              Smazat
-            </Button>
-          )
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs text-white/60 hover:text-red-400 hover:bg-white/10"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Smazat
+          </Button>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+        title="Smazat soubor?"
+        description={file?.name ?? ""}
+        confirmLabel="Smazat"
+        cancelLabel="Zrušit"
+        variant="destructive"
+      />
     </div>
   );
 
