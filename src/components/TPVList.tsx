@@ -121,6 +121,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const { data: statusOptions = [] } = useTPVStatusOptions();
   const TPV_STATUSES = statusOptions.map((o) => o.label);
   const { data: allProjects = [] } = useProjects();
+  const { data: projectStages = [] } = useProjectStages(projectId);
   const { statusMap: productionStatusMap } = useProductionStatuses(projectId);
   const [detailOpen, setDetailOpen] = useState(false);
   const [extractorOpen, setExtractorOpen] = useState(false);
