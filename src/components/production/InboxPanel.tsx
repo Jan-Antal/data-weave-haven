@@ -369,8 +369,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     // Bulk: smazat všechny inbox položky projektu (pre cleanup midflight Multisport-style)
     if (itemCount > 0) {
       actions.push({
-        label: `🗑 Smazat všechny (${itemCount}) z inboxu`,
-        icon: "🗑", danger: true, dividerBefore: true,
+        label: `Zrušit vše (${itemCount})`,
+        icon: "✕", danger: true, dividerBefore: true,
         onClick: async () => {
           if (!confirm(`Smazat ${itemCount} položek projektu ${project.project_name} z inboxu?\n\nPoužívejte pro cleanup midflight importu — položky lze znovu importovat.`)) return;
           try {
