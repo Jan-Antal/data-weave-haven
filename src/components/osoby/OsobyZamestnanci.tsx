@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, MoreVertical, Plus } from "lucide-react";
+import { Search, MoreVertical, Plus, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -353,21 +353,37 @@ export function OsobyZamestnanci() {
           const allEmpsInStredisko = Array.from(useks.values()).flat();
           const strediskoHrs = allEmpsInStredisko.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
           const cardStyle = strediskoCardStyles(stredisko);
+          const isCollapsed = collapsed.has(stredisko);
           return (
             <section
               key={`${stredisko}-card`}
               className={cn("rounded-lg border shadow-sm overflow-hidden bg-card", cardStyle.card)}
             >
-              {/* Card header — stredisko strip */}
-              <div className={cn("flex items-center gap-2 flex-wrap px-3 py-2 border-b", cardStyle.header)}>
-                <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5 bg-background/70", strediskoStyles(stredisko))}>
-                  {stredisko}
-                </Badge>
-                <span className="text-[11px] opacity-80">
-                  Kapacita výroby · {allEmpsInStredisko.length} osob · {strediskoHrs}h brutto/týd
-                </span>
-              </div>
+              {/* Card header — stredisko strip (clickable to collapse) */}
+              <button
+                type="button"
+                onClick={() => toggleCollapsed(stredisko)}
+                className={cn(
+                  "w-full flex items-center justify-between gap-3 px-3 py-2 border-b text-left transition-colors hover:brightness-95",
+                  cardStyle.header,
+                )}
+                aria-expanded={!isCollapsed}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge variant="outline" className={cn("text-[11px] font-semibold border px-2.5 py-0.5 bg-background/80 shrink-0", strediskoStyles(stredisko))}>
+                    {stredisko}
+                  </Badge>
+                  <span className="text-[12px] font-medium text-foreground/80">
+                    {allEmpsInStredisko.length} {allEmpsInStredisko.length === 1 ? "osoba" : allEmpsInStredisko.length < 5 ? "osoby" : "osob"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">· {strediskoHrs} h/týd</span>
+                </div>
+                <ChevronDown
+                  className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", isCollapsed && "-rotate-90")}
+                />
+              </button>
 
+              {!isCollapsed && (
               <Table className="table-fixed">
                 <SharedColgroup />
                 <TableBody>
