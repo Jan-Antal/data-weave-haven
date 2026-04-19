@@ -127,8 +127,38 @@ export function useProductionDragDrop() {
         inbox_item_id: item.id,
       }));
 
+      // Pre-flight: check for existing items with same item_code already scheduled in target week
+      const itemCodes = items.map((i) => i.item_code).filter(Boolean) as string[];
+      if (itemCodes.length > 0) {
+        const { data: collisions } = await supabase
+          .from("production_schedule")
+          .select("item_code")
+          .eq("project_id", projectId)
+          .eq("scheduled_week", weekDate)
+          .in("item_code", itemCodes);
+        if (collisions && collisions.length > 0) {
+          const codes = Array.from(new Set(collisions.map((c: any) => c.item_code))).join(", ");
+          toast({
+            title: "Položky už jsou v tomto týdnu",
+            description: `${codes} – nelze vložit duplicitně do T${weekLabel(weekDate).replace("T", "")}. Zkontrolujte Inbox / TPV.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       const { data: inserted, error: insertErr } = await supabase.from("production_schedule").insert(scheduleRows).select();
-      if (insertErr) throw insertErr;
+      if (insertErr) {
+        if (insertErr.code === "23505" || /production_schedule_item_week_unique|duplicate key/i.test(insertErr.message || "")) {
+          toast({
+            title: "Duplicitní položka",
+            description: `Některá z položek už existuje v T${weekLabel(weekDate).replace("T", "")}. Smažte duplicitu v Inboxu nebo TPV a zkuste znovu.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        throw insertErr;
+      }
 
       const ids = items.map((i) => i.id);
       const { error: updateErr } = await supabase
