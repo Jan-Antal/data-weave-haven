@@ -1117,12 +1117,12 @@ function ProjektRow({
             {g.matched ? (
               <button
                 onClick={(e) => { e.stopPropagation(); onOpenDetail(g.projectId); }}
-                className="font-mono text-xs text-primary hover:underline font-semibold"
+                className="text-xs text-primary hover:underline font-semibold"
               >
                 {g.projectId}
               </button>
             ) : (
-              <span className="font-mono text-xs font-semibold">{g.projectId}</span>
+              <span className="text-xs font-semibold">{g.projectId}</span>
             )}
             <span className="text-xs ml-2 truncate" title={g.projectName}>{g.projectName}</span>
           </div>
