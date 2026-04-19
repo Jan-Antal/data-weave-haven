@@ -46,28 +46,13 @@ function getMonday(date: Date): Date {
   return d;
 }
 
+/**
+ * Backwards-compat wrapper: now delegates to project-wide chain renumbering.
+ * The old behavior was schedule-only and per-item; the new chain spans
+ * schedule + inbox so badges stay consistent across tables.
+ */
 async function renumberSiblings(splitGroupId: string) {
-  const { data: siblings } = await supabase
-    .from("production_schedule")
-    .select("id, scheduled_week")
-    .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
-    .order("scheduled_week", { ascending: true });
-  if (!siblings || siblings.length <= 1) return;
-  const total = siblings.length;
-  const updates = siblings.map((s, i) =>
-    supabase.from("production_schedule").update({
-      split_part: i + 1,
-      split_total: total,
-      item_name: undefined, // we'll handle names separately if needed
-    }).eq("id", s.id)
-  );
-  // Actually just update part/total, not names
-  await Promise.all(siblings.map((s, i) =>
-    supabase.from("production_schedule").update({
-      split_part: i + 1,
-      split_total: total,
-    }).eq("id", s.id)
-  ));
+  await renumberChain(splitGroupId);
 }
 
 export { renumberSiblings };
