@@ -1,30 +1,40 @@
 
-## Plan: Add "Etapa" column to TPV List
 
-### Goal
-Add a new sortable, editable **Etapa** column to TPV List that:
-- Only appears when the project has **2+ stages** (single-stage projects don't need it)
-- Renders as a **dropdown** with options = stages of the current project (`stage.display_name || stage.stage_name`)
-- Allows assigning each TPV item to a specific stage
-- Persists assignment via new `stage_id` column on `tpv_items`
+## Problem
+- DB constraint `production_schedule_item_week_unique (project_id, item_code, scheduled_week)` exists ✅
+- BUT `production_inbox` má **žiadnu unikátnu väzbu** → tam vznikli duplicity
+- Projekt Z-2615-002 má 6 položiek 2× v inboxe (sent 2026-03-21 a znova 2026-04-13)
+- Pri drag celého bundlu sa pokúsi vložiť obe položky s rovnakým `item_code` do toho istého týždňa → unique violation v `production_schedule`
+- Súčasná TPVList "Odoslať do výroby" už dedupe kontrolu má, ale duplicity sú staršieho dáta (alebo z `ExpedicePanel` `returnFromExpedice` ktorý insertuje bez kontroly)
 
-### Changes
+## Riešenie
 
-**1. DB migration** — `tpv_items` add `stage_id UUID NULL` (no FK constraint to keep parity with existing nullable refs; index for query perf).
+### 1. DB migrácia — partial unique index na `production_inbox`
+```sql
+CREATE UNIQUE INDEX production_inbox_pending_unique
+  ON production_inbox (project_id, item_code)
+  WHERE status = 'pending' AND item_code IS NOT NULL;
+```
+Zaručí na úrovni DB že tá istá položka nemôže byť 2× v "pending" inboxe.
 
-**2. `TPVList.tsx`**
-- Add `{ key: "stage_id", label: "Etapa", defaultHidden: true }` to `TPV_LIST_COLUMNS` (default hidden so single-stage projects don't see clutter; auto-shown when 2+ stages)
-- Fetch project stages via existing `useProjectStages(projectId)`
-- When `stages.length >= 2` → force visible by default (override `DEFAULT_HIDDEN_KEYS` logic for this column)
-- Render cell as `InlineEditableCell type="select"` with options built from stages, mapped by `id ↔ display label`
-- `getTPVListColumnStyle("stage_id")` → `minWidth: 140, maxWidth: 200`
-- Save via existing `updateItem` mutation (field: `stage_id`, value: stage UUID or empty for "—")
+### 2. Vyčistenie existujúcich duplicít
+Pre 6 položiek v Z-2615-002 nechať novšiu (2026-04-13, lebo to je čerstvá verzia po midflight) a staršiu zmazať. Robí sa raz cez migráciu.
 
-**3. `MobileTPVCardList.tsx`** — show stage badge in compact + expanded view when present.
+### 3. Defenzívne dedupe v `ExpedicePanel.returnFromExpedice`
+Pred insert do `production_inbox` pridať `.maybeSingle()` check na existujúci pending row (rovnaký vzorec ako v TPVList) — ak existuje, len update na pending namiesto insert.
 
-**4. `useTPVItems.tsx`** — no change needed (generic field update already supports any column).
+### 4. Lepšia error handling pri bundle drag (`moveInboxProjectToWeek`)
+Keď insert do `production_schedule` zlyhá kvôli `production_schedule_item_week_unique`, namiesto generického "duplicate key" toast ukázať jasnú správu:
+> "Položka {item_code} už existuje v T{X}. Zmaž duplicitu v Inboxe alebo TPV."
 
-### Out of scope
-- No auto-assignment from existing data; user assigns manually
-- No cascade behavior when stage is deleted (stays as orphan UUID — UI shows "—")
-- No filtering by stage in TPV List (can be added later if needed)
+A vypísať konkrétne kódy ktoré kolidovali.
+
+## Súbory
+- `supabase/migrations/<new>.sql` — partial unique index + DELETE existujúcich duplicít
+- `src/components/production/ExpedicePanel.tsx` — dedupe check pred inbox insert
+- `src/hooks/useProductionDragDrop.ts` — friendlier error v `moveInboxProjectToWeek`
+
+## Mimo scope
+- Midflight import už dedupe rieši (mažeme legacy a vkladáme čerstvo)
+- `AddItemPopover` — to je manuálne pridanie ad-hoc, môže potrebovať vlastný kód, dedupe by ale obmedzilo legitímne ad-hoc; necháme tak (ad-hoc nemá `item_code`)
+
