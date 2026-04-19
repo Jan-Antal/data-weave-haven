@@ -620,31 +620,55 @@ export function VykazReport() {
           </Button>
         </div>
 
-        {/* Center: segmented control */}
-        <div className="flex-1 flex justify-center">
-          <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
-            {([
-              { key: "projekt", label: "Projekt" },
-              { key: "osoba", label: "Osoba" },
-              { key: "cinnost", label: "Činnosť" },
-            ] as const).map((opt) => {
-              const active = groupBy === opt.key;
-              return (
-                <button
-                  key={opt.key}
-                  onClick={() => setGroupBy(opt.key)}
-                  className={cn(
-                    "h-7 px-3 text-xs rounded-md transition-colors",
-                    active
-                      ? "bg-background shadow-sm font-medium text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+        {/* Center: 3 multi-select filters (Projekt / Osoba / Činnost) */}
+        <div className="flex-1 flex justify-center items-center gap-2">
+          <MultiSelectFilter
+            label="Projekty"
+            options={availableProjects.map((p) => ({
+              value: p.id,
+              label: p.name,
+              hint: p.id !== p.name ? p.id : undefined,
+              hodiny: p.hodiny,
+              searchTokens: [p.id, p.name],
+            }))}
+            value={projectFilter}
+            onChange={setProjectFilter}
+          />
+          <MultiSelectFilter
+            label="Osoby"
+            options={availablePersons.map((p) => ({
+              value: p.name,
+              label: p.name,
+              hodiny: p.hodiny,
+              searchTokens: [p.name],
+            }))}
+            value={personFilter}
+            onChange={setPersonFilter}
+          />
+          <MultiSelectFilter
+            label="Činnosti"
+            options={availableActivities.map((a) => ({
+              value: a.kod,
+              label: a.nazov,
+              hint: a.kod !== a.nazov ? a.kod : undefined,
+              hodiny: a.hodiny,
+              searchTokens: [a.kod, a.nazov],
+            }))}
+            value={activityFilter}
+            onChange={setActivityFilter}
+          />
+          {hasActiveFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              onClick={resetFilters}
+              title="Vyčistit filtry"
+            >
+              <X className="h-3.5 w-3.5" />
+              Reset
+            </Button>
+          )}
         </div>
 
         {/* Right: search + export */}
