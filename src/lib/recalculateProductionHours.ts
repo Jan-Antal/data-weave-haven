@@ -31,7 +31,7 @@ export async function recalculateProductionHours(
       .select("project_id, project_name, marze, cost_production_pct, cost_preset_id, prodejni_cena, currency, created_at, plan_use_project_price"),
     supabaseClient
       .from("production_settings")
-      .select("hourly_rate")
+      .select("hourly_rate, default_margin_pct")
       .limit(1)
       .single(),
     supabaseClient
@@ -44,6 +44,7 @@ export async function recalculateProductionHours(
   ]);
 
   const hourlyRate = Number(settingsData?.hourly_rate) || 550;
+  const defaultMarginPct = Number((settingsData as any)?.default_margin_pct) || 15;
   const presets = presetsData || [];
   const exchangeRates = (exchangeRatesData || []) as Array<{ year: number; eur_czk: number }>;
   const projects = (projectsData || []).filter((p: any) =>
@@ -72,6 +73,7 @@ export async function recalculateProductionHours(
       preset,
       hourlyRate,
       exchangeRates,
+      defaultMarginPct,
       formulas,
     });
 
