@@ -137,7 +137,7 @@ function useDilnaData(weekOffset: number) {
       const hours = (hoursRes.data || []) as Array<{ ami_project_id: string; hodiny: number; created_at: string; datum_sync: string; cinnost_kod: string | null; cinnost_nazov: string | null }>;
       const schedule = (schedRes.data || []) as Array<{ project_id: string; scheduled_hours: number; status: string; item_name: string }>;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null }>;
-      const dailyLogs = (dailyLogsRes.data || []) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
+      const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
 
       const totalHoursWeek = hours.reduce((s, h) => s + Number(h.hodiny), 0);
       const today = toLocalDateStr(new Date());
