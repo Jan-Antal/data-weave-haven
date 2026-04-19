@@ -5,6 +5,7 @@ import { Plus, Search, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
+import { cn } from "@/lib/utils";
 
 const ROLE_FLAGS = [
   { key: "is_pm", label: "PM" },
@@ -22,11 +24,17 @@ const ROLE_FLAGS = [
 
 const ARCHITEKT_LABEL = "Architekt";
 
+/** Externisti color theme — teal/cyan to distinguish from interní bloky. */
+const EXTERNAL_THEME = "bg-cyan-50 text-cyan-900 border-cyan-200";
+const EXTERNAL_BADGE = "bg-cyan-100 text-cyan-800 border-cyan-300";
+
 interface ExternalRow {
   id: string;
   name: string;
   role: string;
   firma: string | null;
+  phone: string | null;
+  email: string | null;
   is_active: boolean;
   is_external: boolean;
   is_pm: boolean | null;
@@ -64,7 +72,7 @@ function useExternals() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("people")
-        .select("id, name, role, firma, is_active, is_external, is_pm, is_kalkulant, is_konstrukter")
+        .select("id, name, role, firma, phone, email, is_active, is_external, is_pm, is_kalkulant, is_konstrukter")
         .eq("source", "external")
         .order("name");
       if (error) throw error;
@@ -81,6 +89,8 @@ export function OsobyExternisti() {
   const [newRow, setNewRow] = useState({
     name: "",
     firma: "",
+    phone: "",
+    email: "",
     is_pm: false,
     is_kalkulant: false,
     is_konstrukter: false,
@@ -94,9 +104,22 @@ export function OsobyExternisti() {
     return rows.filter(r =>
       r.name.toLowerCase().includes(q) ||
       (r.firma ?? "").toLowerCase().includes(q) ||
+      (r.phone ?? "").toLowerCase().includes(q) ||
+      (r.email ?? "").toLowerCase().includes(q) ||
       rolesSummary(r).toLowerCase().includes(q),
     );
   }, [rows, search]);
+
+  /** Group externisti by firma. */
+  const grouped = useMemo(() => {
+    const map = new Map<string, ExternalRow[]>();
+    for (const r of filtered) {
+      const key = r.firma?.trim() || "Bez firmy";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], "cs"));
+  }, [filtered]);
 
   const updateField = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<ExternalRow> }) => {
@@ -124,6 +147,8 @@ export function OsobyExternisti() {
           name: newRow.name.trim(),
           role: newRow.is_architekt ? ARCHITEKT_LABEL : primaryRole,
           firma: newRow.firma.trim() || null,
+          phone: newRow.phone.trim() || null,
+          email: newRow.email.trim() || null,
           is_external: true,
           is_active: true,
           source: "external",
@@ -136,7 +161,7 @@ export function OsobyExternisti() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["people"] });
       setAddOpen(false);
-      setNewRow({ name: "", firma: "", is_pm: false, is_kalkulant: false, is_konstrukter: false, is_architekt: false });
+      setNewRow({ name: "", firma: "", phone: "", email: "", is_pm: false, is_kalkulant: false, is_konstrukter: false, is_architekt: false });
       toast({ title: "Externista přidán" });
     },
     onError: (e: any) => toast({ title: "Chyba", description: e.message, variant: "destructive" }),
@@ -167,6 +192,9 @@ export function OsobyExternisti() {
 
   const activeCount = rows.filter(r => r.is_active).length;
 
+  /** Inline cell input — reveals border on hover/focus, matches Zaměstnanci style. */
+  const inlineInput = "h-8 text-[13px] border-transparent hover:border-border focus:border-border bg-transparent px-2";
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-card">
       <SectionToolbar
@@ -182,8 +210,8 @@ export function OsobyExternisti() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Hledat externistu nebo firmu…"
-                className="pl-8 h-8 w-[260px] text-xs"
+                placeholder="Hledat externistu, firmu, kontakt…"
+                className="pl-8 h-8 w-[280px] text-xs"
               />
             </div>
             <Button size="sm" className="h-8" onClick={() => setAddOpen(true)}>
@@ -197,104 +225,151 @@ export function OsobyExternisti() {
         <Table>
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
-              <TableHead className="w-[300px]">Jméno</TableHead>
-              <TableHead className="w-[220px]">Firma</TableHead>
-              <TableHead className="w-[220px]">Role</TableHead>
-              <TableHead className="w-[100px]">Aktivní</TableHead>
-              <TableHead className="w-[60px]" />
+              <TableHead className="w-[260px]">Jméno</TableHead>
+              <TableHead className="w-[180px]">Firma</TableHead>
+              <TableHead className="w-[150px]">Telefon</TableHead>
+              <TableHead className="w-[220px]">Email</TableHead>
+              <TableHead className="w-[200px]">Role</TableHead>
+              <TableHead className="w-[90px]">Aktivní</TableHead>
+              <TableHead className="w-[50px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((r) => {
-              const av = avatarStyles(r.name);
-              const isArchitekt = r.role === ARCHITEKT_LABEL;
-              return (
-                <TableRow key={r.id} className={r.is_active ? "" : "opacity-60"}>
-                  <TableCell>
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
-                        style={{ backgroundColor: av.bg, color: av.fg }}
-                        aria-hidden
-                      >
-                        {getInitials(r.name)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <Input
-                          defaultValue={r.name}
-                          onBlur={(e) => {
-                            const v = e.target.value.trim();
-                            if (v && v !== r.name) updateField.mutate({ id: r.id, patch: { name: v } });
-                          }}
-                          className="h-8 text-[13px] font-medium border-transparent hover:border-border focus:border-border bg-transparent px-2"
-                        />
-                      </div>
+            {grouped.map(([firma, members]) => (
+              <>
+                {/* Firma block header */}
+                <TableRow key={`${firma}-block`} className="hover:bg-transparent border-b-0">
+                  <TableCell colSpan={7} className="pt-4 pb-1.5 px-0">
+                    <div className={cn("flex items-center gap-2 flex-wrap rounded-md border px-3 py-2", EXTERNAL_THEME)}>
+                      <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5", EXTERNAL_BADGE)}>
+                        {firma}
+                      </Badge>
+                      <span className="text-[11px] opacity-80">Externí spolupracovníci · {members.length} osob</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Input
-                      defaultValue={r.firma ?? ""}
-                      placeholder="—"
-                      onBlur={(e) => {
-                        const v = e.target.value.trim() || null;
-                        if (v !== (r.firma ?? null)) updateField.mutate({ id: r.id, patch: { firma: v as any } });
-                      }}
-                      className="h-8 text-[13px] border-transparent hover:border-border focus:border-border bg-transparent px-2"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 text-xs justify-start font-normal w-full">
-                          {rolesSummary(r)}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-48 p-2" align="start">
-                        <div className="space-y-1.5">
-                          {ROLE_FLAGS.map((rf) => (
-                            <label key={rf.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
-                              <Checkbox
-                                checked={!!r[rf.key]}
-                                onCheckedChange={(v) => toggleRole(r, rf.key, v === true)}
-                                className="h-4 w-4"
-                              />
-                              <span className="text-xs">{rf.label}</span>
-                            </label>
-                          ))}
-                          <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
-                            <Checkbox
-                              checked={isArchitekt}
-                              onCheckedChange={(v) => toggleRole(r, "is_architekt", v === true)}
-                              className="h-4 w-4"
-                            />
-                            <span className="text-xs">Architekt</span>
-                          </label>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={r.is_active}
-                      onCheckedChange={(v) => updateField.mutate({ id: r.id, patch: { is_active: v } })}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => setDeleteFor({ id: r.id, name: r.name })}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
                 </TableRow>
-              );
-            })}
+                {members.map((r) => {
+                  const av = avatarStyles(r.name);
+                  const isArchitekt = r.role === ARCHITEKT_LABEL;
+                  return (
+                    <TableRow key={r.id} className={r.is_active ? "" : "opacity-60"}>
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
+                            style={{ backgroundColor: av.bg, color: av.fg }}
+                            aria-hidden
+                          >
+                            {getInitials(r.name)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <Input
+                              defaultValue={r.name}
+                              onBlur={(e) => {
+                                const v = e.target.value.trim();
+                                if (v && v !== r.name) updateField.mutate({ id: r.id, patch: { name: v } });
+                              }}
+                              className={cn(inlineInput, "font-medium")}
+                            />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          defaultValue={r.firma ?? ""}
+                          placeholder="—"
+                          onBlur={(e) => {
+                            const v = e.target.value.trim() || null;
+                            if (v !== (r.firma ?? null)) updateField.mutate({ id: r.id, patch: { firma: v as any } });
+                          }}
+                          className={inlineInput}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          defaultValue={r.phone ?? ""}
+                          placeholder="—"
+                          onBlur={(e) => {
+                            const v = e.target.value.trim() || null;
+                            if (v !== (r.phone ?? null)) updateField.mutate({ id: r.id, patch: { phone: v as any } });
+                          }}
+                          className={inlineInput}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="email"
+                          defaultValue={r.email ?? ""}
+                          placeholder="—"
+                          onBlur={(e) => {
+                            const v = e.target.value.trim() || null;
+                            if (v !== (r.email ?? null)) updateField.mutate({ id: r.id, patch: { email: v as any } });
+                          }}
+                          className={inlineInput}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className={cn(
+                                "h-8 w-full text-xs px-2 rounded-md border border-transparent bg-transparent text-left font-normal truncate",
+                                "hover:border-border hover:bg-muted transition-colors",
+                                "focus:border-border focus:bg-muted focus:outline-none",
+                              )}
+                            >
+                              {rolesSummary(r)}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-2" align="start">
+                            <div className="space-y-1.5">
+                              {ROLE_FLAGS.map((rf) => (
+                                <label key={rf.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
+                                  <Checkbox
+                                    checked={!!r[rf.key]}
+                                    onCheckedChange={(v) => toggleRole(r, rf.key, v === true)}
+                                    className="h-4 w-4"
+                                  />
+                                  <span className="text-xs">{rf.label}</span>
+                                </label>
+                              ))}
+                              <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
+                                <Checkbox
+                                  checked={isArchitekt}
+                                  onCheckedChange={(v) => toggleRole(r, "is_architekt", v === true)}
+                                  className="h-4 w-4"
+                                />
+                                <span className="text-xs">Architekt</span>
+                              </label>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={r.is_active}
+                          onCheckedChange={(v) => updateField.mutate({ id: r.id, patch: { is_active: v } })}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteFor({ id: r.id, name: r.name })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </>
+            ))}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                   Žádní externisté nenalezeni.
                 </TableCell>
               </TableRow>
@@ -316,6 +391,16 @@ export function OsobyExternisti() {
             <div className="space-y-1.5">
               <Label>Firma</Label>
               <Input value={newRow.firma} onChange={(e) => setNewRow({ ...newRow, firma: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Telefon</Label>
+                <Input value={newRow.phone} onChange={(e) => setNewRow({ ...newRow, phone: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input type="email" value={newRow.email} onChange={(e) => setNewRow({ ...newRow, email: e.target.value })} />
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>

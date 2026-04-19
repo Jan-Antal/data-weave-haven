@@ -1,0 +1,1 @@
+ALTER TABLE public.people ADD COLUMN IF NOT EXISTS phone text, ADD COLUMN IF NOT EXISTS email text;
