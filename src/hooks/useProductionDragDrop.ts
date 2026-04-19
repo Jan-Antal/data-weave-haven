@@ -71,6 +71,11 @@ export function useProductionDragDrop() {
         detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
       });
 
+      // If item is part of a chain, renumber so badges stay consistent.
+      if (item.split_group_id) {
+        try { await renumberChain(item.split_group_id); } catch { /* silent */ }
+      }
+
       invalidateAll();
 
       // Push undo
