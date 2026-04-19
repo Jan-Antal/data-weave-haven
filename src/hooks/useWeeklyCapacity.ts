@@ -189,7 +189,7 @@ export function useWeeklyCapacity(year: number, bruttoHodinyPerDay?: number) {
 
     for (let wn = 1; wn <= 52; wn++) {
       const monday = getMondayOfWeek(year, wn);
-      const weekStart = monday.toISOString().split("T")[0];
+      const weekStart = toLocalDateStr(monday);
       const dbRow = dbMap.get(wn);
 
       if (dbRow?.is_manual_override) {
