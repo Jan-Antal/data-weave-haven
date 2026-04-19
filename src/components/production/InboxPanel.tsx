@@ -421,7 +421,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       id: item.id, item_name: item.item_name, item_code: item.item_code,
       estimated_hours: item.estimated_hours, estimated_czk: item.estimated_czk, stage_id: item.stage_id,
     };
-    const isMidflight = !!item.adhoc_reason && (item.adhoc_reason.startsWith("midflight") || item.adhoc_reason.startsWith("recon"));
     const actions: ContextMenuAction[] = [
       {
         label: "Naplánovat...", icon: "📅",
@@ -434,26 +433,24 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     if (onOpenProjectDetail) {
       actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
     }
-    // Vrátit do TPV — len pre normálne (nie midflight/recon) položky
-    if (!isMidflight) {
-      actions.push({
-        label: "↩ Vrátit do TPV", icon: "↩", dividerBefore: true,
-        onClick: async () => {
-          try {
-            const { error } = await supabase.from("production_inbox").delete().eq("id", item.id);
-            if (error) throw error;
-            qc.invalidateQueries({ queryKey: ["production-inbox"] });
-            qc.invalidateQueries({ queryKey: ["production-progress"] });
-            qc.invalidateQueries({ queryKey: ["production-statuses", project.project_id] });
-            qc.invalidateQueries({ queryKey: ["tpv-items", project.project_id] });
-            toast({ title: "↩ Vráceno do TPV" });
-          } catch (err: any) {
-            console.error("[Vrátit do TPV] failed:", err);
-            toast({ title: "Chyba", description: err?.message, variant: "destructive" });
-          }
-        },
-      });
-    }
+    // Vrátit do TPV — dostupné pre všetky inbox položky (vrátane midflight, kvôli cleanup)
+    actions.push({
+      label: "↩ Vrátit do TPV", icon: "↩", dividerBefore: true,
+      onClick: async () => {
+        try {
+          const { error } = await supabase.from("production_inbox").delete().eq("id", item.id);
+          if (error) throw error;
+          qc.invalidateQueries({ queryKey: ["production-inbox"] });
+          qc.invalidateQueries({ queryKey: ["production-progress"] });
+          qc.invalidateQueries({ queryKey: ["production-statuses", project.project_id] });
+          qc.invalidateQueries({ queryKey: ["tpv-items", project.project_id] });
+          toast({ title: "↩ Vráceno do TPV" });
+        } catch (err: any) {
+          console.error("[Vrátit do TPV] failed:", err);
+          toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+        }
+      },
+    });
     actions.push({
       label: "Zrušit položku", icon: "✕", danger: true, dividerBefore: true,
       onClick: () => setCancelState({
