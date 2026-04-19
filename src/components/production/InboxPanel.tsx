@@ -455,48 +455,95 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
 
   const handleItemContextMenu = (e: React.MouseEvent, item: InboxItem, project: InboxProject) => {
     e.preventDefault(); e.stopPropagation();
-    const planItem: PlanningItem = {
-      id: item.id, item_name: item.item_name, item_code: item.item_code,
-      estimated_hours: item.estimated_hours, estimated_czk: item.estimated_czk, stage_id: item.stage_id,
-    };
+
+    // Ak je položka súčasťou selekcie, aplikujeme akcie na celú selekciu
+    const isInSelection = checkedItems.has(item.id) && checkedItems.size > 1;
+    const selectedItems = isInSelection
+      ? Array.from(checkedItems)
+          .map(id => allInboxItemsMap.get(id))
+          .filter((x): x is { item: InboxItem; project: InboxProject } => !!x)
+      : [{ item, project }];
+    const selCount = selectedItems.length;
+    const affectedProjectIds = Array.from(new Set(selectedItems.map(s => s.project.project_id)));
+
+    const planItems: PlanningItem[] = selectedItems.map(({ item: it }) => ({
+      id: it.id, item_name: it.item_name, item_code: it.item_code,
+      estimated_hours: it.estimated_hours, estimated_czk: it.estimated_czk, stage_id: it.stage_id,
+    }));
+
     const actions: ContextMenuAction[] = [
       {
-        label: "Naplánovat...", icon: "📅",
-        onClick: () => setPlanningState({ projectId: project.project_id, projectName: project.project_name, items: [planItem] }),
+        label: isInSelection ? `Naplánovat výběr (${selCount})...` : "Naplánovat...",
+        icon: "📅",
+        onClick: () => setPlanningState({
+          projectId: project.project_id,
+          projectName: isInSelection && affectedProjectIds.length > 1 ? `${selCount} položek` : project.project_name,
+          items: planItems,
+        }),
       },
     ];
-    if (onNavigateToTPV) {
+    if (!isInSelection && onNavigateToTPV) {
       actions.push({ label: "Zobrazit položky", icon: "📋", onClick: () => onNavigateToTPV(project.project_id) });
     }
-    if (onOpenProjectDetail) {
+    if (!isInSelection && onOpenProjectDetail) {
       actions.push({ label: "Zobrazit detail projektu", icon: "🏗", onClick: () => onOpenProjectDetail(project.project_id) });
     }
     // Vrátit do TPV — dostupné pre všetky inbox položky (vrátane midflight, kvôli cleanup)
     actions.push({
-      label: "Vrátit do TPV", icon: "↩", dividerBefore: true,
+      label: isInSelection ? `Vrátit výběr do TPV (${selCount})` : "Vrátit do TPV",
+      icon: "↩", dividerBefore: true,
       onClick: async () => {
         try {
-          const { error } = await supabase.from("production_inbox").delete().eq("id", item.id);
+          const ids = selectedItems.map(s => s.item.id);
+          const { error } = await supabase.from("production_inbox").delete().in("id", ids);
           if (error) throw error;
           qc.invalidateQueries({ queryKey: ["production-inbox"] });
           qc.invalidateQueries({ queryKey: ["production-progress"] });
-          qc.invalidateQueries({ queryKey: ["production-statuses", project.project_id] });
-          qc.invalidateQueries({ queryKey: ["tpv-items", project.project_id] });
-          toast({ title: "↩ Vráceno do TPV" });
+          for (const pid of affectedProjectIds) {
+            qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
+            qc.invalidateQueries({ queryKey: ["tpv-items", pid] });
+          }
+          clearCheckedItems();
+          toast({ title: isInSelection ? `↩ Vráceno ${selCount} do TPV` : "↩ Vráceno do TPV" });
         } catch (err: any) {
           console.error("[Vrátit do TPV] failed:", err);
           toast({ title: "Chyba", description: err?.message, variant: "destructive" });
         }
       },
     });
-    actions.push({
-      label: "Zrušit položku", icon: "✕", danger: true, dividerBefore: true,
-      onClick: () => setCancelState({
-        itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
-        hours: item.estimated_hours, projectName: project.project_name,
-        projectId: project.project_id, source: "inbox", splitGroupId: null,
-      }),
-    });
+    if (isInSelection) {
+      actions.push({
+        label: `Zrušit výběr (${selCount})`, icon: "✕", danger: true, dividerBefore: true,
+        onClick: async () => {
+          if (!confirm(`Zrušit ${selCount} vybraných položek?`)) return;
+          try {
+            const ids = selectedItems.map(s => s.item.id);
+            const { error } = await supabase.from("production_inbox").delete().in("id", ids);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["production-inbox"] });
+            qc.invalidateQueries({ queryKey: ["production-progress"] });
+            for (const pid of affectedProjectIds) {
+              qc.invalidateQueries({ queryKey: ["production-statuses", pid] });
+              qc.invalidateQueries({ queryKey: ["tpv-items", pid] });
+            }
+            clearCheckedItems();
+            toast({ title: `✕ Zrušeno ${selCount} položek` });
+          } catch (err: any) {
+            console.error("[Bulk cancel] failed:", err);
+            toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+          }
+        },
+      });
+    } else {
+      actions.push({
+        label: "Zrušit položku", icon: "✕", danger: true, dividerBefore: true,
+        onClick: () => setCancelState({
+          itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
+          hours: item.estimated_hours, projectName: project.project_name,
+          projectId: project.project_id, source: "inbox", splitGroupId: null,
+        }),
+      });
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, actions });
   };
 
