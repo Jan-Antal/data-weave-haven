@@ -377,15 +377,15 @@ function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isB
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
           {isRec && (
-            <span className="absolute top-1 left-1 bg-red-500 text-white text-[8px] px-1 py-0.5 rounded font-semibold leading-none">
+            <span className="absolute bottom-1 left-1 bg-red-500 text-white text-[8px] px-1 py-0.5 rounded font-semibold leading-none">
               REC
             </span>
           )}
-          {/* Selection checkbox overlay */}
+          {/* Selection checkbox overlay (top-left) */}
           {isDraggable && (
             <div
               className={cn(
-                "absolute top-1 right-1 w-4 h-4 rounded border flex items-center justify-center transition-all z-10",
+                "absolute top-1 left-1 w-4 h-4 rounded border flex items-center justify-center transition-all z-10",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
                   : hasAnySelection
@@ -396,6 +396,18 @@ function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isB
             >
               {isSelected && <span className="text-[9px] leading-none font-bold">✓</span>}
             </div>
+          )}
+          {/* Delete button overlay (top-right, hover only, no selection) */}
+          {canDelete && onDelete && !hasAnySelection && (
+            <button
+              type="button"
+              className="absolute top-1 right-1 w-6 h-6 rounded-md bg-black/50 text-white hover:bg-destructive flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              onClick={(e) => { e.stopPropagation(); onDelete(file); }}
+              title="Smazat fotku"
+              aria-label="Smazat fotku"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           )}
         </>
       ) : (
