@@ -294,7 +294,7 @@ export async function midflightImportPlanVyroby(
 
     const { data: inboxRows } = await (supabaseClient as any)
       .from("production_inbox")
-      .select("id, project_id, estimated_czk, sent_at")
+      .select("id, project_id, estimated_czk, item_code, sent_at")
       .in("project_id", projectIds)
       .eq("status", "pending")
       .order("sent_at", { ascending: true });
@@ -303,6 +303,18 @@ export async function midflightImportPlanVyroby(
       .from("production_schedule")
       .select("id, project_id, split_group_id")
       .eq("is_midflight", true)
+      .in("project_id", projectIds);
+
+    // Pending TPV CZK = TPV items not in inbox and not in (non-midflight) schedule
+    const { data: tpvRows } = await (supabaseClient as any)
+      .from("tpv_items")
+      .select("project_id, item_code, cena, pocet, status")
+      .in("project_id", projectIds)
+      .is("deleted_at", null);
+
+    const { data: schedRows } = await (supabaseClient as any)
+      .from("production_schedule")
+      .select("project_id, item_code, is_midflight")
       .in("project_id", projectIds);
 
     const inboxByProject = new Map<string, any[]>();
@@ -314,6 +326,35 @@ export async function midflightImportPlanVyroby(
     for (const r of mfRows || []) {
       if (!mfByProject.has(r.project_id)) mfByProject.set(r.project_id, []);
       mfByProject.get(r.project_id)!.push(r);
+    }
+
+    const inboxCodesByProject = new Map<string, Set<string>>();
+    for (const r of inboxRows || []) {
+      if (!r.item_code) continue;
+      if (!inboxCodesByProject.has(r.project_id)) inboxCodesByProject.set(r.project_id, new Set());
+      inboxCodesByProject.get(r.project_id)!.add(r.item_code);
+    }
+    const schedCodesByProject = new Map<string, Set<string>>();
+    for (const r of schedRows || []) {
+      if (!r.item_code || r.is_midflight) continue;
+      if (!schedCodesByProject.has(r.project_id)) schedCodesByProject.set(r.project_id, new Set());
+      schedCodesByProject.get(r.project_id)!.add(r.item_code);
+    }
+    const pendingTpvCzkByProject = new Map<string, number>();
+    for (const t of tpvRows || []) {
+      const status = (t.status || "").toLowerCase();
+      if (status === "zrušeno" || status === "zruseno" || status === "cancelled") continue;
+      const code = t.item_code;
+      const inboxCodes = inboxCodesByProject.get(t.project_id);
+      const schedCodes = schedCodesByProject.get(t.project_id);
+      if (code && inboxCodes?.has(code)) continue;
+      if (code && schedCodes?.has(code)) continue;
+      const cena = Number(t.cena) || 0;
+      const pocet = Number(t.pocet) || 1;
+      pendingTpvCzkByProject.set(
+        t.project_id,
+        (pendingTpvCzkByProject.get(t.project_id) || 0) + cena * pocet
+      );
     }
 
     for (const projectId of projectIds) {
@@ -340,6 +381,14 @@ export async function midflightImportPlanVyroby(
       const mfHours = [...projectWeeklyHours.get(projectId)!.values()].reduce((a, b) => a + b, 0);
       const inboxRemainder = Math.max(0, hodinyPlan - mfHours);
       const totalCzk = inboxList.reduce((s, r) => s + (Number(r.estimated_czk) || 0), 0);
+      const pendingTpvCzk = pendingTpvCzkByProject.get(projectId) || 0;
+
+      // Inbox share: proportional to inbox CZK vs (inbox + pending TPV) CZK.
+      // No pending TPV → inbox absorbs full remainder (preserves Z-2515-001 behavior).
+      const denom = totalCzk + pendingTpvCzk;
+      const inboxShare = denom > 0
+        ? Math.round(((inboxRemainder * totalCzk) / denom) * 10) / 10
+        : 0;
 
       const perItem: { id: string; hours: number }[] = [];
       let allocated = 0;
@@ -348,14 +397,14 @@ export async function midflightImportPlanVyroby(
         const isLast = i === inboxList.length - 1;
         let h: number;
         if (isLast) {
-          h = Math.max(0, Math.round((inboxRemainder - allocated) * 10) / 10);
-        } else if (inboxRemainder === 0) {
+          h = Math.max(0, Math.round((inboxShare - allocated) * 10) / 10);
+        } else if (inboxShare === 0) {
           h = 0;
         } else if (totalCzk > 0) {
           const share = (Number(r.estimated_czk) || 0) / totalCzk;
-          h = Math.round(inboxRemainder * share * 10) / 10;
+          h = Math.round(inboxShare * share * 10) / 10;
         } else {
-          h = Math.round((inboxRemainder / inboxList.length) * 10) / 10;
+          h = Math.round((inboxShare / inboxList.length) * 10) / 10;
         }
         allocated += h;
         perItem.push({ id: r.id, hours: h });
@@ -375,7 +424,7 @@ export async function midflightImportPlanVyroby(
         if (upErr) errors.push(`Inbox update ${id}: ${upErr.message}`);
       }
 
-      onProgress?.(`[midflight] ${projectId}: Inbox ${M}p dorovnaný (${inboxRemainder}h, ${N + 1}..${newTotal}/${newTotal})`);
+      onProgress?.(`[midflight] ${projectId}: Inbox ${M}p (share=${inboxShare}h z ${inboxRemainder}h, pendingTPV=${Math.round(pendingTpvCzk)}Kč)`);
     }
   }
   // ━━━ END INBOX RECONCILIATION ━━━
