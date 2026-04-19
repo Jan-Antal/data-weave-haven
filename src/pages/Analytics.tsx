@@ -288,6 +288,7 @@ export default function Analytics() {
     { key: "projekty", label: "Projekty" },
     { key: "rezie", label: "Režije" },
     { key: "dilna", label: "Dílna" },
+    { key: "vykaz", label: "Výkaz" },
   ];
 
   return (
