@@ -6,16 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff, Pencil, Check, X, ChevronDown, ChevronRight, Shield } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { TestModeBanner } from "./TestModeBanner";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
+import {
+  PERMISSION_FLAGS,
+  PERMISSION_LABELS,
+  ROLE_LABELS,
+  ROLE_PRESETS,
+  resolvePermissions,
+  type Permissions,
+} from "@/lib/permissionPresets";
 
 interface UserRow {
   id: string;
@@ -23,6 +33,7 @@ interface UserRow {
   full_name: string;
   is_active: boolean;
   role: AppRole | null;
+  permissions: Partial<Permissions> | null;
   person_id: string | null;
 }
 
@@ -31,18 +42,21 @@ interface PersonOption {
   name: string;
 }
 
-const ROLE_LABELS: Record<AppRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  pm: "PM",
-  konstrukter: "Konstruktér",
-  viewer: "Viewer",
-  tester: "Tester",
-  vyroba: "Výroba",
-};
-
 // Roles assignable via dropdown (owner excluded — can only be set via transfer)
-const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "vyroba", "viewer", "tester"];
+const ASSIGNABLE_ROLES: AppRole[] = [
+  "admin",
+  "vedouci_pm",
+  "pm",
+  "vedouci_konstrukter",
+  "konstrukter",
+  "vedouci_vyroby",
+  "mistr",
+  "quality",
+  "kalkulant",
+  "vyroba",
+  "viewer",
+  "tester",
+];
 
 interface Props {
   open: boolean;
