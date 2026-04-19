@@ -660,11 +660,17 @@ export function VykazReport() {
         <div className="px-4 pt-2">
           <Card className="p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
                 <h3 className="text-sm font-semibold">Hodiny v čase</h3>
                 <span className="text-[11px] text-muted-foreground">
                   {effectiveBucket === "day" ? "per den" : "per týden"}
                 </span>
+                {effectiveBucket === "day" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground ml-2">
+                    <span className="inline-block w-3 h-2.5 rounded-sm bg-muted border border-border/60" />
+                    Víkend / svátek
+                  </span>
+                )}
               </div>
               <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
                 {([
@@ -690,7 +696,7 @@ export function VykazReport() {
                 })}
               </div>
             </div>
-            {chartData.length === 0 || chartData.every((d) => d.hodiny === 0) ? (
+            {chartData.every((d) => d.hodiny === 0) ? (
               <div className="h-[180px] flex items-center justify-center text-xs text-muted-foreground">
                 Žádné záznamy v období
               </div>
@@ -699,6 +705,31 @@ export function VykazReport() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/40" />
+                    {effectiveBucket === "day" &&
+                      (() => {
+                        const spans: Array<{ start: number; end: number }> = [];
+                        let curStart: number | null = null;
+                        for (let i = 0; i < chartData.length; i++) {
+                          if (chartData[i].isNonWorking) {
+                            if (curStart === null) curStart = i;
+                          } else if (curStart !== null) {
+                            spans.push({ start: curStart, end: i - 1 });
+                            curStart = null;
+                          }
+                        }
+                        if (curStart !== null) spans.push({ start: curStart, end: chartData.length - 1 });
+                        return spans.map((s, idx) => (
+                          <ReferenceArea
+                            key={`nw-${idx}`}
+                            x1={chartData[s.start].label}
+                            x2={chartData[s.end].label}
+                            fill="hsl(var(--muted-foreground))"
+                            fillOpacity={0.12}
+                            stroke="none"
+                            ifOverflow="extendDomain"
+                          />
+                        ));
+                      })()}
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
@@ -712,13 +743,26 @@ export function VykazReport() {
                     />
                     <RTooltip
                       cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
-                      contentStyle={{
-                        background: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: 8,
-                        fontSize: 12,
+                      content={({ active, payload, label }: any) => {
+                        if (!active || !payload || !payload.length) return null;
+                        const item = payload[0].payload;
+                        return (
+                          <div
+                            className="rounded-lg border bg-background px-2.5 py-1.5 shadow-md"
+                            style={{ fontSize: 12 }}
+                          >
+                            <div className="font-medium text-foreground">{label}</div>
+                            <div className="text-muted-foreground tabular-nums">
+                              {formatHours(payload[0].value as number)}
+                            </div>
+                            {item?.nonWorkingLabel && (
+                              <div className="text-[11px] italic text-muted-foreground mt-0.5">
+                                {item.nonWorkingLabel}
+                              </div>
+                            )}
+                          </div>
+                        );
                       }}
-                      formatter={(value: number) => [formatHours(value), "Hodiny"]}
                     />
                     <Bar dataKey="hodiny" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
