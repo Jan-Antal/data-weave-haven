@@ -780,23 +780,23 @@ function SubByProject({
   }, [rows, projectsMap]);
 
   return (
-    <TableRow className="bg-muted/30 hover:bg-muted/30">
+    <TableRow className="hover:bg-transparent">
       <TableCell colSpan={colSpan} className="p-0">
-        <div className="pl-8 pr-4 py-2 space-y-1">
+        <div className="bg-muted/30 border-l-2 border-border pl-10 pr-4 py-2 space-y-1">
           {byProject.map((p) => (
-            <div key={p.id} className="flex items-center gap-2 text-xs">
+            <div key={p.id} className="flex items-center gap-3">
               {p.matched ? (
                 <button
                   onClick={() => onOpenDetail(p.id)}
-                  className="font-mono text-xs text-primary hover:underline"
+                  className="font-mono text-[13px] text-primary hover:underline"
                 >
                   {p.id}
                 </button>
               ) : (
-                <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
+                <span className="font-mono text-[13px] text-muted-foreground">{p.id}</span>
               )}
-              <span className="flex-1 truncate" title={p.name}>{p.name}</span>
-              <span className="tabular-nums font-medium w-20 text-right">{formatHours(p.hodiny)}</span>
+              <span className="flex-1 truncate text-[13px]" title={p.name}>{p.name}</span>
+              <span className="tabular-nums font-medium w-20 text-right text-[13px]">{formatHours(p.hodiny)}</span>
             </div>
           ))}
         </div>
