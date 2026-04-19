@@ -148,10 +148,10 @@ const GROUPS: Group[] = [
     icon: { bg: "#FAEEDA", color: "#633806" },
     rows: [
       {
-        kind: "tri",
+        kind: "bin",
         label: "Modul výroba",
         desc: "Bundles, QC tracking",
-        write: "canManageProduction",
+        flags: ["canManageProduction"],
       },
       {
         kind: "bin",
