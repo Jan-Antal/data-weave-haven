@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -96,6 +96,14 @@ export function OsobyExternisti() {
     is_architekt: false,
   });
   const [deleteFor, setDeleteFor] = useState<{ id: string; name: string } | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapsed = (key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -216,19 +224,37 @@ export function OsobyExternisti() {
       />
 
       <div className="flex-1 overflow-y-auto px-6 pb-4 pt-3 space-y-4">
-        {grouped.map(([firma, members]) => (
+        {grouped.map(([firma, members]) => {
+          const isCollapsed = collapsed.has(firma);
+          return (
           <section
             key={`${firma}-card`}
             className={cn("rounded-lg border shadow-sm overflow-hidden bg-card", "border-cyan-200")}
           >
-            {/* Card header */}
-            <div className={cn("flex items-center gap-2 flex-wrap px-3 py-2 border-b", "bg-cyan-50/80 border-cyan-200")}>
-              <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5 bg-background/70", EXTERNAL_BADGE)}>
-                {firma}
-              </Badge>
-              <span className="text-[11px] opacity-80">Externí spolupracovníci · {members.length} osob</span>
-            </div>
+            {/* Card header (clickable) */}
+            <button
+              type="button"
+              onClick={() => toggleCollapsed(firma)}
+              className={cn(
+                "w-full flex items-center justify-between gap-3 px-3 py-2 border-b text-left transition-colors hover:brightness-95",
+                "bg-cyan-50/80 border-cyan-200",
+              )}
+              aria-expanded={!isCollapsed}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Badge variant="outline" className={cn("text-[11px] font-semibold border px-2.5 py-0.5 bg-background/80 shrink-0", EXTERNAL_BADGE)}>
+                  {firma}
+                </Badge>
+                <span className="text-[12px] font-medium text-foreground/80">
+                  {members.length} {members.length === 1 ? "osoba" : members.length < 5 ? "osoby" : "osob"}
+                </span>
+              </div>
+              <ChevronDown
+                className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", isCollapsed && "-rotate-90")}
+              />
+            </button>
 
+            {!isCollapsed && (
             <Table className="table-fixed">
               <colgroup>
                 <col style={{ width: 260 }} />
