@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2, X, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, ReferenceArea } from "recharts";
 import { useCzechHolidays, useCompanyHolidays } from "@/hooks/useWeeklyCapacity";
 import { supabase } from "@/integrations/supabase/client";
