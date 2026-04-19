@@ -24,7 +24,7 @@ import { formatAppDate } from "@/lib/dateFormat";
 
 type DateRange = "week" | "month" | "prev_week" | "prev_month" | "3months" | "custom";
 
-const EXCLUDED_CINNOST = new Set(["TPV", "ENG", "PRO"]);
+
 
 interface LogRow {
   ami_project_id: string;
