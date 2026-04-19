@@ -396,8 +396,10 @@ export function OsobyExternisti() {
                 })}
               </TableBody>
             </Table>
+            )}
           </section>
-        ))}
+          );
+        })}
         {filtered.length === 0 && (
           <div className="text-center text-sm text-muted-foreground py-8">
             Žádní externisté nenalezeni.
