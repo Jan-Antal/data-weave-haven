@@ -25,7 +25,6 @@ const ROLE_FLAGS = [
 const ARCHITEKT_LABEL = "Architekt";
 
 /** Externisti color theme — teal/cyan to distinguish from interní bloky. */
-const EXTERNAL_THEME = "bg-cyan-50 text-cyan-900 border-cyan-200";
 const EXTERNAL_BADGE = "bg-cyan-100 text-cyan-800 border-cyan-300";
 
 interface ExternalRow {
@@ -216,33 +215,42 @@ export function OsobyExternisti() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-6">
-        <Table>
-          <TableHeader className="sticky top-0 bg-card z-10">
-            <TableRow>
-              <TableHead className="w-[260px]">Jméno</TableHead>
-              <TableHead className="w-[180px]">Firma</TableHead>
-              <TableHead className="w-[150px]">Telefon</TableHead>
-              <TableHead className="w-[220px]">Email</TableHead>
-              <TableHead className="w-[200px]">Role</TableHead>
-              <TableHead className="w-[90px]">Aktivní</TableHead>
-              <TableHead className="w-[50px]" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {grouped.map(([firma, members]) => (
-              <>
-                {/* Firma block header */}
-                <TableRow key={`${firma}-block`} className="hover:bg-transparent border-b-0">
-                  <TableCell colSpan={7} className="pt-4 pb-1.5 px-0">
-                    <div className={cn("flex items-center gap-2 flex-wrap rounded-md border px-3 py-2", EXTERNAL_THEME)}>
-                      <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5", EXTERNAL_BADGE)}>
-                        {firma}
-                      </Badge>
-                      <span className="text-[11px] opacity-80">Externí spolupracovníci · {members.length} osob</span>
-                    </div>
-                  </TableCell>
+      <div className="flex-1 overflow-y-auto px-6 pb-4 pt-3 space-y-4">
+        {grouped.map(([firma, members]) => (
+          <section
+            key={`${firma}-card`}
+            className={cn("rounded-lg border shadow-sm overflow-hidden bg-card", "border-cyan-200")}
+          >
+            {/* Card header */}
+            <div className={cn("flex items-center gap-2 flex-wrap px-3 py-2 border-b", "bg-cyan-50/80 border-cyan-200")}>
+              <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5 bg-background/70", EXTERNAL_BADGE)}>
+                {firma}
+              </Badge>
+              <span className="text-[11px] opacity-80">Externí spolupracovníci · {members.length} osob</span>
+            </div>
+
+            <Table className="table-fixed">
+              <colgroup>
+                <col style={{ width: 260 }} />
+                <col style={{ width: 180 }} />
+                <col style={{ width: 150 }} />
+                <col style={{ width: 220 }} />
+                <col style={{ width: 200 }} />
+                <col style={{ width: 90 }} />
+                <col style={{ width: 50 }} />
+              </colgroup>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Jméno</TableHead>
+                  <TableHead>Firma</TableHead>
+                  <TableHead>Telefon</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Aktivní</TableHead>
+                  <TableHead />
                 </TableRow>
+              </TableHeader>
+              <TableBody>
                 {members.map((r) => {
                   const av = avatarStyles(r.name);
                   const isArchitekt = r.role === ARCHITEKT_LABEL;
@@ -360,17 +368,15 @@ export function OsobyExternisti() {
                     </TableRow>
                   );
                 })}
-              </>
-            ))}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                  Žádní externisté nenalezeni.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              </TableBody>
+            </Table>
+          </section>
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center text-sm text-muted-foreground py-8">
+            Žádní externisté nenalezeni.
+          </div>
+        )}
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

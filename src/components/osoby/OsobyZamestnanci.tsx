@@ -42,6 +42,29 @@ function strediskoStyles(stredisko: string | null | undefined): string {
   return "bg-muted text-muted-foreground border-border";
 }
 
+/** Stredisko card colors — outer border + header strip per stredisko. */
+function strediskoCardStyles(stredisko: string | null | undefined): { card: string; header: string } {
+  const s = (stredisko ?? "").toLowerCase();
+  if (s.includes("direct")) return { card: "border-green-200", header: "bg-green-50/80 border-green-200" };
+  if (s.includes("indirect")) return { card: "border-[#F5A971]", header: "bg-[#FDE2C7]/60 border-[#F5A971]" };
+  if (s.includes("provoz")) return { card: "border-purple-200", header: "bg-purple-50/80 border-purple-200" };
+  return { card: "border-border", header: "bg-muted/40 border-border" };
+}
+
+/** Shared colgroup so per-block tables align with the global sticky header. */
+const SharedColgroup = () => (
+  <colgroup>
+    <col style={{ width: 260 }} />
+    <col style={{ width: 180 }} />
+    <col style={{ width: 160 }} />
+    <col style={{ width: 200 }} />
+    <col style={{ width: 110 }} />
+    <col style={{ width: 160 }} />
+    <col style={{ width: 150 }} />
+    <col style={{ width: 40 }} />
+  </colgroup>
+);
+
 /** Deterministic pastel avatar color from name hash. */
 function avatarStyles(name: string): { bg: string; fg: string } {
   let hash = 0;
@@ -305,249 +328,259 @@ export function OsobyZamestnanci() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-y-auto px-6">
-        <Table>
-          <TableHeader className="sticky top-0 bg-card z-10">
+      {/* Sticky column header (one per page) */}
+      <div className="px-6 pt-3 sticky top-0 z-20 bg-card">
+        <Table className="table-fixed">
+          <SharedColgroup />
+          <TableHeader>
             <TableRow>
-              <TableHead className="w-[260px]">Jméno</TableHead>
-              <TableHead className="w-[180px]">Úsek</TableHead>
-              <TableHead className="w-[160px]">Pozice</TableHead>
-              <TableHead className="w-[200px]">Role na projektu</TableHead>
-              <TableHead className="w-[110px]">Úvazek</TableHead>
-              <TableHead className="w-[160px]">Absence</TableHead>
-              <TableHead className="w-[150px]">Stav</TableHead>
-              <TableHead className="w-[40px]" />
+              <TableHead>Jméno</TableHead>
+              <TableHead>Úsek</TableHead>
+              <TableHead>Pozice</TableHead>
+              <TableHead>Role na projektu</TableHead>
+              <TableHead>Úvazek</TableHead>
+              <TableHead>Absence</TableHead>
+              <TableHead>Stav</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {Array.from(grouped.entries()).map(([stredisko, useks]) => {
-              const allEmpsInStredisko = Array.from(useks.values()).flat();
-              const strediskoHrs = allEmpsInStredisko.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
-              return (
-                <>
-                  {/* Stredisko block header */}
-                  <TableRow key={`${stredisko}-block`} className="hover:bg-transparent border-b-0">
-                    <TableCell colSpan={8} className="pt-4 pb-1.5 px-0">
-                      <div className={cn("flex items-center gap-2 flex-wrap rounded-md border px-3 py-2", strediskoStyles(stredisko))}>
-                        <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5 bg-background/60", strediskoStyles(stredisko))}>
-                          {stredisko}
-                        </Badge>
-                        <span className="text-[11px] opacity-80">Kapacita výroby · {allEmpsInStredisko.length} osob · {strediskoHrs}h brutto/týd</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+        </Table>
+      </div>
+
+      {/* Per-stredisko card blocks */}
+      <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
+        {Array.from(grouped.entries()).map(([stredisko, useks]) => {
+          const allEmpsInStredisko = Array.from(useks.values()).flat();
+          const strediskoHrs = allEmpsInStredisko.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
+          const cardStyle = strediskoCardStyles(stredisko);
+          return (
+            <section
+              key={`${stredisko}-card`}
+              className={cn("rounded-lg border shadow-sm overflow-hidden bg-card", cardStyle.card)}
+            >
+              {/* Card header — stredisko strip */}
+              <div className={cn("flex items-center gap-2 flex-wrap px-3 py-2 border-b", cardStyle.header)}>
+                <Badge variant="outline" className={cn("text-[10px] font-semibold border px-2 py-0.5 bg-background/70", strediskoStyles(stredisko))}>
+                  {stredisko}
+                </Badge>
+                <span className="text-[11px] opacity-80">
+                  Kapacita výroby · {allEmpsInStredisko.length} osob · {strediskoHrs}h brutto/týd
+                </span>
+              </div>
+
+              <Table className="table-fixed">
+                <SharedColgroup />
+                <TableBody>
                   {Array.from(useks.entries()).map(([usek, emps]) => {
                     const totalHrs = emps.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
                     return (
-                  <>
-                    <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/30 hover:bg-muted/30 border-b border-border/40">
-                      <TableCell colSpan={8} className="py-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] font-medium uppercase tracking-wide text-foreground">{usek}</span>
-                          <span className="text-[11px] text-muted-foreground">· {emps.length} osob · {totalHrs}h brutto/týd</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {emps.map((emp: any) => {
-                      const active = activePeriodForEmployee(periods, emp.id);
-                      const terminationDate = emp.deactivated_date || (emp.deactivated_at ? (emp.deactivated_at as string).slice(0, 10) : null);
-                      const isTerminated = !emp.aktivny || (terminationDate && terminationDate <= format(new Date(), "yyyy-MM-dd"));
-                      const positionsForUsek = positionsByUsek.get(emp.usek_nazov ?? "") ?? [];
-                      const av = avatarStyles(emp.meno ?? "");
-                      return (
-                        <TableRow key={emp.id} data-emp-row={emp.id} className={cn("transition-shadow", isTerminated ? "opacity-50" : "")}>
-                          <TableCell>
-                            <div className="flex items-center gap-2.5">
-                              <div
-                                className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
-                                style={{ backgroundColor: av.bg, color: av.fg }}
-                                aria-hidden
-                              >
-                                {getInitials(emp.meno ?? "")}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="font-medium text-sm truncate">{emp.meno}</div>
-                                <div className="text-[11px] text-muted-foreground">{emp.usek}</div>
-                              </div>
+                      <>
+                        {/* Úsek sub-header */}
+                        <TableRow key={`${stredisko}-${usek}-hdr`} className="bg-muted/40 hover:bg-muted/40 border-y border-border/50">
+                          <TableCell colSpan={8} className="py-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] font-medium uppercase tracking-wide text-foreground">{usek}</span>
+                              <span className="text-[11px] text-muted-foreground">· {emps.length} osob · {totalHrs}h brutto/týd</span>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <Select
-                              value={emp.usek_nazov ?? "__none"}
-                              onValueChange={(v) => handleUsekChange(emp, v)}
-                            >
-                              <SelectTrigger className={INLINE_TRIGGER}><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none" disabled>—</SelectItem>
-                                {usekOptions.map((u) => (
-                                  <SelectItem key={`${u.stredisko}-${u.usek}`} value={u.usek}>{u.usek}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={emp.pozicia ?? "__none"}
-                              onValueChange={(v) => handlePoziciaChange(emp, v)}
-                              disabled={!emp.usek_nazov}
-                            >
-                              <SelectTrigger
-                                className={INLINE_TRIGGER}
-                                title={!emp.usek_nazov ? "Nejprve vyberte úsek" : undefined}
-                              >
-                                <SelectValue placeholder={!emp.usek_nazov ? "Vyberte úsek…" : "—"} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none">— Neobsazeno</SelectItem>
-                                {positionsForUsek.map((p) => (
-                                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            {(() => {
-                              const roles: Array<["is_pm" | "is_kalkulant" | "is_konstrukter", string]> = [
-                                ["is_pm", "PM"],
-                                ["is_kalkulant", "Kalkulant"],
-                                ["is_konstrukter", "Konstruktér"],
-                              ];
-                              const selected = roles.filter(([f]) => !!emp[f]).map(([, l]) => l);
-                              const summary = selected.length ? selected.join(", ") : "—";
-                              return (
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className={cn(
-                                        INLINE_TRIGGER,
-                                        "flex items-center text-left truncate",
-                                        selected.length === 0 && "text-muted-foreground",
-                                      )}
-                                    >
-                                      <span className="truncate">{summary}</span>
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-48 p-2" align="start">
-                                    <div className="space-y-1.5">
-                                      {roles.map(([flag, label]) => (
-                                        <label key={flag} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
-                                          <Checkbox
-                                            checked={!!emp[flag]}
-                                            onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
-                                            className="h-4 w-4"
-                                          />
-                                          <span className="text-xs">{label}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              );
-                            })()}
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={String(emp.uvazok_hodiny ?? 8)}
-                              onValueChange={(v) => handleUvazek(emp, Number(v))}
-                            >
-                              <SelectTrigger className={INLINE_TRIGGER}><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {UVAZEK_OPTIONS.map((d) => (
-                                  <SelectItem key={d} value={String(d)}>{d * 5} h/týd</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            {active ? (
-                              <Badge variant="outline" className="text-[11px] bg-amber-100 text-amber-800 border-amber-200">
-                                {active.absencia_kod}
-                              </Badge>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => setAbsenceFor({ id: emp.id, meno: emp.meno, usek: emp.usek, uvazok_hodiny: emp.uvazok_hodiny })}
-                              >
-                                <Plus className="h-3 w-3 mr-1" /> Přidat
-                              </Button>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {isTerminated && terminationDate ? (
-                              <Badge variant="outline" className="text-[11px] bg-red-50 text-red-700 border-red-200">
-                                Ukončen k {format(new Date(terminationDate), "d. M. yyyy", { locale: cs })}
-                              </Badge>
-                            ) : active && (active.absencia_kod === "NEM" || active.absencia_kod === "PN" || active.absencia_kod === "RD") ? (
-                              (() => {
-                                const days = Math.round((new Date(active.date_to).getTime() - new Date(active.date_from).getTime()) / 86400000);
-                                const isOpenEnded = days >= 170;
-                                return (
-                                  <Badge variant="outline" className="text-[10px] leading-tight bg-amber-50 text-amber-800 border-amber-200 flex flex-col items-start py-0.5 px-1.5 max-w-[140px]">
-                                    <span className="font-medium">Pozastaveno</span>
-                                    <span className="text-[9px] opacity-80 truncate w-full">
-                                      {isOpenEnded ? "předp. návrat" : "návrat"} {format(new Date(active.date_to), "d. M. yyyy", { locale: cs })}
-                                    </span>
-                                  </Badge>
-                                );
-                              })()
-                            ) : (
-                              <Badge variant="outline" className="text-[11px] bg-green-50 text-green-700 border-green-200">
-                                Aktívny
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {!isTerminated ? (
-                                  <DropdownMenuItem onClick={() => setTerminateFor({ id: emp.id, name: emp.meno })}>
-                                    Ukončit pracovní poměr
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem onClick={() => reactivate.mutate(emp.id)}>
-                                    Obnovit zaměstnance
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem onClick={() => setAbsenceFor({ id: emp.id, meno: emp.meno, usek: emp.usek, uvazok_hodiny: emp.uvazok_hodiny })}>
-                                  Spravovat absence
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => setDeleteFor({ id: emp.id, name: emp.meno })}
-                                  className="text-destructive focus:text-destructive"
-                                >
-                                  Smazat trvale
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </>
+                        {emps.map((emp: any) => {
+                          const active = activePeriodForEmployee(periods, emp.id);
+                          const terminationDate = emp.deactivated_date || (emp.deactivated_at ? (emp.deactivated_at as string).slice(0, 10) : null);
+                          const isTerminated = !emp.aktivny || (terminationDate && terminationDate <= format(new Date(), "yyyy-MM-dd"));
+                          const positionsForUsek = positionsByUsek.get(emp.usek_nazov ?? "") ?? [];
+                          const av = avatarStyles(emp.meno ?? "");
+                          return (
+                            <TableRow key={emp.id} data-emp-row={emp.id} className={cn("transition-shadow", isTerminated ? "opacity-50" : "")}>
+                              <TableCell>
+                                <div className="flex items-center gap-2.5">
+                                  <div
+                                    className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
+                                    style={{ backgroundColor: av.bg, color: av.fg }}
+                                    aria-hidden
+                                  >
+                                    {getInitials(emp.meno ?? "")}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="font-medium text-sm truncate">{emp.meno}</div>
+                                    <div className="text-[11px] text-muted-foreground">{emp.usek}</div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={emp.usek_nazov ?? "__none"}
+                                  onValueChange={(v) => handleUsekChange(emp, v)}
+                                >
+                                  <SelectTrigger className={INLINE_TRIGGER}><SelectValue placeholder="—" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none" disabled>—</SelectItem>
+                                    {usekOptions.map((u) => (
+                                      <SelectItem key={`${u.stredisko}-${u.usek}`} value={u.usek}>{u.usek}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={emp.pozicia ?? "__none"}
+                                  onValueChange={(v) => handlePoziciaChange(emp, v)}
+                                  disabled={!emp.usek_nazov}
+                                >
+                                  <SelectTrigger
+                                    className={INLINE_TRIGGER}
+                                    title={!emp.usek_nazov ? "Nejprve vyberte úsek" : undefined}
+                                  >
+                                    <SelectValue placeholder={!emp.usek_nazov ? "Vyberte úsek…" : "—"} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none">— Neobsazeno</SelectItem>
+                                    {positionsForUsek.map((p) => (
+                                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const roles: Array<["is_pm" | "is_kalkulant" | "is_konstrukter", string]> = [
+                                    ["is_pm", "PM"],
+                                    ["is_kalkulant", "Kalkulant"],
+                                    ["is_konstrukter", "Konstruktér"],
+                                  ];
+                                  const selected = roles.filter(([f]) => !!emp[f]).map(([, l]) => l);
+                                  const summary = selected.length ? selected.join(", ") : "—";
+                                  return (
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            INLINE_TRIGGER,
+                                            "flex items-center text-left truncate",
+                                            selected.length === 0 && "text-muted-foreground",
+                                          )}
+                                        >
+                                          <span className="truncate">{summary}</span>
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-48 p-2" align="start">
+                                        <div className="space-y-1.5">
+                                          {roles.map(([flag, label]) => (
+                                            <label key={flag} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
+                                              <Checkbox
+                                                checked={!!emp[flag]}
+                                                onCheckedChange={(v) => handleRoleToggle(emp, flag, v === true)}
+                                                className="h-4 w-4"
+                                              />
+                                              <span className="text-xs">{label}</span>
+                                            </label>
+                                          ))}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                  );
+                                })()}
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={String(emp.uvazok_hodiny ?? 8)}
+                                  onValueChange={(v) => handleUvazek(emp, Number(v))}
+                                >
+                                  <SelectTrigger className={INLINE_TRIGGER}><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {UVAZEK_OPTIONS.map((d) => (
+                                      <SelectItem key={d} value={String(d)}>{d * 5} h/týd</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                {active ? (
+                                  <Badge variant="outline" className="text-[11px] bg-amber-100 text-amber-800 border-amber-200">
+                                    {active.absencia_kod}
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => setAbsenceFor({ id: emp.id, meno: emp.meno, usek: emp.usek, uvazok_hodiny: emp.uvazok_hodiny })}
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" /> Přidat
+                                  </Button>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isTerminated && terminationDate ? (
+                                  <Badge variant="outline" className="text-[11px] bg-red-50 text-red-700 border-red-200">
+                                    Ukončen k {format(new Date(terminationDate), "d. M. yyyy", { locale: cs })}
+                                  </Badge>
+                                ) : active && (active.absencia_kod === "NEM" || active.absencia_kod === "PN" || active.absencia_kod === "RD") ? (
+                                  (() => {
+                                    const days = Math.round((new Date(active.date_to).getTime() - new Date(active.date_from).getTime()) / 86400000);
+                                    const isOpenEnded = days >= 170;
+                                    return (
+                                      <Badge variant="outline" className="text-[10px] leading-tight bg-amber-50 text-amber-800 border-amber-200 flex flex-col items-start py-0.5 px-1.5 max-w-[140px]">
+                                        <span className="font-medium">Pozastaveno</span>
+                                        <span className="text-[9px] opacity-80 truncate w-full">
+                                          {isOpenEnded ? "předp. návrat" : "návrat"} {format(new Date(active.date_to), "d. M. yyyy", { locale: cs })}
+                                        </span>
+                                      </Badge>
+                                    );
+                                  })()
+                                ) : (
+                                  <Badge variant="outline" className="text-[11px] bg-green-50 text-green-700 border-green-200">
+                                    Aktívny
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {!isTerminated ? (
+                                      <DropdownMenuItem onClick={() => setTerminateFor({ id: emp.id, name: emp.meno })}>
+                                        Ukončit pracovní poměr
+                                      </DropdownMenuItem>
+                                    ) : (
+                                      <DropdownMenuItem onClick={() => reactivate.mutate(emp.id)}>
+                                        Obnovit zaměstnance
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem onClick={() => setAbsenceFor({ id: emp.id, meno: emp.meno, usek: emp.usek, uvazok_hodiny: emp.uvazok_hodiny })}>
+                                      Spravovat absence
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => setDeleteFor({ id: emp.id, name: emp.meno })}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      Smazat trvale
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </>
                     );
                   })}
-                </>
-              );
-            })}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                  Žádní zaměstnanci nenalezeni.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                </TableBody>
+              </Table>
+            </section>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="text-center text-sm text-muted-foreground py-8">
+            Žádní zaměstnanci nenalezeni.
+          </div>
+        )}
       </div>
 
       {/* Footer hint */}
