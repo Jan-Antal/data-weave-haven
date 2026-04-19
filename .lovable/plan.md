@@ -1,68 +1,72 @@
 
 
-## Diagnóza
+## Reálna diagnóza Z-2515-001
 
-Vidím dáta a problém je jasný — **inbox má úplne nesprávne hodiny**, hoci `estimated_czk` je správne:
+Z dát:
+- `tpv_items` sumár (Schváleno): 30 položiek, raw CZK = 1 889 968
+- `prodejni_cena` = 2 233 699, marža = 0.25, prod_pct = 0.30, hourly = 550
+- TPV raw hodiny (Σ floor per item) ≈ **773 h**
+- Project hodiny = floor(2 233 699 × 0.75 × 0.30 / 550) = **1 092 h**
+- Source = "Project" (project > tpv) → `hodiny_plan = 1092`, `scale_ratio = 1092/773 ≈ 1.413`
 
-| Projekt | TPV Schváleno (CZK) | Inbox CZK | Inbox hodín | Očakávané hodín |
-|---|---|---|---|---|
-| Insia (Z-2605-001) | 860 993 | 860 993 ✅ | **14.4** ❌ | ~672 |
-| Multisport (Z-2607-008) | 726 150 | 726 150 ✅ | **552.2** ❌ | ~586 (chýba ~9–34) |
-| Allianz 5.patro (Z-2617-001) | 1 196 023 | 922 081 ❌ | **7.8** ❌ | ~1214 |
-| Allianz 6.patro (Z-2617-002) | 107 325 | 107 325 ✅ | **54** ✅ | 54 ✅ |
+**Detail projektu (project_plan_hours)** používa `computePlanHours` ktorý aplikuje scale + remainder na poslednej položke → Σ tpv_items.hodiny_plan = **1092 ✅**
 
-### Skutočná príčina
+**Inbox položky** ale boli vytvorené pri `sendToProduction` per-item ako raw `floor(cena × pocet × (1−marže) × prod_pct / hourly_rate)` BEZ scale. Súčet = ~773, ale dáta v DB ukazujú **1215** → znamená to, že `recalculateProductionHours` ich už raz zoškáloval per-item cez `rawTotalHours × scaleRatio`, kde každá položka dostane vlastný floor (× 1.413), ale **bez agregovaného remainderu** → zaokrúhľovanie hore akumuluje rozdiel.
 
-Po dátovom recovery (revert `recon_reduced` → `pending`) sa **vrátili pôvodné hodiny z času midflight reconciliation**, ktoré boli umelo redukované na ~0 (lebo midflight ich „pokryl" historickou prácou). 
+Per item: `floor(rawHours × 1.413)` → Σ ≈ 773 × 1.413 = 1092, ale floor(47×1.413)+floor(20×1.413)+... = 1215 (nadhodnocuje).
 
-Príklad Insia: 7 položiek za 860 993 CZK má spolu len **14.4 h** — to vzniklo tým, že midflight ich zredukoval na zostatok a my sme síce vrátili `status=pending`, ale **`estimated_hours` sme nevrátili na pôvodnú hodnotu**.
+Counter check: `1215/773 ≈ 1.572` → znamená, že scale ratio v DB sa aplikoval dvakrát alebo z inej raw bázy. V každom prípade súčet **nesedí na 1092**.
 
-`recalculateProductionHours` ich neopravil, lebo dnešná logika len kontroluje, či sa `correctCzk` líši od uloženého — CZK je správne, takže preskočí.
+## Návrh opravy (správny tento raz)
 
-### Allianz 5.patro: dva problémy
-1. **Inbox CZK 922 081 ≠ TPV Schváleno 1 196 023** — niektoré položky chýbajú v inboxe (neboli odoslané do výroby).
-2. **`hodiny_plan = 1214`** je z prodejnej ceny (`plan_use_project_price = true`), ale TPV Schváleno = 1 302 → správne by malo byť max(TPV, project) alebo prinajmenšom konzistentné.
-
-## Návrh opravy
-
-### Krok 1 — Doplniť do `recalculateProductionHours` opravu hodín v inboxe na základe CZK
-
-Súčasný kód v `src/lib/recalculateProductionHours.ts` aktualizuje schedule/inbox iba keď zistí zmenu cez výpočet z `cena × pocet`. Ale pre inbox položky **už nepoznáme `cena × pocet`** — ich `estimated_czk` je uložené a estimated_hours by sa malo dopočítať priamo z neho:
-
-```text
-estimated_hours = floor(estimated_czk × (1 − marže) × production_pct / hourly_rate)
+### Princíp
+Pre **každý projekt** (a v budúcnosti per stage, ak má etapy) musí platiť:
+```
+Σ inbox.estimated_hours (pending) + Σ schedule.scheduled_hours (active) == hodiny_plan
 ```
 
-Toto pridáme ako **fallback krok** v recalculate: pre každú pending inbox položku porovnaj uložené `estimated_hours` s prepočítanými z `estimated_czk` — ak sa líši, oprav.
+To dosiahnem **proporcionálnym rozdelením** s **agregovaným remainderom**, nie per-item floor + scale.
 
-### Krok 2 — Jednorazová oprava existujúcich dát (SQL migrácia)
+### Algoritmus per projekt v `recalculateProductionHours.ts`
 
-Pre všetky `production_inbox` rows so statusom `pending`:
-- prepočítať `estimated_hours = FLOOR(estimated_czk × (1 − marže) × cost_production_pct / hourly_rate)` z dát projektu (+ fallback marže 15 %, + EUR konverzia ak `currency='EUR'`)
-- update iba ak sa hodnota líši o > 0.5 h (aby sme zbytočne nešahali do hotových)
+1. Zistiť `hodiny_plan` z `result.hodiny_plan` (computed)
+2. Zistiť koľko hodín je už **uzamknutých v schedule** (status `completed` a `in_progress` s vyčerpanou prácou — alebo jednoduchšie: všetky `scheduled/in_progress/completed` rows zachovať s ich hodinami)
+3. **Remainder pre inbox** = `hodiny_plan − Σ schedule_hours_active`
+4. Inbox položky dostanú podiel z remainderu **proporcionálne k ich `estimated_czk`**:
+   ```
+   item.estimated_hours = floor(remainder × item.estimated_czk / Σ inbox.estimated_czk)
+   ```
+5. **Posledná inbox položka** (poradie podľa `sent_at`) dostane zvyšný diel: `remainder − Σ ostatných` (môže byť aj o pár hodín viac/menej kvôli zaokrúhleniu, ale Σ presne sedí)
 
-### Krok 3 — Allianz 5.patro: chýbajúce položky v inboxe
+### Per-stage (ak projekt má etapy ≥2)
 
-To **nie je bug v recalculate** — niektoré TPV položky jednoducho neboli odoslané do produkcie (alebo boli vrátené). User to musí poslať z TPV listu manuálne. **Mimo scope tejto opravy.**
+V `project_stages` má každá etapa svoju `prodejni_cena` a `marze`. `hodiny_plan` projektu by mal byť Σ etáp. Pre teraz: **stage_id na inbox položkách je v Z-2515-001 `nil`** (nie sú etapy), takže projekt-level rozdelenie stačí. Logiku per-stage pridám len ak `stage_id` je nastavené — vtedy zoskupím inbox položky podľa stage_id a aplikujem rovnaký proporcionálny algoritmus per skupinu so stage-specific `hodiny_plan`.
 
-### Krok 4 — Multisport: chýba ~9 hodín
+### Schedule (active) sa nemení
+Existujúce `scheduled/in_progress/completed` riadky ostávajú s ich hodinami (môžu reflektovať skutočne odpracovaný stav). Inbox je „zostatok do plánu".
 
-Po oprave Krokom 1+2 sa to môže samo dorovnať. Ak nie, je to typická zaokrúhľovacia odchýlka (33 položiek × FLOOR per item) — akceptovateľné.
+### Edge cases
+- Ak `Σ schedule_active >= hodiny_plan` → inbox všetky dostanú 0 (alebo zachovajú estimated_czk pre prípadné rebalansy, ale hours = 0)
+- Ak `hodiny_plan = 0` → inbox sa nemenia
+- Ak inbox je prázdny → nič
+- Ak `Σ inbox.estimated_czk = 0` → rozdeliť rovnomerne
+
+### Multistage handling
+Skontrolujem `inbox.stage_id`. Ak všetky položky v projekte majú `stage_id = NULL` → projekt-level rozdelenie. Ak majú `stage_id` → per-stage skupiny so stage-specific hodiny_plan (z `project_stages.prodejni_cena` × analogicky cez `computePlanHours` alebo pomerom prodejní ceny etapy / projekt).
 
 ## Súbory na úpravu
 
-- **`src/lib/recalculateProductionHours.ts`** — pridať fallback prepočet `estimated_hours` z uloženého `estimated_czk` pre inbox položky kde nie je k dispozícii pôvodný TPV item (alebo kde sa hodiny výrazne líšia od očakávaných z CZK).
-- **Nová migrácia SQL** — jednorazová oprava inbox `estimated_hours` z `estimated_czk` pre všetky aktuálne pending položky, používajúc settings (hourly_rate, default_margin) a per-project marže/preset.
+- **`src/lib/recalculateProductionHours.ts`** — nahradiť aktuálnu inbox-update logiku (per-item floor × scale_ratio) novým post-processing krokom: po výpočte `result` per projekt agregovať existujúce schedule hodiny a redistribuovať remainder do inbox položiek proporcionálne k ich `estimated_czk`, s remainderom na poslednú položku v poradí podľa `sent_at`.
 
-## Edge cases
+- **`computePlanHours` zachovať** — používa sa pre `project_plan_hours.hodiny_plan` a tpv_items per-item hours (pre detail projektu / TPV list). Tam je scale + remainder ok lebo TPV položky sú referenčné.
 
-- **EUR projekty**: `estimated_czk` je už v CZK (stored), takže žiadna konverzia potrebná pri spätnom dopočte.
-- **Položky bez `estimated_czk` (NULL/0)**: preskočiť, ostávajú 0 hodín.
-- **Položky s `adhoc_reason='midflight%'`**: to sú expedice markery, nie sú `pending`, neovplyvní ich to.
-- **Splittnuté položky (`split_part`/`split_total`)**: pre tie sa používa estimated_czk konkrétneho splitu, takže funguje rovnako.
+## Postup
+
+1. Implementovať novú post-processing fázu v `recalculateProductionHours`
+2. Spustiť „Přepočítat hodiny → Všechny týdny" v UI
+3. Overiť: detail Z-2515-001 = 1092, Σ inbox = 1092 − Σ active schedule
 
 ## Mimo scope
 
-- Allianz 5.patro chýbajúcich 274K CZK v inboxe — to je dátový stav (užívateľ neposlal všetko), nie bug.
-- Zaokrúhľovacie rozdiely <1 h per projekt — akceptovateľné.
+- Vyčistenie midflight dát + nový midflight beh (riešime potom v ďalšom kroku ako si pôvodne navrhol)
 
