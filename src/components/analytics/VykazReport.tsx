@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2, X, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, ReferenceArea } from "recharts";
@@ -23,7 +23,6 @@ import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 import { formatAppDate } from "@/lib/dateFormat";
 
 type DateRange = "week" | "month" | "prev_week" | "prev_month" | "3months" | "custom";
-type GroupBy = "projekt" | "osoba" | "cinnost";
 
 const EXCLUDED_CINNOST = new Set(["TPV", "ENG", "PRO"]);
 
@@ -862,7 +861,7 @@ export function VykazReport() {
             <Card className="p-8 shadow-sm text-center text-sm text-muted-foreground">
               Žádné záznamy v zvoleném období
             </Card>
-          ) : groupBy === "projekt" ? (
+          ) : (
             <ProjektSections
               grouped={grouped as any}
               expanded={expanded}
@@ -871,52 +870,6 @@ export function VykazReport() {
               collapsedSections={collapsedSections}
               toggleSection={toggleSection}
             />
-          ) : groupBy === "osoba" ? (
-            <FlatSection title="Osoby" count={grouped.length} hours={totalHours} tone="neutral">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
-                    <TableHead className="w-[60%] h-9 text-[11px] uppercase tracking-wide">Jméno</TableHead>
-                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Počet projektů</TableHead>
-                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Hodiny celkem</TableHead>
-                    <TableHead className="w-8 h-9" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <OsobaRows
-                    grouped={grouped as any}
-                    expanded={expanded}
-                    toggleExpand={toggleExpand}
-                    projectsMap={projectsMap}
-                    overheadMap={overheadMap}
-                    onOpenDetail={setDetailProjectId}
-                  />
-                </TableBody>
-              </Table>
-            </FlatSection>
-          ) : (
-            <FlatSection title="Činnosti" count={grouped.length} hours={totalHours} tone="neutral">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
-                    <TableHead className="w-[60%] h-9 text-[11px] uppercase tracking-wide">Název činnosti</TableHead>
-                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Kód</TableHead>
-                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Hodiny</TableHead>
-                    <TableHead className="w-8 h-9" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <CinnostRows
-                    grouped={grouped as any}
-                    expanded={expanded}
-                    toggleExpand={toggleExpand}
-                    projectsMap={projectsMap}
-                    overheadMap={overheadMap}
-                    onOpenDetail={setDetailProjectId}
-                  />
-                </TableBody>
-              </Table>
-            </FlatSection>
           )}
 
           {/* Celkem footer card */}
