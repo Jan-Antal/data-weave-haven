@@ -3,6 +3,7 @@ import { OsobyExternisti } from "@/components/osoby/OsobyExternisti";
 import { OsobyUzivatele } from "@/components/osoby/OsobyUzivatele";
 import { OsobyKatalog } from "@/components/osoby/OsobyKatalog";
 import { OsobyKapacita } from "@/components/osoby/OsobyKapacita";
+import { OsobyOpravneni } from "@/components/osoby/OsobyOpravneni";
 import { useAuth } from "@/hooks/useAuth";
 import { TestModeBanner } from "@/components/TestModeBanner";
 import { PageTabsShell, type ShellTabDef } from "@/components/shell/PageTabsShell";
@@ -15,6 +16,7 @@ export default function Osoby() {
     { key: "zamestnanci", label: "Zaměstnanci" },
     { key: "externisti", label: "Externisté" },
     { key: "uzivatele", label: "Uživatelé", visible: canManageUsers },
+    { key: "opravneni", label: "Oprávnění", visible: canSeeAdminTabs },
     { key: "katalog", label: "Pozice & číselníky", visible: canSeeAdminTabs },
     { key: "kapacita", label: "Kapacita", visible: canSeeAdminTabs },
   ];
@@ -30,6 +32,7 @@ export default function Osoby() {
           {active === "zamestnanci" && <OsobyZamestnanci />}
           {active === "externisti" && <OsobyExternisti />}
           {active === "uzivatele" && canManageUsers && <OsobyUzivatele />}
+          {active === "opravneni" && canSeeAdminTabs && <OsobyOpravneni />}
           {active === "katalog" && canSeeAdminTabs && <OsobyKatalog />}
           {active === "kapacita" && canSeeAdminTabs && <OsobyKapacita />}
         </>
