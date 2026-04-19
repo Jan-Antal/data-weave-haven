@@ -1,53 +1,85 @@
 
 
-## Plan: Polish Oprávnění — colors + fix non-functional Ne toggles
+## Diagnóza: Prečo PM nevidí Správu osôb
 
-### 1. Unified color semantics (TriToggle + BinToggle)
+### Hlavná príčina (front-end gating)
+PM klikne na "Správa osob" v hlavičke → `navigate('/osoby')`. V `src/App.tsx` je route gating:
 
-Replace the current pale neutral "Ne" with **red** and the blue "Čítať" with **orange** for instant visual reading:
-
-| State | Background | Text | Border |
-|---|---|---|---|
-| Ne (selected) | `#FDECEC` | `#B42318` | `#F4A6A0` |
-| Čítať (selected) | `#FFF1E0` | `#9A4A00` | `#F4B66A` |
-| Upraviť / Áno (selected) | `#EAF3DE` | `#27500A` | `#97C459` (unchanged) |
-| Unselected | transparent | muted | transparent |
-
-Apply to `SegBtn` `variant`s: rename `neutral` → `none` styling to red; `read` → orange. No changes to `write`.
-
-### 2. Fix "Modul výroba" + "Správa osob" tri toggles that can't go to Ne
-
-Root cause: `triState()` returns `"read"` as the fallback when a row has no separate `read` flag and `write` is false. So clicking "Ne" sets the write flag to false, then the state immediately reads back as "Čítať" — Ne is never selected and the section feels inert.
-
-Fix: change rows in `Modul výroba` and `Správa osob` from **tri** to **bin** (one flag, Ne / Áno), since there is no separate read permission backing them in `permissionPresets.ts`. Specifically:
-
-- `Modul výroba` (write `canManageProduction`) → bin row `["canManageProduction"]`
-- `Správa osob` (write `canManagePeople`) → bin row `["canManagePeople"]`
-- Same fix for `Project Info`, `PM Status`, `TPV Status`, `TPV List` — they all use `canEdit`/`canManageTPV` with no read flag. Convert to binary so "Ne" actually deselects them visibly.
-
-Keep `Plán výroby — Kanban / Tabulka` as **tri** (it has both `canAccessPlanVyroby` read + `canWritePlanVyroby` write — the only row where tri-state is meaningful).
-
-### 3. Stronger section color blocks
-
-Wrap each `GROUPS[]` section in a tinted card using the same color from `g.icon`:
-
-```text
-┌─ ▌ Project Info ──────────────────────┐  <- left border 3px, header bg = icon.bg
-│ rows...                                │  <- card has subtle bg = icon.bg @ 30%
-└────────────────────────────────────────┘
+```ts
+function AdminRoute({ children }) {
+  const { isAdmin, isOwner, isVyroba } = useAuth();
+  if (!isAdmin && !isOwner && !isVyroba) return <Navigate to="/" replace />;
+  ...
+}
+<Route path="/osoby" element={<AdminRoute>...</AdminRoute>} />
 ```
 
-- Section root: `border-l-[3px]` using `icon.color`, `rounded-md`, `bg-[icon.bg]/40`
-- Header bar inside: solid `bg-[icon.bg]`, text `icon.color`, larger 12px label
-- Replaces the current 18×18 swatch with a real colored band
+PM nie je `admin/owner/vyroba` → **redirect na `/`**. Stránka sa vôbec neotvorí, žiadne RLS volanie sa nestihne urobiť. To je dôvod, prečo "sa neotvorí" Externisti.
 
-### 4. RLS verification (no DB changes — audit only)
+Druhá vrstva, ktorá by ho aj tak zatvorila: dropdown v `ProductionHeader` ukazuje "Správa osob" len ak `canManageUsers || canManagePeople`. PM má `canManagePeople = true` (preset), takže sa link zobrazí — ale klik vyhodí redirect.
 
-Will quickly cross-check via `supabase--read_query` that each permission flag has a corresponding RLS policy on the relevant tables, and document any gap (e.g. `canManageProduction` for `vyroba` role — DB only allows `pm/admin/owner` to write `production_schedule`, so revoking it client-side matches DB enforcement). If gaps exist they'll be listed in the implementation message — no migration unless user approves.
+### RLS audit (čo som overil cez `supabase--read_query`)
 
-### Files touched
+| Tabuľka | RLS status | Pre PM |
+|---|---|---|
+| `people` | SELECT všetkým authenticated; INSERT/UPDATE owner/admin/pm/konstrukter; DELETE owner/admin/pm | OK — PM môže čítať aj editovať externistov |
+| `ami_employees` | SELECT všetkým authenticated; INSERT/UPDATE/DELETE iba owner/admin | PM by **nemohol editovať** zamestnancov, iba čítať (čo dáva zmysel — PM nespravuje úväzky) |
+| `position_catalogue` | INSERT/UPDATE/DELETE iba owner/admin | OK pre admin tabs (PM ich aj tak nemá vidieť) |
+| `production_capacity` / `..._employees` | INSERT/UPDATE/DELETE iba owner/admin | OK |
+| `ami_absences` | INSERT/UPDATE/DELETE iba owner/admin | OK |
+| `user_roles` | SELECT/manage iba admin/owner | OK |
+| `profiles` | SELECT/UPDATE iba admin/owner (okrem own profile) | OK |
 
-- `src/components/osoby/OsobyOpravneni.tsx` — update `GROUPS` (convert several tri→bin), update `SegBtn` color variants, restructure section rendering with colored cards.
+**Záver:** RLS pre `people` je správne nastavené pre PM. Iba route guard a viditeľnosť tabov sú zle.
 
-No changes to `permissionPresets.ts`, `useAuth.tsx`, or DB schema.
+### Vedľajšia drobnosť (nesúlad UI vs DB)
+- `OsobyZamestnanci` má inline editovateľné polia (úväzok, pozícia atď.) — PM ich uvidí ako editovateľné, ale UPDATE na `ami_employees` mu RLS odmietne (a vyhodí toast chybu). Tab "Zaměstnanci" by mal byť pre PM read-only alebo skrytý.
+
+---
+
+## Plán opravy
+
+### Zmena 1 — povoliť PM (a Konstruktérom) prístup na `/osoby`
+
+`src/App.tsx`, `AdminRoute`: rozšíriť o role, ktoré majú `canManagePeople` alebo `canManageExternisti` (PM, vedouci_pm, konstrukter, vedouci_konstrukter):
+
+```ts
+function AdminRoute({ children }) {
+  const { isAdmin, isOwner, isVyroba, isPM, isKonstrukter, canManagePeople, canManageExternisti } = useAuth();
+  const allowed = isAdmin || isOwner || isVyroba || isPM || isKonstrukter
+                  || canManagePeople || canManageExternisti;
+  if (!allowed) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+```
+
+Lepšie ešte: rozdeliť AdminRoute do dvoch — `AdminRoute` pre `/analytics` a `/vyroba`, a nový `PeopleRoute` pre `/osoby` ktorý kontroluje `canManagePeople || canManageExternisti || canManageUsers`. Ale jednoduchší fix vyššie stačí.
+
+### Zmena 2 — `Osoby.tsx` viditeľnosť tabov podľa role
+
+Aktuálne `defaultTab="zamestnanci"` a všetci tam padnú. PM by mal po príchode vidieť **Externisti** (jeho hlavný use-case). Použiť `defaultTab` podľa role:
+
+```ts
+const defaultTab = canSeeAdminTabs ? "zamestnanci" : "externisti";
+```
+
+Tab `Zaměstnanci` ponechať viditeľný (PM môže aj tak iba čítať) — alebo skryť pre non-admins, keďže väčšina interakcií je editačná. Navrhujem **skryť** pre PM:
+
+```ts
+{ key: "zamestnanci", label: "Zaměstnanci", visible: canSeeAdminTabs },
+{ key: "externisti", label: "Externisté" },  // všetci s prístupom
+```
+
+### Zmena 3 — `OsobyExternisti` rešpektovať `canManageExternisti`
+
+Tlačidlá "Přidat externistu", inline editácie a delete sú momentálne aktívne pre každého. Pridať `disabled` / skryť ak `!canManageExternisti`. Pre PM `canManageExternisti = true` (preset), takže reálne sa nič nezmení — len bezpečnostne čisté pre prípadné budúce role.
+
+### Súbory
+
+- `src/App.tsx` — rozšíriť `AdminRoute`
+- `src/pages/Osoby.tsx` — `defaultTab` podľa role + `visible` pre `zamestnanci`
+- `src/components/osoby/OsobyExternisti.tsx` — gating tlačidiel cez `canManageExternisti`
+
+### Bez DB zmien
+RLS netreba meniť. Aktuálne policies sú správne — iba front-end ich blokoval predtým, než sa stihli vyvolať.
 
