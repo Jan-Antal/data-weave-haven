@@ -795,25 +795,30 @@ function CinnostRows({
 }
 
 function SubByProject({
-  rows, colSpan, projectsMap, onOpenDetail,
+  rows, colSpan, projectsMap, overheadMap, onOpenDetail,
 }: {
   rows: LogRow[];
   colSpan: number;
   projectsMap: Map<string, string>;
+  overheadMap: Map<string, string>;
   onOpenDetail: (id: string) => void;
 }) {
   const byProject = useMemo(() => {
-    const map = new Map<string, { hodiny: number; matched: boolean }>();
+    const map = new Map<string, { hodiny: number; matched: boolean; isOverhead: boolean }>();
     for (const r of rows) {
       const k = r.ami_project_id || "—";
       let g = map.get(k);
-      if (!g) { g = { hodiny: 0, matched: projectsMap.has(k) }; map.set(k, g); }
+      if (!g) {
+        const isOverhead = overheadMap.has(k);
+        g = { hodiny: 0, matched: projectsMap.has(k) || isOverhead, isOverhead };
+        map.set(k, g);
+      }
       g.hodiny += Number(r.hodiny) || 0;
     }
     return Array.from(map.entries())
-      .map(([id, g]) => ({ id, ...g, name: projectsMap.get(id) ?? id }))
+      .map(([id, g]) => ({ id, ...g, name: projectsMap.get(id) ?? overheadMap.get(id) ?? id }))
       .sort((a, b) => b.hodiny - a.hodiny);
-  }, [rows, projectsMap]);
+  }, [rows, projectsMap, overheadMap]);
 
   return (
     <TableRow className="hover:bg-transparent">
