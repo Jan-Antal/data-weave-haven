@@ -24,11 +24,20 @@ import { toast } from "@/hooks/use-toast";
 
 const UVAZEK_OPTIONS = [4, 6, 8];
 
-/** Stredisko pill colors — green/orange/purple per spec. */
+/** Unified inline cell style — looks like plain text, reveals affordance on hover. */
+const INLINE_TRIGGER = cn(
+  "h-8 text-xs px-2 bg-transparent border border-transparent shadow-none rounded-md transition-colors w-full justify-start font-normal",
+  "[&>svg]:opacity-0",
+  "hover:bg-muted hover:border-border/60 hover:[&>svg]:opacity-100",
+  "focus:bg-muted focus:border-border/60 focus:[&>svg]:opacity-100 focus-visible:ring-0 focus-visible:ring-offset-0",
+  "data-[state=open]:bg-muted data-[state=open]:border-border/60 data-[state=open]:[&>svg]:opacity-100",
+);
+
+/** Stredisko pill colors — green / vivid orange / purple per spec. */
 function strediskoStyles(stredisko: string | null | undefined): string {
   const s = (stredisko ?? "").toLowerCase();
   if (s.includes("direct")) return "bg-green-100 text-green-800 border-green-200";
-  if (s.includes("indirect")) return "bg-orange-100 text-orange-800 border-orange-200";
+  if (s.includes("indirect")) return "bg-[#FDE2C7] text-[#B4471A] border-[#F5A971]";
   if (s.includes("provoz")) return "bg-purple-100 text-purple-800 border-purple-200";
   return "bg-muted text-muted-foreground border-border";
 }
