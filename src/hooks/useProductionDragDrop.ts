@@ -193,6 +193,12 @@ export function useProductionDragDrop() {
         });
       }
 
+      // Renumber any chains touched by this bulk move.
+      const chainIds = new Set(items.map((i: any) => i.split_group_id).filter(Boolean) as string[]);
+      for (const g of chainIds) {
+        try { await renumberChain(g); } catch { /* silent */ }
+      }
+
       invalidateAll();
 
       const insertedIds = (inserted || []).map((r: any) => r.id);
