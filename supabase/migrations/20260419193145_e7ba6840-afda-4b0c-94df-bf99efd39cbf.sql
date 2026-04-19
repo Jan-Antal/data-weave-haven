@@ -1,0 +1,1 @@
+ALTER TABLE public.production_settings ADD COLUMN IF NOT EXISTS default_margin_pct numeric NOT NULL DEFAULT 15;

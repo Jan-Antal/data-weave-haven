@@ -1049,6 +1049,7 @@ export type Database = {
       }
       production_settings: {
         Row: {
+          default_margin_pct: number
           hourly_rate: number
           id: string
           monthly_capacity_hours: number
@@ -1058,6 +1059,7 @@ export type Database = {
           weekly_capacity_hours: number
         }
         Insert: {
+          default_margin_pct?: number
           hourly_rate?: number
           id?: string
           monthly_capacity_hours?: number
@@ -1067,6 +1069,7 @@ export type Database = {
           weekly_capacity_hours?: number
         }
         Update: {
+          default_margin_pct?: number
           hourly_rate?: number
           id?: string
           monthly_capacity_hours?: number
