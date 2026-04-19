@@ -1,80 +1,64 @@
 
-## Plan: Role-First Permission Manager
+## Plan: Výkaz tab (Toggl-style report) in Analytics
 
-Replace `OsobyOpravneni.tsx` with a two-column UI. Keep `permissionPresets.ts` and `useAuth.tsx` untouched.
+### 1. New tab in `PageTabsShell`
+Add `{ key: "vykaz", label: "Výkaz" }` to `tabs` array in `Analytics.tsx`. Render `<VykazReport />` when `activeTab === "vykaz"`. Hide existing toolbar/summary cards/table for that mode (mirror `dilnaMode` pattern).
 
-### Layout
+### 2. New component `src/components/analytics/VykazReport.tsx`
+Self-contained — fetches its own data, owns its toolbar.
+
+**State:**
+- `dateRange: "week" | "month" | "3months" | "custom"` (default `month`)
+- `customFrom`, `customTo` (used when `custom`)
+- `groupBy: "projekt" | "osoba" | "cinnost"` (default `projekt`)
+- `search: string`
+- `expanded: Set<string>` (group keys)
+
+**Data fetch (React Query):**
+- Query key: `["vykaz-log", from, to]`
+- Single `supabase.from("production_hours_log").select("ami_project_id,zamestnanec,cinnost_kod,cinnost_nazov,hodiny,datum_sync").gte("datum_sync", from).lte("datum_sync", to).range(0, 99999)`
+- Side fetch (cached): `supabase.from("projects").select("project_id, project_name").is("deleted_at", null)` to resolve matched/unmatched + names.
+- Filter out `cinnost_kod ∈ {TPV, ENG, PRO}` (consistent with rest of analytics — note in memory).
+
+**Aggregation in `useMemo`:** build three group structures keyed by `projekt | osoba | cinnost`, each with totals + nested sub-rows. For "projekt" group, attach `matched: boolean` from projects map.
+
+### 3. Toolbar layout (top of Výkaz panel, same `border-b bg-card px-4 py-2` pattern)
 
 ```text
-┌───────────────────────────────────────────────────────────┐
-│ ROLY (220px)         │  Header: [Role name] [Dup][Uložit]│
-│ ─ owner       (2)    │                                    │
-│ ─ admin       (1)    │  Pridelení uživatelia              │
-│ ▌pm           (5) ●  │  ◯JK ✕  ◯PN ✕  + Přidat            │
-│ ─ konstruktér (3)    │                                    │
-│ ...                  │  ── Projekty & TPV ──              │
-│ + Nová rola          │  Projekty       [– │Čítať│Upraviť] │
-│                      │  TPV list       [– │Čítať│Upraviť] │
-│                      │  Vytvořit       [– │Áno]           │
-│                      │  ...                               │
-└───────────────────────────────────────────────────────────┘
+[Range select]  [From][To if custom]   [Projekt|Osoba|Činnosť toggle]   [search]      [Export CSV]
 ```
 
-### Component structure (`src/components/osoby/OsobyOpravneni.tsx`)
+- Range: `Select` with the four options.
+- Custom: two `<input type="date">` shown only when `custom`.
+- Group toggle: 3-button pill group (same pattern as existing chips).
+- Search: `TableSearchBar`.
+- Export CSV: builds CSV from currently filtered+grouped rows (no download lib — use `Blob` + anchor click). Filename: `vykaz_{from}_{to}_{groupBy}.csv`.
 
-State:
-- `selectedRole: AppRole` (default `pm`)
-- `draftPerms: Permissions` — starts from `ROLE_PRESETS[selectedRole]`, mutated by toggle clicks
-- `assignedUsers: { id, full_name, email }[]` (for selected role)
-- `addUserOpen: boolean`, `newRoleOpen: boolean`
-- `confirmOverwrite: { count: number } | null`
+### 4. Table (Projekt view, default)
 
-Data:
-- Fetch profiles + user_roles once. Group user counts per role.
-- On role select: load assigned users, reset `draftPerms` to preset.
+Columns: `Projekt` | `Stav` (chip) | `Hodiny` | `Záznamů` | `Posledný záznam` | `›`
 
-### Permission row mapping
+- Matched rows: project name (clickable → `setDetailProjectId`), green "Spárováno" badge.
+- Unmatched rows: rendered after a separator row `Nespárované záznamy z Alvena · X projektů` with `bg-amber-500/10` header. Each unmatched row has `border-l-[3px] border-amber-500` and `text-muted-foreground`.
+- Click row → toggle expand. Expanded panel = sub-table grouped by `zamestnanec` with chips listing distinct `cinnost_nazov` values, total hours, date range. Use the same `bg-muted/30` indent pattern as `AnalyticsBreakdownRow`.
 
-Tri-state rows (`–` / `Čítať` / `Upraviť`):
-| Row | Read flag | Write flag |
-|---|---|---|
-| Projekty | (always read if any access) | `canEdit` |
-| TPV list | implicit read | `canManageTPV` |
-| Plán výroby | `canAccessPlanVyroby` | `canWritePlanVyroby` |
-| Správa osob | implicit read | `canManagePeople` |
+### 5. Osoba view
+Columns: `Jméno` | `Počet projektů` | `Hodiny celkem` | `›`. Expanded: per-project hours sub-rows.
 
-For "Projekty"/"TPV list"/"Správa osob" — `–` means the user has no access at all (handled via `canEdit=false` and either keeping read-only via existing logic or hiding). Since `useAuth` doesn't have separate read flags for these, treat: `–` = false write + no related access; `Čítať` = false write + visible (default for any role); `Upraviť` = write true. We persist only the write flag — read is implied by role membership.
+### 6. Činnosť view
+Columns: `Název činnosti` | `Kód` | `Hodiny` | `›`. Expanded: per-project hours sub-rows.
 
-Binary rows (`–` / `Áno`):
-- `canCreateProject`, `canDeleteProject`, combined `canEditProjectCode`+`canEditSmluvniTermin` (saved together), `canSeePrices`, `canAccessVyroba` (NEW — see note), `canAccessDaylog`, `canQCOnly`, `canAccessAnalytics`, `canManageExternisti`, `canAccessSettings`, `canManageUsers`, `canPermanentDelete`
+### 7. Footer row
+Bold `tfoot` row showing sum of all currently visible hours.
 
-NOTE: `canAccessVyroba` does not exist in `permissionPresets.ts`. Per instruction we must NOT change presets. We will store it in the JSONB as an additional key — `useAuth.resolvePermissions` ignores unknown keys, so it's safe data-wise; the row just won't gate UI yet (acceptable, future wiring).
+### 8. Visual style
+Reuse `Table/TableHeader/TableRow/TableCell` from `@/components/ui/table` and `Badge`/`Card` tokens — matches existing Projekty tab. No new dependencies.
 
-### Save flow
+### 9. Files touched
+- `src/pages/Analytics.tsx` — add tab key, add `vykazMode` branch that renders `<VykazReport />` and hides existing toolbar/table.
+- `src/components/analytics/VykazReport.tsx` — **new**, full component.
 
-1. On "Uložit": query `user_roles` for users with `role = selectedRole`.
-2. For each, compare current `permissions` JSONB against `ROLE_PRESETS[selectedRole]`. Count those with non-null custom overrides differing from preset.
-3. If count > 0 → open `ConfirmDialog` "X uživatelů má vlastní úpravy — přepsat?".
-4. On confirm → bulk update `user_roles.permissions = draftPerms` where `role = selectedRole`. Toast success.
-
-### Add/remove users
-
-- "+ Přidat uživatele": Popover with `Command` search over profiles not in role. Select → update that user's `user_roles.role` to selectedRole.
-- ✕ on chip → set user's role to `viewer` (cannot null role given existing schema). Confirm before demoting.
-
-### "+ Nová rola"
-
-The `app_role` enum is fixed. Show toast: "Nové role je možné pridať len cez DB migráciu" instead of allowing creation. (Documented limitation — keeps spec scope without enum migration.)
-
-### Styling
-
-- Use existing tokens: `bg-muted`, `bg-background`, `border-border`. Map spec colors:
-  - Active item left border: `border-l-2 border-[#0a2e28]`
-  - Read selected: `bg-[#E6F1FB] text-[#0C447C] border-[#85B7EB]`
-  - Write selected: `bg-[#EAF3DE] text-[#27500A] border-[#97C459]`
-  - Save button: `bg-[#0a2e28] text-white`
-
-### Files touched
-
-- `src/components/osoby/OsobyOpravneni.tsx` — full rewrite
-- No changes to `permissionPresets.ts`, `useAuth.tsx`, `Osoby.tsx`, or other components.
+### 10. Out of scope
+- No DB schema changes; `production_hours_log` already provides everything needed.
+- No edits to existing Projekty / Režije / Dílna tabs.
+- CSV export is client-side only (no edge function).
