@@ -3,12 +3,25 @@ import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { logLoginEvent, resetLoginTracking, hasLoginLoggedInCurrentTab } from "@/hooks/useLoginTracking";
 import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
+import { resolvePermissions, type Permissions } from "@/lib/permissionPresets";
 
-export type AppRole = "owner" | "admin" | "pm" | "konstrukter" | "viewer" | "tester" | "vyroba";
+export type AppRole =
+  | "owner"
+  | "admin"
+  | "vedouci_pm"
+  | "pm"
+  | "vedouci_konstrukter"
+  | "konstrukter"
+  | "vedouci_vyroby"
+  | "mistr"
+  | "quality"
+  | "kalkulant"
+  | "viewer"
+  | "tester"
+  | "vyroba";
 
 interface AuthContextType {
   user: User | null;
-
   session: Session | null;
   profile: { full_name: string; email: string; is_active: boolean; password_set: boolean } | null;
   role: AppRole | null;
@@ -18,26 +31,38 @@ interface AuthContextType {
   isTestUser: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  // Legacy role booleans (back-compat)
   isOwner: boolean;
   isAdmin: boolean;
   isPM: boolean;
   isKonstrukter: boolean;
   isViewer: boolean;
   isVyroba: boolean;
+  // Permissions
+  permissions: Permissions;
   canEdit: boolean;
   canCreateProject: boolean;
   canDeleteProject: boolean;
+  canEditProjectCode: boolean;
+  canEditSmluvniTermin: boolean;
   canManageTPV: boolean;
   canAccessSettings: boolean;
-  canEditColumns: boolean;
-  canUploadDocuments: boolean;
-  canPermanentDelete: boolean;
   canManageUsers: boolean;
   canManagePeople: boolean;
+  canManageExternisti: boolean;
+  canManageProduction: boolean;
+  canAccessAnalytics: boolean;
+  canSeePrices: boolean;
+  canAccessPlanVyroby: boolean;
+  canWritePlanVyroby: boolean;
+  canAccessDaylog: boolean;
+  canQCOnly: boolean;
+  canUploadDocuments: boolean;
+  canPermanentDelete: boolean;
   canManageExchangeRates: boolean;
   canManageStatuses: boolean;
   canAccessRecycleBin: boolean;
-  canManageProduction: boolean;
+  canEditColumns: boolean;
   isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   defaultTab: string;
   simulatedRole: AppRole | null;
@@ -55,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
   const [realRole, setRealRole] = useState<AppRole | null>(null);
+  const [dbPermissions, setDbPermissions] = useState<Partial<Permissions> | null>(null);
   const [loading, setLoading] = useState(true);
   const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
   const [linkedPersonName, setLinkedPersonName] = useState<string | null>(null);
@@ -70,7 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (event === "SIGNED_IN" && session.user.id && !hasLoginLoggedInCurrentTab()) {
             void logLoginEvent(session.user.id, session.user.email ?? "");
           }
-          // Always start/resume session tracking (heartbeat-based, independent of login log)
           startSession(session.user.id, session.user.email ?? "", session.access_token);
 
           prevUserRef.current = session.user.id;
@@ -84,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .single(),
               supabase
                 .from("user_roles")
-                .select("role")
+                .select("role, permissions")
                 .eq("user_id", session.user.id)
                 .single(),
             ]);
@@ -99,8 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 : null
             );
             setRealRole((roleData?.role as AppRole) ?? null);
+            setDbPermissions(((roleData as any)?.permissions as Partial<Permissions>) ?? null);
 
-            // Fetch linked person name
             const personId = (profileData as any)?.person_id;
             if (personId) {
               const { data: personData } = await supabase
@@ -118,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
           setRealRole(null);
+          setDbPermissions(null);
           setSimulatedRole(null);
           setLinkedPersonName(null);
           prevUserRef.current = null;
@@ -134,7 +160,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!session) setLoading(false);
     });
 
-    // Listen for profile updates from AccountSettings
     const handleProfileUpdate = async () => {
       const { data: { session: s } } = await supabase.auth.getSession();
       if (s?.user) {
@@ -171,57 +196,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  // Effective role: use simulated if set (only owner can simulate)
-  const effectiveRole = (simulatedRole && (realRole === "owner")) ? simulatedRole : realRole;
+  // Effective role: only owner can simulate
+  const effectiveRole: AppRole | null = (simulatedRole && realRole === "owner") ? simulatedRole : realRole;
+
+  // When simulating, ignore DB overrides — use preset only.
+  const isSimulating = !!simulatedRole && realRole === "owner";
+  const permissions: Permissions = resolvePermissions(
+    effectiveRole,
+    isSimulating ? null : dbPermissions,
+  );
 
   const isTestUser = user?.email === "alfred@ami-test.cz" || effectiveRole === "tester";
-  const isTester = effectiveRole === "tester";
 
+  // Legacy role booleans (back-compat)
   const isOwner = effectiveRole === "owner";
   const isAdmin = effectiveRole === "admin" || isOwner;
-  const isPM = effectiveRole === "pm";
-  const isKonstrukter = effectiveRole === "konstrukter";
+  const isPM = effectiveRole === "pm" || effectiveRole === "vedouci_pm";
+  const isKonstrukter = effectiveRole === "konstrukter" || effectiveRole === "vedouci_konstrukter";
   const isViewer = effectiveRole === "viewer";
-  const isVyroba = effectiveRole === "vyroba";
+  const isVyroba =
+    effectiveRole === "vyroba" ||
+    effectiveRole === "vedouci_vyroby" ||
+    effectiveRole === "mistr";
 
-  // Granular permissions — tester gets edit rights (scoped to test projects via RLS)
-  const canEdit = !isViewer && !isVyroba;
-  const canCreateProject = isAdmin || isPM || isTester;
-  const canDeleteProject = isAdmin || isPM || isTester;
-  const canManageTPV = isAdmin || isPM || isKonstrukter || isTester;
-  const canAccessSettings = isAdmin || isPM || isKonstrukter || isTester;
+  // canEditColumns kept for back-compat (only admins/PMs can reorder columns; testers excluded)
   const canEditColumns = (isAdmin || isPM) && !isTestUser;
-  const canUploadDocuments = !isViewer;
-  const canPermanentDelete = isAdmin || isPM || isTester;
 
-  // Settings menu item visibility
-  const canManageUsers = isAdmin;
-  const canManagePeople = isAdmin || isPM || isKonstrukter;
-  const canManageExchangeRates = isAdmin;
-  const canManageStatuses = isAdmin;
-  const canAccessRecycleBin = isAdmin || isPM || isKonstrukter || isTester;
-  const canManageProduction = isAdmin || isPM || isKonstrukter || isVyroba;
+  const isQCOnlyUser =
+    permissions.canQCOnly &&
+    permissions.canAccessDaylog &&
+    !permissions.canEdit &&
+    !permissions.canManageProduction &&
+    !permissions.canManageTPV;
 
-  // Fields that are read-only for Konstruktér
-  const konstrukterReadOnlyFields = new Set([
-    "project_id", "project_name", "pm", "datum_smluvni",
-    "datum_objednavky", "prodejni_cena", "marze", "risk", "klient"
-  ]);
-  // Fields that are read-only for PM
-  const pmReadOnlyFields = new Set(["project_id"]);
-
-  const isFieldReadOnly = (field: string, currentValue?: string | null): boolean => {
-    if (isViewer) return true;
-    if (isVyroba) return true;
-    if (isKonstrukter && konstrukterReadOnlyFields.has(field)) return true;
-    if (isPM && pmReadOnlyFields.has(field)) return true;
-    // PM can set datum_smluvni only when empty; once set it's read-only
-    if (isPM && field === "datum_smluvni" && currentValue) return true;
+  const isFieldReadOnly = (field: string, _currentValue?: string | null): boolean => {
+    if (!permissions.canEdit) return true;
+    if (isQCOnlyUser) return true;
+    if (!permissions.canSeePrices && (field === "prodejni_cena" || field === "marze")) return true;
+    if (!permissions.canEditProjectCode && field === "project_id") return true;
+    if (!permissions.canEditSmluvniTermin && field === "datum_smluvni") return true;
     return false;
   };
 
-  // Default tab for role
-  const defaultTab = isVyroba ? "vyroba" : isPM ? "pm-status" : isKonstrukter ? "tpv-status" : "project-info";
+  // defaultTab derived from permissions
+  let defaultTab = "project-info";
+  if (permissions.canQCOnly && !permissions.canCreateProject) {
+    defaultTab = "vyroba";
+  } else if (permissions.canAccessPlanVyroby && !permissions.canCreateProject) {
+    defaultTab = "vyroba";
+  } else if (permissions.canManageTPV && !permissions.canCreateProject) {
+    defaultTab = "tpv-status";
+  } else if (permissions.canCreateProject) {
+    defaultTab = "pm-status";
+  }
 
   const value: AuthContextType = {
     user,
@@ -240,20 +267,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isKonstrukter,
     isViewer,
     isVyroba,
-    canEdit,
-    canCreateProject,
-    canDeleteProject,
-    canManageTPV,
-    canAccessSettings,
+    permissions,
+    canEdit: permissions.canEdit,
+    canCreateProject: permissions.canCreateProject,
+    canDeleteProject: permissions.canDeleteProject,
+    canEditProjectCode: permissions.canEditProjectCode,
+    canEditSmluvniTermin: permissions.canEditSmluvniTermin,
+    canManageTPV: permissions.canManageTPV,
+    canAccessSettings: permissions.canAccessSettings,
+    canManageUsers: permissions.canManageUsers,
+    canManagePeople: permissions.canManagePeople,
+    canManageExternisti: permissions.canManageExternisti,
+    canManageProduction: permissions.canManageProduction,
+    canAccessAnalytics: permissions.canAccessAnalytics,
+    canSeePrices: permissions.canSeePrices,
+    canAccessPlanVyroby: permissions.canAccessPlanVyroby,
+    canWritePlanVyroby: permissions.canWritePlanVyroby,
+    canAccessDaylog: permissions.canAccessDaylog,
+    canQCOnly: permissions.canQCOnly,
+    canUploadDocuments: permissions.canUploadDocuments,
+    canPermanentDelete: permissions.canPermanentDelete,
+    canManageExchangeRates: permissions.canManageExchangeRates,
+    canManageStatuses: permissions.canManageStatuses,
+    canAccessRecycleBin: permissions.canAccessRecycleBin,
     canEditColumns,
-    canUploadDocuments,
-    canPermanentDelete,
-    canManageUsers,
-    canManagePeople,
-    canManageExchangeRates,
-    canManageStatuses,
-    canAccessRecycleBin,
-    canManageProduction,
     isFieldReadOnly,
     defaultTab,
     simulatedRole,

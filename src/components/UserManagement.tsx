@@ -6,16 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, ArrowRightLeft, Link2, Lock, Eye, EyeOff, Pencil, Check, X, ChevronDown, ChevronRight, Shield } from "lucide-react";
 import type { AppRole } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { TestModeBanner } from "./TestModeBanner";
 import { PasswordChecklist } from "@/components/PasswordChecklist";
 import { usePasswordValidation } from "@/hooks/usePasswordValidation";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
+import {
+  PERMISSION_FLAGS,
+  PERMISSION_LABELS,
+  ROLE_LABELS,
+  ROLE_PRESETS,
+  resolvePermissions,
+  type Permissions,
+} from "@/lib/permissionPresets";
 
 interface UserRow {
   id: string;
@@ -23,6 +33,7 @@ interface UserRow {
   full_name: string;
   is_active: boolean;
   role: AppRole | null;
+  permissions: Partial<Permissions> | null;
   person_id: string | null;
 }
 
@@ -31,18 +42,21 @@ interface PersonOption {
   name: string;
 }
 
-const ROLE_LABELS: Record<AppRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  pm: "PM",
-  konstrukter: "Konstruktér",
-  viewer: "Viewer",
-  tester: "Tester",
-  vyroba: "Výroba",
-};
-
 // Roles assignable via dropdown (owner excluded — can only be set via transfer)
-const ASSIGNABLE_ROLES: AppRole[] = ["admin", "pm", "konstrukter", "vyroba", "viewer", "tester"];
+const ASSIGNABLE_ROLES: AppRole[] = [
+  "admin",
+  "vedouci_pm",
+  "pm",
+  "vedouci_konstrukter",
+  "konstrukter",
+  "vedouci_vyroby",
+  "mistr",
+  "quality",
+  "kalkulant",
+  "vyroba",
+  "viewer",
+  "tester",
+];
 
 interface Props {
   open: boolean;
@@ -74,6 +88,44 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
 
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
+
+  // Permissions panel state
+  const [expandedPermsUserId, setExpandedPermsUserId] = useState<string | null>(null);
+  const [permsDraft, setPermsDraft] = useState<Permissions | null>(null);
+  const [permsSaving, setPermsSaving] = useState(false);
+
+  const togglePermsPanel = (u: UserRow) => {
+    if (expandedPermsUserId === u.id) {
+      setExpandedPermsUserId(null);
+      setPermsDraft(null);
+      return;
+    }
+    setExpandedPermsUserId(u.id);
+    setPermsDraft(resolvePermissions(u.role, u.permissions));
+  };
+
+  const resetPermsToPreset = (u: UserRow) => {
+    if (!u.role) return;
+    setPermsDraft({ ...ROLE_PRESETS[u.role] });
+  };
+
+  const handleSavePerms = async (u: UserRow) => {
+    if (!permsDraft) return;
+    setPermsSaving(true);
+    const { error } = await supabase
+      .from("user_roles")
+      .update({ permissions: permsDraft as any })
+      .eq("user_id", u.id);
+    setPermsSaving(false);
+    if (error) {
+      toast({ title: "Chyba pri ukladaní oprávnení", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Oprávnenia uložené" });
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, permissions: permsDraft } : x)));
+    setExpandedPermsUserId(null);
+    setPermsDraft(null);
+  };
 
   const handleCopyInviteLink = async (userId: string) => {
     setCopyingLinkId(userId);
@@ -111,17 +163,23 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
     }
 
     if (profiles) {
-      const roleMap = new Map<string, AppRole>();
-      roles?.forEach((r: any) => roleMap.set(r.user_id, r.role));
+      const roleMap = new Map<string, { role: AppRole; permissions: Partial<Permissions> | null }>();
+      roles?.forEach((r: any) =>
+        roleMap.set(r.user_id, { role: r.role, permissions: (r.permissions as Partial<Permissions> | null) ?? null }),
+      );
       setUsers(
-        profiles.map((p: any) => ({
-          id: p.id,
-          email: p.email,
-          full_name: p.full_name,
-          is_active: p.is_active,
-          role: roleMap.get(p.id) ?? null,
-          person_id: p.person_id ?? null,
-        }))
+        profiles.map((p: any) => {
+          const r = roleMap.get(p.id);
+          return {
+            id: p.id,
+            email: p.email,
+            full_name: p.full_name,
+            is_active: p.is_active,
+            role: r?.role ?? null,
+            permissions: r?.permissions ?? null,
+            person_id: p.person_id ?? null,
+          };
+        })
       );
     }
     setLoading(false);
@@ -316,7 +374,10 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => (
+                  users.map((u) => {
+                    const isExpanded = expandedPermsUserId === u.id;
+                    return (
+                    <>
                     <TableRow key={u.id}>
                       <TableCell className="text-sm">
                         {editingNameId === u.id ? (
@@ -331,7 +392,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                               className="h-7 text-sm"
                               autoFocus
                             />
-                            <button onClick={() => handleUpdateName(u.id)} className="text-green-600 hover:text-green-700"><Check className="h-4 w-4" /></button>
+                            <button onClick={() => handleUpdateName(u.id)} className="text-success hover:text-success/80"><Check className="h-4 w-4" /></button>
                             <button onClick={() => setEditingNameId(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
                           </div>
                         ) : (
@@ -385,7 +446,14 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                           <Switch checked={u.is_active} onCheckedChange={(v) => handleToggleActive(u.id, v)} />
                         )}
                       </TableCell>
-                        <TableCell className="flex gap-1">
+                      <TableCell className="flex gap-1">
+                        <button
+                          onClick={() => togglePermsPanel(u)}
+                          className={`transition-colors ${isExpanded ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                          title="Oprávnenia"
+                        >
+                          <Shield className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleCopyInviteLink(u.id)}
                           className="text-muted-foreground hover:text-foreground transition-colors"
@@ -419,7 +487,53 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                         )}
                       </TableCell>
                     </TableRow>
-                  ))
+                    {isExpanded && permsDraft && (
+                      <TableRow key={`${u.id}-perms`} className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={6} className="p-0">
+                          <div className="p-4 border-l-4 border-primary">
+                            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <Shield className="h-4 w-4 text-primary" />
+                                <span className="font-semibold text-sm">Oprávnenia</span>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Preset: {u.role ? ROLE_LABELS[u.role] : "—"}
+                                </Badge>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => resetPermsToPreset(u)}>
+                                  Resetovat na preset
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setExpandedPermsUserId(null); setPermsDraft(null); }}>
+                                  Zrušit
+                                </Button>
+                                <Button size="sm" className="h-7 text-xs" onClick={() => handleSavePerms(u)} disabled={permsSaving}>
+                                  {permsSaving ? "Ukládám..." : "Uložiť"}
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2">
+                              {PERMISSION_FLAGS.map((flag) => (
+                                <label
+                                  key={flag}
+                                  className="flex items-center gap-2 text-xs cursor-pointer hover:text-foreground text-muted-foreground"
+                                >
+                                  <Checkbox
+                                    checked={!!permsDraft[flag]}
+                                    onCheckedChange={(v) =>
+                                      setPermsDraft((prev) => (prev ? { ...prev, [flag]: v === true } : prev))
+                                    }
+                                  />
+                                  <span>{PERMISSION_LABELS[flag]}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

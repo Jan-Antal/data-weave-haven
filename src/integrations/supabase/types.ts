@@ -1739,16 +1739,19 @@ export type Database = {
       user_roles: {
         Row: {
           id: string
+          permissions: Json | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           id?: string
+          permissions?: Json | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           id?: string
+          permissions?: Json | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -1822,6 +1825,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      has_any_role: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1843,6 +1847,12 @@ export type Database = {
         | "viewer"
         | "tester"
         | "vyroba"
+        | "vedouci_pm"
+        | "vedouci_konstrukter"
+        | "vedouci_vyroby"
+        | "mistr"
+        | "quality"
+        | "kalkulant"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1978,6 +1988,12 @@ export const Constants = {
         "viewer",
         "tester",
         "vyroba",
+        "vedouci_pm",
+        "vedouci_konstrukter",
+        "vedouci_vyroby",
+        "mistr",
+        "quality",
+        "kalkulant",
       ],
     },
   },
