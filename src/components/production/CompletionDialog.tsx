@@ -188,7 +188,7 @@ export function CompletionDialog({
       qc.invalidateQueries({ queryKey: ["production-daily-logs"] });
 
       const totalCompleted = fullCompleteIds.length + splitItems.length;
-      toast({ title: `${totalCompleted} položek přesunuto do Expedice` });
+      toast({ title: `${totalCompleted} položek dokončeno` });
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
@@ -370,7 +370,7 @@ export function CompletionDialog({
               opacity: submitting ? 0.7 : 1,
             }}
           >
-            {submitting ? "Ukládám..." : `Dokončit vybrané → Expedice`}
+            {submitting ? "Ukládám..." : `Dokončit vybrané`}
           </button>
         </div>
       </DialogContent>
