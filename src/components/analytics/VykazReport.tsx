@@ -250,7 +250,7 @@ export function VykazReport() {
     let matched = 0;
     let unmatched = 0;
     for (const id of distinctProjects) {
-      if (projectsMap.has(id)) matched++;
+      if (projectsMap.has(id) || overheadMap.has(id)) matched++;
       else unmatched++;
     }
     return {
@@ -259,7 +259,7 @@ export function VykazReport() {
       matchedProjects: matched,
       unmatchedProjects: unmatched,
     };
-  }, [logs, projectsMap]);
+  }, [logs, projectsMap, overheadMap]);
 
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
