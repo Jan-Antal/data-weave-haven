@@ -28,6 +28,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
 import { DilnaDashboard, getISOWeekForOffset } from "@/components/DilnaDashboard";
+import { VykazReport } from "@/components/analytics/VykazReport";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
@@ -85,6 +86,7 @@ export default function Analytics() {
   const activeTab = searchParams.get("tab") ?? "projekty";
   const dilnaMode = activeTab === "dilna";
   const rezieMode = activeTab === "rezie";
+  const vykazMode = activeTab === "vykaz";
   const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
 
@@ -286,6 +288,7 @@ export default function Analytics() {
     { key: "projekty", label: "Projekty" },
     { key: "rezie", label: "Režije" },
     { key: "dilna", label: "Dílna" },
+    { key: "vykaz", label: "Výkaz" },
   ];
 
   return (
@@ -293,6 +296,7 @@ export default function Analytics() {
       {() => (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Per-tab toolbar */}
+      {!vykazMode && (
       <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b bg-card">
 
         {!dilnaMode && (
@@ -411,8 +415,11 @@ export default function Analytics() {
           )}
         </div>
       </div>
+      )}
 
-      {dilnaMode ? (
+      {vykazMode ? (
+        <VykazReport />
+      ) : dilnaMode ? (
         <DilnaDashboard weekOffset={dilnaWeekOffset} />
       ) : (
         <>
