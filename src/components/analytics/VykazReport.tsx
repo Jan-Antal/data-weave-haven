@@ -815,16 +815,16 @@ export function VykazReport() {
                       }}
                     />
                     <Bar dataKey="projekty" stackId="h" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="rezije" stackId="h" fill="hsl(var(--accent))" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="nesparovane" stackId="h" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="rezije" stackId="h" fill="hsl(var(--primary) / 0.55)" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="nesparovane" stackId="h" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             )}
             <div className="flex items-center justify-center gap-4 mt-2 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary" />Projekty</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent" />Režie</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: "hsl(var(--muted-foreground))" }} />Nespárované</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: "hsl(var(--primary) / 0.55)" }} />Režie</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-2.5 h-2.5 rounded-sm bg-accent" />Nespárované</span>
             </div>
           </Card>
         </div>
