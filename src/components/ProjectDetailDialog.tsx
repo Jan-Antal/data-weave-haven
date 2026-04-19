@@ -790,6 +790,27 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
     setDeletingFile(null);
   };
 
+  const handleDeleteMany = async (categoryKey: string, filesToDelete: SPFile[]) => {
+    if (filesToDelete.length === 0) return;
+    const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
+    let succeeded = 0;
+    let failed = 0;
+    for (const f of filesToDelete) {
+      try {
+        await sp.deleteFile(categoryKey, f.name);
+        logActivity({ projectId: project!.project_id, actionType: "document_deleted", oldValue: f.name, detail: catLabel });
+        succeeded++;
+      } catch {
+        failed++;
+      }
+    }
+    if (succeeded > 0) dispatchDocCountUpdate(project!.project_id, -succeeded);
+    if (failed === 0) toast({ title: `Smazáno ${succeeded} souborů` });
+    else toast({ title: `Smazáno ${succeeded}, ${failed} selhalo`, variant: "destructive" });
+    fileSelection.clearSelection();
+    setBulkDeleteConfirm(null);
+  };
+
   // ── Move files between folders ──────────────────────────────
   const handleMoveFiles = useCallback(async (sourceCategoryKey: string, destCategoryKey: string, filesToMove: SPFile[]) => {
     if (!project || filesToMove.length === 0) return;
