@@ -494,68 +494,73 @@ export function VykazReport() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
-            <SelectTrigger className="h-8 w-[170px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week" className="text-xs">Tento týden</SelectItem>
-              <SelectItem value="month" className="text-xs">Tento měsíc</SelectItem>
-              <SelectItem value="3months" className="text-xs">Poslední 3 měsíce</SelectItem>
-              <SelectItem value="custom" className="text-xs">Vlastní</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => setRangeOffset((o) => o + 1)}
-            title="Další období"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
           <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className={cn(
-                  "h-8 px-3 text-xs gap-1.5",
-                  dateRange !== "custom" && "text-muted-foreground",
-                )}
-                onClick={() => {
-                  if (dateRange !== "custom") setDateRangeRaw("custom");
-                }}
+                className="h-8 px-3 text-xs gap-1.5 min-w-[200px] justify-start"
               >
-                <CalendarIcon className="h-3.5 w-3.5" />
-                {dateRange === "custom" && customFrom && customTo ? (
-                  <span>
-                    {formatAppDate(new Date(customFrom + "T00:00:00"))}
-                    {" – "}
-                    {formatAppDate(new Date(customTo + "T00:00:00"))}
-                  </span>
-                ) : (
-                  <span>Vyberte rozsah</span>
-                )}
+                <CalendarIcon className="h-3.5 w-3.5 shrink-0" />
+                <span className="tabular-nums">
+                  {(() => {
+                    const fd = new Date(from + "T00:00:00");
+                    const td = new Date(to + "T00:00:00");
+                    const sameYear = fd.getFullYear() === td.getFullYear();
+                    const sameDay = from === to;
+                    if (sameDay) return formatAppDate(fd);
+                    if (sameYear) {
+                      return `${fd.getDate()}. ${fd.getMonth() + 1}. – ${formatAppDate(td)}`;
+                    }
+                    return `${formatAppDate(fd)} – ${formatAppDate(td)}`;
+                  })()}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0 z-[99999]" align="start">
-              <Calendar
-                mode="range"
-                numberOfMonths={2}
-                weekStartsOn={1}
-                defaultMonth={customFrom ? new Date(customFrom + "T00:00:00") : new Date()}
-                selected={{
-                  from: customFrom ? new Date(customFrom + "T00:00:00") : undefined,
-                  to: customTo ? new Date(customTo + "T00:00:00") : undefined,
-                }}
-                onSelect={(range: any) => {
-                  setRangeOffset(0);
-                  setCustomFrom(range?.from ? toLocalDateStr(range.from) : "");
-                  setCustomTo(range?.to ? toLocalDateStr(range.to) : "");
-                }}
-                className="p-3 pointer-events-auto"
-              />
+              <div className="flex">
+                {/* Preset list */}
+                <div className="flex flex-col gap-0.5 p-2 border-r min-w-[170px]">
+                  {([
+                    { key: "week", label: "Tento týden" },
+                    { key: "month", label: "Tento měsíc" },
+                    { key: "prev_week", label: "Minulý týden" },
+                    { key: "prev_month", label: "Minulý měsíc" },
+                    { key: "3months", label: "Posledné 3 měsíce" },
+                  ] as const).map((p) => (
+                    <Button
+                      key={p.key}
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-8 justify-start text-xs font-normal",
+                        dateRange === p.key && "bg-accent text-accent-foreground font-medium",
+                      )}
+                      onClick={() => setDateRange(p.key)}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+                {/* Calendar */}
+                <Calendar
+                  mode="range"
+                  numberOfMonths={2}
+                  weekStartsOn={1}
+                  defaultMonth={new Date(from + "T00:00:00")}
+                  selected={{
+                    from: new Date(from + "T00:00:00"),
+                    to: new Date(to + "T00:00:00"),
+                  }}
+                  onSelect={(range: any) => {
+                    setDateRangeRaw("custom");
+                    setRangeOffset(0);
+                    setCustomFrom(range?.from ? toLocalDateStr(range.from) : "");
+                    setCustomTo(range?.to ? toLocalDateStr(range.to) : range?.from ? toLocalDateStr(range.from) : "");
+                  }}
+                  className="p-3 pointer-events-auto"
+                />
+              </div>
               <div className="flex items-center justify-between border-t p-2">
                 <Button
                   variant="ghost"
@@ -564,7 +569,7 @@ export function VykazReport() {
                   onClick={() => {
                     setCustomFrom("");
                     setCustomTo("");
-                    setRangeOffset(0);
+                    setDateRange("week");
                   }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -581,11 +586,15 @@ export function VykazReport() {
               </div>
             </PopoverContent>
           </Popover>
-          {rangeOffset !== 0 && (
-            <span className="text-[11px] text-muted-foreground tabular-nums ml-1">
-              {formatAppDate(new Date(from + "T00:00:00"))} – {formatAppDate(new Date(to + "T00:00:00"))}
-            </span>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setRangeOffset((o) => o + 1)}
+            title="Další období"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Center: segmented control */}
