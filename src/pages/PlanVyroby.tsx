@@ -219,6 +219,8 @@ export default function PlanVyroby() {
       toast({ title: "Chyba při přepočtu", variant: "destructive" });
     } finally {
       setRecalculating(false);
+      setRecalcProgress(null);
+      setRecalcDialogOpen(false);
     }
   }, [qc]);
 
@@ -1073,6 +1075,7 @@ export default function PlanVyroby() {
         onClose={() => setRecalcDialogOpen(false)}
         onFutureOnly={() => doRecalculate(false)}
         onAll={() => doRecalculate(true)}
+        progress={recalcProgress}
       />
       {isMobile && <MobileBottomNav />}
     </DndContext>

@@ -115,12 +115,19 @@ export default function Analytics() {
   }, []);
 
   const [recalcDialogOpen, setRecalcDialogOpen] = useState(false);
+  const [recalcProgress, setRecalcProgress] = useState<{ phase: string; pct: number } | null>(null);
 
   const doRecalculate = useCallback(async (recalculateAll: boolean) => {
-    setRecalcDialogOpen(false);
     setRecalculating(true);
+    setRecalcProgress({ phase: "Spouštím...", pct: 0 });
     try {
-      const updated = await recalculateProductionHours(supabase, "all", undefined, recalculateAll);
+      const updated = await recalculateProductionHours(
+        supabase,
+        "all",
+        undefined,
+        recalculateAll,
+        (info) => setRecalcProgress(info),
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["analytics"] }),
         queryClient.invalidateQueries({ queryKey: ["production-schedule"] }),
@@ -132,6 +139,8 @@ export default function Analytics() {
       toast.error("Chyba při přepočtu: " + (e.message || "neznámá chyba"));
     } finally {
       setRecalculating(false);
+      setRecalcProgress(null);
+      setRecalcDialogOpen(false);
     }
   }, [queryClient]);
 
@@ -567,6 +576,7 @@ export default function Analytics() {
         onClose={() => setRecalcDialogOpen(false)}
         onFutureOnly={() => doRecalculate(false)}
         onAll={() => doRecalculate(true)}
+        progress={recalcProgress}
       />
     </div>
       )}
