@@ -195,13 +195,20 @@ export default function PlanVyroby() {
 
   const [recalculating, setRecalculating] = useState(false);
   const [recalcDialogOpen, setRecalcDialogOpen] = useState(false);
+  const [recalcProgress, setRecalcProgress] = useState<{ phase: string; pct: number } | null>(null);
 
   const doRecalculate = useCallback(async (recalculateAll: boolean) => {
-    setRecalcDialogOpen(false);
     setRecalculating(true);
+    setRecalcProgress({ phase: "Spouštím...", pct: 0 });
     try {
       const { recalculateProductionHours } = await import("@/lib/recalculateProductionHours");
-      const updated = await recalculateProductionHours(supabase, "all", undefined, recalculateAll);
+      const updated = await recalculateProductionHours(
+        supabase,
+        "all",
+        undefined,
+        recalculateAll,
+        (info) => setRecalcProgress(info),
+      );
       qc.invalidateQueries({ queryKey: ["analytics"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
