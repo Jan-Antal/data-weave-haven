@@ -178,10 +178,10 @@ const GROUPS: Group[] = [
     icon: { bg: "#F1EFE8", color: "#5F5E5A" },
     rows: [
       {
-        kind: "tri",
+        kind: "bin",
         label: "Správa osob",
         desc: "Zamestnanci, externisti, kapacita",
-        write: "canManagePeople",
+        flags: ["canManagePeople"],
       },
       { kind: "bin", label: "Externisti", flags: ["canManageExternisti"] },
       {
