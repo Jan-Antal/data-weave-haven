@@ -120,11 +120,11 @@ export async function recalculateProductionHours(
       "id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id, project_id, status",
       "project_id",
       filteredProjectIds,
-      (q) => q.in("status", ["scheduled", "in_progress"]),
+      (q) => q.in("status", ["scheduled", "in_progress", "completed"]),
     ),
     bulkFetchIn<any>(
       "production_inbox",
-      "id, item_code, estimated_czk, estimated_hours, split_part, split_total, split_group_id, project_id, status",
+      "id, item_code, estimated_czk, estimated_hours, split_part, split_total, split_group_id, project_id, stage_id, sent_at, status",
       "project_id",
       filteredProjectIds,
       (q) => q.eq("status", "pending"),
