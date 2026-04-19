@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, ReferenceArea } from "recharts";
 import { useCzechHolidays, useCompanyHolidays } from "@/hooks/useWeeklyCapacity";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +23,6 @@ import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 import { formatAppDate } from "@/lib/dateFormat";
 
 type DateRange = "week" | "month" | "prev_week" | "prev_month" | "3months" | "custom";
-type GroupBy = "projekt" | "osoba" | "cinnost";
 
 const EXCLUDED_CINNOST = new Set(["TPV", "ENG", "PRO"]);
 
@@ -102,7 +103,6 @@ export function VykazReport() {
   const [dateRange, setDateRangeRaw] = useState<DateRange>("month");
   const [customFrom, setCustomFrom] = useState<string>(() => toLocalDateStr(new Date()));
   const [customTo, setCustomTo] = useState<string>(() => toLocalDateStr(new Date()));
-  const [groupBy, setGroupBy] = useState<GroupBy>("projekt");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
@@ -110,6 +110,10 @@ export function VykazReport() {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [rangeOffset, setRangeOffset] = useState(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  // Multi-select filters: null = "all selected"
+  const [projectFilter, setProjectFilter] = useState<Set<string> | null>(null);
+  const [personFilter, setPersonFilter] = useState<Set<string> | null>(null);
+  const [activityFilter, setActivityFilter] = useState<Set<string> | null>(null);
 
   const setDateRange = useCallback((r: DateRange) => {
     setDateRangeRaw(r);
@@ -184,114 +188,111 @@ export function VykazReport() {
     return (projectsList as any[]).find((p) => p.project_id === detailProjectId) || null;
   }, [detailProjectId, projectsList]);
 
-  // ── Aggregation ─────────────────────────────────────────────────
-  const grouped = useMemo(() => {
-    const q = search ? normalizeSearch(search) : null;
+  // ── Filtered logs (multi-select filters) ────────────────────────
+  const filteredLogs = useMemo(() => {
+    if (!projectFilter && !personFilter && !activityFilter) return logs;
+    return logs.filter((r) =>
+      (!projectFilter || projectFilter.has(r.ami_project_id || "—")) &&
+      (!personFilter || personFilter.has(r.zamestnanec || "—")) &&
+      (!activityFilter || activityFilter.has(r.cinnost_kod || "—")),
+    );
+  }, [logs, projectFilter, personFilter, activityFilter]);
 
-    if (groupBy === "projekt") {
-      const map = new Map<string, {
-        key: string;
-        projectId: string;
-        projectName: string;
-        matched: boolean;
-        isOverhead: boolean;
-        hodiny: number;
-        records: number;
-        last: string;
-        rows: LogRow[];
-      }>();
-      for (const r of logs) {
-        const id = r.ami_project_id || "—";
-        let g = map.get(id);
-        if (!g) {
-          const matchedName = projectsMap.get(id);
-          const overheadLabel = overheadMap.get(id);
-          g = {
-            key: id,
-            projectId: id,
-            projectName: matchedName ?? overheadLabel ?? id,
-            matched: !!matchedName || !!overheadLabel,
-            isOverhead: !!overheadLabel,
-            hodiny: 0,
-            records: 0,
-            last: r.datum_sync,
-            rows: [],
-          };
-          map.set(id, g);
-        }
-        g.hodiny += Number(r.hodiny) || 0;
-        g.records += 1;
-        if (r.datum_sync > g.last) g.last = r.datum_sync;
-        g.rows.push(r);
+  // ── Available filter options (always from raw logs) ─────────────
+  const availableProjects = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; hodiny: number }>();
+    for (const r of logs) {
+      const id = r.ami_project_id || "—";
+      let g = map.get(id);
+      if (!g) {
+        const name = projectsMap.get(id) ?? overheadMap.get(id) ?? id;
+        g = { id, name, hodiny: 0 };
+        map.set(id, g);
       }
-      let arr = Array.from(map.values());
-      if (q) {
-        arr = arr.filter(
-          (g) => normalizedIncludes(g.projectId, q) || normalizedIncludes(g.projectName, q),
-        );
-      }
-      arr.sort((a, b) => b.hodiny - a.hodiny);
-      return arr;
+      g.hodiny += Number(r.hodiny) || 0;
     }
+    return Array.from(map.values()).sort((a, b) => b.hodiny - a.hodiny);
+  }, [logs, projectsMap, overheadMap]);
 
-    if (groupBy === "osoba") {
-      const map = new Map<string, {
-        key: string;
-        zamestnanec: string;
-        hodiny: number;
-        projects: Set<string>;
-        rows: LogRow[];
-      }>();
-      for (const r of logs) {
-        const k = r.zamestnanec || "—";
-        let g = map.get(k);
-        if (!g) {
-          g = { key: k, zamestnanec: k, hodiny: 0, projects: new Set(), rows: [] };
-          map.set(k, g);
-        }
-        g.hodiny += Number(r.hodiny) || 0;
-        g.projects.add(r.ami_project_id);
-        g.rows.push(r);
-      }
-      let arr = Array.from(map.values());
-      if (q) arr = arr.filter((g) => normalizedIncludes(g.zamestnanec, q));
-      arr.sort((a, b) => b.hodiny - a.hodiny);
-      return arr;
+  const availablePersons = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of logs) {
+      const k = r.zamestnanec || "—";
+      map.set(k, (map.get(k) || 0) + (Number(r.hodiny) || 0));
     }
+    return Array.from(map.entries())
+      .map(([name, hodiny]) => ({ name, hodiny }))
+      .sort((a, b) => b.hodiny - a.hodiny);
+  }, [logs]);
 
-    // cinnost
-    const map = new Map<string, {
-      key: string;
-      cinnost_kod: string;
-      cinnost_nazov: string;
-      hodiny: number;
-      rows: LogRow[];
-    }>();
+  const availableActivities = useMemo(() => {
+    const map = new Map<string, { kod: string; nazov: string; hodiny: number }>();
     for (const r of logs) {
       const k = r.cinnost_kod || "—";
       let g = map.get(k);
       if (!g) {
-        g = {
-          key: k,
-          cinnost_kod: k,
-          cinnost_nazov: r.cinnost_nazov ?? "—",
-          hodiny: 0,
-          rows: [],
-        };
+        g = { kod: k, nazov: r.cinnost_nazov ?? "—", hodiny: 0 };
         map.set(k, g);
       }
       g.hodiny += Number(r.hodiny) || 0;
+    }
+    return Array.from(map.values()).sort((a, b) => b.hodiny - a.hodiny);
+  }, [logs]);
+
+  const hasActiveFilter = projectFilter !== null || personFilter !== null || activityFilter !== null;
+  const resetFilters = useCallback(() => {
+    setProjectFilter(null);
+    setPersonFilter(null);
+    setActivityFilter(null);
+  }, []);
+
+  // ── Aggregation (project grouping only) ─────────────────────────
+  const grouped = useMemo(() => {
+    const q = search ? normalizeSearch(search) : null;
+    const map = new Map<string, {
+      key: string;
+      projectId: string;
+      projectName: string;
+      matched: boolean;
+      isOverhead: boolean;
+      hodiny: number;
+      records: number;
+      last: string;
+      rows: LogRow[];
+    }>();
+    for (const r of filteredLogs) {
+      const id = r.ami_project_id || "—";
+      let g = map.get(id);
+      if (!g) {
+        const matchedName = projectsMap.get(id);
+        const overheadLabel = overheadMap.get(id);
+        g = {
+          key: id,
+          projectId: id,
+          projectName: matchedName ?? overheadLabel ?? id,
+          matched: !!matchedName || !!overheadLabel,
+          isOverhead: !!overheadLabel,
+          hodiny: 0,
+          records: 0,
+          last: r.datum_sync,
+          rows: [],
+        };
+        map.set(id, g);
+      }
+      g.hodiny += Number(r.hodiny) || 0;
+      g.records += 1;
+      if (r.datum_sync > g.last) g.last = r.datum_sync;
       g.rows.push(r);
     }
     let arr = Array.from(map.values());
     if (q) {
       arr = arr.filter(
-        (g) => normalizedIncludes(g.cinnost_nazov, q) || normalizedIncludes(g.cinnost_kod, q),
+        (g) => normalizedIncludes(g.projectId, q) || normalizedIncludes(g.projectName, q),
       );
     }
     arr.sort((a, b) => b.hodiny - a.hodiny);
     return arr;
-  }, [logs, groupBy, search, projectsMap, overheadMap]);
+  }, [filteredLogs, search, projectsMap, overheadMap]);
 
   const totalHours = useMemo(
     () => (grouped as any[]).reduce((s, g) => s + g.hodiny, 0),
@@ -306,7 +307,7 @@ export function VykazReport() {
     let projektHours = 0;
     let rezijneHours = 0;
     let nesparovaneHours = 0;
-    for (const r of logs) {
+    for (const r of filteredLogs) {
       const id = r.ami_project_id || "—";
       distinctProjects.add(id);
       if (r.zamestnanec) distinctWorkers.add(r.zamestnanec);
@@ -333,7 +334,7 @@ export function VykazReport() {
       nesparovaneHours,
       utilization,
     };
-  }, [logs, projectsMap, overheadMap]);
+  }, [filteredLogs, projectsMap, overheadMap]);
 
   // ── Holidays for non-working highlight ──────────────────────────
   const fromYear = useMemo(() => new Date(from + "T00:00:00").getFullYear(), [from]);
@@ -425,7 +426,7 @@ export function VykazReport() {
           nonWorkingLabel,
         });
       }
-      for (const r of logs) {
+      for (const r of filteredLogs) {
         const b = buckets.get(r.datum_sync);
         if (b) b[categorize(r.ami_project_id || "—")] += Number(r.hodiny) || 0;
       }
@@ -446,7 +447,7 @@ export function VykazReport() {
         }
         cursor.setDate(cursor.getDate() + 1);
       }
-      for (const r of logs) {
+      for (const r of filteredLogs) {
         const d = new Date(r.datum_sync + "T00:00:00");
         const { year, week } = isoWeek(d);
         const key = `${year}-W${String(week).padStart(2, "0")}`;
@@ -469,53 +470,33 @@ export function VykazReport() {
       })),
       effectiveBucket: eff,
     };
-  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday, projectsMap, overheadMap]);
+  }, [filteredLogs, from, to, bucketMode, holidayMap, findCompanyHoliday, projectsMap, overheadMap]);
 
-  // ── CSV Export ──────────────────────────────────────────────────
+  // ── CSV Export (project grouping) ───────────────────────────────
   const handleExport = useCallback(() => {
     const lines: string[] = [];
-    if (groupBy === "projekt") {
-      lines.push("Projekt ID;Název;Stav;Hodiny;Záznamů;Poslední záznam");
-      for (const g of grouped as any[]) {
-        lines.push([
-          g.projectId,
-          `"${g.projectName.replace(/"/g, '""')}"`,
-          g.matched ? "Spárováno" : "Nespárováno",
-          (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
-          g.records,
-          g.last,
-        ].join(";"));
-      }
-    } else if (groupBy === "osoba") {
-      lines.push("Jméno;Počet projektů;Hodiny celkem");
-      for (const g of grouped as any[]) {
-        lines.push([
-          `"${g.zamestnanec.replace(/"/g, '""')}"`,
-          g.projects.size,
-          (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
-        ].join(";"));
-      }
-    } else {
-      lines.push("Název činnosti;Kód;Hodiny");
-      for (const g of grouped as any[]) {
-        lines.push([
-          `"${g.cinnost_nazov.replace(/"/g, '""')}"`,
-          g.cinnost_kod,
-          (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
-        ].join(";"));
-      }
+    lines.push("Projekt ID;Název;Stav;Hodiny;Záznamů;Poslední záznam");
+    for (const g of grouped as any[]) {
+      lines.push([
+        g.projectId,
+        `"${g.projectName.replace(/"/g, '""')}"`,
+        g.matched ? "Spárováno" : "Nespárováno",
+        (Math.round(g.hodiny * 10) / 10).toString().replace(".", ","),
+        g.records,
+        g.last,
+      ].join(";"));
     }
     const csv = "\uFEFF" + lines.join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `vykaz_${from}_${to}_${groupBy}.csv`;
+    a.download = `vykaz_${from}_${to}_projekt.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [grouped, groupBy, from, to]);
+  }, [grouped, from, to]);
 
   // ── Render ──────────────────────────────────────────────────────
   return (
@@ -638,31 +619,55 @@ export function VykazReport() {
           </Button>
         </div>
 
-        {/* Center: segmented control */}
-        <div className="flex-1 flex justify-center">
-          <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
-            {([
-              { key: "projekt", label: "Projekt" },
-              { key: "osoba", label: "Osoba" },
-              { key: "cinnost", label: "Činnosť" },
-            ] as const).map((opt) => {
-              const active = groupBy === opt.key;
-              return (
-                <button
-                  key={opt.key}
-                  onClick={() => setGroupBy(opt.key)}
-                  className={cn(
-                    "h-7 px-3 text-xs rounded-md transition-colors",
-                    active
-                      ? "bg-background shadow-sm font-medium text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+        {/* Center: 3 multi-select filters (Projekt / Osoba / Činnost) */}
+        <div className="flex-1 flex justify-center items-center gap-2">
+          <MultiSelectFilter
+            label="Projekty"
+            options={availableProjects.map((p) => ({
+              value: p.id,
+              label: p.name,
+              hint: p.id !== p.name ? p.id : undefined,
+              hodiny: p.hodiny,
+              searchTokens: [p.id, p.name],
+            }))}
+            value={projectFilter}
+            onChange={setProjectFilter}
+          />
+          <MultiSelectFilter
+            label="Osoby"
+            options={availablePersons.map((p) => ({
+              value: p.name,
+              label: p.name,
+              hodiny: p.hodiny,
+              searchTokens: [p.name],
+            }))}
+            value={personFilter}
+            onChange={setPersonFilter}
+          />
+          <MultiSelectFilter
+            label="Činnosti"
+            options={availableActivities.map((a) => ({
+              value: a.kod,
+              label: a.nazov,
+              hint: a.kod !== a.nazov ? a.kod : undefined,
+              hodiny: a.hodiny,
+              searchTokens: [a.kod, a.nazov],
+            }))}
+            value={activityFilter}
+            onChange={setActivityFilter}
+          />
+          {hasActiveFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              onClick={resetFilters}
+              title="Vyčistit filtry"
+            >
+              <X className="h-3.5 w-3.5" />
+              Reset
+            </Button>
+          )}
         </div>
 
         {/* Right: search + export */}
@@ -856,7 +861,7 @@ export function VykazReport() {
             <Card className="p-8 shadow-sm text-center text-sm text-muted-foreground">
               Žádné záznamy v zvoleném období
             </Card>
-          ) : groupBy === "projekt" ? (
+          ) : (
             <ProjektSections
               grouped={grouped as any}
               expanded={expanded}
@@ -865,52 +870,6 @@ export function VykazReport() {
               collapsedSections={collapsedSections}
               toggleSection={toggleSection}
             />
-          ) : groupBy === "osoba" ? (
-            <FlatSection title="Osoby" count={grouped.length} hours={totalHours} tone="neutral">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
-                    <TableHead className="w-[60%] h-9 text-[11px] uppercase tracking-wide">Jméno</TableHead>
-                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Počet projektů</TableHead>
-                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Hodiny celkem</TableHead>
-                    <TableHead className="w-8 h-9" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <OsobaRows
-                    grouped={grouped as any}
-                    expanded={expanded}
-                    toggleExpand={toggleExpand}
-                    projectsMap={projectsMap}
-                    overheadMap={overheadMap}
-                    onOpenDetail={setDetailProjectId}
-                  />
-                </TableBody>
-              </Table>
-            </FlatSection>
-          ) : (
-            <FlatSection title="Činnosti" count={grouped.length} hours={totalHours} tone="neutral">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
-                    <TableHead className="w-[60%] h-9 text-[11px] uppercase tracking-wide">Název činnosti</TableHead>
-                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Kód</TableHead>
-                    <TableHead className="text-right h-9 text-[11px] uppercase tracking-wide">Hodiny</TableHead>
-                    <TableHead className="w-8 h-9" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <CinnostRows
-                    grouped={grouped as any}
-                    expanded={expanded}
-                    toggleExpand={toggleExpand}
-                    projectsMap={projectsMap}
-                    overheadMap={overheadMap}
-                    onOpenDetail={setDetailProjectId}
-                  />
-                </TableBody>
-              </Table>
-            </FlatSection>
           )}
 
           {/* Celkem footer card */}
@@ -932,7 +891,125 @@ export function VykazReport() {
   );
 }
 
-// ── Section helpers (Zaměstnanci-style cards) ───────────────────────
+// ── MultiSelectFilter (Toggl-style) ─────────────────────────────────
+interface FilterOption {
+  value: string;
+  label: string;
+  hint?: string;
+  hodiny: number;
+  searchTokens: string[];
+}
+
+function MultiSelectFilter({
+  label, options, value, onChange,
+}: {
+  label: string;
+  options: FilterOption[];
+  value: Set<string> | null;
+  onChange: (next: Set<string> | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const allValues = useMemo(() => options.map((o) => o.value), [options]);
+  const selectedCount = value === null ? options.length : value.size;
+  const isAll = value === null;
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return options;
+    const q = normalizeSearch(query);
+    return options.filter((o) => o.searchTokens.some((t) => normalizedIncludes(t, q)));
+  }, [options, query]);
+
+  const isChecked = useCallback(
+    (val: string) => (value === null ? true : value.has(val)),
+    [value],
+  );
+
+  const toggle = useCallback(
+    (val: string) => {
+      const current = value === null ? new Set(allValues) : new Set(value);
+      if (current.has(val)) current.delete(val);
+      else current.add(val);
+      // If everything is selected → null (means "all"); otherwise the set
+      if (current.size === allValues.length) onChange(null);
+      else onChange(current);
+    },
+    [value, allValues, onChange],
+  );
+
+  const selectAll = useCallback(() => onChange(null), [onChange]);
+  const clearAll = useCallback(() => onChange(new Set()), [onChange]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "h-8 px-3 text-xs gap-1.5",
+            !isAll && "border-primary/50 text-foreground",
+          )}
+        >
+          <span className="font-medium">{label}</span>
+          <span className="text-muted-foreground">
+            {isAll ? "Vše" : `(${selectedCount})`}
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0 z-[99999]" align="start">
+        <div className="p-2 border-b">
+          <Input
+            placeholder="Hledat..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-8 text-xs"
+            autoFocus
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 border-b bg-muted/30">
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={selectAll}>
+            Vybrat vše
+          </Button>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {selectedCount} / {options.length}
+          </span>
+          <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={clearAll}>
+            Zrušit vše
+          </Button>
+        </div>
+        <div className="max-h-[280px] overflow-y-auto py-1">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+              Žádné výsledky
+            </div>
+          ) : (
+            filtered.map((o) => (
+              <label
+                key={o.value}
+                className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/60 cursor-pointer text-xs"
+              >
+                <Checkbox
+                  checked={isChecked(o.value)}
+                  onCheckedChange={() => toggle(o.value)}
+                />
+                <span className="flex-1 truncate" title={o.label}>{o.label}</span>
+                {o.hint && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                    {o.hint}
+                  </span>
+                )}
+              </label>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 type SectionTone = "projekty" | "rezie" | "nesparovane" | "neutral";
 
 function sectionStyle(tone: SectionTone): { card: string; header: string; badge: string; icon?: boolean } {
