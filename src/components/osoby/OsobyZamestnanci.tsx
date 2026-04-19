@@ -24,6 +24,19 @@ import { toast } from "@/hooks/use-toast";
 
 const UVAZEK_OPTIONS = [4, 6, 8];
 
+/**
+ * Hover-reveal Select trigger styled like Project Info inline cells.
+ * Default: plain text, transparent bg, no visible border, no chevron.
+ * Hover/focus/open: subtle border, muted bg, chevron visible.
+ */
+const INLINE_SELECT_TRIGGER = cn(
+  "h-8 text-xs px-2 bg-transparent border-transparent shadow-none",
+  "[&>svg]:opacity-0 transition-colors",
+  "hover:bg-muted hover:border-border/60 hover:[&>svg]:opacity-100",
+  "focus:bg-muted focus:border-border/60 focus:[&>svg]:opacity-100",
+  "data-[state=open]:bg-muted data-[state=open]:border-border/60 data-[state=open]:[&>svg]:opacity-100",
+);
+
 /** Stredisko canonical kind from raw label. */
 type StrediskoKind = "direct" | "indirect" | "provoz" | "none";
 function strediskoKind(stredisko: string | null | undefined): StrediskoKind {
