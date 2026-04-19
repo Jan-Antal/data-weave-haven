@@ -94,7 +94,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes] = await Promise.all([
+      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -127,6 +127,11 @@ function useDilnaData(weekOffset: number) {
           .select("bundle_id, day_index, percent, logged_at")
           .eq("week_key", weekInfo.weekKey)
           .order("day_index", { ascending: true }),
+        // Overhead project codes — to exclude režije/ENG/PM/etc. from production hours
+        supabase
+          .from("overhead_projects" as any)
+          .select("project_code")
+          .eq("is_active", true),
       ]);
 
       const weeklyCapacity =
@@ -134,7 +139,12 @@ function useDilnaData(weekOffset: number) {
         Number(settingsRes.data?.weekly_capacity_hours) ||
         875;
 
-      const hours = (hoursRes.data || []) as Array<{ ami_project_id: string; hodiny: number; created_at: string; datum_sync: string; cinnost_kod: string | null; cinnost_nazov: string | null }>;
+      const overheadSet = new Set<string>(
+        (((overheadRes.data || []) as unknown) as Array<{ project_code: string }>).map(o => o.project_code)
+      );
+
+      const hoursRaw = (hoursRes.data || []) as Array<{ ami_project_id: string; hodiny: number; created_at: string; datum_sync: string; cinnost_kod: string | null; cinnost_nazov: string | null }>;
+      const hours = hoursRaw.filter(h => !overheadSet.has(h.ami_project_id));
       const schedule = (schedRes.data || []) as Array<{ project_id: string; scheduled_hours: number; status: string; item_name: string }>;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null }>;
       const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
