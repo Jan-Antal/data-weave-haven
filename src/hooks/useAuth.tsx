@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { logLoginEvent, resetLoginTracking, hasLoginLoggedInCurrentTab } from "@/hooks/useLoginTracking";
 import { startSession, endSession, resetSessionTracking } from "@/hooks/useSessionTracking";
-import { resolvePermissions, ROLE_PRESETS, type Permissions, type PermissionFlag } from "@/lib/permissionPresets";
+import { resolvePermissions, type Permissions } from "@/lib/permissionPresets";
 
 export type AppRole =
   | "owner"
