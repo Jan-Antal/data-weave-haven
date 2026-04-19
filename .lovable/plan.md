@@ -1,95 +1,61 @@
 
+Cíl: vrátit midflight na původně správné chování tak, aby už nesahal na běžné Inbox položky destruktivně a nerozhazoval hodiny.
 
-## Problém
+1. Potvrzená příčina
+- Problém není samotné povolení statusu `completed`.
+- Rozbití vzniklo v `src/lib/midflightImportPlanVyroby.ts`, kde se při resetu/importu:
+  - spouští globální `recalculateProductionHours(...)`,
+  - mažou Inbox řádky podle regexu názvu,
+  - některé Inbox položky se přepínají na `status: "scheduled"`,
+  - historické bundle se zapisují do `production_schedule`, kde je bere běžná logika plánování/přepočtu.
 
-`recalculateProductionHours("all", undefined, true)` trvá dlho. Pri pohľade na kód (`src/lib/recalculateProductionHours.ts`) vidím tieto bottlenecky:
+2. Co opravit v kódu
+- `src/lib/midflightImportPlanVyroby.ts`
+  - odstranit globální přepočet hodin z reset části,
+  - odstranit mazání Inbox položek podle `item_name ~ (N/M)`,
+  - nechat reset jen na skutečných midflight datech (`is_midflight`, `is_historical`, `bundle_id ::MF_`),
+  - při reconciliaci už neměnit normální Inbox položky na `scheduled`,
+  - historicky plně pokryté položky nechat mimo aktivní Inbox přes vlastní midflight/historical mechanismus, ne přes běžný Inbox status,
+  - zachovat historické bundle jako oddělená data, aby je normální plánovací tok nebral jako klasické naplánované položky.
 
-### Bottleneck 1: N+1 queries v hlavnej slučke
-Pre každý projekt (môže ich byť 100+):
-- `SELECT tpv_items` (1 query/projekt)
-- `SELECT production_schedule` (1 query/projekt)
-- `SELECT production_inbox` (1 query/projekt)
+- `src/hooks/useProductionInbox.ts`
+  - ověřit/upevnit, že Inbox počítá jen skutečné `pending` produkční položky a nebere nic “reconciled/historical”.
 
-→ **3× N queries** (pri 200 projektoch = 600 queries sériovo)
+- `src/hooks/useProductionSchedule.ts`, `src/hooks/useProductionProgress.ts`, `src/hooks/useProductionStatuses.ts`
+  - zkontrolovat filtrování, aby historical/midflight řádky nevstupovaly do běžných progress/metrik, pokud tam nemají být.
 
-### Bottleneck 2: Per-row UPDATEs
-- `UPDATE production_schedule` per riadok (sériovo, await v cykle)
-- `UPDATE production_inbox` per riadok (sériovo)
-- `UPDATE tpv_items` per riadok (sériovo, batch=100 ale stále await v cykle)
+- `src/components/production/InboxPanel.tsx`
+  - zablokovat destruktivní “Vrátit do TPV” pro midflight/historical položky stejně přísně jako v table view; teď je v Inboxu povolené i pro cleanup a to je riskantní.
 
-Pri tisíckach riadkov → tisíce sériových roundtripov.
+3. Datová oprava po fixu
+Protože problém už poškodil data, samotná změna kódu nestačí. Bude potřeba jednorázový recovery krok:
+- obnovit běžné Inbox položky, které byly jen “reconciled” a neměly být smazané/přepnuté,
+- odstranit jen skutečné midflight artefakty,
+- znovu dopočítat hodiny pouze standardním bezpečným přepočtem.
 
-### Bottleneck 3: Over-plan check
-- `SELECT production_schedule` pre všetky over-plan projekty (1 query, OK)
-- `createNotification` per projekt (sériovo)
+To udělám jako jednorázovou opravu dat, odděleně od trvalé logiky midflight.
 
-## Návrh optimalizácie
+4. Co ponechat
+- DB funkce `validate_production_schedule_status` s podporou `completed` může zůstat, sama o sobě není root cause.
+- Midflight může dál vytvářet historické záznamy, ale musí být izolované od normálního Inbox/plán flow.
 
-### 1. Bulk fetch namiesto N+1 (najväčší zisk)
+5. Výsledek po opravě
+- Midflight bude čistit jen svoje vlastní artefakty.
+- Nebude mazat ani “přemaskovávat” normální Inbox položky.
+- Běžné výpočty hodin a Inbox totals se přestanou rozjíždět po resetu/importu.
+- Historie zůstane viditelná, ale nebude vstupovat do normální plánovací logiky tam, kde nemá.
 
-Načítať **všetky** `tpv_items`, `production_schedule`, `production_inbox` pre dotknuté projekty **jedným queryom**, potom group-by-project v JS:
+6. Implementační postup
+- nejdřív opravit trvalou logiku v `midflightImportPlanVyroby.ts` a souvisejících guardech,
+- potom připravit bezpečný jednorázový recovery pro aktuálně rozbitá data,
+- nakonec ověřit na flow:
+  - midflight import,
+  - vyčištění midflight dat,
+  - Inbox totals,
+  - project detail vs Inbox,
+  - návrat položek z výroby/expedice.
 
-```ts
-const { data: allTpv } = await supabase
-  .from("tpv_items")
-  .select("...")
-  .in("project_id", projectIds)
-  .is("deleted_at", null);
-
-const tpvByProject = groupBy(allTpv, "project_id");
-```
-
-→ z **3N queries → 3 queries** (pre 200 projektov: 600 → 3)
-
-### 2. Bulk UPDATE cez upsert
-
-Namiesto per-row `UPDATE`:
-```ts
-// Zozbierať všetky zmeny do array
-const scheduleUpdates: Array<{id, scheduled_hours, scheduled_czk}> = [];
-// Po výpočte všetkého:
-await supabase.from("production_schedule").upsert(scheduleUpdates);
-```
-
-PostgREST podporuje bulk upsert (1 HTTP call pre stovky riadkov). Rovnako pre `production_inbox` a `tpv_items`.
-
-→ z **tisíce roundtripov → ~3-6 bulk callov** (po batchoch ~500)
-
-### 3. Iba zmenené riadky
-Aj dnes sa kontroluje `if (correctCzk !== ...)`, ale stále sa robí await per riadok. Po prechode na bulk upsert toto zostane (pridať do bulk array len ak sa hodnota mení).
-
-### 4. Paralelizácia top-level fetchov
-Už existuje `Promise.all` pre projects/settings/presets/rates ✅. Pridať tam aj bulk tpv/schedule/inbox fetch.
-
-### 5. Kratší progress feedback
-Aktuálne user nevidí progress. Pridať `onProgress?: (pct: number) => void` callback a v `RecalculateDialog` zobrazovať progress bar (per-projekt tick). Nezrýchli to výpočet, ale UX bude znesiteľnejší.
-
-## Očakávaný zisk
-
-| Krok | Pred | Po |
-|---|---|---|
-| Fetch (200 projektov) | ~600 queries sériovo | 3 queries paralelne |
-| Update schedule (~2000 zmien) | ~2000 await roundtripov | ~4 bulk calls |
-| Update inbox (~500 zmien) | ~500 roundtripov | ~1 bulk call |
-| Update tpv_items (~3000) | ~3000 roundtripov | ~6 bulk calls |
-| **Celkový čas (odhad)** | **60-120 s** | **5-15 s** |
-
-## Súbory na úpravu
-
-- **`src/lib/recalculateProductionHours.ts`** — refactor na bulk fetch + bulk upsert + optional `onProgress` callback
-- **`src/components/RecalculateDialog.tsx`** — pridať progress bar (0–100 %), pripojiť cez nový callback
-- **`supabase/functions/forecast-schedule/index.ts`** — *NEMENIŤ* (forecast má vlastnú logiku, mimo scope)
-
-## Edge cases
-
-- **Bulk upsert vyžaduje `id` v payloade** — máme ho ✅
-- **PostgREST limit ~1000 riadkov per request** — chunkujeme po 500
-- **`onConflict`** pre upsert: použiť `id` (PK) → bezpečné, žiadne náhodné insert-y
-- **Konzistencia split groups**: výpočet ratiá zostáva per-group v JS (no-op zmena, len sa neposiela do DB sériovo)
-- **Notifikácie over-plan**: ponecháme sériovo (max ~10-20 projektov, zanedbateľné)
-
-## Mimo scope
-
-- Background job/queue (overkill pre projekt tejto veľkosti — bulk operations stačia)
-- Edge function offload (recalculate beží už cez supabase client v browseri / RecalculateDialog; bulk fix vyrieši performance bez infraštruktúrnej zmeny)
-
+## Technické poznámky
+- V projektové memory je explicitně uvedeno, že midflight má zapisovat historické souhrny do `production_schedule` se statusem `scheduled`, ale jako izolovaná midflight data.
+- Aktuální problém vzniká tím, že kód navíc manipuluje s normálními `production_inbox` řádky (`recon_scheduled`, `recon_reduced`, delete regex), což porušuje tuto izolaci.
+- Je potřeba vrátit boundary: “midflight data jsou separátní vrstva”, ne transformace standardních Inbox řádků.
