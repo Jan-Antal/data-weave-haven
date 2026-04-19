@@ -1,69 +1,95 @@
 
 
-## Návrh: Proporcionálne škálovanie TPV hodín na project_hours
+## Problém
 
-### Princíp
+`recalculateProductionHours("all", undefined, true)` trvá dlho. Pri pohľade na kód (`src/lib/recalculateProductionHours.ts`) vidím tieto bottlenecky:
 
-Namiesto opravovania `production_pct` (Varianta A z minulého kola) urobíme **post-scaling**:
+### Bottleneck 1: N+1 queries v hlavnej slučke
+Pre každý projekt (môže ich byť 100+):
+- `SELECT tpv_items` (1 query/projekt)
+- `SELECT production_schedule` (1 query/projekt)
+- `SELECT production_inbox` (1 query/projekt)
 
-1. Vypočítaj `tpv_hours_raw` = súčet hodín z TPV položiek (per-item floor, ako dnes)
-2. Vypočítaj `project_hours` = z `prodejni_cena × (1−marže) × production_pct / hourly_rate`
-3. **Vždy** (keď existujú TPV položky aj prodejní cena) škáluj per-item hodiny pomerom `project_hours / tpv_hours_raw`
-4. Posledná položka dostane "remainder" (zvyšok do `project_hours`), aby sa eliminovala zaokrúhľovacia odchýlka → súčet sedí presne
+→ **3× N queries** (pri 200 projektoch = 600 queries sériovo)
 
-### Príklad: Z-2615-002
+### Bottleneck 2: Per-row UPDATEs
+- `UPDATE production_schedule` per riadok (sériovo, await v cykle)
+- `UPDATE production_inbox` per riadok (sériovo)
+- `UPDATE tpv_items` per riadok (sériovo, batch=100 ale stále await v cykle)
 
-- `tpv_hours_raw` = 125h (57+25+12+6+5+20)
-- `project_hours` = 187h
-- ratio = 187/125 = **1.496**
-- Per-item: 57→85, 25→37, 12→18, 6→9, 5→7, 20→**31** (remainder, aby súčet = 187)
-- **Výsledok**: Inbox súčet = 187h = Project Detail ✅
+Pri tisíckach riadkov → tisíce sériových roundtripov.
 
-### Logika výberu plánu (`hodiny_plan`)
+### Bottleneck 3: Over-plan check
+- `SELECT production_schedule` pre všetky over-plan projekty (1 query, OK)
+- `createNotification` per projekt (sériovo)
 
-| Stav | `hodiny_plan` | Per-item škálovanie |
+## Návrh optimalizácie
+
+### 1. Bulk fetch namiesto N+1 (najväčší zisk)
+
+Načítať **všetky** `tpv_items`, `production_schedule`, `production_inbox` pre dotknuté projekty **jedným queryom**, potom group-by-project v JS:
+
+```ts
+const { data: allTpv } = await supabase
+  .from("tpv_items")
+  .select("...")
+  .in("project_id", projectIds)
+  .is("deleted_at", null);
+
+const tpvByProject = groupBy(allTpv, "project_id");
+```
+
+→ z **3N queries → 3 queries** (pre 200 projektov: 600 → 3)
+
+### 2. Bulk UPDATE cez upsert
+
+Namiesto per-row `UPDATE`:
+```ts
+// Zozbierať všetky zmeny do array
+const scheduleUpdates: Array<{id, scheduled_hours, scheduled_czk}> = [];
+// Po výpočte všetkého:
+await supabase.from("production_schedule").upsert(scheduleUpdates);
+```
+
+PostgREST podporuje bulk upsert (1 HTTP call pre stovky riadkov). Rovnako pre `production_inbox` a `tpv_items`.
+
+→ z **tisíce roundtripov → ~3-6 bulk callov** (po batchoch ~500)
+
+### 3. Iba zmenené riadky
+Aj dnes sa kontroluje `if (correctCzk !== ...)`, ale stále sa robí await per riadok. Po prechode na bulk upsert toto zostane (pridať do bulk array len ak sa hodnota mení).
+
+### 4. Paralelizácia top-level fetchov
+Už existuje `Promise.all` pre projects/settings/presets/rates ✅. Pridať tam aj bulk tpv/schedule/inbox fetch.
+
+### 5. Kratší progress feedback
+Aktuálne user nevidí progress. Pridať `onProgress?: (pct: number) => void` callback a v `RecalculateDialog` zobrazovať progress bar (per-projekt tick). Nezrýchli to výpočet, ale UX bude znesiteľnejší.
+
+## Očakávaný zisk
+
+| Krok | Pred | Po |
 |---|---|---|
-| TPV existuje, project_hours > tpv_hours_raw | `project_hours` | škáluj nahor |
-| TPV existuje, project_hours ≤ tpv_hours_raw | `tpv_hours_raw` | bez škálovania |
-| Len project price (žiadne TPV) | `project_hours` | — |
-| Žiadne | 0 | — |
-| `plan_use_project_price = true` | `project_hours` | škáluj nahor |
+| Fetch (200 projektov) | ~600 queries sériovo | 3 queries paralelne |
+| Update schedule (~2000 zmien) | ~2000 await roundtripov | ~4 bulk calls |
+| Update inbox (~500 zmien) | ~500 roundtripov | ~1 bulk call |
+| Update tpv_items (~3000) | ~3000 roundtripov | ~6 bulk calls |
+| **Celkový čas (odhad)** | **60-120 s** | **5-15 s** |
 
-→ **`hodiny_plan = max(tpv_hours_raw, project_hours)`** v praxi (s výnimkou explicit override).
+## Súbory na úpravu
 
-### Zmeny v súboroch
+- **`src/lib/recalculateProductionHours.ts`** — refactor na bulk fetch + bulk upsert + optional `onProgress` callback
+- **`src/components/RecalculateDialog.tsx`** — pridať progress bar (0–100 %), pripojiť cez nový callback
+- **`supabase/functions/forecast-schedule/index.ts`** — *NEMENIŤ* (forecast má vlastnú logiku, mimo scope)
 
-**1. `src/lib/computePlanHours.ts`**
-- Po výpočte `tpv_hours_raw` a `project_hours` pridať blok: ak `project_hours > tpv_hours_raw && tpv_hours_raw > 0`, prejsť cez `item_hours[]` a vynásobiť každú položku `ratio = project_hours / tpv_hours_raw` (Math.floor), posledná položka = `project_hours − súčet predošlých` (remainder)
-- `hodiny_plan = source === "TPV" ? max(tpv_hours, project_hours) : ...`
-- Pridať nové pole do `PlanHoursResult`: `scale_ratio: number` (na audit)
+## Edge cases
 
-**2. `src/lib/recalculateProductionHours.ts`**
-- V cykle ktorý prepočítava `production_inbox.estimated_hours` a `production_schedule.scheduled_hours` per `item_code`: použiť **rovnaký škálovací pomer** ako v `computePlanHours` (vrátiť `scale_ratio` z `result` a aplikovať `correctHours = floor(rawItemHours × scale_ratio)`)
-- Pre split rows zachovať proporciu v rámci split groupy (už funguje)
-- Posledná položka v projekte = remainder, aby súčet = `project_hours`
+- **Bulk upsert vyžaduje `id` v payloade** — máme ho ✅
+- **PostgREST limit ~1000 riadkov per request** — chunkujeme po 500
+- **`onConflict`** pre upsert: použiť `id` (PK) → bezpečné, žiadne náhodné insert-y
+- **Konzistencia split groups**: výpočet ratiá zostáva per-group v JS (no-op zmena, len sa neposiela do DB sériovo)
+- **Notifikácie over-plan**: ponecháme sériovo (max ~10-20 projektov, zanedbateľné)
 
-**3. `src/lib/formulaEngine.ts` + `FORMULA_DEFAULTS`**
-- Pridať voliteľný vzorec `tpv_scale_ratio` s defaultom `project_hours / tpv_hours_raw` (pre transparentnosť v Formula Builderi, nemusí byť okamžite editovateľný)
+## Mimo scope
 
-**4. `src/components/RozpadCeny.tsx` / `ProjectDetailDialog.tsx`** (drobné UI)
-- Pri zobrazení "Hodiny plán" pridať tooltip: "Z prodejní ceny: 187h • TPV súčet (raw): 125h • Škálovanie: ×1.50"
-
-### Edge cases
-
-- **`tpv_hours_raw = 0`** ale TPV položky existujú (cena=0) → ratio nedefinované → použiť `project_hours` ako celok bez škálovania (per-item ostáva 0; alebo distribuovať rovnomerne — preferujem ostáva 0, project_hours sa berie ako "blocker"-style)
-- **`project_hours = 0`** (chýba prodejní cena) → použiť `tpv_hours_raw` bez škálovania
-- **`plan_use_project_price = true`** + TPV existuje → škáluj rovnako (nahor)
-- **`warning_low_tpv`** prah 60 % zostáva pre badge varovania v UI, ale **už neovplyvňuje výpočet** (logiku nahrádza max())
-- **Zaokrúhľovanie**: Math.floor v cykle + posledná položka = remainder zaručí presný súčet
-
-### Migrácia
-
-Po nasadení spustiť `recalculateProductionHours("all", undefined, true)` → prepočíta všetky existujúce inbox + schedule riadky podľa novej logiky.
-
-### Vplyv
-
-- Inbox súčet = `hodiny_plan` v Project Detail (vždy)
-- Žiadne "stratené" hodiny medzi TPV cenou a prodejní cenou
-- Položky s nižšou cenou v TPV dostanú proporcionálne viac hodín → zodpovedajú reálnemu nákladu vrátane Montáže/Dopravy
+- Background job/queue (overkill pre projekt tejto veľkosti — bulk operations stačia)
+- Edge function offload (recalculate beží už cez supabase client v browseri / RecalculateDialog; bulk fix vyrieši performance bez infraštruktúrnej zmeny)
 
