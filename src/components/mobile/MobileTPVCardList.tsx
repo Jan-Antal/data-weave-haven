@@ -46,6 +46,7 @@ export function MobileTPVCardList({
   projectName,
   currency,
   productionStatusMap,
+  stages = [],
   onBack,
   onOpenDetail,
   onAddItem,
