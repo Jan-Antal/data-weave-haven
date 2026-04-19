@@ -474,6 +474,7 @@ export function VykazReport() {
                     expanded={expanded}
                     toggleExpand={toggleExpand}
                     projectsMap={projectsMap}
+                    overheadMap={overheadMap}
                     onOpenDetail={setDetailProjectId}
                   />
                 ) : (
@@ -482,6 +483,7 @@ export function VykazReport() {
                     expanded={expanded}
                     toggleExpand={toggleExpand}
                     projectsMap={projectsMap}
+                    overheadMap={overheadMap}
                     onOpenDetail={setDetailProjectId}
                   />
                 )}
