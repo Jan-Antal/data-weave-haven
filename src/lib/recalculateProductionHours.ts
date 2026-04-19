@@ -230,6 +230,7 @@ export async function recalculateProductionHours(
         updated++;
       }
     }
+  }
 
   // Batch upsert to project_plan_hours
   if (projectResults.length > 0) {
