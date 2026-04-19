@@ -937,6 +937,7 @@ export function useProductionDragDrop() {
           estimated_czk: item.scheduled_czk,
           sent_by: user.id,
           status: "pending" as const,
+          split_group_id: item.split_group_id ?? null,
         }));
         const { error: insertErr } = await supabase.from("production_inbox").insert(newItems);
         if (insertErr) throw insertErr;
@@ -951,6 +952,12 @@ export function useProductionDragDrop() {
           newValue: "Inbox",
           detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, from_week: weekLabel(weekDate) }),
         });
+      }
+
+      // Renumber any chains touched by this return.
+      const chainIds = new Set(items.map((i: any) => i.split_group_id).filter(Boolean) as string[]);
+      for (const g of chainIds) {
+        try { await renumberChain(g); } catch { /* silent */ }
       }
 
       invalidateAll();
