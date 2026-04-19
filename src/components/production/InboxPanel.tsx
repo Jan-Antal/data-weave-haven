@@ -321,16 +321,31 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const handleExpandAll = () => { setAllExpanded(true); setExpandKey((k) => k + 1); };
   const handleCollapseAll = () => { setAllExpanded(false); setExpandKey((k) => k + 1); };
 
-  const toggleCheckItem = useCallback((itemId: string) => {
+  const lastClickedItemRef = useRef<{ projectId: string; itemId: string } | null>(null);
+
+  const toggleCheckItem = useCallback((itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => {
     setCheckedItems(prev => {
       const next = new Set(prev);
+      // Shift+click range select within same project
+      if (opts?.shiftKey && opts.projectItemIds && opts.projectId
+          && lastClickedItemRef.current?.projectId === opts.projectId) {
+        const ids = opts.projectItemIds;
+        const lastIdx = ids.indexOf(lastClickedItemRef.current.itemId);
+        const curIdx = ids.indexOf(itemId);
+        if (lastIdx >= 0 && curIdx >= 0) {
+          const [from, to] = lastIdx < curIdx ? [lastIdx, curIdx] : [curIdx, lastIdx];
+          for (let i = from; i <= to; i++) next.add(ids[i]);
+          return next;
+        }
+      }
       if (next.has(itemId)) next.delete(itemId);
       else next.add(itemId);
       return next;
     });
+    if (opts?.projectId) lastClickedItemRef.current = { projectId: opts.projectId, itemId };
   }, []);
 
-  const clearCheckedItems = useCallback(() => setCheckedItems(new Set()), []);
+  const clearCheckedItems = useCallback(() => { setCheckedItems(new Set()); lastClickedItemRef.current = null; }, []);
 
   // Build a lookup of all inbox items for batch drag data
   const allInboxItemsMap = useMemo(() => {
