@@ -114,6 +114,8 @@ export async function recalculateProductionHours(
       }
     }
 
+    const scaleRatio = result.scale_ratio || 1;
+
     for (const item of schedItems || []) {
       if (item.item_code?.startsWith('HIST_')) {
         const histHours = Number(item.scheduled_hours) || 0;
@@ -143,13 +145,15 @@ export async function recalculateProductionHours(
         formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
         { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
       ));
-      const totalHours =
+      const rawTotalHours =
         itemCostCzk > 0
           ? Math.floor(evaluateFormula(
               formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
               { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
             ))
           : 0;
+      // Apply project-level scale ratio (TPV → Project hours)
+      const totalHours = Math.floor(rawTotalHours * scaleRatio);
       const splitGroupId = item.split_group_id;
       const correctHours = (() => {
         if (!splitGroupId || !splitGroupTotals[splitGroupId]) {
@@ -198,13 +202,14 @@ export async function recalculateProductionHours(
         formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
         { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
       ));
-      const totalHours =
+      const rawTotalHours =
         itemCostCzk > 0
           ? Math.floor(evaluateFormula(
               formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
               { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
             ))
           : 0;
+      const totalHours = Math.floor(rawTotalHours * scaleRatio);
       const splitGroupId = item.split_group_id;
       const correctHours = (() => {
         if (!splitGroupId || !inboxSplitGroupTotals[splitGroupId]) {
