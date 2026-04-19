@@ -1,61 +1,68 @@
 
-Cíl: vrátit midflight na původně správné chování tak, aby už nesahal na běžné Inbox položky destruktivně a nerozhazoval hodiny.
 
-1. Potvrzená příčina
-- Problém není samotné povolení statusu `completed`.
-- Rozbití vzniklo v `src/lib/midflightImportPlanVyroby.ts`, kde se při resetu/importu:
-  - spouští globální `recalculateProductionHours(...)`,
-  - mažou Inbox řádky podle regexu názvu,
-  - některé Inbox položky se přepínají na `status: "scheduled"`,
-  - historické bundle se zapisují do `production_schedule`, kde je bere běžná logika plánování/přepočtu.
+## Diagnóza
 
-2. Co opravit v kódu
-- `src/lib/midflightImportPlanVyroby.ts`
-  - odstranit globální přepočet hodin z reset části,
-  - odstranit mazání Inbox položek podle `item_name ~ (N/M)`,
-  - nechat reset jen na skutečných midflight datech (`is_midflight`, `is_historical`, `bundle_id ::MF_`),
-  - při reconciliaci už neměnit normální Inbox položky na `scheduled`,
-  - historicky plně pokryté položky nechat mimo aktivní Inbox přes vlastní midflight/historical mechanismus, ne přes běžný Inbox status,
-  - zachovat historické bundle jako oddělená data, aby je normální plánovací tok nebral jako klasické naplánované položky.
+Vidím dáta a problém je jasný — **inbox má úplne nesprávne hodiny**, hoci `estimated_czk` je správne:
 
-- `src/hooks/useProductionInbox.ts`
-  - ověřit/upevnit, že Inbox počítá jen skutečné `pending` produkční položky a nebere nic “reconciled/historical”.
+| Projekt | TPV Schváleno (CZK) | Inbox CZK | Inbox hodín | Očakávané hodín |
+|---|---|---|---|---|
+| Insia (Z-2605-001) | 860 993 | 860 993 ✅ | **14.4** ❌ | ~672 |
+| Multisport (Z-2607-008) | 726 150 | 726 150 ✅ | **552.2** ❌ | ~586 (chýba ~9–34) |
+| Allianz 5.patro (Z-2617-001) | 1 196 023 | 922 081 ❌ | **7.8** ❌ | ~1214 |
+| Allianz 6.patro (Z-2617-002) | 107 325 | 107 325 ✅ | **54** ✅ | 54 ✅ |
 
-- `src/hooks/useProductionSchedule.ts`, `src/hooks/useProductionProgress.ts`, `src/hooks/useProductionStatuses.ts`
-  - zkontrolovat filtrování, aby historical/midflight řádky nevstupovaly do běžných progress/metrik, pokud tam nemají být.
+### Skutočná príčina
 
-- `src/components/production/InboxPanel.tsx`
-  - zablokovat destruktivní “Vrátit do TPV” pro midflight/historical položky stejně přísně jako v table view; teď je v Inboxu povolené i pro cleanup a to je riskantní.
+Po dátovom recovery (revert `recon_reduced` → `pending`) sa **vrátili pôvodné hodiny z času midflight reconciliation**, ktoré boli umelo redukované na ~0 (lebo midflight ich „pokryl" historickou prácou). 
 
-3. Datová oprava po fixu
-Protože problém už poškodil data, samotná změna kódu nestačí. Bude potřeba jednorázový recovery krok:
-- obnovit běžné Inbox položky, které byly jen “reconciled” a neměly být smazané/přepnuté,
-- odstranit jen skutečné midflight artefakty,
-- znovu dopočítat hodiny pouze standardním bezpečným přepočtem.
+Príklad Insia: 7 položiek za 860 993 CZK má spolu len **14.4 h** — to vzniklo tým, že midflight ich zredukoval na zostatok a my sme síce vrátili `status=pending`, ale **`estimated_hours` sme nevrátili na pôvodnú hodnotu**.
 
-To udělám jako jednorázovou opravu dat, odděleně od trvalé logiky midflight.
+`recalculateProductionHours` ich neopravil, lebo dnešná logika len kontroluje, či sa `correctCzk` líši od uloženého — CZK je správne, takže preskočí.
 
-4. Co ponechat
-- DB funkce `validate_production_schedule_status` s podporou `completed` může zůstat, sama o sobě není root cause.
-- Midflight může dál vytvářet historické záznamy, ale musí být izolované od normálního Inbox/plán flow.
+### Allianz 5.patro: dva problémy
+1. **Inbox CZK 922 081 ≠ TPV Schváleno 1 196 023** — niektoré položky chýbajú v inboxe (neboli odoslané do výroby).
+2. **`hodiny_plan = 1214`** je z prodejnej ceny (`plan_use_project_price = true`), ale TPV Schváleno = 1 302 → správne by malo byť max(TPV, project) alebo prinajmenšom konzistentné.
 
-5. Výsledek po opravě
-- Midflight bude čistit jen svoje vlastní artefakty.
-- Nebude mazat ani “přemaskovávat” normální Inbox položky.
-- Běžné výpočty hodin a Inbox totals se přestanou rozjíždět po resetu/importu.
-- Historie zůstane viditelná, ale nebude vstupovat do normální plánovací logiky tam, kde nemá.
+## Návrh opravy
 
-6. Implementační postup
-- nejdřív opravit trvalou logiku v `midflightImportPlanVyroby.ts` a souvisejících guardech,
-- potom připravit bezpečný jednorázový recovery pro aktuálně rozbitá data,
-- nakonec ověřit na flow:
-  - midflight import,
-  - vyčištění midflight dat,
-  - Inbox totals,
-  - project detail vs Inbox,
-  - návrat položek z výroby/expedice.
+### Krok 1 — Doplniť do `recalculateProductionHours` opravu hodín v inboxe na základe CZK
 
-## Technické poznámky
-- V projektové memory je explicitně uvedeno, že midflight má zapisovat historické souhrny do `production_schedule` se statusem `scheduled`, ale jako izolovaná midflight data.
-- Aktuální problém vzniká tím, že kód navíc manipuluje s normálními `production_inbox` řádky (`recon_scheduled`, `recon_reduced`, delete regex), což porušuje tuto izolaci.
-- Je potřeba vrátit boundary: “midflight data jsou separátní vrstva”, ne transformace standardních Inbox řádků.
+Súčasný kód v `src/lib/recalculateProductionHours.ts` aktualizuje schedule/inbox iba keď zistí zmenu cez výpočet z `cena × pocet`. Ale pre inbox položky **už nepoznáme `cena × pocet`** — ich `estimated_czk` je uložené a estimated_hours by sa malo dopočítať priamo z neho:
+
+```text
+estimated_hours = floor(estimated_czk × (1 − marže) × production_pct / hourly_rate)
+```
+
+Toto pridáme ako **fallback krok** v recalculate: pre každú pending inbox položku porovnaj uložené `estimated_hours` s prepočítanými z `estimated_czk` — ak sa líši, oprav.
+
+### Krok 2 — Jednorazová oprava existujúcich dát (SQL migrácia)
+
+Pre všetky `production_inbox` rows so statusom `pending`:
+- prepočítať `estimated_hours = FLOOR(estimated_czk × (1 − marže) × cost_production_pct / hourly_rate)` z dát projektu (+ fallback marže 15 %, + EUR konverzia ak `currency='EUR'`)
+- update iba ak sa hodnota líši o > 0.5 h (aby sme zbytočne nešahali do hotových)
+
+### Krok 3 — Allianz 5.patro: chýbajúce položky v inboxe
+
+To **nie je bug v recalculate** — niektoré TPV položky jednoducho neboli odoslané do produkcie (alebo boli vrátené). User to musí poslať z TPV listu manuálne. **Mimo scope tejto opravy.**
+
+### Krok 4 — Multisport: chýba ~9 hodín
+
+Po oprave Krokom 1+2 sa to môže samo dorovnať. Ak nie, je to typická zaokrúhľovacia odchýlka (33 položiek × FLOOR per item) — akceptovateľné.
+
+## Súbory na úpravu
+
+- **`src/lib/recalculateProductionHours.ts`** — pridať fallback prepočet `estimated_hours` z uloženého `estimated_czk` pre inbox položky kde nie je k dispozícii pôvodný TPV item (alebo kde sa hodiny výrazne líšia od očakávaných z CZK).
+- **Nová migrácia SQL** — jednorazová oprava inbox `estimated_hours` z `estimated_czk` pre všetky aktuálne pending položky, používajúc settings (hourly_rate, default_margin) a per-project marže/preset.
+
+## Edge cases
+
+- **EUR projekty**: `estimated_czk` je už v CZK (stored), takže žiadna konverzia potrebná pri spätnom dopočte.
+- **Položky bez `estimated_czk` (NULL/0)**: preskočiť, ostávajú 0 hodín.
+- **Položky s `adhoc_reason='midflight%'`**: to sú expedice markery, nie sú `pending`, neovplyvní ich to.
+- **Splittnuté položky (`split_part`/`split_total`)**: pre tie sa používa estimated_czk konkrétneho splitu, takže funguje rovnako.
+
+## Mimo scope
+
+- Allianz 5.patro chýbajúcich 274K CZK v inboxe — to je dátový stav (užívateľ neposlal všetko), nie bug.
+- Zaokrúhľovacie rozdiely <1 h per projekt — akceptovateľné.
+
