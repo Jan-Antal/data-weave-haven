@@ -63,22 +63,52 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Working days an employee is "lifecycle-active" in the given week,
+ * honouring activated_at, deactivated_at, and deactivated_date (date only).
+ */
 export function getActiveWorkingDays(emp: EmployeeRow, weekStart: string, workingDays: number): number {
-  if (!emp.deactivated_at) return workingDays;
+  if (workingDays <= 0) return 0;
   const wStart = new Date(weekStart + "T00:00:00");
-  const deactDate = new Date(emp.deactivated_at);
-  if (deactDate <= wStart) return 0;
   const wEnd = new Date(wStart);
-  wEnd.setDate(wStart.getDate() + workingDays);
-  if (deactDate >= wEnd) return workingDays;
-  const daysActive = Math.ceil((deactDate.getTime() - wStart.getTime()) / 86400000);
-  return Math.max(0, Math.min(workingDays, daysActive));
+  wEnd.setDate(wStart.getDate() + workingDays); // exclusive
+
+  // Activation cut-off
+  let activeFrom = wStart;
+  if (emp.activated_at) {
+    const act = new Date(emp.activated_at);
+    if (act > activeFrom) activeFrom = act;
+  }
+  // Deactivation cut-off (prefer deactivated_at, fallback to deactivated_date EOD)
+  let activeTo = wEnd;
+  const anyEmp = emp as any;
+  if (emp.deactivated_at) {
+    const deact = new Date(emp.deactivated_at);
+    if (deact < activeTo) activeTo = deact;
+  } else if (anyEmp.deactivated_date) {
+    const deact = new Date(anyEmp.deactivated_date + "T23:59:59");
+    if (deact < activeTo) activeTo = deact;
+  }
+
+  if (activeTo <= activeFrom) return 0;
+  if (activeFrom <= wStart && activeTo >= wEnd) return workingDays;
+
+  // Count weekday-effective days within [activeFrom, activeTo) clipped to week.
+  const startMs = Math.max(activeFrom.getTime(), wStart.getTime());
+  const endMs = Math.min(activeTo.getTime(), wEnd.getTime());
+  const days = Math.ceil((endMs - startMs) / 86400000);
+  return Math.max(0, Math.min(workingDays, days));
 }
 
 export function isEmployeeActiveInWeek(emp: EmployeeRow, weekStart: string): boolean {
-  if (!emp.deactivated_at) return true;
-  return new Date(emp.deactivated_at) > new Date(weekStart + "T00:00:00");
+  return getActiveWorkingDays(emp, weekStart, 5) > 0;
 }
+
+/**
+ * Per-employee absence hours map for a given week.
+ * Key = employee_id, Value = absence hours within the week (capped at brutto).
+ */
+export type EmployeeWeekAbsenceMap = Map<string, number>;
 
 export function computeWeekCapacity(
   employees: EmployeeRow[],
@@ -86,10 +116,13 @@ export function computeWeekCapacity(
   workingDays: number,
   utilizationPct: number,
   weekStart: string,
+  employeeAbsenceHours?: EmployeeWeekAbsenceMap,
 ): CapacityCalcResult {
   const byUsek: Record<string, number> = {};
   let totalEmployees = 0;
   let bruttoHodiny = 0;
+  let nettoHodiny = 0;
+  let totalAbsence = 0;
 
   for (const emp of employees) {
     const usekKey = normalizeUsek(emp);
@@ -97,20 +130,29 @@ export function computeWeekCapacity(
     const activeDays = getActiveWorkingDays(emp, weekStart, workingDays);
     if (activeDays === 0) continue;
     const dailyHours = emp.uvazok_hodiny ?? 8;
-    const weeklyHours = dailyHours * activeDays;
-    byUsek[usekKey] = (byUsek[usekKey] ?? 0) + weeklyHours;
-    bruttoHodiny += weeklyHours;
+    const empBrutto = dailyHours * activeDays;
+    const empAbs = Math.min(empBrutto, employeeAbsenceHours?.get(emp.id) ?? 0);
+    const empNetto = Math.max(0, empBrutto - empAbs);
+
+    bruttoHodiny += empBrutto;
+    totalAbsence += empAbs;
+
+    if (empNetto <= 0) continue; // fully absent — not counted as available
+    byUsek[usekKey] = (byUsek[usekKey] ?? 0) + empNetto;
+    nettoHodiny += empNetto;
     totalEmployees++;
   }
 
-  const nettoHours = bruttoHodiny - absenceHours;
-  const capacity = Math.round(nettoHours * utilizationPct / 100);
+  // Backwards-compat: when no per-employee map is given, fall back to global absence hours.
+  const effectiveAbsence = employeeAbsenceHours ? totalAbsence : absenceHours;
+  const baseForCapacity = employeeAbsenceHours ? nettoHodiny : (bruttoHodiny - absenceHours);
+  const capacity = Math.round(baseForCapacity * utilizationPct / 100);
 
   return {
     capacity: Math.max(0, capacity),
     byUsek,
     totalEmployees,
-    absenceHours,
+    absenceHours: effectiveAbsence,
     bruttoHodiny,
     utilizationPct,
   };
