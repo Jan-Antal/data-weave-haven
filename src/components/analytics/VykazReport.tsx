@@ -371,11 +371,19 @@ export function VykazReport() {
     type Bucket = {
       label: string;
       sortKey: string;
-      hodiny: number;
+      projekty: number;
+      rezije: number;
+      nesparovane: number;
       isNonWorking: boolean;
       nonWorkingLabel?: string;
     };
     const buckets = new Map<string, Bucket>();
+
+    const categorize = (id: string): "projekty" | "rezije" | "nesparovane" => {
+      if (projectsMap.has(id)) return "projekty";
+      if (overheadMap.has(id)) return "rezije";
+      return "nesparovane";
+    };
 
     if (eff === "day") {
       for (let i = 0; i < spanDays; i++) {
@@ -397,14 +405,16 @@ export function VykazReport() {
         buckets.set(key, {
           label,
           sortKey: key,
-          hodiny: 0,
+          projekty: 0,
+          rezije: 0,
+          nesparovane: 0,
           isNonWorking: !!nonWorkingLabel,
           nonWorkingLabel,
         });
       }
       for (const r of logs) {
         const b = buckets.get(r.datum_sync);
-        if (b) b.hodiny += Number(r.hodiny) || 0;
+        if (b) b[categorize(r.ami_project_id || "—")] += Number(r.hodiny) || 0;
       }
     } else {
       const cursor = new Date(fromD);
@@ -415,7 +425,9 @@ export function VykazReport() {
           buckets.set(key, {
             label: `T${week}`,
             sortKey: toLocalDateStr(monday),
-            hodiny: 0,
+            projekty: 0,
+            rezije: 0,
+            nesparovane: 0,
             isNonWorking: false,
           });
         }
@@ -426,21 +438,25 @@ export function VykazReport() {
         const { year, week } = isoWeek(d);
         const key = `${year}-W${String(week).padStart(2, "0")}`;
         const b = buckets.get(key);
-        if (b) b.hodiny += Number(r.hodiny) || 0;
+        if (b) b[categorize(r.ami_project_id || "—")] += Number(r.hodiny) || 0;
       }
     }
 
     const arr = Array.from(buckets.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    const round1 = (n: number) => Math.round(n * 10) / 10;
     return {
-      chartData: arr.map(({ label, hodiny, isNonWorking, nonWorkingLabel }) => ({
+      chartData: arr.map(({ label, projekty, rezije, nesparovane, isNonWorking, nonWorkingLabel }) => ({
         label,
-        hodiny: Math.round(hodiny * 10) / 10,
+        projekty: round1(projekty),
+        rezije: round1(rezije),
+        nesparovane: round1(nesparovane),
+        hodiny: round1(projekty + rezije + nesparovane),
         isNonWorking,
         nonWorkingLabel,
       })),
       effectiveBucket: eff,
     };
-  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday]);
+  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday, projectsMap, overheadMap]);
 
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
