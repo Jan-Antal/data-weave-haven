@@ -825,6 +825,8 @@ export default function PlanVyroby() {
           onRecalculateHours={() => setRecalcDialogOpen(true)}
           midflightRunning={midflightRunning}
           onMidflightImport={() => setMidflightConfirmOpen(true)}
+          syncTpvRunning={syncTpvRunning}
+          onSyncTpvStatuses={handleSyncTpvStatuses}
         />
         )}
 
