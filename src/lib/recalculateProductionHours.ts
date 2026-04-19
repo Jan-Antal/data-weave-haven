@@ -21,7 +21,22 @@ async function chunkedUpsert(
 ) {
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    await supabaseClient.from(table).upsert(chunk, { onConflict: "id" });
+
+    // production_inbox / production_schedule updates are partial payloads keyed by id.
+    // Using upsert here can silently fail on NOT NULL columns not included in the payload.
+    if (table === "production_inbox" || table === "production_schedule") {
+      const results = await Promise.all(
+        chunk.map(async ({ id, ...changes }) => {
+          const { error } = await supabaseClient.from(table).update(changes).eq("id", id);
+          if (error) throw error;
+        }),
+      );
+      await Promise.all(results);
+      continue;
+    }
+
+    const { error } = await supabaseClient.from(table).upsert(chunk, { onConflict: "id" });
+    if (error) throw error;
   }
 }
 
@@ -105,11 +120,11 @@ export async function recalculateProductionHours(
       "id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id, project_id, status",
       "project_id",
       filteredProjectIds,
-      (q) => q.in("status", ["scheduled", "in_progress"]),
+      (q) => q.in("status", ["scheduled", "in_progress", "completed"]),
     ),
     bulkFetchIn<any>(
       "production_inbox",
-      "id, item_code, estimated_czk, estimated_hours, split_part, split_total, split_group_id, project_id, status",
+      "id, item_code, estimated_czk, estimated_hours, split_part, split_total, split_group_id, project_id, stage_id, sent_at, status",
       "project_id",
       filteredProjectIds,
       (q) => q.eq("status", "pending"),
