@@ -158,19 +158,38 @@ export async function midflightImportPlanVyroby(
     .select("project_id, project_name, status")
     .is("deleted_at", null);
 
+  // Post-production statuses — these projects are past production stage
+  // and should NEVER appear in production inbox (only in expedice markers below)
+  const POST_PRODUCTION_STATUSES = new Set([
+    "fakturace",
+    "dokončeno",
+    "dokonceno",
+    "montáž",
+    "montaz",
+    "expedice",
+    "reklamace",
+  ]);
+
   const validProjectMap = new Map<string, { name: string; status: string }>();
+  const postProductionProjects = new Set<string>();
   for (const p of validProjects || []) {
+    const status = (p.status || "").toLowerCase();
     validProjectMap.set(p.project_id, {
       name: p.project_name,
-      status: (p.status || "").toLowerCase(),
+      status,
     });
+    if (POST_PRODUCTION_STATUSES.has(status)) {
+      postProductionProjects.add(p.project_id);
+    }
   }
 
   // Group by normalized project + monday (only past/current weeks)
+  // SKIP post-production projects entirely — they belong only in expedice
   const byProjectMonday = new Map<string, number>();
   for (const row of allHours) {
     const normalizedId = normalizeProjectId(row.ami_project_id);
     if (!validProjectMap.has(normalizedId)) continue;
+    if (postProductionProjects.has(normalizedId)) continue;
     const monday = getMondayOfWeek(row.datum_sync);
     if (monday > currentMonday) continue; // skip future
     const key = `${normalizedId}||${monday}`;
