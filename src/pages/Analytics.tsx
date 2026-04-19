@@ -86,6 +86,7 @@ export default function Analytics() {
   const activeTab = searchParams.get("tab") ?? "projekty";
   const dilnaMode = activeTab === "dilna";
   const rezieMode = activeTab === "rezie";
+  const vykazMode = activeTab === "vykaz";
   const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
 
