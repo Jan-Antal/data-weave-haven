@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/currency";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
 import { getProjectColor } from "@/lib/projectColors";
 import type { ProductionStatus } from "@/hooks/useProductionStatuses";
+import type { ProjectStage } from "@/hooks/useProjectStages";
 
 interface TPVItem {
   id: string;
@@ -22,6 +23,7 @@ interface TPVItem {
   sent_date: string | null;
   accepted_date: string | null;
   custom_fields: any;
+  stage_id?: string | null;
 }
 
 interface MobileTPVCardListProps {
@@ -30,6 +32,7 @@ interface MobileTPVCardListProps {
   projectName: string;
   currency: string;
   productionStatusMap: Map<string, ProductionStatus[]>;
+  stages?: ProjectStage[];
   onBack: () => void;
   onOpenDetail: () => void;
   onAddItem: (name: string) => void;
