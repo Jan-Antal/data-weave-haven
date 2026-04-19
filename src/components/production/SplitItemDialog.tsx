@@ -7,6 +7,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { Slider } from "@/components/ui/slider";
+import { renumberChain } from "@/lib/splitChainHelpers";
 
 interface WeekOption {
   key: string;
