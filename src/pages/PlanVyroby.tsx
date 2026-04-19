@@ -1316,19 +1316,8 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
         </button>
       )}
 
-      {/* Sync TPV statuses — admin only */}
-      {isAdmin && !forecastActive && onSyncTpvStatuses && (
-        <button
-          onClick={onSyncTpvStatuses}
-          disabled={syncTpvRunning}
-          title="Vyčistit osirelé inbox/schedule záznamy a aktualizovat TPV statusy"
-          className="inline-flex items-center gap-1 px-2.5 py-1 h-8 text-[12px] font-medium rounded-md border transition-colors hover:bg-muted disabled:opacity-50"
-          style={{ borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
-        >
-          {syncTpvRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <span className="text-[12px]">🔄</span>}
-          Sync TPV
-        </button>
-      )}
+
+
 
       {/* Forecast plan mode toggle + Reset */}
       {forecastActive && (
