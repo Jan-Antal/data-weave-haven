@@ -265,15 +265,15 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   const triggerAutoRecalc = useCallback(async () => {
     if (vyrobniEmployees.length === 0) return;
     try {
-      const recalcAbsMap = absMap;
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
         const workingDays = getWorkingDaysForWeek(wn);
-        const absHours = recalcAbsMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
+        const absHours = absMap.get(weekStart) ?? 0;
+        const perEmpAbs = absPerEmployee.get(weekStart);
+        const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart, perEmpAbs);
         const dbAbsenceDays = (week as any)?.absence_days ?? 0;
         const calcAbsenceDays = Math.round(calc.absenceHours / 8);
         const shouldUpsert = !week 
@@ -292,7 +292,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
             utilization_pct: localUtilizationPct,
             usek_breakdown: calc.byUsek,
             total_employees: calc.totalEmployees,
-            absence_days: Math.round(calc.absenceHours / 8),
+            absence_days: calcAbsenceDays,
           });
         }
       }
@@ -300,7 +300,7 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
       await supabase.from("production_capacity" as any).upsert(upserts as any, { onConflict: "week_year,week_number" });
       queryClient.invalidateQueries({ queryKey: ["production-capacity", selectedYear] });
     } catch { /* silent */ }
-  }, [vyrobniEmployees, filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek, absMap]);
+  }, [vyrobniEmployees, filteredEmployees, weekMap, selectedYear, localUtilizationPct, queryClient, getWorkingDaysForWeek, absMap, absPerEmployee]);
 
   // Expose triggerAutoRecalc through ref so handleToggleEmployees can call it without circular deps
   useEffect(() => { triggerAutoRecalcRef.current = triggerAutoRecalc; }, [triggerAutoRecalc]);
