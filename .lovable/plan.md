@@ -1,46 +1,53 @@
 
-Visual-only refactor of `src/components/analytics/VykazReport.tsx`. No changes to data, filters, grouping, export, or expand logic.
 
-### 1. Summary cards row (above toolbar)
-Add 4 stat cards using existing Card style (white bg, border, shadow-sm, rounded-lg, p-4). Label `text-[11px] uppercase tracking-wide text-muted-foreground`, value `text-2xl font-bold`.
-- Celkem hodin: `formatHours(totalHours)` from existing `totalHours`
-- Aktívní pracovníci: `new Set(logs.map(l => l.zamestnanec)).size`
-- Spárované projekty: distinct `ami_project_id` where `projectsMap.has(id)`
-- Nespárováno: distinct `ami_project_id` where `!projectsMap.has(id)`; value text `#854F0B` when >0, `text-muted-foreground` when 0
-All derived via `useMemo` from existing `logs` + `projectsMap`.
+## Plan: Vykaz hours-per-period chart + toolbar repositioning
 
-### 2. Toolbar redesign
-Replace current toolbar with single row, three slots:
-- **Left**: existing `Select` (h-8) for date range; when `"custom"`, two `<Input type="date" className="h-8 w-[140px]">` inline (no wrap, `flex items-center gap-2`)
-- **Center**: segmented control — outer `div` bg `bg-muted` rounded-lg p-0.5, three buttons each `h-7 px-3 text-xs rounded-md`. Active: `bg-background shadow-sm font-medium text-foreground`. Inactive: `text-muted-foreground hover:text-foreground`. Wires to existing `groupBy` state.
-- **Right**: existing search `Input` (h-8 w-[200px]) + Export CSV `Button` (h-8 variant outline, Download icon)
+### 1. New chart "Hodiny v čase" (visual import sanity check)
 
-### 3. Table visual
-- `<thead>`: `bg-muted/50 sticky top-0 z-10`, header cells `text-[11px] uppercase tracking-wide text-muted-foreground font-medium h-9 border-b`
-- `<tbody>` rows: `h-10 text-[13px] hover:bg-muted/50 border-b border-border/40`
-- Project ID cell: `font-mono text-primary hover:underline cursor-pointer`
-- Spárované count badge: green pill `bg-green-100 text-green-800 text-[11px] px-2 py-0.5 rounded-full`
-- For unmatched indicator inside ProjektRow when no match: amber pill `bg-amber-100 text-amber-800`
+Add a chart card directly under the **Vykaz** tab heading (above the toolbar/summary cards). Uses existing `recharts` (already used in `DashboardStats.tsx`).
 
-### 4. Expanded sub-rows
-Update `ProjektExpanded`, `OsobaRows` (sub), `CinnostRows` (sub), `SubByProject`:
-- Wrapping cell: `bg-muted/30 border-l-2 border-border pl-10 py-2`
-- Person row: `flex items-center gap-3` — name `w-40 text-[13px]`, činnosti chips `flex-1 flex flex-wrap gap-1` each `bg-secondary text-secondary-foreground text-[11px] px-2 py-0.5 rounded`, hours `w-20 text-right font-medium text-[13px]`, date range `w-[130px] text-right text-[11px] text-muted-foreground`
+**Auto-bucketing logic** (computed via `useMemo` from `logs` + `from`/`to`):
+- Span ≤ **31 days** → bucket = **day** (label: `15.4.`)
+- Span > **31 days** → bucket = **week** (label: `T16` — ISO week, monday-anchored, using existing `toLocalDateStr` helper)
 
-### 5. Nespárované separator
-Replace current unmatched section header with full-width `<tr>` containing single `<td colSpan={...}>`:
-- `bg-[#FEF3C7] border-l-[3px] border-l-[#F59E0B] px-4 py-2`
-- Inner `flex items-center gap-2`: `<AlertTriangle className="h-4 w-4 text-[#F59E0B]" />` + label `font-semibold text-[12px] text-[#92400E]`
+Each bucket sums `hodiny` across all logs in range. Empty buckets are filled with 0 so gaps are visible (a missing day jumps out as a hole = clear import-failure signal).
 
-### 6. Celkem footer
-Sticky bottom row in tfoot or just below table:
-- `<tfoot>` with `sticky bottom-0 bg-muted/50 border-t border-border`
-- Cells: "Celkem" label `font-semibold text-[13px]`, total hours `font-bold text-[14px] text-[#0a2e28]`
+**Visual:**
+- BarChart, height `h-[180px]`, full-width inside a `Card` (white bg, border, shadow-sm, rounded-lg, p-4)
+- Title row: left = `"Hodiny v čase"` (text-sm font-semibold) + small muted subtitle showing bucket mode (`"per den"` / `"per týden"`); right = mini segmented toggle **Auto | Den | Týden** (default "Auto", lets user override). Same segmented style as existing groupBy control.
+- Bars: brand primary color (`hsl(var(--primary))`), rounded top corners, hover tooltip showing bucket label + `formatHours(value)`
+- X-axis: 11px muted ticks, no gridlines on X
+- Y-axis: 11px muted ticks, light dashed gridlines (`strokeDasharray="3 3"`, `stroke-border/40`)
+- Empty state (no logs): show muted centered text `"Žádné záznamy v období"`
 
-### Files touched
-- `src/components/analytics/VykazReport.tsx` — only this file. Add `AlertTriangle`, `Download` imports from lucide-react. Add memos for the 4 summary stats. Reuse `Card`, `Select`, `Input`, `Button` from existing UI.
+**State:**
+- Add `bucketMode: "auto" | "day" | "week"` (default `"auto"`)
+- Memo `chartData: { label: string; hodiny: number }[]` — resolves effective bucket from mode + span
+
+### 2. Layout reorder
+
+Current order: Summary cards → Toolbar → Table  
+New order:
+1. **Toolbar** (date range + groupBy segmented + search + export) — moved to **top**, immediately under tab header
+2. **Chart "Hodiny v čase"**
+3. **Summary cards** (4 stat cards)
+4. **Table**
+
+This gives the user filters first (control), then visual (chart), then numbers (cards), then detail (table) — top-down information hierarchy.
+
+The toolbar keeps its current visual styling (border-b, h-12-ish, bg-card, px-4 py-2). Summary-cards section padding adjusts (`pt-2` instead of `pt-4`) since they're no longer the topmost element.
+
+### 3. Files touched
+
+- `src/components/analytics/VykazReport.tsx` only
+  - Add imports: `BarChart`, `Bar`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer` from `recharts`
+  - Add `bucketMode` state
+  - Add `chartData` + `effectiveBucket` memos (ISO-week helper inline)
+  - Reorder JSX: Toolbar → Chart card → Summary cards → Table
+  - No changes to data fetching, grouping, filtering, export, RLS
 
 ### Out of scope
-- No data/query/filter/group/export/expand logic changes
-- No changes to `Analytics.tsx` or any other file
-- No DB or RLS changes
+- No DB / RLS changes
+- No changes to summary stats math, table rendering, expand/collapse, or CSV export
+- No new dependencies
+
