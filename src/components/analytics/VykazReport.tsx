@@ -1260,7 +1260,7 @@ function CinnostRows({
                 <span className="text-xs font-medium">{g.cinnost_nazov}</span>
               </div>
             </TableCell>
-            <TableCell className="text-xs font-mono text-muted-foreground">{g.cinnost_kod}</TableCell>
+            <TableCell className="text-xs text-muted-foreground">{g.cinnost_kod}</TableCell>
             <TableCell className="text-right text-xs tabular-nums font-medium">{formatHours(g.hodiny)}</TableCell>
             <TableCell />
           </TableRow>
@@ -1308,12 +1308,12 @@ function SubByProject({
               {p.matched ? (
                 <button
                   onClick={() => onOpenDetail(p.id)}
-                  className="font-mono text-[13px] text-primary hover:underline"
+                  className="text-[13px] text-primary hover:underline"
                 >
                   {p.id}
                 </button>
               ) : (
-                <span className="font-mono text-[13px] text-muted-foreground">{p.id}</span>
+                <span className="text-[13px] text-muted-foreground">{p.id}</span>
               )}
               <span className="flex-1 truncate text-[13px]" title={p.name}>{p.name}</span>
               <span className="tabular-nums font-medium w-20 text-right text-[13px]">{formatHours(p.hodiny)}</span>
