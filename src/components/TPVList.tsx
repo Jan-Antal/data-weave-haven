@@ -43,6 +43,7 @@ import { logActivity } from "@/lib/activityLog";
 import { TPVExtractor } from "./assistant/TPVExtractor";
 import { useCNDiff } from "@/hooks/useCNDiff";
 import { CNDiffDialog } from "./CNDiffDialog";
+import { useProjectStages } from "@/hooks/useProjectStages";
 
 const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultHidden?: boolean }[] = [
   { key: "item_code", label: "Kód prvku" },
@@ -51,6 +52,7 @@ const TPV_LIST_COLUMNS: { key: string; label: string; locked?: boolean; defaultH
   { key: "konstrukter", label: "Konstruktér" },
   { key: "status", label: "Status" },
   { key: "vyroba_status", label: "Výroba" },
+  { key: "stage_id", label: "Etapa", defaultHidden: true },
   { key: "sent_date", label: "Odesláno" },
   { key: "accepted_date", label: "Přijato" },
   { key: "notes", label: "Poznámka" },
