@@ -615,13 +615,13 @@ function AnalyticsTableRow({
               </button>
             )}
             {r.unmatched || isRezie ? (
-              <span className="whitespace-nowrap font-mono text-xs text-muted-foreground font-semibold">
+              <span className="whitespace-nowrap text-xs text-muted-foreground font-semibold">
                 {r.project_id}
               </span>
             ) : (
               <button
                 onClick={() => onOpenDetail(r.project_id)}
-                className="whitespace-nowrap font-mono text-xs text-primary hover:underline cursor-pointer font-semibold"
+                className="whitespace-nowrap text-xs text-primary hover:underline cursor-pointer font-semibold"
               >
                 {r.project_id}
               </button>
@@ -868,7 +868,7 @@ function UtilizationCard({
                 <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5">Rozpad režií ({rangeLabel[timeRange]})</p>
                 {rezieRows.map((r) => (
                   <div key={r.project_id} className="flex justify-between gap-3 text-[10px] tabular-nums">
-                    <span className="font-mono">{r.project_id}</span>
+                    <span>{r.project_id}</span>
                     <span className="text-muted-foreground truncate flex-1 text-left">{r.project_name}</span>
                     <span>{formatHours(rezieByCode[r.project_id] || 0)}</span>
                   </div>
