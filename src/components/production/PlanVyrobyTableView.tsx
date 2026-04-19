@@ -920,6 +920,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
             scheduled_week: entries[0].scheduledWeek, scheduled_hours: entries[0].scheduledHours,
             scheduled_czk: entries[0].scheduledCzk, position: 999, status: "scheduled",
             created_by: user.id, inbox_item_id: inboxItemId,
+            split_group_id: inboxItem.split_group_id ?? null,
+            split_part: inboxItem.split_part ?? null,
+            split_total: inboxItem.split_total ?? null,
           });
         } else {
           const { data: firstPart } = await supabase.from("production_schedule").insert({
