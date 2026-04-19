@@ -1276,14 +1276,20 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           qc.invalidateQueries({ queryKey: ["production-expedice"] });
         },
       });
+      // Intermediate split part → virtual "completed" (expediced_at SET, won't go to Expedice panel yet).
+      // Last/non-split part → virtual "expedice" (expediced_at NULL, awaiting shipment).
+      const isIntermediateSplit = !!item?.split_group_id
+        && item.split_part != null && item.split_total != null
+        && item.split_part < item.split_total;
+      const nowIsoMark = new Date().toISOString();
       await (supabase.from("production_expedice") as any).insert({
         project_id: pid,
         item_name: item?.item_name || "",
         item_code: item?.item_code || null,
         source_schedule_id: itemId,
         stage_id: item?.stage_id || null,
-        manufactured_at: new Date().toISOString(),
-        expediced_at: null,
+        manufactured_at: nowIsoMark,
+        expediced_at: isIntermediateSplit ? nowIsoMark : null,
         is_midflight: false,
       });
       // Log item hotovo

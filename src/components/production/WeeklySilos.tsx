@@ -1749,20 +1749,36 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
 
 function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContextMenu: (e: React.MouseEvent) => void }) {
   const isSplit = !!item.split_group_id || (!!item.split_part && !!item.split_total);
+  // Intermediate split part: virtual status "completed" + has more parts coming.
+  // Visually distinct from fully shipped ("expedice") items so they don't look fully done.
+  const isIntermediateSplit = item.status === "completed"
+    && !!item.split_group_id
+    && item.split_part != null && item.split_total != null
+    && item.split_part < item.split_total;
   return (
     <div data-context="item" className="flex items-center gap-[3px] px-[6px] py-[3px] rounded cursor-default transition-colors"
-      style={{ borderLeft: isSplit ? "2px dashed #c4ccc9" : undefined, backgroundColor: "#f8f7f4" }}
-      onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#eceae6"; }}
-      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#f5f3f0"; }}
+      style={{
+        borderLeft: isIntermediateSplit ? "2px solid #6366f1" : (isSplit ? "2px dashed #c4ccc9" : undefined),
+        backgroundColor: isIntermediateSplit ? "rgba(99,102,241,0.06)" : "#f8f7f4",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.backgroundColor = isIntermediateSplit ? "rgba(99,102,241,0.12)" : "#eceae6"; }}
+      onMouseLeave={e => { e.currentTarget.style.backgroundColor = isIntermediateSplit ? "rgba(99,102,241,0.06)" : "#f5f3f0"; }}
       onContextMenu={onContextMenu}
     >
-      <span style={{ width: 10, fontSize: 9, color: "#3a8a36", fontWeight: 700 }}>✓</span>
+      <span style={{ width: 10, fontSize: 9, color: isIntermediateSplit ? "#6366f1" : "#3a8a36", fontWeight: 700 }}>{isIntermediateSplit ? "↻" : "✓"}</span>
       {item.item_code && <span className="font-sans text-[9px] font-bold shrink-0" style={{ color: "#99a5a3" }}>{item.item_code}</span>}
-      <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7280", textDecoration: "line-through" }}>{item.item_name}</span>
+      <span className="text-[10px] flex-1 truncate" style={{ color: isIntermediateSplit ? "#4f46e5" : "#6b7280", textDecoration: isIntermediateSplit ? "none" : "line-through" }}>{item.item_name}</span>
       {item.is_midflight && (
         <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
       )}
-      {isSplit && (
+      {isIntermediateSplit ? (
+        <Tooltip><TooltipTrigger asChild>
+          <span className="text-[8px] font-semibold shrink-0 px-1 py-px rounded" style={{ backgroundColor: "rgba(99,102,241,0.18)", color: "#4f46e5" }}>
+            Část {item.split_part}/{item.split_total} hotová
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="z-[9999] text-[10px]">Část dokončena, výroba pokračuje v dalších týdnech</TooltipContent></Tooltip>
+      ) : isSplit && (
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-sans shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
