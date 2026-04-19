@@ -472,6 +472,7 @@ export type Database = {
       people: {
         Row: {
           created_at: string
+          email: string | null
           employee_id: string | null
           firma: string | null
           id: string
@@ -481,11 +482,13 @@ export type Database = {
           is_konstrukter: boolean | null
           is_pm: boolean | null
           name: string
+          phone: string | null
           role: string
           source: string | null
         }
         Insert: {
           created_at?: string
+          email?: string | null
           employee_id?: string | null
           firma?: string | null
           id?: string
@@ -495,11 +498,13 @@ export type Database = {
           is_konstrukter?: boolean | null
           is_pm?: boolean | null
           name: string
+          phone?: string | null
           role: string
           source?: string | null
         }
         Update: {
           created_at?: string
+          email?: string | null
           employee_id?: string | null
           firma?: string | null
           id?: string
@@ -509,6 +514,7 @@ export type Database = {
           is_konstrukter?: boolean | null
           is_pm?: boolean | null
           name?: string
+          phone?: string | null
           role?: string
           source?: string | null
         }
