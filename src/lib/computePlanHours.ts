@@ -21,6 +21,7 @@ export interface PlanHoursInput {
   hourlyRate: number;
   exchangeRates: Array<{ year: number; eur_czk: number }>;
   fallbackEurToCzk?: number;
+  defaultMarginPct?: number;
   formulas?: Record<string, string>;
 }
 
@@ -50,6 +51,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     hourlyRate,
     exchangeRates,
     fallbackEurToCzk = 25,
+    defaultMarginPct = 15,
     formulas,
   } = input;
 
@@ -63,10 +65,13 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
     sorted[0]?.eur_czk ??
     fallbackEurToCzk;
 
+  // Default margin from settings (percentage like 15) → decimal
+  const defaultMarginDecimal = defaultMarginPct > 1 ? defaultMarginPct / 100 : defaultMarginPct;
+
   // Marze: handle both percentage (15) and decimal (0.15) storage formats
   const marze = (() => {
     const raw = Number(project.marze);
-    if (!raw || raw <= 0) return 0.15;
+    if (!raw || raw <= 0) return defaultMarginDecimal;
     return raw > 1 ? raw / 100 : raw;
   })();
 
