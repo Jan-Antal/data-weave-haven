@@ -131,20 +131,18 @@ export function SplitItemDialog({
       }
 
       if (source === "schedule") {
-        // Batched: update original + insert new part in parallel
+        // Update original (keep its current part), insert a NEW row, then renumber whole chain.
         const [, insertResult] = await Promise.all([
           supabase.from("production_schedule").update({
             scheduled_hours: part1Hours,
             scheduled_czk: part1Hours * czkPerHour,
             split_group_id: groupId,
-            split_part: 1,
-            split_total: 2,
-            item_name: `${cleanName} (1/2)`,
+            item_name: cleanName, // numbering applied by renumberChain
           }).eq("id", itemId),
           supabase.from("production_schedule").insert({
             project_id: projectId,
             stage_id: stageId,
-            item_name: `${cleanName} (2/2)`,
+            item_name: cleanName,
             item_code: itemCode ?? null,
             scheduled_week: targetWeek,
             scheduled_hours: part2Hours,
@@ -153,12 +151,13 @@ export function SplitItemDialog({
             status: "scheduled",
             created_by: user.id,
             split_group_id: groupId,
-            split_part: 2,
-            split_total: 2,
           }).select().single(),
         ]);
 
         const insertedId = insertResult.data?.id;
+
+        // Renumber the entire chain (schedule + inbox) so all parts share total = N+1.
+        await renumberChain(groupId);
 
         // Push undo first, then invalidate
         pushUndo({
@@ -177,26 +176,26 @@ export function SplitItemDialog({
                 item_name: originalItem.item_name,
               }).eq("id", itemId);
             }
-            if (originalItem?.split_group_id) await renumberSiblings(originalItem.split_group_id);
+            if (originalItem?.split_group_id) await renumberChain(originalItem.split_group_id);
             invalidateAll();
           },
           redo: async () => {
             const { data: { user: u } } = await supabase.auth.getUser();
-            await Promise.all([
+            const [, insRes] = await Promise.all([
               supabase.from("production_schedule").update({
                 scheduled_hours: part1Hours, scheduled_czk: part1Hours * czkPerHour,
-                split_group_id: groupId, split_part: 1, split_total: 2,
-                item_name: `${cleanName} (1/2)`,
+                split_group_id: groupId, item_name: cleanName,
               }).eq("id", itemId),
               supabase.from("production_schedule").insert({
                 project_id: projectId, stage_id: stageId,
-                item_name: `${cleanName} (2/2)`, item_code: itemCode ?? null,
+                item_name: cleanName, item_code: itemCode ?? null,
                 scheduled_week: targetWeek, scheduled_hours: part2Hours,
                 scheduled_czk: part2Hours * czkPerHour, position: 999,
                 status: "scheduled", created_by: u?.id,
-                split_group_id: groupId, split_part: 2, split_total: 2,
-              }),
+                split_group_id: groupId,
+              }).select().single(),
             ]);
+            await renumberChain(groupId);
             invalidateAll();
           },
         });
