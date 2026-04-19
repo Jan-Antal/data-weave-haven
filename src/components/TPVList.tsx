@@ -508,9 +508,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   }, [addingInline]);
 
   // ── Bulk-aware field save ────────────────────────────────────────
-  const BULK_FIELDS = new Set(["status", "konstrukter", "sent_date", "accepted_date"]);
+  const BULK_FIELDS = new Set(["status", "konstrukter", "sent_date", "accepted_date", "stage_id"]);
 
-  const saveField = async (itemId: string, field: string, value: string, oldValue: string) => {
+  const saveField = async (itemId: string, field: string, value: any, oldValue: string) => {
     // Handle cena empty → save null
     if (field === "cena" && value.trim() === "") {
       updateItem.mutate({ id: itemId, field: "cena", value: null as any, projectId, oldValue });
