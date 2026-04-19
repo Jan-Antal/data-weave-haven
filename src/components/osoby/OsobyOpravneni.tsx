@@ -801,7 +801,7 @@ function BinToggle({
         variant="neutral"
         onClick={() => onChange(false)}
       >
-        –
+        Ne
       </SegBtn>
       <SegBtn
         selected={value}
