@@ -184,10 +184,12 @@ export async function midflightImportPlanVyroby(
   }
 
   // Group by normalized project + monday (only past/current weeks)
+  // SKIP post-production projects entirely — they belong only in expedice
   const byProjectMonday = new Map<string, number>();
   for (const row of allHours) {
     const normalizedId = normalizeProjectId(row.ami_project_id);
     if (!validProjectMap.has(normalizedId)) continue;
+    if (postProductionProjects.has(normalizedId)) continue;
     const monday = getMondayOfWeek(row.datum_sync);
     if (monday > currentMonday) continue; // skip future
     const key = `${normalizedId}||${monday}`;
