@@ -365,7 +365,7 @@ export function OsobyZamestnanci() {
                               value={emp.usek_nazov ?? "__none"}
                               onValueChange={(v) => handleUsekChange(emp, v)}
                             >
-                              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                              <SelectTrigger className={INLINE_TRIGGER}><SelectValue placeholder="—" /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none" disabled>—</SelectItem>
                                 {usekOptions.map((u) => (
@@ -381,7 +381,7 @@ export function OsobyZamestnanci() {
                               disabled={!emp.usek_nazov}
                             >
                               <SelectTrigger
-                                className="h-8 text-xs"
+                                className={INLINE_TRIGGER}
                                 title={!emp.usek_nazov ? "Nejprve vyberte úsek" : undefined}
                               >
                                 <SelectValue placeholder={!emp.usek_nazov ? "Vyberte úsek…" : "—"} />
