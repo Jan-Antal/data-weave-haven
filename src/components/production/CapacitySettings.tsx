@@ -496,14 +496,26 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
         }
       }
 
-      // Compute brutto from selected employees only (respects enabledUseky)
-      const brutto = selectedEmployees.reduce((s, e) => {
+      // Compute brutto and per-employee netto from selected employees only.
+      const perEmpAbs = absPerEmployee.get(weekStart) ?? new Map<string, number>();
+      let brutto = 0;
+      let netto = 0;
+      let activeCount = 0;
+      for (const e of selectedEmployees) {
         const activeDays = getActiveWorkingDays(e, weekStart, effectiveWorkingDays);
-        return s + (e.uvazok_hodiny ?? 8) * activeDays;
-      }, 0);
+        if (activeDays === 0) continue;
+        const empBrutto = (e.uvazok_hodiny ?? 8) * activeDays;
+        const empAbs = Math.min(empBrutto, perEmpAbs.get(e.id) ?? 0);
+        const empNetto = Math.max(0, empBrutto - empAbs);
+        brutto += empBrutto;
+        if (empNetto > 0) {
+          netto += empNetto;
+          activeCount++;
+        }
+      }
 
       const absHours = absMap.get(weekStart) ?? 0;
-      const capacity = Math.max(0, Math.round((brutto - absHours) * localUtilizationPct / 100));
+      const capacity = Math.max(0, Math.round(netto * localUtilizationPct / 100));
 
       map.set(wn, {
         ...(dbWeek ?? {}),
@@ -515,10 +527,12 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
         is_manual_override: false,
         holiday_name: dbWeek?.holiday_name ?? null,
         company_holiday_name: companyHolidayName,
+        total_employees: activeCount,
+        absence_days: Math.round(absHours / 8),
       });
     }
     return map;
-  }, [vyrobniEmployees, selectedEmployees, weekMap, selectedYear, localUtilizationPct, holidays, companyHolidays, autoApplyHolidays, absMap]);
+  }, [vyrobniEmployees, selectedEmployees, weekMap, selectedYear, localUtilizationPct, holidays, companyHolidays, autoApplyHolidays, absMap, absPerEmployee]);
 
   // Get month for a week number
   const getWeekMonth = useCallback((wn: number): number => {
@@ -651,16 +665,15 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
     setIsRecalculating(true);
     console.log("[recalc] start — employees:", filteredEmployees.length, "weeks:", weekMap.size);
     try {
-      // Use absences from React Query (already loaded)
-      const recalcAbsMap = absMap;
       const upserts: Array<Record<string, any>> = [];
       for (let wn = 1; wn <= 52; wn++) {
         const week = weekMap.get(wn);
         if (week?.is_manual_override) continue;
         const weekStart = week?.week_start ?? getWeekStartFromNumber(selectedYear, wn);
         const workingDays = getWorkingDaysForWeek(wn);
-        const absHours = recalcAbsMap.get(weekStart) ?? 0;
-        const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart);
+        const absHours = absMap.get(weekStart) ?? 0;
+        const perEmpAbs = absPerEmployee.get(weekStart);
+        const calc = computeWeekCapacity(filteredEmployees, absHours, workingDays, localUtilizationPct, weekStart, perEmpAbs);
 
         const dbCap = week?.capacity_hours ?? -1;
         const dbAbsDays = (week as any)?.absence_days ?? -1;
