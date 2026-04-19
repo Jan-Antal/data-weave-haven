@@ -44,6 +44,7 @@ export async function recalculateProductionHours(
   ]);
 
   const hourlyRate = Number(settingsData?.hourly_rate) || 550;
+  const defaultMarginPct = Number((settingsData as any)?.default_margin_pct) || 15;
   const presets = presetsData || [];
   const exchangeRates = (exchangeRatesData || []) as Array<{ year: number; eur_czk: number }>;
   const projects = (projectsData || []).filter((p: any) =>
