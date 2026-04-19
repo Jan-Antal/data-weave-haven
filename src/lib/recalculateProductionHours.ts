@@ -31,7 +31,7 @@ export async function recalculateProductionHours(
       .select("project_id, project_name, marze, cost_production_pct, cost_preset_id, prodejni_cena, currency, created_at, plan_use_project_price"),
     supabaseClient
       .from("production_settings")
-      .select("hourly_rate")
+      .select("hourly_rate, default_margin_pct")
       .limit(1)
       .single(),
     supabaseClient
