@@ -303,10 +303,18 @@ export function VykazReport() {
     const distinctProjects = new Set<string>();
     const distinctWorkers = new Set<string>();
     let allHours = 0;
+    let projektHours = 0;
+    let rezijneHours = 0;
+    let nesparovaneHours = 0;
     for (const r of logs) {
-      distinctProjects.add(r.ami_project_id || "—");
+      const id = r.ami_project_id || "—";
+      distinctProjects.add(id);
       if (r.zamestnanec) distinctWorkers.add(r.zamestnanec);
-      allHours += Number(r.hodiny) || 0;
+      const h = Number(r.hodiny) || 0;
+      allHours += h;
+      if (projectsMap.has(id)) projektHours += h;
+      else if (overheadMap.has(id)) rezijneHours += h;
+      else nesparovaneHours += h;
     }
     let matched = 0;
     let unmatched = 0;
@@ -314,11 +322,16 @@ export function VykazReport() {
       if (projectsMap.has(id) || overheadMap.has(id)) matched++;
       else unmatched++;
     }
+    const utilization = allHours > 0 ? ((allHours - rezijneHours) / allHours) * 100 : 0;
     return {
       totalHours: allHours,
       activeWorkers: distinctWorkers.size,
       matchedProjects: matched,
       unmatchedProjects: unmatched,
+      projektHours,
+      rezijneHours,
+      nesparovaneHours,
+      utilization,
     };
   }, [logs, projectsMap, overheadMap]);
 
@@ -681,18 +694,12 @@ export function VykazReport() {
             <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.activeWorkers}</div>
           </Card>
           <Card className="p-4 shadow-sm">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Spárované projekty</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{summaryStats.matchedProjects}</div>
-          </Card>
-          <Card className="p-4 shadow-sm">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárováno</div>
-            <div
-              className={cn(
-                "text-2xl font-bold mt-1 tabular-nums",
-                summaryStats.unmatchedProjects > 0 ? "text-amber-700" : "text-muted-foreground",
-              )}
-            >
-              {summaryStats.unmatchedProjects}
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Utilizace</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">
+              {summaryStats.utilization.toFixed(1).replace(".", ",")} %
+            </div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              (celkem − režie) / celkem
             </div>
           </Card>
         </div>
