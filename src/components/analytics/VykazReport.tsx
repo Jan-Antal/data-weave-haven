@@ -226,6 +226,30 @@ export function VykazReport() {
     [grouped],
   );
 
+  // ── Summary stats (reactive to date range + filters) ────────────
+  const summaryStats = useMemo(() => {
+    const distinctProjects = new Set<string>();
+    const distinctWorkers = new Set<string>();
+    let allHours = 0;
+    for (const r of logs) {
+      distinctProjects.add(r.ami_project_id || "—");
+      if (r.zamestnanec) distinctWorkers.add(r.zamestnanec);
+      allHours += Number(r.hodiny) || 0;
+    }
+    let matched = 0;
+    let unmatched = 0;
+    for (const id of distinctProjects) {
+      if (projectsMap.has(id)) matched++;
+      else unmatched++;
+    }
+    return {
+      totalHours: allHours,
+      activeWorkers: distinctWorkers.size,
+      matchedProjects: matched,
+      unmatchedProjects: unmatched,
+    };
+  }, [logs, projectsMap]);
+
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
     const lines: string[] = [];
