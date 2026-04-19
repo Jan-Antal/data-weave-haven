@@ -476,13 +476,13 @@ export function VykazReport() {
                 )}
               </TableBody>
               {grouped.length > 0 && (
-                <tfoot className="bg-muted/40 font-bold sticky bottom-0">
-                  <TableRow>
-                    <TableCell className="text-xs">Celkem</TableCell>
+                <tfoot className="bg-muted/50 sticky bottom-0 border-t border-border">
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell className="text-[13px] font-semibold">Celkem</TableCell>
                     {groupBy === "projekt" && (
                       <>
                         <TableCell />
-                        <TableCell className="text-right text-xs tabular-nums">{formatHours(totalHours)}</TableCell>
+                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
                         <TableCell />
                         <TableCell />
                         <TableCell />
@@ -491,14 +491,14 @@ export function VykazReport() {
                     {groupBy === "osoba" && (
                       <>
                         <TableCell />
-                        <TableCell className="text-right text-xs tabular-nums">{formatHours(totalHours)}</TableCell>
+                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
                         <TableCell />
                       </>
                     )}
                     {groupBy === "cinnost" && (
                       <>
                         <TableCell />
-                        <TableCell className="text-right text-xs tabular-nums">{formatHours(totalHours)}</TableCell>
+                        <TableCell className="text-right text-[14px] font-bold tabular-nums" style={{ color: "#0a2e28" }}>{formatHours(totalHours)}</TableCell>
                         <TableCell />
                       </>
                     )}
