@@ -49,6 +49,9 @@ export function useProductionDragDrop() {
         status: "scheduled",
         created_by: user.id,
         inbox_item_id: item.id,
+        split_group_id: item.split_group_id ?? null,
+        split_part: item.split_part ?? null,
+        split_total: item.split_total ?? null,
       }).select().single();
       if (insertErr) throw insertErr;
 
@@ -88,6 +91,9 @@ export function useProductionDragDrop() {
               scheduled_week: weekDate, scheduled_hours: item.estimated_hours,
               scheduled_czk: item.estimated_czk, position: 999, status: "scheduled",
               created_by: u?.id || user.id, inbox_item_id: item.id,
+              split_group_id: item.split_group_id ?? null,
+              split_part: item.split_part ?? null,
+              split_total: item.split_total ?? null,
             });
             await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", inboxItemId);
             invalidateAll();
@@ -125,6 +131,9 @@ export function useProductionDragDrop() {
         status: "scheduled" as const,
         created_by: user.id,
         inbox_item_id: item.id,
+        split_group_id: item.split_group_id ?? null,
+        split_part: item.split_part ?? null,
+        split_total: item.split_total ?? null,
       }));
 
       // Pre-flight: check for existing items with same item_code already scheduled in target week
@@ -198,6 +207,9 @@ export function useProductionDragDrop() {
             scheduled_week: weekDate, scheduled_hours: item.estimated_hours,
             scheduled_czk: item.estimated_czk, position: i, status: "scheduled" as const,
             created_by: u?.id || user.id, inbox_item_id: item.id,
+            split_group_id: item.split_group_id ?? null,
+            split_part: item.split_part ?? null,
+            split_total: item.split_total ?? null,
           }));
           await supabase.from("production_schedule").insert(rows);
           await supabase.from("production_inbox").update({ status: "scheduled" }).in("id", ids);
