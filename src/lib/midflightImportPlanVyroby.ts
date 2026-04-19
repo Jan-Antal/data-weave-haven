@@ -295,7 +295,7 @@ export async function midflightImportPlanVyroby(
         scheduled_week: monday,
         scheduled_hours: hours,
         scheduled_czk: 0,
-        status: "scheduled",
+        status: "completed",
         is_midflight: true,
         completed_at: new Date().toISOString(),
         completed_by: userId,
@@ -318,6 +318,7 @@ export async function midflightImportPlanVyroby(
     }
 
     // Reduce inbox items proportionally by totalHistHours (apply split metadata to ALL items)
+    const inboxIdsToDelete: string[] = [];
     if (inboxItems && inboxItems.length > 0 && totalInboxHours > 0) {
       const reductionRatio = Math.min(1, totalHistHours / totalInboxHours);
 
@@ -326,15 +327,8 @@ export async function midflightImportPlanVyroby(
         const newHours = Math.max(0, Math.round((item.estimated_hours - reducedBy) * 10) / 10);
 
         if (newHours < 0.05) {
-          // Fully consumed by history → mark as scheduled (legacy completed)
-          inboxUpdates.push({
-            id: item.id,
-            status: "scheduled",
-            adhoc_reason: "recon_scheduled",
-            split_group_id: firstBundleId,
-            split_part: totalParts,
-            split_total: totalParts,
-          });
+          // Fully consumed by history → DELETE from inbox (covered by completed midflight bundle)
+          inboxIdsToDelete.push(item.id);
         } else {
           // Partially consumed → keep in inbox as remainder, attach to split group
           inboxUpdates.push({
@@ -346,6 +340,14 @@ export async function midflightImportPlanVyroby(
             split_total: totalParts,
           });
         }
+      }
+
+      if (inboxIdsToDelete.length > 0) {
+        const { error: delErr } = await (supabaseClient as any)
+          .from("production_inbox")
+          .delete()
+          .in("id", inboxIdsToDelete);
+        if (delErr) errors.push(`Inbox delete (recon) error: ${delErr.message}`);
       }
     }
 
