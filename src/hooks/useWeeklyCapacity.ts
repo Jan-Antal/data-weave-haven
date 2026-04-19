@@ -52,6 +52,14 @@ function getMondayOfWeek(year: number, week: number): Date {
   return monday;
 }
 
+/** Format Date as YYYY-MM-DD using LOCAL time (avoids UTC/CZ tz shift). */
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function isWeekday(date: Date): boolean {
   const day = date.getDay();
   return day !== 0 && day !== 6;
@@ -181,7 +189,7 @@ export function useWeeklyCapacity(year: number, bruttoHodinyPerDay?: number) {
 
     for (let wn = 1; wn <= 52; wn++) {
       const monday = getMondayOfWeek(year, wn);
-      const weekStart = monday.toISOString().split("T")[0];
+      const weekStart = toLocalDateStr(monday);
       const dbRow = dbMap.get(wn);
 
       if (dbRow?.is_manual_override) {
