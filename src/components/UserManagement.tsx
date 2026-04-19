@@ -163,17 +163,23 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
     }
 
     if (profiles) {
-      const roleMap = new Map<string, AppRole>();
-      roles?.forEach((r: any) => roleMap.set(r.user_id, r.role));
+      const roleMap = new Map<string, { role: AppRole; permissions: Partial<Permissions> | null }>();
+      roles?.forEach((r: any) =>
+        roleMap.set(r.user_id, { role: r.role, permissions: (r.permissions as Partial<Permissions> | null) ?? null }),
+      );
       setUsers(
-        profiles.map((p: any) => ({
-          id: p.id,
-          email: p.email,
-          full_name: p.full_name,
-          is_active: p.is_active,
-          role: roleMap.get(p.id) ?? null,
-          person_id: p.person_id ?? null,
-        }))
+        profiles.map((p: any) => {
+          const r = roleMap.get(p.id);
+          return {
+            id: p.id,
+            email: p.email,
+            full_name: p.full_name,
+            is_active: p.is_active,
+            role: r?.role ?? null,
+            permissions: r?.permissions ?? null,
+            person_id: p.person_id ?? null,
+          };
+        })
       );
     }
     setLoading(false);
