@@ -402,17 +402,24 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
     [absMap, compositionWeekStart],
   );
 
-  /** Hours worked per employee that week (uvazok × activeDays). */
+  const compositionPerEmployeeAbs = useMemo(
+    () => absPerEmployee.get(compositionWeekStart) ?? new Map<string, number>(),
+    [absPerEmployee, compositionWeekStart],
+  );
+
+  /** Net hours per employee that week (uvazok × activeDays − absences). */
   const compositionEmpHours = useMemo(() => {
     const map = new Map<string, number>();
     for (const emp of vyrobniEmployees) {
       const activeDays = getActiveWorkingDays(emp, compositionWeekStart, compositionWorkingDays);
-      map.set(emp.id, (emp.uvazok_hodiny ?? 8) * activeDays);
+      const brutto = (emp.uvazok_hodiny ?? 8) * activeDays;
+      const abs = compositionPerEmployeeAbs.get(emp.id) ?? 0;
+      map.set(emp.id, Math.max(0, brutto - abs));
     }
     return map;
-  }, [vyrobniEmployees, compositionWeekStart, compositionWorkingDays]);
+  }, [vyrobniEmployees, compositionWeekStart, compositionWorkingDays, compositionPerEmployeeAbs]);
 
-  /** Employees actually contributing in the composition week (active that week + included). */
+  /** Employees actually contributing in the composition week (active that week + included + not fully absent). */
   const compositionActiveEmployees = useMemo(
     () => selectedEmployees.filter(e => (compositionEmpHours.get(e.id) ?? 0) > 0),
     [selectedEmployees, compositionEmpHours],
@@ -424,8 +431,8 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
   );
 
   const compositionNettoCapacity = useMemo(
-    () => Math.max(0, Math.round((compositionBruttoWeekly - compositionAbsenceHours) * localUtilizationPct / 100)),
-    [compositionBruttoWeekly, compositionAbsenceHours, localUtilizationPct],
+    () => Math.max(0, Math.round(compositionBruttoWeekly * localUtilizationPct / 100)),
+    [compositionBruttoWeekly, localUtilizationPct],
   );
 
 
