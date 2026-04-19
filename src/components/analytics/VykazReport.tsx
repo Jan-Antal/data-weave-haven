@@ -147,16 +147,26 @@ export function VykazReport() {
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["vykaz-log", from, to],
     queryFn: async (): Promise<LogRow[]> => {
-      const { data, error } = await supabase
-        .from("production_hours_log")
-        .select("ami_project_id,zamestnanec,cinnost_kod,cinnost_nazov,hodiny,datum_sync")
-        .gte("datum_sync", from)
-        .lte("datum_sync", to)
-        .range(0, 99999);
-      if (error) throw error;
-      return ((data ?? []) as LogRow[]).filter(
-        (r) => !r.cinnost_kod || !EXCLUDED_CINNOST.has(r.cinnost_kod),
-      );
+      const PAGE = 1000;
+      let all: LogRow[] = [];
+      let offset = 0;
+      // Paginate to bypass Supabase's server-side row cap (~1000 rows/request).
+      while (true) {
+        const { data, error } = await supabase
+          .from("production_hours_log")
+          .select("ami_project_id,zamestnanec,cinnost_kod,cinnost_nazov,hodiny,datum_sync")
+          .gte("datum_sync", from)
+          .lte("datum_sync", to)
+          .order("datum_sync", { ascending: true })
+          .range(offset, offset + PAGE - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as LogRow[];
+        if (!batch.length) break;
+        all = all.concat(batch);
+        if (batch.length < PAGE) break;
+        offset += PAGE;
+      }
+      return all.filter((r) => !r.cinnost_kod || !EXCLUDED_CINNOST.has(r.cinnost_kod));
     },
   });
 
