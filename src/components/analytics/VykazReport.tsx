@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, ReferenceArea } from "recharts";
+import { useCzechHolidays, useCompanyHolidays } from "@/hooks/useWeeklyCapacity";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -307,6 +308,31 @@ export function VykazReport() {
     };
   }, [logs, projectsMap, overheadMap]);
 
+  // ── Holidays for non-working highlight ──────────────────────────
+  const fromYear = useMemo(() => new Date(from + "T00:00:00").getFullYear(), [from]);
+  const toYear = useMemo(() => new Date(to + "T00:00:00").getFullYear(), [to]);
+  const { data: holidaysY1 } = useCzechHolidays(fromYear);
+  const { data: holidaysY2 } = useCzechHolidays(toYear);
+  const { data: companyHolidays } = useCompanyHolidays();
+
+  const holidayMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const h of holidaysY1 || []) m.set(h.date, h.localName);
+    if (toYear !== fromYear) for (const h of holidaysY2 || []) m.set(h.date, h.localName);
+    return m;
+  }, [holidaysY1, holidaysY2, fromYear, toYear]);
+
+  const findCompanyHoliday = useCallback(
+    (dateStr: string): string | null => {
+      if (!companyHolidays) return null;
+      for (const ch of companyHolidays) {
+        if (dateStr >= ch.start_date && dateStr <= ch.end_date) return ch.name;
+      }
+      return null;
+    },
+    [companyHolidays],
+  );
+
   // ── Chart data (hours per day/week) ─────────────────────────────
   const { chartData, effectiveBucket } = useMemo(() => {
     const fromD = new Date(from + "T00:00:00");
@@ -328,7 +354,14 @@ export function VykazReport() {
       return { year: date.getUTCFullYear(), week, monday };
     };
 
-    const buckets = new Map<string, { label: string; sortKey: string; hodiny: number }>();
+    type Bucket = {
+      label: string;
+      sortKey: string;
+      hodiny: number;
+      isNonWorking: boolean;
+      nonWorkingLabel?: string;
+    };
+    const buckets = new Map<string, Bucket>();
 
     if (eff === "day") {
       for (let i = 0; i < spanDays; i++) {
@@ -336,7 +369,24 @@ export function VykazReport() {
         d.setDate(fromD.getDate() + i);
         const key = toLocalDateStr(d);
         const label = `${d.getDate()}.${d.getMonth() + 1}.`;
-        buckets.set(key, { label, sortKey: key, hodiny: 0 });
+        const dow = d.getDay();
+        const isWeekend = dow === 0 || dow === 6;
+        const stateHoliday = holidayMap.get(key);
+        const companyHol = findCompanyHoliday(key);
+        const nonWorkingLabel = companyHol
+          ? `Firemní volno: ${companyHol}`
+          : stateHoliday
+          ? stateHoliday
+          : isWeekend
+          ? "Víkend"
+          : undefined;
+        buckets.set(key, {
+          label,
+          sortKey: key,
+          hodiny: 0,
+          isNonWorking: !!nonWorkingLabel,
+          nonWorkingLabel,
+        });
       }
       for (const r of logs) {
         const b = buckets.get(r.datum_sync);
@@ -348,7 +398,12 @@ export function VykazReport() {
         const { year, week, monday } = isoWeek(cursor);
         const key = `${year}-W${String(week).padStart(2, "0")}`;
         if (!buckets.has(key)) {
-          buckets.set(key, { label: `T${week}`, sortKey: toLocalDateStr(monday), hodiny: 0 });
+          buckets.set(key, {
+            label: `T${week}`,
+            sortKey: toLocalDateStr(monday),
+            hodiny: 0,
+            isNonWorking: false,
+          });
         }
         cursor.setDate(cursor.getDate() + 1);
       }
@@ -362,8 +417,16 @@ export function VykazReport() {
     }
 
     const arr = Array.from(buckets.values()).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-    return { chartData: arr.map(({ label, hodiny }) => ({ label, hodiny: Math.round(hodiny * 10) / 10 })), effectiveBucket: eff };
-  }, [logs, from, to, bucketMode]);
+    return {
+      chartData: arr.map(({ label, hodiny, isNonWorking, nonWorkingLabel }) => ({
+        label,
+        hodiny: Math.round(hodiny * 10) / 10,
+        isNonWorking,
+        nonWorkingLabel,
+      })),
+      effectiveBucket: eff,
+    };
+  }, [logs, from, to, bucketMode, holidayMap, findCompanyHoliday]);
 
   // ── CSV Export ──────────────────────────────────────────────────
   const handleExport = useCallback(() => {
@@ -597,11 +660,17 @@ export function VykazReport() {
         <div className="px-4 pt-2">
           <Card className="p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-baseline gap-2 flex-wrap">
                 <h3 className="text-sm font-semibold">Hodiny v čase</h3>
                 <span className="text-[11px] text-muted-foreground">
                   {effectiveBucket === "day" ? "per den" : "per týden"}
                 </span>
+                {effectiveBucket === "day" && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground ml-2">
+                    <span className="inline-block w-3 h-2.5 rounded-sm bg-muted border border-border/60" />
+                    Víkend / svátek
+                  </span>
+                )}
               </div>
               <div className="inline-flex items-center bg-muted rounded-lg p-0.5">
                 {([
@@ -627,7 +696,7 @@ export function VykazReport() {
                 })}
               </div>
             </div>
-            {chartData.length === 0 || chartData.every((d) => d.hodiny === 0) ? (
+            {chartData.every((d) => d.hodiny === 0) ? (
               <div className="h-[180px] flex items-center justify-center text-xs text-muted-foreground">
                 Žádné záznamy v období
               </div>
@@ -636,6 +705,31 @@ export function VykazReport() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/40" />
+                    {effectiveBucket === "day" &&
+                      (() => {
+                        const spans: Array<{ start: number; end: number }> = [];
+                        let curStart: number | null = null;
+                        for (let i = 0; i < chartData.length; i++) {
+                          if (chartData[i].isNonWorking) {
+                            if (curStart === null) curStart = i;
+                          } else if (curStart !== null) {
+                            spans.push({ start: curStart, end: i - 1 });
+                            curStart = null;
+                          }
+                        }
+                        if (curStart !== null) spans.push({ start: curStart, end: chartData.length - 1 });
+                        return spans.map((s, idx) => (
+                          <ReferenceArea
+                            key={`nw-${idx}`}
+                            x1={chartData[s.start].label}
+                            x2={chartData[s.end].label}
+                            fill="hsl(var(--muted-foreground))"
+                            fillOpacity={0.12}
+                            stroke="none"
+                            ifOverflow="extendDomain"
+                          />
+                        ));
+                      })()}
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
@@ -649,13 +743,26 @@ export function VykazReport() {
                     />
                     <RTooltip
                       cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
-                      contentStyle={{
-                        background: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: 8,
-                        fontSize: 12,
+                      content={({ active, payload, label }: any) => {
+                        if (!active || !payload || !payload.length) return null;
+                        const item = payload[0].payload;
+                        return (
+                          <div
+                            className="rounded-lg border bg-background px-2.5 py-1.5 shadow-md"
+                            style={{ fontSize: 12 }}
+                          >
+                            <div className="font-medium text-foreground">{label}</div>
+                            <div className="text-muted-foreground tabular-nums">
+                              {formatHours(payload[0].value as number)}
+                            </div>
+                            {item?.nonWorkingLabel && (
+                              <div className="text-[11px] italic text-muted-foreground mt-0.5">
+                                {item.nonWorkingLabel}
+                              </div>
+                            )}
+                          </div>
+                        );
                       }}
-                      formatter={(value: number) => [formatHours(value), "Hodiny"]}
                     />
                     <Bar dataKey="hodiny" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
