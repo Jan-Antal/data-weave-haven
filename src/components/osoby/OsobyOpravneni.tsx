@@ -294,7 +294,7 @@ export function OsobyOpravneni() {
                   </div>
                   <div>
                     {diffs > 0 ? (
-                      <Badge className="bg-orange-500 hover:bg-orange-500 text-white font-normal">
+                      <Badge className="bg-warning hover:bg-warning text-warning-foreground font-normal">
                         Vlastní · {diffs}
                       </Badge>
                     ) : (
