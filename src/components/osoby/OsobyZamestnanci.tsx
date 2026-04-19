@@ -42,6 +42,29 @@ function strediskoStyles(stredisko: string | null | undefined): string {
   return "bg-muted text-muted-foreground border-border";
 }
 
+/** Stredisko card colors — outer border + header strip per stredisko. */
+function strediskoCardStyles(stredisko: string | null | undefined): { card: string; header: string } {
+  const s = (stredisko ?? "").toLowerCase();
+  if (s.includes("direct")) return { card: "border-green-200", header: "bg-green-50/80 border-green-200" };
+  if (s.includes("indirect")) return { card: "border-[#F5A971]", header: "bg-[#FDE2C7]/60 border-[#F5A971]" };
+  if (s.includes("provoz")) return { card: "border-purple-200", header: "bg-purple-50/80 border-purple-200" };
+  return { card: "border-border", header: "bg-muted/40 border-border" };
+}
+
+/** Shared colgroup so per-block tables align with the global sticky header. */
+const SharedColgroup = () => (
+  <colgroup>
+    <col style={{ width: 260 }} />
+    <col style={{ width: 180 }} />
+    <col style={{ width: 160 }} />
+    <col style={{ width: 200 }} />
+    <col style={{ width: 110 }} />
+    <col style={{ width: 160 }} />
+    <col style={{ width: 150 }} />
+    <col style={{ width: 40 }} />
+  </colgroup>
+);
+
 /** Deterministic pastel avatar color from name hash. */
 function avatarStyles(name: string): { bg: string; fg: string } {
   let hash = 0;
