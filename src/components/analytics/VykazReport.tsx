@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableSearchBar } from "@/components/TableSearchBar";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
+import { useOverheadProjects } from "@/hooks/useOverheadProjects";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 
