@@ -534,9 +534,11 @@ export function OsobyZamestnanci() {
                       );
                     })}
                   </>
-                );
-              }),
-            )}
+                    );
+                  })}
+                </>
+              );
+            })}
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
