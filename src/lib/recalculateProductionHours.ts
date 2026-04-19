@@ -254,7 +254,24 @@ export async function recalculateProductionHours(
       for (const item of inboxItems) {
         if (item.item_code?.startsWith('HIST_')) continue;
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
-        if (!tpv) continue;
+
+        // Fallback: if no matching TPV (or hours look wrong vs stored CZK),
+        // recompute estimated_hours from stored estimated_czk.
+        if (!tpv) {
+          const storedCzk = Number(item.estimated_czk) || 0;
+          if (storedCzk <= 0) continue;
+          const correctHoursFromCzk = Math.floor(evaluateFormula(
+            formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
+            { itemCostCzk: storedCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
+          ));
+          const splitDivisor = Number(item.split_total) || 1;
+          const finalHours = Math.floor(correctHoursFromCzk / splitDivisor);
+          if (Math.abs(finalHours - Number(item.estimated_hours)) > 0.5) {
+            inboxUpdates.push({ id: item.id, estimated_hours: finalHours, estimated_czk: storedCzk });
+            updated++;
+          }
+          continue;
+        }
 
         const rawCena = Number(tpv.cena) || 0;
         const cenaCzk = isEur ? rawCena * eurRate : rawCena;
