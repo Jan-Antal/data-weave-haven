@@ -230,7 +230,7 @@ export function VykazReport() {
     }
     arr.sort((a, b) => b.hodiny - a.hodiny);
     return arr;
-  }, [logs, groupBy, search, projectsMap]);
+  }, [logs, groupBy, search, projectsMap, overheadMap]);
 
   const totalHours = useMemo(
     () => (grouped as any[]).reduce((s, g) => s + g.hodiny, 0),
