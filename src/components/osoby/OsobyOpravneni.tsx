@@ -1,50 +1,48 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Search, Check, Minus } from "lucide-react";
+import { Plus, X, Search, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  PERMISSION_FLAGS,
-  PERMISSION_LABELS,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   ROLE_LABELS,
   ROLE_PRESETS,
-  resolvePermissions,
+  PERMISSION_FLAGS,
   type Permissions,
   type PermissionFlag,
 } from "@/lib/permissionPresets";
 import type { AppRole } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
-interface UserRow {
+interface ProfileLite {
   id: string;
   email: string;
   full_name: string;
-  role: AppRole | null;
+}
+
+interface UserRoleRow {
+  user_id: string;
+  role: AppRole;
   permissions: Partial<Permissions> | null;
 }
 
-const PRESET_ROLES: AppRole[] = [
+const ROLE_ORDER: AppRole[] = [
   "owner",
   "admin",
   "vedouci_pm",
@@ -58,47 +56,84 @@ const PRESET_ROLES: AppRole[] = [
   "viewer",
 ];
 
-type ColDef = { flag: PermissionFlag; short: string };
-type GroupDef = { title: string; cols: ColDef[] };
+type TriRow = {
+  kind: "tri";
+  label: string;
+  desc?: string;
+  read?: PermissionFlag; // optional — if missing, treat as implicit
+  write: PermissionFlag;
+};
+type BinRow = {
+  kind: "bin";
+  label: string;
+  desc?: string;
+  flags: PermissionFlag[]; // toggled together
+};
+type Row = TriRow | BinRow;
+type Group = { title: string; rows: Row[] };
 
-const GROUPS: GroupDef[] = [
+const GROUPS: Group[] = [
   {
-    title: "Projekty",
-    cols: [
-      { flag: "canCreateProject", short: "Vytvořit" },
-      { flag: "canDeleteProject", short: "Smazat" },
-      { flag: "canSeePrices", short: "Ceny" },
-      { flag: "canEditProjectCode", short: "Kód/termín" },
+    title: "Projekty & TPV",
+    rows: [
+      {
+        kind: "tri",
+        label: "Projekty",
+        desc: "Zoznam projektov, detail, dokumenty",
+        write: "canEdit",
+      },
+      {
+        kind: "tri",
+        label: "TPV list",
+        desc: "Položky, ceny, odoslanie do výroby",
+        write: "canManageTPV",
+      },
+      { kind: "bin", label: "Vytvořit projekt", flags: ["canCreateProject"] },
+      { kind: "bin", label: "Smazat projekt", flags: ["canDeleteProject"] },
+      {
+        kind: "bin",
+        label: "Upravit kód / termín",
+        flags: ["canEditProjectCode", "canEditSmluvniTermin"],
+      },
+      { kind: "bin", label: "Vidět ceny", flags: ["canSeePrices"] },
     ],
   },
   {
-    title: "TPV & dok.",
-    cols: [
-      { flag: "canManageTPV", short: "TPV" },
-      { flag: "canUploadDocuments", short: "Dok." },
-      { flag: "canPermanentDelete", short: "Mazat" },
-    ],
-  },
-  {
-    title: "Plán výroby",
-    cols: [
-      { flag: "canAccessPlanVyroby", short: "Zobrazit" },
-      { flag: "canWritePlanVyroby", short: "Editovat" },
-      { flag: "canAccessDaylog", short: "Daylog" },
-      { flag: "canQCOnly", short: "QC" },
+    title: "Výroba",
+    rows: [
+      {
+        kind: "tri",
+        label: "Plán výroby",
+        desc: "Kanban, plánovanie, Midflight",
+        read: "canAccessPlanVyroby",
+        write: "canWritePlanVyroby",
+      },
+      {
+        kind: "bin",
+        label: "Modul výroba",
+        desc: "Bundles, QC tracking, Daylog",
+        flags: ["canManageProduction"],
+      },
+      { kind: "bin", label: "Daylog", flags: ["canAccessDaylog"] },
+      { kind: "bin", label: "Pouze QC", flags: ["canQCOnly"] },
     ],
   },
   {
     title: "Analytika & správa",
-    cols: [
-      { flag: "canAccessAnalytics", short: "Analytika" },
-      { flag: "canManagePeople", short: "Lidé" },
-      { flag: "canAccessSettings", short: "Nastavení" },
+    rows: [
+      { kind: "bin", label: "Analytics", flags: ["canAccessAnalytics"] },
+      {
+        kind: "tri",
+        label: "Správa osob",
+        desc: "Zamestnanci, externisti",
+        write: "canManagePeople",
+      },
+      { kind: "bin", label: "Externisti", flags: ["canManageExternisti"] },
+      { kind: "bin", label: "Nastavenia", flags: ["canAccessSettings"] },
+      { kind: "bin", label: "Správa uživatelů", flags: ["canManageUsers"] },
     ],
   },
 ];
-
-const ALL_COLS: ColDef[] = GROUPS.flatMap((g) => g.cols);
 
 function initials(name: string, email: string) {
   const src = (name || email || "?").trim();
@@ -107,59 +142,46 @@ function initials(name: string, email: string) {
   return src.slice(0, 2).toUpperCase();
 }
 
-function diffsFromPreset(
-  role: AppRole | null,
-  perms: Partial<Permissions> | null,
-): number {
-  if (!role || !perms) return 0;
-  const preset = ROLE_PRESETS[role];
-  let n = 0;
+function permsEqual(a: Permissions, b: Partial<Permissions> | null | undefined) {
+  if (!b) return false;
   for (const f of PERMISSION_FLAGS) {
-    if (typeof perms[f] === "boolean" && perms[f] !== preset[f]) n += 1;
+    const av = !!a[f];
+    const bv = typeof b[f] === "boolean" ? (b[f] as boolean) : null;
+    if (bv === null) return false;
+    if (av !== bv) return false;
   }
-  return n;
+  return true;
 }
 
 export function OsobyOpravneni() {
-  const [users, setUsers] = useState<UserRow[]>([]);
+  const [profiles, setProfiles] = useState<ProfileLite[]>([]);
+  const [roles, setRoles] = useState<UserRoleRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [presetFilter, setPresetFilter] = useState<string>("__all__");
-  const [drafts, setDrafts] = useState<
-    Record<string, { role: AppRole; perms: Permissions }>
-  >({});
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<AppRole>("pm");
+  const [draftPerms, setDraftPerms] = useState<Permissions>(
+    () => ({ ...ROLE_PRESETS["pm"] }),
+  );
+  const [saving, setSaving] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [addUserSearch, setAddUserSearch] = useState("");
+  const [confirmOverwrite, setConfirmOverwrite] = useState<{
+    count: number;
+  } | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<ProfileLite | null>(null);
 
   const fetchAll = async () => {
     setLoading(true);
-    const [{ data: profiles }, { data: roles }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, email, full_name")
-        .order("full_name"),
+    const [{ data: profs }, { data: rls }] = await Promise.all([
+      supabase.from("profiles").select("id, email, full_name").order("full_name"),
       supabase.from("user_roles").select("user_id, role, permissions"),
     ]);
-    const roleMap = new Map<
-      string,
-      { role: AppRole; permissions: Partial<Permissions> | null }
-    >();
-    roles?.forEach((r: any) =>
-      roleMap.set(r.user_id, {
-        role: r.role,
+    setProfiles((profs ?? []) as ProfileLite[]);
+    setRoles(
+      ((rls ?? []) as any[]).map((r) => ({
+        user_id: r.user_id,
+        role: r.role as AppRole,
         permissions: (r.permissions as Partial<Permissions> | null) ?? null,
-      }),
-    );
-    setUsers(
-      (profiles ?? []).map((p: any) => {
-        const r = roleMap.get(p.id);
-        return {
-          id: p.id,
-          email: p.email,
-          full_name: p.full_name,
-          role: r?.role ?? null,
-          permissions: r?.permissions ?? null,
-        };
-      }),
+      })),
     );
     setLoading(false);
   };
@@ -168,370 +190,551 @@ export function OsobyOpravneni() {
     fetchAll();
   }, []);
 
-  const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    return users
-      .filter((u) => {
-        if (presetFilter !== "__all__" && u.role !== presetFilter) return false;
-        if (!s) return true;
-        return (
-          (u.full_name || "").toLowerCase().includes(s) ||
-          (u.email || "").toLowerCase().includes(s)
-        );
-      })
+  // Reset draft when switching role
+  useEffect(() => {
+    setDraftPerms({ ...ROLE_PRESETS[selectedRole] });
+  }, [selectedRole]);
+
+  const profileById = useMemo(() => {
+    const m = new Map<string, ProfileLite>();
+    profiles.forEach((p) => m.set(p.id, p));
+    return m;
+  }, [profiles]);
+
+  const roleCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    roles.forEach((r) => {
+      counts[r.role] = (counts[r.role] ?? 0) + 1;
+    });
+    return counts;
+  }, [roles]);
+
+  const assignedUsers = useMemo(() => {
+    return roles
+      .filter((r) => r.role === selectedRole)
+      .map((r) => profileById.get(r.user_id))
+      .filter((p): p is ProfileLite => !!p)
       .sort((a, b) =>
         (a.full_name || a.email).localeCompare(b.full_name || b.email, "cs"),
       );
-  }, [users, search, presetFilter]);
+  }, [roles, selectedRole, profileById]);
 
-  const getEffective = (u: UserRow) => {
-    const draft = drafts[u.id];
-    if (draft) return { role: draft.role, perms: draft.perms };
-    return {
-      role: u.role,
-      perms: resolvePermissions(u.role, u.permissions),
-    };
-  };
+  const availableUsers = useMemo(() => {
+    const inRole = new Set(
+      roles.filter((r) => r.role === selectedRole).map((r) => r.user_id),
+    );
+    const s = addUserSearch.trim().toLowerCase();
+    return profiles
+      .filter((p) => !inRole.has(p.id))
+      .filter((p) => {
+        if (!s) return true;
+        return (
+          (p.full_name || "").toLowerCase().includes(s) ||
+          (p.email || "").toLowerCase().includes(s)
+        );
+      })
+      .slice(0, 50);
+  }, [profiles, roles, selectedRole, addUserSearch]);
 
-  const isCellOverride = (u: UserRow, flag: PermissionFlag, value: boolean) => {
-    const role = drafts[u.id]?.role ?? u.role;
-    if (!role) return false;
-    return ROLE_PRESETS[role][flag] !== value;
-  };
-
-  const toggleCell = (u: UserRow, flag: PermissionFlag) => {
-    const eff = getEffective(u);
-    if (!eff.role) return;
-    const next: Permissions = { ...eff.perms, [flag]: !eff.perms[flag] };
-    setDrafts((d) => ({
-      ...d,
-      [u.id]: { role: eff.role as AppRole, perms: next },
-    }));
-  };
-
-  const applyPreset = (u: UserRow, role: AppRole) => {
-    setDrafts((d) => ({
-      ...d,
-      [u.id]: { role, perms: { ...ROLE_PRESETS[role] } },
-    }));
-  };
-
-  const cancelDraft = (u: UserRow) => {
-    setDrafts((d) => {
-      const { [u.id]: _, ...rest } = d;
-      return rest;
+  const setBin = (flags: PermissionFlag[], value: boolean) => {
+    setDraftPerms((d) => {
+      const next = { ...d };
+      flags.forEach((f) => {
+        next[f] = value;
+      });
+      return next;
     });
   };
 
-  const saveDraft = async (u: UserRow) => {
-    const draft = drafts[u.id];
-    if (!draft) return;
-    setSavingId(u.id);
+  const setTri = (
+    row: TriRow,
+    state: "none" | "read" | "write",
+  ) => {
+    setDraftPerms((d) => {
+      const next = { ...d };
+      if (row.read) {
+        next[row.read] = state === "read" || state === "write";
+      }
+      next[row.write] = state === "write";
+      return next;
+    });
+  };
+
+  const triState = (row: TriRow): "none" | "read" | "write" => {
+    if (draftPerms[row.write]) return "write";
+    if (row.read && draftPerms[row.read]) return "read";
+    if (!row.read) {
+      // implicit read — "none" if write false (we have no signal); default to "read"
+      return "read";
+    }
+    return "none";
+  };
+
+  const binState = (row: BinRow): boolean => {
+    return row.flags.every((f) => draftPerms[f]);
+  };
+
+  const handleSave = async () => {
+    const targets = roles.filter((r) => r.role === selectedRole);
+    if (targets.length === 0) {
+      toast({ title: "Žiadni používatelia v tejto roli" });
+      return;
+    }
+    const customCount = targets.filter(
+      (r) =>
+        r.permissions &&
+        Object.keys(r.permissions).length > 0 &&
+        !permsEqual(ROLE_PRESETS[selectedRole], r.permissions),
+    ).length;
+    if (customCount > 0) {
+      setConfirmOverwrite({ count: customCount });
+      return;
+    }
+    await persistSave();
+  };
+
+  const persistSave = async () => {
+    setSaving(true);
+    setConfirmOverwrite(null);
     const { error } = await supabase
       .from("user_roles")
-      .update({ role: draft.role, permissions: draft.perms as any })
-      .eq("user_id", u.id);
-    setSavingId(null);
+      .update({ permissions: draftPerms as any })
+      .eq("role", selectedRole);
+    setSaving(false);
     if (error) {
       toast({
-        title: "Chyba při ukládání",
+        title: "Chyba pri ukladaní",
         description: error.message,
         variant: "destructive",
       });
       return;
     }
-    toast({ title: "Oprávnění uložena" });
-    setUsers((prev) =>
-      prev.map((x) =>
-        x.id === u.id
-          ? { ...x, role: draft.role, permissions: draft.perms }
-          : x,
-      ),
-    );
-    cancelDraft(u);
+    toast({ title: `Uložené pre ${ROLE_LABELS[selectedRole]}` });
+    fetchAll();
+  };
+
+  const handleDuplicate = () => {
+    toast({
+      title: "Duplikovať",
+      description:
+        "Nové role je možné pridať len cez DB migráciu (enum app_role).",
+    });
+  };
+
+  const handleAddUser = async (p: ProfileLite) => {
+    const existing = roles.find((r) => r.user_id === p.id);
+    const { error } = existing
+      ? await supabase
+          .from("user_roles")
+          .update({ role: selectedRole })
+          .eq("user_id", p.id)
+      : await supabase
+          .from("user_roles")
+          .insert({ user_id: p.id, role: selectedRole } as any);
+    if (error) {
+      toast({
+        title: "Chyba",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: `${p.full_name || p.email} priradený` });
+    setAddUserOpen(false);
+    setAddUserSearch("");
+    fetchAll();
+  };
+
+  const handleRemoveUser = async () => {
+    if (!confirmRemove) return;
+    const { error } = await supabase
+      .from("user_roles")
+      .update({ role: "viewer" as any })
+      .eq("user_id", confirmRemove.id);
+    if (error) {
+      toast({
+        title: "Chyba",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "Používateľ presunutý do Viewer" });
+    setConfirmRemove(null);
+    fetchAll();
+  };
+
+  const handleNewRole = () => {
+    toast({
+      title: "Nová rola",
+      description:
+        "Nové role je možné pridať len cez DB migráciu (enum app_role).",
+    });
   };
 
   return (
-    <TooltipProvider delayDuration={150}>
-      <div className="h-full flex flex-col bg-card">
-        {/* Toolbar */}
-        <div className="shrink-0 flex items-center justify-between gap-3 px-6 h-12 border-b border-border/60 bg-card">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Hledat jméno / email…"
-                className="h-8 w-[240px] pl-7 text-xs"
-              />
-            </div>
-            <Select value={presetFilter} onValueChange={setPresetFilter}>
-              <SelectTrigger className="h-8 w-[180px] text-xs">
-                <SelectValue placeholder="Všechny presety" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Všechny presety</SelectItem>
-                {PRESET_ROLES.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {ROLE_LABELS[r]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="h-full flex bg-card">
+      {/* LEFT SIDEBAR */}
+      <aside className="shrink-0 w-[220px] border-r border-border/60 bg-muted/30 flex flex-col">
+        <div className="px-4 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Roly
+        </div>
+        <div className="flex-1 overflow-y-auto px-2 pb-2">
+          {ROLE_ORDER.map((r) => {
+            const active = r === selectedRole;
+            const count = roleCounts[r] ?? 0;
+            return (
+              <button
+                key={r}
+                onClick={() => setSelectedRole(r)}
+                className={cn(
+                  "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-xs transition-colors text-left",
+                  active
+                    ? "bg-background font-medium text-foreground border-l-2 border-[#0a2e28] pl-[10px]"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+              >
+                <span className="truncate">{ROLE_LABELS[r]}</span>
+                <span
+                  className={cn(
+                    "text-[10px] tabular-nums px-1.5 py-0.5 rounded-full",
+                    active
+                      ? "bg-[#0a2e28] text-white"
+                      : "bg-muted-foreground/10 text-muted-foreground",
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={handleNewRole}
+          className="m-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center gap-1.5 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Nová rola
+        </button>
+      </aside>
+
+      {/* RIGHT PANEL */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-border/60">
+          <div>
+            <h2 className="text-base font-medium text-foreground">
+              {ROLE_LABELS[selectedRole]}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {assignedUsers.length}{" "}
+              {assignedUsers.length === 1
+                ? "používateľ"
+                : assignedUsers.length >= 2 && assignedUsers.length <= 4
+                ? "používatelia"
+                : "používateľov"}
+            </p>
           </div>
-          <div className="text-[11px] text-muted-foreground shrink-0">
-            Klikni do bunky pre prepnutie • oranžová = vlastné oprávnění
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={handleDuplicate}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1.5" />
+              Duplikovať
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 text-xs bg-[#0a2e28] hover:bg-[#0a2e28]/90 text-white"
+              onClick={handleSave}
+              disabled={saving || loading}
+            >
+              {saving ? "Ukladám…" : "Uložit"}
+            </Button>
           </div>
         </div>
 
-        {/* Matrix */}
-        <div className="flex-1 overflow-auto">
-          <table className="border-collapse text-xs">
-            {/* Group header row */}
-            <thead className="sticky top-0 z-30 bg-card shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
-              <tr>
-                <th
-                  className="sticky left-0 z-40 bg-card border-b border-r border-border/60 px-3 py-2 text-left font-medium text-muted-foreground min-w-[260px]"
-                  rowSpan={2}
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+          {/* Assigned users */}
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Pridelení uživatelia
+            </h3>
+            <div className="flex flex-wrap gap-1.5">
+              {assignedUsers.map((u) => (
+                <div
+                  key={u.id}
+                  className="group inline-flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full bg-muted/60 border border-border/60"
                 >
-                  Uživatel
-                </th>
-                <th
-                  className="sticky left-[260px] z-40 bg-card border-b border-r border-border/60 px-3 py-2 text-left font-medium text-muted-foreground min-w-[180px]"
-                  rowSpan={2}
-                >
-                  Preset
-                </th>
-                {GROUPS.map((g) => (
-                  <th
-                    key={g.title}
-                    colSpan={g.cols.length}
-                    className="px-2 py-1.5 text-center text-[10px] uppercase tracking-wide font-semibold text-muted-foreground bg-muted/40 border-b border-l border-border/60"
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback className="text-[9px] font-medium">
+                      {initials(u.full_name, u.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-[11px] text-foreground max-w-[140px] truncate">
+                    {u.full_name || u.email}
+                  </span>
+                  <button
+                    onClick={() => setConfirmRemove(u)}
+                    className="opacity-50 hover:opacity-100 transition-opacity"
+                    title="Odobrať z roly"
                   >
-                    {g.title}
-                  </th>
-                ))}
-                <th
-                  className="bg-card border-b border-l border-border/60 min-w-[180px]"
-                  rowSpan={2}
-                />
-              </tr>
-              <tr>
-                {ALL_COLS.map((c, idx) => {
-                  const groupBoundary = GROUPS.some(
-                    (g, gi) =>
-                      gi > 0 &&
-                      g.cols[0].flag === c.flag &&
-                      idx ===
-                        GROUPS.slice(0, gi).reduce(
-                          (s, gg) => s + gg.cols.length,
-                          0,
-                        ),
-                  );
-                  return (
-                    <Tooltip key={c.flag}>
-                      <TooltipTrigger asChild>
-                        <th
-                          className={cn(
-                            "h-[110px] w-[44px] min-w-[44px] max-w-[44px] border-b border-border/60 bg-muted/20 align-bottom p-0 cursor-help",
-                            groupBoundary && "border-l border-border/60",
-                          )}
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              <Popover open={addUserOpen} onOpenChange={setAddUserOpen}>
+                <PopoverTrigger asChild>
+                  <button className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-border text-[11px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors">
+                    <Plus className="h-3 w-3" />
+                    Přidat uživatele
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-[280px] p-2"
+                >
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      value={addUserSearch}
+                      onChange={(e) => setAddUserSearch(e.target.value)}
+                      placeholder="Hľadať…"
+                      className="h-8 pl-7 text-xs"
+                    />
+                  </div>
+                  <div className="max-h-[260px] overflow-y-auto">
+                    {availableUsers.length === 0 ? (
+                      <div className="text-[11px] text-muted-foreground text-center py-3">
+                        Žiadni voľní používatelia
+                      </div>
+                    ) : (
+                      availableUsers.map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => handleAddUser(p)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted text-left"
                         >
-                          <div className="flex items-end justify-center h-full pb-2">
-                            <div
-                              className="text-[11px] font-medium text-foreground whitespace-nowrap"
-                              style={{
-                                writingMode: "vertical-rl",
-                                transform: "rotate(180deg)",
-                              }}
-                            >
-                              {c.short}
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-[10px]">
+                              {initials(p.full_name, p.email)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-medium truncate">
+                              {p.full_name || "—"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground truncate">
+                              {p.email}
                             </div>
                           </div>
-                        </th>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="text-xs">
-                        {PERMISSION_LABELS[c.flag]}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={2 + ALL_COLS.length + 1}
-                    className="px-6 py-8 text-center text-muted-foreground"
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </section>
+
+          {/* Permissions */}
+          {GROUPS.map((g) => (
+            <section key={g.title}>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 pb-1.5 border-b border-border/40">
+                {g.title}
+              </h3>
+              <div className="divide-y divide-border/40">
+                {g.rows.map((row, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-4 py-2.5"
                   >
-                    Načítání…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={2 + ALL_COLS.length + 1}
-                    className="px-6 py-8 text-center text-muted-foreground"
-                  >
-                    Žádní uživatelé
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((u) => {
-                  const eff = getEffective(u);
-                  const hasDraft = !!drafts[u.id];
-                  const savedDiffs = diffsFromPreset(u.role, u.permissions);
-                  return (
-                    <tr
-                      key={u.id}
-                      className={cn(
-                        "border-b border-border/60 hover:bg-muted/30 transition-colors",
-                        hasDraft && "bg-warning/5",
-                      )}
-                    >
-                      {/* Sticky user cell */}
-                      <td className="sticky left-0 z-20 bg-card border-r border-border/60 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <div className="relative">
-                            <Avatar className="h-7 w-7">
-                              <AvatarFallback className="text-[10px] font-medium">
-                                {initials(u.full_name, u.email)}
-                              </AvatarFallback>
-                            </Avatar>
-                            {hasDraft && (
-                              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-warning border-2 border-card" />
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-medium truncate max-w-[180px]">
-                              {u.full_name || "—"}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">
-                              {u.email}
-                            </div>
-                          </div>
+                    <div className="min-w-0">
+                      <div className="text-[13px] text-foreground">
+                        {row.label}
+                      </div>
+                      {row.desc && (
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {row.desc}
                         </div>
-                      </td>
-
-                      {/* Sticky preset cell */}
-                      <td className="sticky left-[260px] z-20 bg-card border-r border-border/60 px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button className="inline-flex">
-                                <Badge
-                                  variant="secondary"
-                                  className="font-normal text-[10px] cursor-pointer hover:bg-secondary/80"
-                                >
-                                  {eff.role ? ROLE_LABELS[eff.role] : "—"}
-                                </Badge>
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-[220px] p-2"
-                              align="start"
-                            >
-                              <div className="text-[11px] font-medium text-muted-foreground mb-2 px-1">
-                                Použít preset
-                              </div>
-                              <div className="flex flex-col gap-0.5 max-h-[260px] overflow-y-auto">
-                                {PRESET_ROLES.map((r) => (
-                                  <button
-                                    key={r}
-                                    onClick={() => applyPreset(u, r)}
-                                    className={cn(
-                                      "text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors",
-                                      eff.role === r &&
-                                        "bg-muted font-medium",
-                                    )}
-                                  >
-                                    {ROLE_LABELS[r]}
-                                  </button>
-                                ))}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                          {(hasDraft
-                            ? diffsFromPreset(eff.role, eff.perms)
-                            : savedDiffs) > 0 && (
-                            <Badge className="bg-warning hover:bg-warning text-warning-foreground font-normal text-[10px] px-1.5 py-0">
-                              Vlastní
-                            </Badge>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Permission cells */}
-                      {GROUPS.map((g, gi) =>
-                        g.cols.map((c, ci) => {
-                          const value = !!eff.perms[c.flag];
-                          const override = isCellOverride(u, c.flag, value);
-                          return (
-                            <td
-                              key={c.flag}
-                              className={cn(
-                                "p-0 text-center border-b border-border/60",
-                                ci === 0 && gi > 0 && "border-l",
-                              )}
-                            >
-                              <button
-                                onClick={() => toggleCell(u, c.flag)}
-                                className={cn(
-                                  "w-[44px] h-[36px] flex items-center justify-center transition-colors",
-                                  value
-                                    ? override
-                                      ? "bg-warning/20 text-warning hover:bg-warning/30"
-                                      : "text-success hover:bg-success/10"
-                                    : override
-                                    ? "bg-warning/20 text-warning hover:bg-warning/30"
-                                    : "text-muted-foreground/50 hover:bg-muted",
-                                )}
-                                title={PERMISSION_LABELS[c.flag]}
-                              >
-                                {value ? (
-                                  <Check className="h-4 w-4" strokeWidth={3} />
-                                ) : (
-                                  <Minus className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                            </td>
-                          );
-                        }),
                       )}
-
-                      {/* Action cell */}
-                      <td className="border-b border-l border-border/60 px-2 py-1.5 bg-card">
-                        {hasDraft ? (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              className="h-7 text-[11px] px-2"
-                              onClick={() => saveDraft(u)}
-                              disabled={savingId === u.id}
-                            >
-                              {savingId === u.id ? "…" : "Uložit"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 text-[11px] px-2"
-                              onClick={() => cancelDraft(u)}
-                            >
-                              Zrušit
-                            </Button>
-                          </div>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                    </div>
+                    {row.kind === "tri" ? (
+                      <TriToggle
+                        value={triState(row)}
+                        onChange={(v) => setTri(row, v)}
+                      />
+                    ) : (
+                      <BinToggle
+                        value={binState(row)}
+                        onChange={(v) => setBin(row.flags, v)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       </div>
-    </TooltipProvider>
+
+      {/* Confirm overwrite */}
+      <AlertDialog
+        open={!!confirmOverwrite}
+        onOpenChange={(o) => !o && setConfirmOverwrite(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Prepísať vlastné úpravy?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmOverwrite?.count} používateľ(ov) má vlastné úpravy
+              oprávnení odlišné od predvoleného presetu. Uložením prepíšete ich
+              individuálne nastavenia.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zrušiť</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#0a2e28] hover:bg-[#0a2e28]/90 text-white"
+              onClick={persistSave}
+            >
+              Potvrdiť a prepísať
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm remove user */}
+      <AlertDialog
+        open={!!confirmRemove}
+        onOpenChange={(o) => !o && setConfirmRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Odobrať z roly?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRemove?.full_name || confirmRemove?.email} bude presunutý
+              do role "Viewer". Túto operáciu môžete kedykoľvek zvrátiť
+              priradením do inej roly.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Zrušiť</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemoveUser}>
+              Odobrať
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+/* ---------------- Toggle widgets ---------------- */
+
+function SegBase({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="inline-flex items-center gap-0.5 p-0.5 rounded-md bg-muted/60 shrink-0">
+      {children}
+    </div>
+  );
+}
+
+function SegBtn({
+  selected,
+  variant,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  variant: "neutral" | "read" | "write";
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const styles = selected
+    ? variant === "read"
+      ? "bg-[#E6F1FB] text-[#0C447C] border-[#85B7EB]"
+      : variant === "write"
+      ? "bg-[#EAF3DE] text-[#27500A] border-[#97C459]"
+      : "bg-background text-foreground border-border"
+    : "bg-transparent text-muted-foreground border-transparent hover:text-foreground";
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "text-[11px] px-2.5 py-1 rounded border-[0.5px] transition-colors",
+        styles,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TriToggle({
+  value,
+  onChange,
+}: {
+  value: "none" | "read" | "write";
+  onChange: (v: "none" | "read" | "write") => void;
+}) {
+  return (
+    <SegBase>
+      <SegBtn
+        selected={value === "none"}
+        variant="neutral"
+        onClick={() => onChange("none")}
+      >
+        –
+      </SegBtn>
+      <SegBtn
+        selected={value === "read"}
+        variant="read"
+        onClick={() => onChange("read")}
+      >
+        Čítať
+      </SegBtn>
+      <SegBtn
+        selected={value === "write"}
+        variant="write"
+        onClick={() => onChange("write")}
+      >
+        Upraviť
+      </SegBtn>
+    </SegBase>
+  );
+}
+
+function BinToggle({
+  value,
+  onChange,
+}: {
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <SegBase>
+      <SegBtn
+        selected={!value}
+        variant="neutral"
+        onClick={() => onChange(false)}
+      >
+        –
+      </SegBtn>
+      <SegBtn
+        selected={value}
+        variant="write"
+        onClick={() => onChange(true)}
+      >
+        <span className="inline-flex items-center gap-1">
+          <Check className="h-3 w-3" strokeWidth={3} />
+          Áno
+        </span>
+      </SegBtn>
+    </SegBase>
   );
 }
