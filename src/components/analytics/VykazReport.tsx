@@ -104,7 +104,6 @@ export function VykazReport() {
   const [dateRange, setDateRangeRaw] = useState<DateRange>("month");
   const [customFrom, setCustomFrom] = useState<string>(() => toLocalDateStr(new Date()));
   const [customTo, setCustomTo] = useState<string>(() => toLocalDateStr(new Date()));
-  const [groupBy, setGroupBy] = useState<GroupBy>("projekt");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
@@ -112,6 +111,10 @@ export function VykazReport() {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [rangeOffset, setRangeOffset] = useState(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  // Multi-select filters: null = "all selected"
+  const [projectFilter, setProjectFilter] = useState<Set<string> | null>(null);
+  const [personFilter, setPersonFilter] = useState<Set<string> | null>(null);
+  const [activityFilter, setActivityFilter] = useState<Set<string> | null>(null);
 
   const setDateRange = useCallback((r: DateRange) => {
     setDateRangeRaw(r);
