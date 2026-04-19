@@ -256,8 +256,10 @@ export function CapacitySettings({ open, onOpenChange, inline = false }: Props) 
 
   // Absences loaded independently via React Query
   const absencesQuery = useAbsencesForYear(selectedYear, vyrobniEmployees);
-  const EMPTY_ABS_MAP = useMemo(() => new Map<string, number>(), []);
-  const absMap = absencesQuery.data ?? EMPTY_ABS_MAP;
+  const EMPTY_ABS = useMemo(() => ({ weekTotals: new Map<string, number>(), perEmployee: new Map<string, Map<string, number>>() }), []);
+  const absData = absencesQuery.data ?? EMPTY_ABS;
+  const absMap = absData.weekTotals;
+  const absPerEmployee = absData.perEmployee;
 
 
   const triggerAutoRecalc = useCallback(async () => {
