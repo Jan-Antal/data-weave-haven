@@ -11,14 +11,31 @@ function getCurrentWeekKey(): string {
   return monday.toISOString().split("T")[0];
 }
 
+export type RecalcProgress = (info: { phase: string; pct: number }) => void;
+
+async function chunkedUpsert(
+  supabaseClient: SupabaseClient,
+  table: string,
+  rows: any[],
+  chunkSize = 500,
+) {
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    await supabaseClient.from(table).upsert(chunk, { onConflict: "id" });
+  }
+}
+
 export async function recalculateProductionHours(
   supabaseClient: SupabaseClient,
   projectIds: string[] | "all",
   currentWeekKey?: string,
-  recalculateAll?: boolean
+  recalculateAll?: boolean,
+  onProgress?: RecalcProgress,
 ): Promise<number> {
   const weekKey = currentWeekKey || getCurrentWeekKey();
   const formulas = await loadFormulas(supabaseClient);
+
+  onProgress?.({ phase: "Načítám data...", pct: 2 });
 
   const [
     { data: projectsData },
@@ -50,25 +67,94 @@ export async function recalculateProductionHours(
   const projects = (projectsData || []).filter((p: any) =>
     projectIds === "all" || projectIds.includes(p.project_id)
   );
+  const filteredProjectIds = projects.map((p: any) => p.project_id);
+
+  if (filteredProjectIds.length === 0) return 0;
+
+  // Bulk fetch tpv_items, schedule, inbox in parallel — chunk IN() lists to avoid URL length limits
+  async function bulkFetchIn<T = any>(
+    table: string,
+    select: string,
+    column: string,
+    values: string[],
+    extra?: (q: any) => any,
+  ): Promise<T[]> {
+    const chunkSize = 200;
+    const out: T[] = [];
+    for (let i = 0; i < values.length; i += chunkSize) {
+      const slice = values.slice(i, i + chunkSize);
+      let q = supabaseClient.from(table).select(select).in(column, slice);
+      if (extra) q = extra(q);
+      const { data, error } = await q;
+      if (error) throw error;
+      if (data) out.push(...(data as T[]));
+    }
+    return out;
+  }
+
+  const [allTpv, allSched, allInbox] = await Promise.all([
+    bulkFetchIn<any>(
+      "tpv_items",
+      "id, item_code, nazev, cena, pocet, status, project_id",
+      "project_id",
+      filteredProjectIds,
+      (q) => q.is("deleted_at", null),
+    ),
+    bulkFetchIn<any>(
+      "production_schedule",
+      "id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id, project_id, status",
+      "project_id",
+      filteredProjectIds,
+      (q) => q.in("status", ["scheduled", "in_progress"]),
+    ),
+    bulkFetchIn<any>(
+      "production_inbox",
+      "id, item_code, estimated_czk, estimated_hours, split_part, split_total, split_group_id, project_id, status",
+      "project_id",
+      filteredProjectIds,
+      (q) => q.eq("status", "pending"),
+    ),
+  ]);
+
+  // Group by project
+  const tpvByProject = new Map<string, any[]>();
+  for (const t of allTpv) {
+    const arr = tpvByProject.get(t.project_id) || [];
+    arr.push(t);
+    tpvByProject.set(t.project_id, arr);
+  }
+  const schedByProject = new Map<string, any[]>();
+  for (const s of allSched) {
+    if (!recalculateAll && s.scheduled_week < weekKey) continue;
+    const arr = schedByProject.get(s.project_id) || [];
+    arr.push(s);
+    schedByProject.set(s.project_id, arr);
+  }
+  const inboxByProject = new Map<string, any[]>();
+  for (const it of allInbox) {
+    const arr = inboxByProject.get(it.project_id) || [];
+    arr.push(it);
+    inboxByProject.set(it.project_id, arr);
+  }
 
   let updated = 0;
   const projectResults: Array<{ project_id: string; result: PlanHoursResult }> = [];
-  const allItemHours: Array<{ id: string; hodiny_plan: number; hodiny_source: string }> = [];
+  const allItemHourUpdates: Array<{ id: string; hodiny_plan: number; hodiny_source: string }> = [];
+  const scheduleUpdates: Array<{ id: string; scheduled_hours: number; scheduled_czk: number }> = [];
+  const inboxUpdates: Array<{ id: string; estimated_hours: number; estimated_czk: number }> = [];
+
+  const total = projects.length;
+  let processed = 0;
 
   for (const proj of projects) {
     const preset = proj.cost_preset_id
       ? presets.find((p: any) => p.id === proj.cost_preset_id)
       : presets.find((p: any) => p.is_default) || presets[0];
 
-    // Get TPV items for this project
-    const { data: tpvItems } = await supabaseClient
-      .from("tpv_items")
-      .select("id, item_code, nazev, cena, pocet, status")
-      .eq("project_id", proj.project_id)
-      .is("deleted_at", null);
+    const tpvItems = tpvByProject.get(proj.project_id) || [];
 
     const result = computePlanHours({
-      tpvItems: tpvItems || [],
+      tpvItems,
       project: proj,
       preset,
       hourlyRate,
@@ -78,239 +164,244 @@ export async function recalculateProductionHours(
     });
 
     projectResults.push({ project_id: proj.project_id, result });
-    allItemHours.push(...result.item_hours);
+    allItemHourUpdates.push(...result.item_hours);
 
-    if (!tpvItems?.length && result.hodiny_plan === 0) continue;
+    if (tpvItems.length || result.hodiny_plan !== 0) {
+      // EUR conversion for this project
+      const isEur = proj.currency === 'EUR';
+      const eurRate = (() => {
+        const projYear = proj.created_at ? new Date(proj.created_at).getFullYear() : new Date().getFullYear();
+        const sorted = [...exchangeRates].sort((a, b) => b.year - a.year);
+        return sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
+      })();
 
-    // EUR conversion for this project
-    const isEur = proj.currency === 'EUR';
-    const eurRate = (() => {
-      const projYear = proj.created_at ? new Date(proj.created_at).getFullYear() : new Date().getFullYear();
-      const sorted = [...exchangeRates].sort((a, b) => b.year - a.year);
-      return sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
-    })();
+      const prodejniCena = isEur
+        ? (Number(proj.prodejni_cena) || 0) * eurRate
+        : (Number(proj.prodejni_cena) || 0);
 
-    const prodejniCena = isEur
-      ? (Number(proj.prodejni_cena) || 0) * eurRate
-      : (Number(proj.prodejni_cena) || 0);
+      const scaleRatio = result.scale_ratio || 1;
+      const schedItems = schedByProject.get(proj.project_id) || [];
 
-
-    // Update schedule items
-    let schedQuery = supabaseClient
-      .from("production_schedule")
-      .select("id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id")
-      .eq("project_id", proj.project_id)
-      .in("status", ["scheduled", "in_progress"]);
-    if (!recalculateAll) {
-      schedQuery = schedQuery.gte("scheduled_week", weekKey);
-    }
-    const { data: schedItems } = await schedQuery;
-
-    // Build ratio map for split groups (preserve proportional distribution)
-    const splitGroupTotals: Record<string, number> = {};
-    for (const item of schedItems || []) {
-      if (item.split_group_id) {
-        splitGroupTotals[item.split_group_id] = (splitGroupTotals[item.split_group_id] || 0) + Number(item.scheduled_hours);
+      // Build ratio map for split groups (preserve proportional distribution)
+      const splitGroupTotals: Record<string, number> = {};
+      for (const item of schedItems) {
+        if (item.split_group_id) {
+          splitGroupTotals[item.split_group_id] = (splitGroupTotals[item.split_group_id] || 0) + Number(item.scheduled_hours);
+        }
       }
-    }
 
-    const scaleRatio = result.scale_ratio || 1;
-
-    for (const item of schedItems || []) {
-      if (item.item_code?.startsWith('HIST_')) {
-        const histHours = Number(item.scheduled_hours) || 0;
-        const totalPlanHours = result.hodiny_plan || 0;
-        if (histHours > 0 && totalPlanHours > 0) {
-          const correctCzk = Math.floor(evaluateFormula(
-            formulas['scheduled_czk_hist'] ?? FORMULA_DEFAULTS['scheduled_czk_hist'],
-            { scheduled_hours: histHours, hodiny_plan: totalPlanHours, prodejni_cena: prodejniCena, eur_czk: 1 }
-          ));
-          if (correctCzk !== Number(item.scheduled_czk)) {
-            await supabaseClient
-              .from("production_schedule")
-              .update({ scheduled_czk: correctCzk })
-              .eq("id", item.id);
-            updated++;
+      for (const item of schedItems) {
+        if (item.item_code?.startsWith('HIST_')) {
+          const histHours = Number(item.scheduled_hours) || 0;
+          const totalPlanHours = result.hodiny_plan || 0;
+          if (histHours > 0 && totalPlanHours > 0) {
+            const correctCzk = Math.floor(evaluateFormula(
+              formulas['scheduled_czk_hist'] ?? FORMULA_DEFAULTS['scheduled_czk_hist'],
+              { scheduled_hours: histHours, hodiny_plan: totalPlanHours, prodejni_cena: prodejniCena, eur_czk: 1 }
+            ));
+            if (correctCzk !== Number(item.scheduled_czk)) {
+              scheduleUpdates.push({ id: item.id, scheduled_hours: Number(item.scheduled_hours), scheduled_czk: correctCzk });
+              updated++;
+            }
           }
+          continue;
         }
-        continue;
+        const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
+        if (!tpv) continue;
+
+        const rawCena = Number(tpv.cena) || 0;
+        const cenaCzk = isEur ? rawCena * eurRate : rawCena;
+        const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
+        const correctCzk = Math.floor(evaluateFormula(
+          formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
+          { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
+        ));
+        const rawTotalHours =
+          itemCostCzk > 0
+            ? Math.floor(evaluateFormula(
+                formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
+                { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
+              ))
+            : 0;
+        const totalHours = Math.floor(rawTotalHours * scaleRatio);
+        const splitGroupId = item.split_group_id;
+        const correctHours = (() => {
+          if (!splitGroupId || !splitGroupTotals[splitGroupId]) {
+            return Math.floor(totalHours / (Number(item.split_total) || 1));
+          }
+          const ratio = Number(item.scheduled_hours) / splitGroupTotals[splitGroupId];
+          return Math.floor(totalHours * ratio);
+        })();
+
+        if (
+          correctCzk !== Number(item.scheduled_czk) ||
+          correctHours !== Number(item.scheduled_hours)
+        ) {
+          scheduleUpdates.push({ id: item.id, scheduled_hours: correctHours, scheduled_czk: correctCzk });
+          updated++;
+        }
       }
-      const tpv = (tpvItems || []).find((t: any) => t.item_code === item.item_code);
-      if (!tpv) continue;
 
-      const rawCena = Number(tpv.cena) || 0;
-      const cenaCzk = isEur ? rawCena * eurRate : rawCena;
-      const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const correctCzk = Math.floor(evaluateFormula(
-        formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
-        { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
-      ));
-      const rawTotalHours =
-        itemCostCzk > 0
-          ? Math.floor(evaluateFormula(
-              formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
-              { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
-            ))
-          : 0;
-      // Apply project-level scale ratio (TPV → Project hours)
-      const totalHours = Math.floor(rawTotalHours * scaleRatio);
-      const splitGroupId = item.split_group_id;
-      const correctHours = (() => {
-        if (!splitGroupId || !splitGroupTotals[splitGroupId]) {
-          return Math.floor(totalHours / (Number(item.split_total) || 1));
+      // Inbox
+      const inboxItems = inboxByProject.get(proj.project_id) || [];
+      const inboxSplitGroupTotals: Record<string, number> = {};
+      for (const item of inboxItems) {
+        if (item.split_group_id) {
+          inboxSplitGroupTotals[item.split_group_id] = (inboxSplitGroupTotals[item.split_group_id] || 0) + Number(item.estimated_hours);
         }
-        const ratio = Number(item.scheduled_hours) / splitGroupTotals[splitGroupId];
-        return Math.floor(totalHours * ratio);
-      })();
+      }
 
-      if (
-        correctCzk !== Number(item.scheduled_czk) ||
-        correctHours !== Number(item.scheduled_hours)
-      ) {
-        await supabaseClient
-          .from("production_schedule")
-          .update({ scheduled_hours: correctHours, scheduled_czk: correctCzk })
-          .eq("id", item.id);
-        updated++;
+      for (const item of inboxItems) {
+        if (item.item_code?.startsWith('HIST_')) continue;
+        const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
+        if (!tpv) continue;
+
+        const rawCena = Number(tpv.cena) || 0;
+        const cenaCzk = isEur ? rawCena * eurRate : rawCena;
+        const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
+        const correctCzk = Math.floor(evaluateFormula(
+          formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
+          { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
+        ));
+        const rawTotalHours =
+          itemCostCzk > 0
+            ? Math.floor(evaluateFormula(
+                formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
+                { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
+              ))
+            : 0;
+        const totalHours = Math.floor(rawTotalHours * scaleRatio);
+        const splitGroupId = item.split_group_id;
+        const correctHours = (() => {
+          if (!splitGroupId || !inboxSplitGroupTotals[splitGroupId]) {
+            return Math.floor(totalHours / (Number(item.split_total) || 1));
+          }
+          const ratio = Number(item.estimated_hours) / inboxSplitGroupTotals[splitGroupId];
+          return Math.floor(totalHours * ratio);
+        })();
+
+        if (
+          correctCzk !== Number(item.estimated_czk) ||
+          correctHours !== Number(item.estimated_hours)
+        ) {
+          inboxUpdates.push({ id: item.id, estimated_hours: correctHours, estimated_czk: correctCzk });
+          updated++;
+        }
       }
     }
 
-    // Update inbox items (pending)
-    const { data: inboxItems } = await supabaseClient
-      .from("production_inbox")
-      .select("id, item_code, estimated_czk, estimated_hours, split_part, split_total, split_group_id")
-      .eq("project_id", proj.project_id)
-      .eq("status", "pending");
-
-    // Build ratio map for inbox split groups
-    const inboxSplitGroupTotals: Record<string, number> = {};
-    for (const item of inboxItems || []) {
-      if (item.split_group_id) {
-        inboxSplitGroupTotals[item.split_group_id] = (inboxSplitGroupTotals[item.split_group_id] || 0) + Number(item.estimated_hours);
-      }
-    }
-
-    for (const item of inboxItems || []) {
-      if (item.item_code?.startsWith('HIST_')) continue;
-      const tpv = (tpvItems || []).find((t: any) => t.item_code === item.item_code);
-      if (!tpv) continue;
-
-      const rawCena = Number(tpv.cena) || 0;
-      const cenaCzk = isEur ? rawCena * eurRate : rawCena;
-      const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-      const correctCzk = Math.floor(evaluateFormula(
-        formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
-        { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
-      ));
-      const rawTotalHours =
-        itemCostCzk > 0
-          ? Math.floor(evaluateFormula(
-              formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
-              { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
-            ))
-          : 0;
-      const totalHours = Math.floor(rawTotalHours * scaleRatio);
-      const splitGroupId = item.split_group_id;
-      const correctHours = (() => {
-        if (!splitGroupId || !inboxSplitGroupTotals[splitGroupId]) {
-          return Math.floor(totalHours / (Number(item.split_total) || 1));
-        }
-        const ratio = Number(item.estimated_hours) / inboxSplitGroupTotals[splitGroupId];
-        return Math.floor(totalHours * ratio);
-      })();
-
-      if (
-        correctCzk !== Number(item.estimated_czk) ||
-        correctHours !== Number(item.estimated_hours)
-      ) {
-        await supabaseClient
-          .from("production_inbox")
-          .update({ estimated_hours: correctHours, estimated_czk: correctCzk })
-          .eq("id", item.id);
-        updated++;
-      }
+    processed++;
+    // Compute phase covers ~10% → 70%
+    if (onProgress && (processed % 10 === 0 || processed === total)) {
+      const pct = 10 + Math.floor((processed / total) * 60);
+      onProgress({ phase: `Počítám projekty (${processed}/${total})...`, pct });
     }
   }
 
-  // Batch upsert to project_plan_hours
+  // Bulk writes in parallel where possible
+  onProgress?.({ phase: "Ukládám změny...", pct: 75 });
+
+  const writePromises: Promise<any>[] = [];
+
+  if (scheduleUpdates.length > 0) {
+    writePromises.push(chunkedUpsert(supabaseClient, "production_schedule", scheduleUpdates));
+  }
+  if (inboxUpdates.length > 0) {
+    writePromises.push(chunkedUpsert(supabaseClient, "production_inbox", inboxUpdates));
+  }
+
+  // project_plan_hours upsert (by project_id, not id)
   if (projectResults.length > 0) {
-    const batchSize = 50;
-    for (let i = 0; i < projectResults.length; i += batchSize) {
-      const batch = projectResults.slice(i, i + batchSize);
-      await supabaseClient.from("project_plan_hours").upsert(
-        batch.map((r) => {
-          const proj = projects.find((p: any) => p.project_id === r.project_id);
-          return {
-            project_id: r.project_id,
-            tpv_hours: r.result.tpv_hours,
-            project_hours: r.result.project_hours,
-            hodiny_plan: r.result.hodiny_plan,
-            source: r.result.source,
-            warning_low_tpv: r.result.warning_low_tpv,
-            force_project_price: proj?.plan_use_project_price ?? false,
-            marze_used: r.result.marze_used,
-            prodpct_used: r.result.prodpct_used,
-            eur_rate_used: r.result.eur_rate_used,
-            recalculated_at: new Date().toISOString(),
-          };
-        }),
-        { onConflict: "project_id" }
+    const planRows = projectResults.map((r) => {
+      const proj = projects.find((p: any) => p.project_id === r.project_id);
+      return {
+        project_id: r.project_id,
+        tpv_hours: r.result.tpv_hours,
+        project_hours: r.result.project_hours,
+        hodiny_plan: r.result.hodiny_plan,
+        source: r.result.source,
+        warning_low_tpv: r.result.warning_low_tpv,
+        force_project_price: proj?.plan_use_project_price ?? false,
+        marze_used: r.result.marze_used,
+        prodpct_used: r.result.prodpct_used,
+        eur_rate_used: r.result.eur_rate_used,
+        recalculated_at: new Date().toISOString(),
+      };
+    });
+    const batchSize = 500;
+    for (let i = 0; i < planRows.length; i += batchSize) {
+      const batch = planRows.slice(i, i + batchSize);
+      writePromises.push(
+        supabaseClient.from("project_plan_hours").upsert(batch, { onConflict: "project_id" }) as any
       );
     }
+  }
 
-    // Check for over-plan projects (>100%) and notify admin/owner
-    try {
-      // Get total scheduled hours per project from production_schedule
-      const overPlanProjectIds = projectResults
-        .filter((r) => r.result.hodiny_plan > 0)
-        .map((r) => r.project_id);
+  // tpv_items bulk update — need full row for upsert by id; include project_id (NOT NULL)
+  if (allItemHourUpdates.length > 0) {
+    const idToProject = new Map<string, string>();
+    for (const t of allTpv) idToProject.set(t.id, t.project_id);
+    const tpvRows = allItemHourUpdates
+      .filter((it) => idToProject.has(it.id))
+      .map((it) => ({
+        id: it.id,
+        project_id: idToProject.get(it.id)!,
+        item_code: allTpv.find((t: any) => t.id === it.id)?.item_code,
+        hodiny_plan: it.hodiny_plan,
+        hodiny_source: it.hodiny_source,
+      }));
+    writePromises.push(chunkedUpsert(supabaseClient, "tpv_items", tpvRows));
+  }
 
-      if (overPlanProjectIds.length > 0) {
-        const { data: schedData } = await supabaseClient
+  await Promise.all(writePromises);
+
+  onProgress?.({ phase: "Kontrola překročení plánu...", pct: 92 });
+
+  // Over-plan notifications
+  try {
+    const overPlanProjectIds = projectResults
+      .filter((r) => r.result.hodiny_plan > 0)
+      .map((r) => r.project_id);
+
+    if (overPlanProjectIds.length > 0) {
+      const schedData: any[] = [];
+      const chunk = 200;
+      for (let i = 0; i < overPlanProjectIds.length; i += chunk) {
+        const slice = overPlanProjectIds.slice(i, i + chunk);
+        const { data } = await supabaseClient
           .from("production_schedule")
           .select("project_id, scheduled_hours")
-          .in("project_id", overPlanProjectIds)
+          .in("project_id", slice)
           .in("status", ["scheduled", "in_progress", "completed"]);
-
-        const hoursByProject: Record<string, number> = {};
-        for (const s of schedData || []) {
-          hoursByProject[s.project_id] = (hoursByProject[s.project_id] || 0) + Number(s.scheduled_hours);
-        }
-
-        const adminIds = await getUserIdsByRole(supabaseClient, ["owner", "admin"]);
-        for (const r of projectResults) {
-          if (r.result.hodiny_plan <= 0) continue;
-          const usedHours = hoursByProject[r.project_id] || 0;
-          const pct = Math.round((usedHours / r.result.hodiny_plan) * 100);
-          if (pct > 100) {
-            await createNotification(supabaseClient, {
-              userIds: adminIds,
-              type: "warning",
-              title: "Překročení plánu hodin",
-              body: `${r.project_id} — ${pct}% čerpání`,
-              projectId: r.project_id,
-              linkContext: { tab: "plan-vyroby", project_id: r.project_id },
-              batchKey: `over-plan-${r.project_id}`,
-            });
-          }
-        }
+        if (data) schedData.push(...data);
       }
-    } catch { /* silent */ }
-  }
 
-  // Batch update tpv_items.hodiny_plan
-  if (allItemHours.length > 0) {
-    const batchSize = 100;
-    for (let i = 0; i < allItemHours.length; i += batchSize) {
-      const batch = allItemHours.slice(i, i + batchSize);
-      for (const item of batch) {
-        await supabaseClient
-          .from("tpv_items")
-          .update({ hodiny_plan: item.hodiny_plan, hodiny_source: item.hodiny_source })
-          .eq("id", item.id);
+      const hoursByProject: Record<string, number> = {};
+      for (const s of schedData) {
+        hoursByProject[s.project_id] = (hoursByProject[s.project_id] || 0) + Number(s.scheduled_hours);
+      }
+
+      const adminIds = await getUserIdsByRole(supabaseClient, ["owner", "admin"]);
+      for (const r of projectResults) {
+        if (r.result.hodiny_plan <= 0) continue;
+        const usedHours = hoursByProject[r.project_id] || 0;
+        const pct = Math.round((usedHours / r.result.hodiny_plan) * 100);
+        if (pct > 100) {
+          await createNotification(supabaseClient, {
+            userIds: adminIds,
+            type: "warning",
+            title: "Překročení plánu hodin",
+            body: `${r.project_id} — ${pct}% čerpání`,
+            projectId: r.project_id,
+            linkContext: { tab: "plan-vyroby", project_id: r.project_id },
+            batchKey: `over-plan-${r.project_id}`,
+          });
+        }
       }
     }
-  }
+  } catch { /* silent */ }
+
+  onProgress?.({ phase: "Hotovo", pct: 100 });
 
   return updated;
 }
