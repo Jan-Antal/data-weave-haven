@@ -673,6 +673,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               if (!statuses || statuses.length === 0) return "Neodesláno";
               return statuses.map((s: any) => s.label).join(", ");
             }
+            if (k === "stage_id") {
+              const sid = (item as any).stage_id;
+              if (!sid) return "";
+              const st = projectStages.find((s) => s.id === sid);
+              return st ? (st.display_name || st.stage_name) : "";
+            }
             if (k === "cena") return (item as any).cena != null ? Number((item as any).cena) : "";
             if (k.startsWith("custom_")) {
               const cf = (item as any).custom_fields || {};
