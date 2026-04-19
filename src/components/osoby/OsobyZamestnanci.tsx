@@ -336,25 +336,7 @@ export function OsobyZamestnanci() {
         </div>
       </div>
 
-      {/* Sticky column header (one per page) */}
-      <div className="px-6 pt-3 sticky top-0 z-20 bg-card">
-        <Table className="table-fixed">
-          <SharedColgroup />
-          <TableHeader>
-            <TableRow>
-              <TableHead>Jméno</TableHead>
-              <TableHead>Úsek</TableHead>
-              <TableHead>Pozice</TableHead>
-              <TableHead>Role na projektu</TableHead>
-              <TableHead>Úvazek</TableHead>
-              <TableHead>Absence</TableHead>
-              <TableHead>Stav</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-        </Table>
-      </div>
-
+      {/* Column header now lives inside each card (no global sticky header). */}
       {/* Per-stredisko card blocks */}
       <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
         {Array.from(grouped.entries()).map(([stredisko, useks]) => {
@@ -394,6 +376,18 @@ export function OsobyZamestnanci() {
               {!isCollapsed && (
               <Table className="table-fixed">
                 <SharedColgroup />
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Jméno</TableHead>
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Úsek</TableHead>
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Pozice</TableHead>
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Role na projektu</TableHead>
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Úvazek</TableHead>
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Absence</TableHead>
+                    <TableHead className="h-9 text-[11px] uppercase tracking-wide">Stav</TableHead>
+                    <TableHead className="h-9" />
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {Array.from(useks.entries()).map(([usek, emps]) => {
                     const totalHrs = emps.reduce((s: number, e: any) => s + (e.uvazok_hodiny ?? 8) * 5, 0);
