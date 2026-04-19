@@ -133,6 +133,7 @@ export function VykazReport() {
         projectId: string;
         projectName: string;
         matched: boolean;
+        isOverhead: boolean;
         hodiny: number;
         records: number;
         last: string;
@@ -143,11 +144,13 @@ export function VykazReport() {
         let g = map.get(id);
         if (!g) {
           const matchedName = projectsMap.get(id);
+          const overheadLabel = overheadMap.get(id);
           g = {
             key: id,
             projectId: id,
-            projectName: matchedName ?? id,
-            matched: !!matchedName,
+            projectName: matchedName ?? overheadLabel ?? id,
+            matched: !!matchedName || !!overheadLabel,
+            isOverhead: !!overheadLabel,
             hodiny: 0,
             records: 0,
             last: r.datum_sync,
