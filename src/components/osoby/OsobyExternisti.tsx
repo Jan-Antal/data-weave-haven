@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { SectionToolbar } from "@/components/shell/SectionToolbar";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const ROLE_FLAGS = [
   { key: "is_pm", label: "PM" },
@@ -83,6 +84,7 @@ function useExternals() {
 export function OsobyExternisti() {
   const qc = useQueryClient();
   const { data: rows = [] } = useExternals();
+  const { canManageExternisti } = useAuth();
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [newRow, setNewRow] = useState({
@@ -216,9 +218,11 @@ export function OsobyExternisti() {
                 className="pl-8 h-8 w-[280px] text-xs"
               />
             </div>
-            <Button size="sm" className="h-8" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-1.5" /> Přidat externistu
-            </Button>
+            {canManageExternisti && (
+              <Button size="sm" className="h-8" onClick={() => setAddOpen(true)}>
+                <Plus className="h-4 w-4 mr-1.5" /> Přidat externistu
+              </Button>
+            )}
           </>
         }
       />
@@ -382,14 +386,16 @@ export function OsobyExternisti() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => setDeleteFor({ id: r.id, name: r.name })}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canManageExternisti && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteFor({ id: r.id, name: r.name })}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

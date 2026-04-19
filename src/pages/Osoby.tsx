@@ -13,7 +13,7 @@ export default function Osoby() {
   const canSeeAdminTabs = isAdmin || isOwner;
 
   const tabs: ShellTabDef[] = [
-    { key: "zamestnanci", label: "Zaměstnanci" },
+    { key: "zamestnanci", label: "Zaměstnanci", visible: canSeeAdminTabs },
     { key: "externisti", label: "Externisté" },
     { key: "uzivatele", label: "Uživatelé", visible: canManageUsers },
     { key: "opravneni", label: "Oprávnění", visible: canSeeAdminTabs },
@@ -21,15 +21,17 @@ export default function Osoby() {
     { key: "kapacita", label: "Kapacita", visible: canSeeAdminTabs },
   ];
 
+  const defaultTab = canSeeAdminTabs ? "zamestnanci" : "externisti";
+
   return (
     <PageTabsShell
       tabs={tabs}
-      defaultTab="zamestnanci"
+      defaultTab={defaultTab}
       belowTabsSlot={isTestUser ? <div className="px-5 py-2 border-b border-border/60"><TestModeBanner /></div> : null}
     >
       {(active) => (
         <>
-          {active === "zamestnanci" && <OsobyZamestnanci />}
+          {active === "zamestnanci" && canSeeAdminTabs && <OsobyZamestnanci />}
           {active === "externisti" && <OsobyExternisti />}
           {active === "uzivatele" && canManageUsers && <OsobyUzivatele />}
           {active === "opravneni" && canSeeAdminTabs && <OsobyOpravneni />}
