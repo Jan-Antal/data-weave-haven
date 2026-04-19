@@ -716,12 +716,13 @@ function ProjektExpanded({ rows }: { rows: LogRow[] }) {
 
 // ── Osoba rows ─────────────────────────────────────────────────────
 function OsobaRows({
-  grouped, expanded, toggleExpand, projectsMap, onOpenDetail,
+  grouped, expanded, toggleExpand, projectsMap, overheadMap, onOpenDetail,
 }: {
   grouped: Array<{ key: string; zamestnanec: string; hodiny: number; projects: Set<string>; rows: LogRow[] }>;
   expanded: Set<string>;
   toggleExpand: (k: string) => void;
   projectsMap: Map<string, string>;
+  overheadMap: Map<string, string>;
   onOpenDetail: (id: string) => void;
 }) {
   return (
@@ -745,7 +746,7 @@ function OsobaRows({
             <TableCell />
           </TableRow>
           {expanded.has(g.key) && (
-            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} onOpenDetail={onOpenDetail} />
+            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} overheadMap={overheadMap} onOpenDetail={onOpenDetail} />
           )}
         </Fragment>
       ))}
@@ -755,12 +756,13 @@ function OsobaRows({
 
 // ── Cinnost rows ────────────────────────────────────────────────────
 function CinnostRows({
-  grouped, expanded, toggleExpand, projectsMap, onOpenDetail,
+  grouped, expanded, toggleExpand, projectsMap, overheadMap, onOpenDetail,
 }: {
   grouped: Array<{ key: string; cinnost_kod: string; cinnost_nazov: string; hodiny: number; rows: LogRow[] }>;
   expanded: Set<string>;
   toggleExpand: (k: string) => void;
   projectsMap: Map<string, string>;
+  overheadMap: Map<string, string>;
   onOpenDetail: (id: string) => void;
 }) {
   return (
@@ -784,7 +786,7 @@ function CinnostRows({
             <TableCell />
           </TableRow>
           {expanded.has(g.key) && (
-            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} onOpenDetail={onOpenDetail} />
+            <SubByProject rows={g.rows} colSpan={4} projectsMap={projectsMap} overheadMap={overheadMap} onOpenDetail={onOpenDetail} />
           )}
         </Fragment>
       ))}
