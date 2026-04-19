@@ -166,6 +166,9 @@ export function MobileTPVCardList({
                     {vyrobaLabel && (
                       <Badge variant="secondary" className="text-[10px] h-5">{vyrobaLabel}</Badge>
                     )}
+                    {stageLabel && (
+                      <Badge variant="outline" className="text-[10px] h-5 border-primary/40 text-primary">{stageLabel}</Badge>
+                    )}
                   </div>
                 </div>
 
