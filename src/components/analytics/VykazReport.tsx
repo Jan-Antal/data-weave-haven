@@ -170,7 +170,7 @@ export function VykazReport() {
         if (batch.length < PAGE) break;
         offset += PAGE;
       }
-      return all.filter((r) => !r.cinnost_kod || !EXCLUDED_CINNOST.has(r.cinnost_kod));
+      return all;
     },
   });
 
