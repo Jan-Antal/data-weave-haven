@@ -1782,7 +1782,7 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
         <Tooltip><TooltipTrigger asChild><span className="text-[8px] font-sans shrink-0" style={{ color: "#c4ccc9" }}>{item.split_part}/{item.split_total}</span></TooltipTrigger>
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
-      <span className="font-sans text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>{item.scheduled_hours}h</span>
+      <span className="font-sans text-[9px] shrink-0" style={{ color: "#c4ccc9" }}>{Math.round(item.scheduled_hours * 10) / 10}h</span>
     </div>
   );
 }
@@ -1821,7 +1821,7 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
           {pauseExpDate ? `Očekávané uvolnění: ${new Date(pauseExpDate).toLocaleDateString("cs-CZ")}` : "Bez termínu uvolnění"}
         </TooltipContent>
       </Tooltip>
-      <span className="font-sans text-[9px] shrink-0" style={{ color: "#d97706", textDecoration: "line-through" }}>{item.scheduled_hours}h</span>
+      <span className="font-sans text-[9px] shrink-0" style={{ color: "#d97706", textDecoration: "line-through" }}>{Math.round(item.scheduled_hours * 10) / 10}h</span>
     </div>
   );
 }
@@ -1873,7 +1873,7 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = f
           <TooltipContent side="top" className="z-[9999] text-[10px]">Část {item.split_part} ze {item.split_total}</TooltipContent></Tooltip>
       )}
       <span className="font-sans text-[9px] shrink-0" style={{ color: "#99a5a3" }}>
-        {item.scheduled_hours}h{showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}
+        {Math.round(item.scheduled_hours * 10) / 10}h{showCzk && ` ${Math.round(item.scheduled_czk / 1000)}K`}
       </span>
     </div>
   );
