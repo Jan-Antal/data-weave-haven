@@ -1,40 +1,63 @@
 
-## Plán: Spojený výber obdobia — preset + kalendár v jednom popoveri
+## Plán: 3 opravy — chýbajúce dni v grafe, geometria range selekcie, skrytie outside dní
 
-### A. Jeden trigger (bunka) namiesto dvoch
-V `src/components/analytics/VykazReport.tsx`:
-- Odstrániť pôvodný `<Select>` aj samostatný "Vlastní" Popover.
-- Jeden `Popover` trigger button (`variant="outline" size="sm" h-8 text-xs`) s `CalendarIcon` medzi šípkami ◀ ▶.
-- **Label vždy zobrazuje konkrétny dátumový rozsah** spočítaný z `getRangeBounds(dateRange, customFrom, customTo, rangeOffset)`:
-  - Format: `"5. 3. – 12. 4. 2026"` (cez `parseAppDate` + `formatAppDate`); ak rovnaký rok, rok len raz na konci.
-  - Nikdy "Tento týden" — vždy reálne dátumy, aby sa po kliku ◀ ▶ label aktualizoval.
+### 1) Chýbajúce dni v grafe "Hodiny v čase" — Supabase row cap
 
-### B. Obsah popoveru (jedna plocha, žiadne taby)
-- **Ľavá kolóna** (~180px) — preset list (vertikálne buttony, `variant="ghost"`, aktívny preset má `bg-accent`):
-  - Tento týden (`week`)
-  - Tento měsíc (`month`)
-  - Minulý týden (`prev_week`) — **nový**
-  - Minulý měsíc (`prev_month`) — **nový**
-  - Posledné 3 měsíce (`3months`)
-- **Pravá kolóna** — `Calendar` `mode="range"`, `numberOfMonths={2}`, `weekStartsOn={1}`:
-  - `selected={{ from, to }}` — vždy odráža **aktuálne aktívny rozsah** (preset alebo custom). Klik na preset → vyznačí rozsah v kalendári.
-  - `onSelect={(range) => { setDateRange("custom"); setCustomFrom(...); setCustomTo(...); setRangeOffset(0); }}` — akýkoľvek klik v kalendári automaticky prepne na custom.
-- **Footer**: `Smazat` (Trash2, vyčistí custom + vráti na `week`) vľavo, `Hotovo` (zatvorí) vpravo.
+**Príčina**: Query v `useQuery(["vykaz-log", ...])` používa `.range(0, 99999)` ale Supabase REST API má server-side hard cap (typicky 1000 riadkov per request). Pre marec 2026 existuje 1682 riadkov v `production_hours_log` → vráti len prvých 1000 (chronologicky skôr) a posledné dni v mesiaci vypadnú. Rovnaký pattern v každom mesiaci s viac ako ~1000 záznamami.
 
-### C. Rozšírenie typov a `getRangeBounds`
-- `type DateRange = "week" | "month" | "prev_week" | "prev_month" | "3months" | "custom"`
-- `getRangeBounds`:
-  - `prev_week` → pondelok–nedeľa minulého týždňa, posun `offset * 7` dní
-  - `prev_month` → 1.–posledný deň minulého mesiaca, posun `offset` mesiacov
-- Šípky ◀ ▶ ostávajú; pre nové presety fungujú rovnako (posun o 1 jednotku periody).
+**Riešenie**: Stránkované načítanie v cykle (po 1000 riadkov, kým server vráti plný batch), s ORDER BY `datum_sync` aby sa pagination chovala deterministicky.
 
-### D. Synchronizácia šípok ↔ label
-- Label triggeru je odvodený **z `currentBounds`** (memoizované `getRangeBounds(...)`), takže kliknutie ◀ ▶ ho automaticky prepíše.
-- Kalendár vnútri popoveru tiež zobrazuje `selected={currentBounds}` → pri opätovnom otvorení vidno presne, čo je vybrané (vrátane offsetu).
+```ts
+// Pseudo-implementácia v queryFn:
+const PAGE = 1000;
+let all: LogRow[] = [];
+let offset = 0;
+while (true) {
+  const { data, error } = await supabase
+    .from("production_hours_log")
+    .select("ami_project_id,zamestnanec,cinnost_kod,cinnost_nazov,hodiny,datum_sync")
+    .gte("datum_sync", from)
+    .lte("datum_sync", to)
+    .order("datum_sync", { ascending: true })
+    .range(offset, offset + PAGE - 1);
+  if (error) throw error;
+  if (!data?.length) break;
+  all = all.concat(data as LogRow[]);
+  if (data.length < PAGE) break;
+  offset += PAGE;
+}
+return all.filter((r) => !r.cinnost_kod || !EXCLUDED_CINNOST.has(r.cinnost_kod));
+```
 
-### Súbor
-- `src/components/analytics/VykazReport.tsx` — jediný súbor.
+### 2) Geometria range selekcie v kalendári (kontinuálny pill)
+
+**Súčasný stav** (screenshot 1): každý vybraný deň má vlastný oranžový bubble s roundingom zo všetkých strán → vyzerá ako separátne bunky.
+
+**Cieľ** (screenshot 3 — fialová referencia): súvislá pill-tvarovaná lišta cez celý riadok. Začiatok riadka rounded vľavo, koniec rounded vpravo, stred bez radiusu, jeden súvislý fill.
+
+**Zmeny v `src/components/ui/calendar.tsx` → `classNames`**:
+- `cell`: pridať `[&:has([aria-selected])]:bg-primary/15` (kontinuálne pozadie cez celú šírku bunky bez gapov medzi dňami) a odstrániť/úpraviť pôvodné `[&:has([aria-selected])]:bg-transparent`
+- `day_range_start`: `bg-primary text-primary-foreground rounded-l-md rounded-r-none`
+- `day_range_end`: `bg-primary text-primary-foreground rounded-r-md rounded-l-none`
+- `day_range_middle`: `bg-transparent text-foreground rounded-none hover:bg-primary/25` (parent `cell` poskytuje fill)
+- `day_selected` (single = `from === to` alebo iba `from`): ponechať `rounded-md bg-primary` — react-day-picker aplikuje `day_selected` aj na single dátum
+- `first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md` — ponechať (zaobľuje okraje riadka keď selekcia pokračuje cez koniec týždňa)
+
+⚠️ Toto je shared `ui/calendar.tsx`, ovplyvní aj iné dialogy (PlanDateEditDialog, StageDateEditDialog) — vizuálne zlepšenie konzistentné s brand štýlom.
+
+### 3) Skryť outside-month dni v kalendári
+
+**Súčasný stav** (screenshot 1): dni z predchádzajúceho/nasledujúceho mesiaca (napr. "30, 31" v aprílovom paneli pre prev_month=marec) sú zobrazené šedo a niekedy s fill, čo pôsobí chaoticky.
+
+**Cieľ**: outside dni úplne skryť (prázdne bunky), aby každý mesiac mal jasne vymedzený rámec.
+
+**Zmeny len v inštancii `Calendar` v `VykazReport.tsx`** (nie globálne — iné dialogy môžu chcieť outside dni):
+- Pridať prop `showOutsideDays={false}` (DayPicker default je true; náš wrapper ho explicitne odovzdáva, takže `false` zafunguje).
+
+### Súbory
+- `src/components/analytics/VykazReport.tsx` — query pagination + `showOutsideDays={false}` na Calendar
+- `src/components/ui/calendar.tsx` — úpravy `classNames` pre kontinuálny range pill
 
 ### Bez zmien
-- `ui/calendar.tsx` ostáva bez úprav (vizuál range selekcie ladiť až keď user potvrdí).
-- Žiadne zmeny v dátach, grafe, sekciách tabuľky, exporte, RLS.
+- Žiadne zmeny v dátach, RLS, agregácii, exporte, iných sekciách
+- Žiadne nové závislosti
