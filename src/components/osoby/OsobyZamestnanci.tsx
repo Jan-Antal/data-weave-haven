@@ -349,9 +349,76 @@ export function OsobyZamestnanci() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-y-auto px-6">
-        <Table>
+      {/* Blocks per stredisko */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        {(() => {
+          // Order: Direct, Indirect, Provoz, Nepriradené, then any others
+          const orderRank = (s: string) => {
+            const k = strediskoKind(s);
+            if (k === "direct") return 0;
+            if (k === "indirect") return 1;
+            if (k === "provoz") return 2;
+            if (s === "Nepriradené") return 3;
+            return 4;
+          };
+          const blocks = Array.from(grouped.entries()).sort((a, b) => {
+            const ra = orderRank(a[0]); const rb = orderRank(b[0]);
+            if (ra !== rb) return ra - rb;
+            return a[0].localeCompare(b[0], "cs");
+          });
+
+          if (filtered.length === 0) {
+            return (
+              <div className="text-center text-sm text-muted-foreground py-8">
+                Žádní zaměstnanci nenalezeni.
+              </div>
+            );
+          }
+
+          return blocks.map(([stredisko, useks]) => {
+            const kind = strediskoKind(stredisko);
+            const theme = BLOCK_THEME[kind];
+            // Block totals
+            let blockHeads = 0;
+            let blockHrs = 0;
+            for (const emps of useks.values()) {
+              blockHeads += emps.length;
+              for (const e of emps) blockHrs += (e.uvazok_hodiny ?? 8) * 5;
+            }
+
+            return (
+              <div
+                key={stredisko}
+                className="rounded-lg overflow-hidden mb-3"
+                style={{ border: "0.5px solid hsl(var(--border))" }}
+              >
+                {/* Block header */}
+                <div
+                  className="px-4 py-2.5 flex items-center gap-3"
+                  style={{
+                    backgroundColor: theme.headerBg,
+                    borderBottom: `0.5px solid ${theme.headerBorder}`,
+                  }}
+                >
+                  <span
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded uppercase tracking-wide"
+                    style={{ backgroundColor: theme.badgeBg, color: theme.badgeFg }}
+                  >
+                    {stredisko}
+                  </span>
+                  <span className="text-[11px]" style={{ color: theme.badgeFg, opacity: 0.85 }}>
+                    {theme.description}
+                  </span>
+                  <span
+                    className="ml-auto text-[11px] font-medium tabular-nums"
+                    style={{ color: theme.badgeFg }}
+                  >
+                    {blockHeads} {blockHeads === 1 ? "osoba" : blockHeads < 5 ? "osoby" : "osob"} · {blockHrs} h/týd
+                  </span>
+                </div>
+
+                {/* Table for this block */}
+                <Table>
           <TableHeader className="sticky top-0 bg-card z-10">
             <TableRow>
               <TableHead className="w-[260px]">Jméno</TableHead>
