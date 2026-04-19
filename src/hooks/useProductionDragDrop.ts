@@ -6,6 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { autoUpdateProjectPercents } from "@/lib/autoProjectPercent";
+import { renumberChain } from "@/lib/splitChainHelpers";
 
 function weekLabel(weekDate: string): string {
   try {
