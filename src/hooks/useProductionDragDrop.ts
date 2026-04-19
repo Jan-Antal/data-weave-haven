@@ -6,6 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { autoUpdateProjectPercents } from "@/lib/autoProjectPercent";
+import { renumberChain } from "@/lib/splitChainHelpers";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -69,6 +70,11 @@ export function useProductionDragDrop() {
         newValue: weekLabel(weekDate),
         detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
       });
+
+      // If item is part of a chain, renumber so badges stay consistent.
+      if (item.split_group_id) {
+        try { await renumberChain(item.split_group_id); } catch { /* silent */ }
+      }
 
       invalidateAll();
 
@@ -185,6 +191,12 @@ export function useProductionDragDrop() {
           newValue: weekLabel(weekDate),
           detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
         });
+      }
+
+      // Renumber any chains touched by this bulk move.
+      const chainIds = new Set(items.map((i: any) => i.split_group_id).filter(Boolean) as string[]);
+      for (const g of chainIds) {
+        try { await renumberChain(g); } catch { /* silent */ }
       }
 
       invalidateAll();
@@ -683,6 +695,7 @@ export function useProductionDragDrop() {
             estimated_czk: schedItem.scheduled_czk,
             sent_by: user.id,
             status: "pending",
+            split_group_id: schedItem.split_group_id ?? null,
           });
         if (insertErr) throw insertErr;
       }
@@ -695,6 +708,11 @@ export function useProductionDragDrop() {
         newValue: "Inbox",
         detail: JSON.stringify({ item_name: schedItem.item_name, item_code: schedItem.item_code, from_week: weekLabel(schedItem.scheduled_week) }),
       });
+
+      // Keep chain badges consistent across schedule + inbox.
+      if (schedItem.split_group_id) {
+        try { await renumberChain(schedItem.split_group_id); } catch { /* silent */ }
+      }
 
       invalidateAll();
 
@@ -919,6 +937,7 @@ export function useProductionDragDrop() {
           estimated_czk: item.scheduled_czk,
           sent_by: user.id,
           status: "pending" as const,
+          split_group_id: item.split_group_id ?? null,
         }));
         const { error: insertErr } = await supabase.from("production_inbox").insert(newItems);
         if (insertErr) throw insertErr;
@@ -933,6 +952,12 @@ export function useProductionDragDrop() {
           newValue: "Inbox",
           detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, from_week: weekLabel(weekDate) }),
         });
+      }
+
+      // Renumber any chains touched by this return.
+      const chainIds = new Set(items.map((i: any) => i.split_group_id).filter(Boolean) as string[]);
+      for (const g of chainIds) {
+        try { await renumberChain(g); } catch { /* silent */ }
       }
 
       invalidateAll();

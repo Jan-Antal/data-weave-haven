@@ -357,6 +357,9 @@ export async function midflightImportPlanVyroby(
       );
     }
 
+    // Lazy import to avoid cycles
+    const { renumberChain } = await import("./splitChainHelpers");
+
     for (const projectId of projectIds) {
       const mfList = mfByProject.get(projectId) || [];
       const inboxList = inboxByProject.get(projectId) || [];
@@ -364,18 +367,6 @@ export async function midflightImportPlanVyroby(
 
       const head = mfList.find((r) => !r.split_group_id) || mfList[0];
       const firstBundleId: string = head.id;
-      const N = mfList.length;
-      const M = inboxList.length;
-      const newTotal = N + M;
-
-      const { error: mfUpdErr } = await (supabaseClient as any)
-        .from("production_schedule")
-        .update({ split_total: newTotal })
-        .eq("is_midflight", true)
-        .eq("project_id", projectId);
-      if (mfUpdErr) errors.push(`MF split_total update (${projectId}): ${mfUpdErr.message}`);
-
-      if (M === 0) continue;
 
       const hodinyPlan = planMap.get(projectId) || 0;
       const mfHours = [...projectWeeklyHours.get(projectId)!.values()].reduce((a, b) => a + b, 0);
@@ -390,41 +381,59 @@ export async function midflightImportPlanVyroby(
         ? Math.round(((inboxRemainder * totalCzk) / denom) * 10) / 10
         : 0;
 
-      const perItem: { id: string; hours: number }[] = [];
-      let allocated = 0;
-      for (let i = 0; i < inboxList.length; i++) {
-        const r = inboxList[i];
-        const isLast = i === inboxList.length - 1;
-        let h: number;
-        if (isLast) {
-          h = Math.max(0, Math.round((inboxShare - allocated) * 10) / 10);
-        } else if (inboxShare === 0) {
-          h = 0;
-        } else if (totalCzk > 0) {
-          const share = (Number(r.estimated_czk) || 0) / totalCzk;
-          h = Math.round(inboxShare * share * 10) / 10;
-        } else {
-          h = Math.round((inboxShare / inboxList.length) * 10) / 10;
+      // Distribute inbox hours proportionally (last item carries remainder).
+      if (inboxList.length > 0) {
+        const perItem: { id: string; hours: number }[] = [];
+        let allocated = 0;
+        for (let i = 0; i < inboxList.length; i++) {
+          const r = inboxList[i];
+          const isLast = i === inboxList.length - 1;
+          let h: number;
+          if (isLast) {
+            h = Math.max(0, Math.round((inboxShare - allocated) * 10) / 10);
+          } else if (inboxShare === 0) {
+            h = 0;
+          } else if (totalCzk > 0) {
+            const share = (Number(r.estimated_czk) || 0) / totalCzk;
+            h = Math.round(inboxShare * share * 10) / 10;
+          } else {
+            h = Math.round((inboxShare / inboxList.length) * 10) / 10;
+          }
+          allocated += h;
+          perItem.push({ id: r.id, hours: h });
         }
-        allocated += h;
-        perItem.push({ id: r.id, hours: h });
+
+        for (const { id, hours } of perItem) {
+          // Assign chain group; renumberChain will set part/total below.
+          const { error: upErr } = await (supabaseClient as any)
+            .from("production_inbox")
+            .update({
+              estimated_hours: hours,
+              split_group_id: firstBundleId,
+            })
+            .eq("id", id);
+          if (upErr) errors.push(`Inbox update ${id}: ${upErr.message}`);
+        }
       }
 
-      for (let i = 0; i < perItem.length; i++) {
-        const { id, hours } = perItem[i];
-        const { error: upErr } = await (supabaseClient as any)
-          .from("production_inbox")
-          .update({
-            estimated_hours: hours,
-            split_group_id: firstBundleId,
-            split_part: N + i + 1,
-            split_total: newTotal,
-          })
-          .eq("id", id);
-        if (upErr) errors.push(`Inbox update ${id}: ${upErr.message}`);
+      // Ensure all midflight schedule rows belong to this chain group too.
+      // Head row has split_group_id = null in our insert above; set it now so
+      // renumberChain sees the full chain via the .or(...) query.
+      await (supabaseClient as any)
+        .from("production_schedule")
+        .update({ split_group_id: firstBundleId })
+        .eq("is_midflight", true)
+        .eq("project_id", projectId)
+        .neq("id", firstBundleId);
+
+      // Project-wide chain renumbering (schedule + inbox).
+      try {
+        await renumberChain(firstBundleId);
+      } catch (e: any) {
+        errors.push(`renumberChain (${projectId}): ${e?.message || e}`);
       }
 
-      onProgress?.(`[midflight] ${projectId}: Inbox ${M}p (share=${inboxShare}h z ${inboxRemainder}h, pendingTPV=${Math.round(pendingTpvCzk)}Kč)`);
+      onProgress?.(`[midflight] ${projectId}: chain ${mfList.length}+${inboxList.length} (share=${inboxShare}h z ${inboxRemainder}h, pendingTPV=${Math.round(pendingTpvCzk)}Kč)`);
     }
   }
   // ━━━ END INBOX RECONCILIATION ━━━

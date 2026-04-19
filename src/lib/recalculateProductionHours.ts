@@ -265,18 +265,20 @@ export async function recalculateProductionHours(
       const inboxItems = inboxItemsAll.filter((it: any) => !it.item_code?.startsWith('HIST_'));
 
       // 1) Refresh estimated_czk per item from TPV when available.
+      //    For chained items (split_group_id present) we DO NOT divide by
+      //    split_total — the bundle-wide chain doesn't map a single inbox
+      //    row to a single TPV item. We keep the existing estimated_czk in
+      //    that case (it was set when the inbox item was created/split).
       const refreshedCzk = new Map<string, number>();
       for (const item of inboxItems) {
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
-        if (tpv) {
+        if (tpv && !item.split_group_id) {
           const rawCena = Number(tpv.cena) || 0;
           const correctCzk = Math.floor(evaluateFormula(
             formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
             { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
           ));
-          // Account for split: if item is part of a split, scale CZK by its part fraction
-          const splitDivisor = Number(item.split_total) || 1;
-          refreshedCzk.set(item.id, Math.floor(correctCzk / splitDivisor));
+          refreshedCzk.set(item.id, correctCzk);
         } else {
           refreshedCzk.set(item.id, Number(item.estimated_czk) || 0);
         }
@@ -423,6 +425,16 @@ export async function recalculateProductionHours(
   }
 
   await Promise.all(writePromises);
+
+  // Project-wide chain renumbering: keep split badges (N/N) consistent across
+  // schedule + inbox after hour redistribution. Best-effort — failures don't
+  // abort the recalc.
+  try {
+    const { renumberAllChainsForProject } = await import("./splitChainHelpers");
+    for (const pid of filteredProjectIds) {
+      try { await renumberAllChainsForProject(pid); } catch { /* per-project silent */ }
+    }
+  } catch { /* silent */ }
 
   onProgress?.({ phase: "Kontrola překročení plánu...", pct: 92 });
 
