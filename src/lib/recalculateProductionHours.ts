@@ -426,6 +426,16 @@ export async function recalculateProductionHours(
 
   await Promise.all(writePromises);
 
+  // Project-wide chain renumbering: keep split badges (N/N) consistent across
+  // schedule + inbox after hour redistribution. Best-effort — failures don't
+  // abort the recalc.
+  try {
+    const { renumberAllChainsForProject } = await import("./splitChainHelpers");
+    for (const pid of filteredProjectIds) {
+      try { await renumberAllChainsForProject(pid); } catch { /* per-project silent */ }
+    }
+  } catch { /* silent */ }
+
   onProgress?.({ phase: "Kontrola překročení plánu...", pct: 92 });
 
   // Over-plan notifications
