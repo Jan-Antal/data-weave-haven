@@ -1,43 +1,48 @@
 
-Cieľ: vizuálne lepšie oddeliť jednotlivé strediská (Výroba Direct, Výroba Indirect, Provoz, Nepriradené) a Externistov ako samostatné „bloky" tabuľky, aby každé stredisko pôsobilo ako vlastná karta s úsekmi vnútri, namiesto plynulého zoznamu riadkov.
+## Plan: Per-User Permission System
 
-Súčasný stav
-- `OsobyZamestnanci.tsx`: jeden veľký scroll s jedným sticky headerom; stredisko aj úsek sú len farebné riadky cez `colSpan`, opticky splývajú s ostatnými riadkami.
-- `OsobyExternisti.tsx`: rovnaký princíp – jeden tyrkysový header riadok + ploché riadky.
+### 1. Database migration
+- `ALTER TABLE user_roles ADD COLUMN IF NOT EXISTS permissions JSONB`
+- Fix RLS on `projects`, `project_stages`, `tpv_items`, `production_schedule`, `production_inbox` so any authenticated user with a row in `user_roles` can SELECT (regardless of role). Currently `vedouci_vyroby`, `mistr`, `quality`, `vyroba` are blocked because policies (or `is_test_project` joins) gate them out.
+  - Add SELECT policy: `USING (auth.uid() IN (SELECT user_id FROM user_roles))` alongside existing tester/test isolation logic where applicable.
+- Extend `app_role` enum with new values: `vedouci_pm`, `vedouci_konstrukter`, `vedouci_vyroby`, `mistr`, `quality`, `kalkulant` (keep existing owner/admin/pm/konstrukter/viewer/vyroba/tester for backward compat).
 
-Návrh – „card block" pre každé stredisko
-1. Wrapper karta per stredisko
-   - Každé stredisko (Direct / Indirect / Provoz / Nepriradené / Externisté) zabaliť do `<section>` s:
-     - `rounded-lg border` v farbe stredisko (zelená / oranžová / fialová / sivá / cyan)
-     - jemný `shadow-sm`, `overflow-hidden`
-     - `mb-4` medzera medzi blokmi
-   - Karty budú vizuálne oddelené prázdnym priestorom + vlastným orámovaním → jasné „bloky".
+### 2. Permission presets module
+New file `src/lib/permissionPresets.ts`:
+- Export `PERMISSION_FLAGS` (string[] of all 22 flags).
+- Export `ROLE_PRESETS: Record<AppRole, Partial<Permissions>>` exactly as specified.
+- Helper `resolvePermissions(role, overrides)` → merges preset + JSONB overrides, missing keys default `false`.
 
-2. Hlavička bloku (stredisko)
-   - Plná farebná lišta na vrchu karty (existujúce farby: `EAF3DE` / nová oranžová pre Indirect / `EEEDFE` / sivá / `cyan-50`).
-   - Obsahuje: badge so stredisko názvom, počet osôb, súčet hodín.
-   - Žiadne `colSpan` cez tabuľku – je to čistý `div` nad tabuľkou.
+### 3. `useAuth.tsx` refactor
+- Load `permissions` JSONB alongside `role` from `user_roles`.
+- Compute resolved `permissions` object via `resolvePermissions(role, dbPermissions)`. When `simulatedRole` set (owner only), use **preset only** (ignore stored overrides).
+- Expose every flag on AuthContext: `canEdit`, `canCreateProject`, `canDeleteProject`, `canEditProjectCode`, `canEditSmluvniTermin`, `canManageTPV`, `canAccessSettings`, `canManageUsers`, `canManagePeople`, `canManageExternisti`, `canManageProduction`, `canAccessAnalytics`, `canSeePrices`, `canAccessPlanVyroby`, `canWritePlanVyroby`, `canAccessDaylog`, `canQCOnly`, `canUploadDocuments`, `canPermanentDelete`, `canManageExchangeRates`, `canManageStatuses`, `canAccessRecycleBin`.
+- Keep legacy booleans (`isAdmin`, `isPM`, …) for back-compat but derive UI gating from flags.
+- `isFieldReadOnly(field, currentValue)`:
+  - `!canEdit` → true for all
+  - QC-only user (only `canAccessDaylog` + `canQCOnly`) → true for all
+  - `!canSeePrices` and field ∈ {`prodejni_cena`, `marze`} → true
+  - `!canEditProjectCode` and field === `project_id` → true
+  - `!canEditSmluvniTermin` and field === `datum_smluvni` → true (always, not just when set)
+- `defaultTab` derived per spec.
 
-3. Vnútro bloku
-   - Jedna `<table>` per blok so sticky-like column headerom:
-     - Stĺpcový header (Meno · Úsek · Pozícia · Role · Úvazek · Absencie · Akcie) sa zobrazí raz na vrchu prvého bloku ako globálny sticky header (ostáva ako dnes).
-     - Vo vnútri každého bloku už hlavičku stĺpcov neopakovať.
-   - Úseky vo vnútri bloku oddeliť sub-headerom:
-     - Riadok `bg-muted/40`, `text-[11px] uppercase tracking-wide`, jemný `border-y`
-     - Obsah: názov úseku · počet osôb · hodiny
-   - Riadky zamestnancov bez zmeny štýlu (inline edit, hover-to-reveal).
+### 4. UI: Oprávnenia section in Uživatelé
+Edit `src/components/UserManagement.tsx`:
+- Add expand chevron per row; expanded panel renders below row (full-width).
+- Panel content:
+  - Badge with current role preset label + "Resetovat na preset" button (repopulates local state from preset, does not save).
+  - Grid of 22 labeled `Checkbox`es bound to local state.
+  - "Uložiť" button → upserts `user_roles.permissions` JSONB via supabase update; "Zrušit" reverts.
+- Permission labels in Czech (e.g. "Editovat projekty", "Vytvárať projekty", "Vidieť ceny", …).
+- No other UI changes.
 
-4. Externisté
-   - Rovnaký princíp: jedna karta s cyan hlavičkou, vnútri jeden zoznam (bez sub-úsekov).
+### 5. Files touched
+- `supabase/migrations/<new>.sql` — column + RLS fixes + enum values
+- `src/lib/permissionPresets.ts` — new
+- `src/hooks/useAuth.tsx` — load + expose permissions
+- `src/components/UserManagement.tsx` — expandable Oprávnenia panel
+- (No changes needed in consuming components — they already read flags from `useAuth()`.)
 
-5. Sticky header stĺpcov
-   - Globálny sticky header nad prvým blokom zostáva (Meno / Úsek / …). Šírky stĺpcov zafixovať cez `<colgroup>` zdieľaný medzi headerom a každým blokom, aby zarovnanie sedelo.
-
-Čo sa NEMENÍ
-- Funkčnosť (mutácie, inline edit, dialógy, absencie, role).
-- Farebná paleta stredisko + Externistov.
-- Triedenie a filtrovanie.
-
-Súbory na úpravu
-- `src/components/osoby/OsobyZamestnanci.tsx` – rozdeliť render do kariet per stredisko, pridať wrapper `<section>` a sub-header pre úseky.
-- `src/components/osoby/OsobyExternisti.tsx` – zabaliť do rovnakej karty, aby vizuálne ladila so Zamestnancami.
+### 6. Out of scope
+- No redesign of existing permission-gated UI beyond the new panel.
+- Existing `isAdmin`/`isPM`/etc. checks remain (compute from role) so no cascading edits required this round.
