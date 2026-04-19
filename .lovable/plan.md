@@ -1,48 +1,80 @@
 
-## Plan: Per-User Permission System
+## Plan: Role-First Permission Manager
 
-### 1. Database migration
-- `ALTER TABLE user_roles ADD COLUMN IF NOT EXISTS permissions JSONB`
-- Fix RLS on `projects`, `project_stages`, `tpv_items`, `production_schedule`, `production_inbox` so any authenticated user with a row in `user_roles` can SELECT (regardless of role). Currently `vedouci_vyroby`, `mistr`, `quality`, `vyroba` are blocked because policies (or `is_test_project` joins) gate them out.
-  - Add SELECT policy: `USING (auth.uid() IN (SELECT user_id FROM user_roles))` alongside existing tester/test isolation logic where applicable.
-- Extend `app_role` enum with new values: `vedouci_pm`, `vedouci_konstrukter`, `vedouci_vyroby`, `mistr`, `quality`, `kalkulant` (keep existing owner/admin/pm/konstrukter/viewer/vyroba/tester for backward compat).
+Replace `OsobyOpravneni.tsx` with a two-column UI. Keep `permissionPresets.ts` and `useAuth.tsx` untouched.
 
-### 2. Permission presets module
-New file `src/lib/permissionPresets.ts`:
-- Export `PERMISSION_FLAGS` (string[] of all 22 flags).
-- Export `ROLE_PRESETS: Record<AppRole, Partial<Permissions>>` exactly as specified.
-- Helper `resolvePermissions(role, overrides)` → merges preset + JSONB overrides, missing keys default `false`.
+### Layout
 
-### 3. `useAuth.tsx` refactor
-- Load `permissions` JSONB alongside `role` from `user_roles`.
-- Compute resolved `permissions` object via `resolvePermissions(role, dbPermissions)`. When `simulatedRole` set (owner only), use **preset only** (ignore stored overrides).
-- Expose every flag on AuthContext: `canEdit`, `canCreateProject`, `canDeleteProject`, `canEditProjectCode`, `canEditSmluvniTermin`, `canManageTPV`, `canAccessSettings`, `canManageUsers`, `canManagePeople`, `canManageExternisti`, `canManageProduction`, `canAccessAnalytics`, `canSeePrices`, `canAccessPlanVyroby`, `canWritePlanVyroby`, `canAccessDaylog`, `canQCOnly`, `canUploadDocuments`, `canPermanentDelete`, `canManageExchangeRates`, `canManageStatuses`, `canAccessRecycleBin`.
-- Keep legacy booleans (`isAdmin`, `isPM`, …) for back-compat but derive UI gating from flags.
-- `isFieldReadOnly(field, currentValue)`:
-  - `!canEdit` → true for all
-  - QC-only user (only `canAccessDaylog` + `canQCOnly`) → true for all
-  - `!canSeePrices` and field ∈ {`prodejni_cena`, `marze`} → true
-  - `!canEditProjectCode` and field === `project_id` → true
-  - `!canEditSmluvniTermin` and field === `datum_smluvni` → true (always, not just when set)
-- `defaultTab` derived per spec.
+```text
+┌───────────────────────────────────────────────────────────┐
+│ ROLY (220px)         │  Header: [Role name] [Dup][Uložit]│
+│ ─ owner       (2)    │                                    │
+│ ─ admin       (1)    │  Pridelení uživatelia              │
+│ ▌pm           (5) ●  │  ◯JK ✕  ◯PN ✕  + Přidat            │
+│ ─ konstruktér (3)    │                                    │
+│ ...                  │  ── Projekty & TPV ──              │
+│ + Nová rola          │  Projekty       [– │Čítať│Upraviť] │
+│                      │  TPV list       [– │Čítať│Upraviť] │
+│                      │  Vytvořit       [– │Áno]           │
+│                      │  ...                               │
+└───────────────────────────────────────────────────────────┘
+```
 
-### 4. UI: Oprávnenia section in Uživatelé
-Edit `src/components/UserManagement.tsx`:
-- Add expand chevron per row; expanded panel renders below row (full-width).
-- Panel content:
-  - Badge with current role preset label + "Resetovat na preset" button (repopulates local state from preset, does not save).
-  - Grid of 22 labeled `Checkbox`es bound to local state.
-  - "Uložiť" button → upserts `user_roles.permissions` JSONB via supabase update; "Zrušit" reverts.
-- Permission labels in Czech (e.g. "Editovat projekty", "Vytvárať projekty", "Vidieť ceny", …).
-- No other UI changes.
+### Component structure (`src/components/osoby/OsobyOpravneni.tsx`)
 
-### 5. Files touched
-- `supabase/migrations/<new>.sql` — column + RLS fixes + enum values
-- `src/lib/permissionPresets.ts` — new
-- `src/hooks/useAuth.tsx` — load + expose permissions
-- `src/components/UserManagement.tsx` — expandable Oprávnenia panel
-- (No changes needed in consuming components — they already read flags from `useAuth()`.)
+State:
+- `selectedRole: AppRole` (default `pm`)
+- `draftPerms: Permissions` — starts from `ROLE_PRESETS[selectedRole]`, mutated by toggle clicks
+- `assignedUsers: { id, full_name, email }[]` (for selected role)
+- `addUserOpen: boolean`, `newRoleOpen: boolean`
+- `confirmOverwrite: { count: number } | null`
 
-### 6. Out of scope
-- No redesign of existing permission-gated UI beyond the new panel.
-- Existing `isAdmin`/`isPM`/etc. checks remain (compute from role) so no cascading edits required this round.
+Data:
+- Fetch profiles + user_roles once. Group user counts per role.
+- On role select: load assigned users, reset `draftPerms` to preset.
+
+### Permission row mapping
+
+Tri-state rows (`–` / `Čítať` / `Upraviť`):
+| Row | Read flag | Write flag |
+|---|---|---|
+| Projekty | (always read if any access) | `canEdit` |
+| TPV list | implicit read | `canManageTPV` |
+| Plán výroby | `canAccessPlanVyroby` | `canWritePlanVyroby` |
+| Správa osob | implicit read | `canManagePeople` |
+
+For "Projekty"/"TPV list"/"Správa osob" — `–` means the user has no access at all (handled via `canEdit=false` and either keeping read-only via existing logic or hiding). Since `useAuth` doesn't have separate read flags for these, treat: `–` = false write + no related access; `Čítať` = false write + visible (default for any role); `Upraviť` = write true. We persist only the write flag — read is implied by role membership.
+
+Binary rows (`–` / `Áno`):
+- `canCreateProject`, `canDeleteProject`, combined `canEditProjectCode`+`canEditSmluvniTermin` (saved together), `canSeePrices`, `canAccessVyroba` (NEW — see note), `canAccessDaylog`, `canQCOnly`, `canAccessAnalytics`, `canManageExternisti`, `canAccessSettings`, `canManageUsers`, `canPermanentDelete`
+
+NOTE: `canAccessVyroba` does not exist in `permissionPresets.ts`. Per instruction we must NOT change presets. We will store it in the JSONB as an additional key — `useAuth.resolvePermissions` ignores unknown keys, so it's safe data-wise; the row just won't gate UI yet (acceptable, future wiring).
+
+### Save flow
+
+1. On "Uložit": query `user_roles` for users with `role = selectedRole`.
+2. For each, compare current `permissions` JSONB against `ROLE_PRESETS[selectedRole]`. Count those with non-null custom overrides differing from preset.
+3. If count > 0 → open `ConfirmDialog` "X uživatelů má vlastní úpravy — přepsat?".
+4. On confirm → bulk update `user_roles.permissions = draftPerms` where `role = selectedRole`. Toast success.
+
+### Add/remove users
+
+- "+ Přidat uživatele": Popover with `Command` search over profiles not in role. Select → update that user's `user_roles.role` to selectedRole.
+- ✕ on chip → set user's role to `viewer` (cannot null role given existing schema). Confirm before demoting.
+
+### "+ Nová rola"
+
+The `app_role` enum is fixed. Show toast: "Nové role je možné pridať len cez DB migráciu" instead of allowing creation. (Documented limitation — keeps spec scope without enum migration.)
+
+### Styling
+
+- Use existing tokens: `bg-muted`, `bg-background`, `border-border`. Map spec colors:
+  - Active item left border: `border-l-2 border-[#0a2e28]`
+  - Read selected: `bg-[#E6F1FB] text-[#0C447C] border-[#85B7EB]`
+  - Write selected: `bg-[#EAF3DE] text-[#27500A] border-[#97C459]`
+  - Save button: `bg-[#0a2e28] text-white`
+
+### Files touched
+
+- `src/components/osoby/OsobyOpravneni.tsx` — full rewrite
+- No changes to `permissionPresets.ts`, `useAuth.tsx`, `Osoby.tsx`, or other components.
