@@ -1102,7 +1102,7 @@ function ProjektRow({
       <TableRow
         className={cn(
           "hover:bg-muted/50 cursor-pointer",
-          !g.matched && "border-l-[3px] border-l-amber-500 text-muted-foreground",
+          !g.matched && "text-muted-foreground",
         )}
         onClick={onToggle}
       >
