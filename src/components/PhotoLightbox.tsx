@@ -255,6 +255,8 @@ export function PhotoTimelineGrid({
                         isSelected={selectedIds?.has(f.itemId)}
                         onToggleSelect={onToggleSelect ? (e) => onToggleSelect(f.itemId, flatFiles, e) : undefined}
                         hasAnySelection={(selectedIds?.size ?? 0) > 0}
+                        onDelete={onDelete}
+                        canDelete={canDelete}
                       />
                     );
                   })}
