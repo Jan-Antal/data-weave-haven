@@ -1,74 +1,42 @@
 
+## Plán: Sjednotenie "Vlastní" výberu + šípky pre posun obdobia
 
-## Plán: Vizuálny redesign Výkazu — 3 sekcie ako Zaměstnanci + reorganizácia
+### A. Vlastní výber datumu — unifikovaný kalendár (nahradiť natívne `<input type="date">`)
 
-### 1. Reorganizácia poradia (zhora dole)
-Aktuálne: Toolbar → Graf → Summary cards → Tabuľka  
-Nové: **Toolbar → Summary cards (4 dashboardy) → Graf → Tabuľka**
+V `src/components/analytics/VykazReport.tsx`:
 
-Summary cards (Hodiny, Pracovníci, Spárované, Nespárované) idú **nad graf** ako požaduje user.
+- Odstrániť dvojicu `<Input type="date">` pre `customFrom`/`customTo`.
+- Pridať jeden **Popover trigger button** (`variant="outline" size="sm" h-8 text-xs`) s `CalendarIcon`:
+  - Label: ak `customFrom && customTo` → `"5. 3. 2026 – 12. 4. 2026"` (cez `formatAppDate`), inak `"Vyberte rozsah"`.
+  - Klik na trigger automaticky `setDateRange("custom")` a otvorí popover.
+- **PopoverContent** (`w-auto p-0 z-[99999]`, `align="start"`):
+  - `Calendar` z `@/components/ui/calendar` v `mode="range"`, `numberOfMonths={2}`, `weekStartsOn={1}`, `defaultMonth={parseAppDate(customFrom) || new Date()}`, `className="p-3 pointer-events-auto"`.
+  - `selected={{ from: parseAppDate(customFrom), to: parseAppDate(customTo) }}`.
+  - `onSelect={(range) => { setCustomFrom(range?.from ? toLocalDateStr(range.from) : ""); setCustomTo(range?.to ? toLocalDateStr(range.to) : ""); setRangeOffset(0); }}`.
+  - Footer: `"Smazat"` (Trash2) — vyčistí from/to.
+- Vizuálne identické s `PlanDateEditDialog` / `StageDateEditDialog`.
 
-### 2. Tabuľka rozdelená do 3 samostatných karet (groupBy = "projekt")
+### B. Šípky pre posun o jednu periodu (◀ ▶)
 
-Namiesto jednej tabuľky s farebnými oddeľovacími riadkami (aktuálny stav) vytvoriť **tri samostatné `<section>` karty** v štýle `OsobyZamestnanci.tsx`:
+- Nový state: `const [rangeOffset, setRangeOffset] = useState(0)` — počet posunov v jednotkách aktuálnej periody.
+- Reset `rangeOffset` na 0 pri zmene `dateRange` (cez wrapper setter alebo `useEffect`).
+- Rozšíriť `getRangeBounds(range, customFrom, customTo, offset)`:
+  - `week` → posun o `offset * 7` dní (lokálne `Date`, žiadne `toISOString`).
+  - `month` → posun o `offset` mesiacov (`setMonth`).
+  - `3months` → posun o `offset * 3` mesiace.
+  - `custom` → posun oboch dátumov o `offset * spanDays` dní (kde `spanDays = (to - from) / 86400000 + 1`).
+- V toolbare flankovať range select dvoma icon buttonmi:
+  ```
+  [◀] [Range select ▾] [▶]   [Custom calendar trigger]   …
+  ```
+  - `Button variant="ghost" size="sm" h-8 w-8` s `ChevronLeft` / `ChevronRight`.
+  - `onClick={() => setRangeOffset(o => o ∓ 1)}`.
+- Voliteľný kompaktný label `text-[11px] text-muted-foreground` zobrazujúci aktuálny rozsah `"d. M. – d. M. yyyy"` keď `rangeOffset !== 0` (orientačná pomôcka).
 
-```
-┌─ Card 1: "Projekty" ──────────────────┐
-│ Header strip (badge + count + h/týd) │
-│ ─────────────────────────────────────│
-│ Table header (UPPERCASE 11px)        │
-│ Riadky projektov...                  │
-└──────────────────────────────────────┘
-
-┌─ Card 2: "Režie" ─────────────────────┐
-│ Header strip — fialový pruh           │
-│ Table header                          │
-│ Riadky overhead projektov...          │
-└──────────────────────────────────────┘
-
-┌─ Card 3: "Nespárované" ───────────────┐
-│ Header strip — amber pruh + ikona ⚠   │
-│ Table header                          │
-│ Riadky unmatched s amber border-l     │
-└──────────────────────────────────────┘
-```
-
-**Vizuálny jazyk presne ako Zaměstnanci:**
-- `<section className="rounded-lg border shadow-sm overflow-hidden bg-card {colorBorder}">`
-- Klikateľný header: `w-full flex items-center justify-between px-3 py-2 border-b {colorHeader}` + collapse chevron
-- V headeri: `Badge` s farbou sekcie + počet projektov + súčet hodín
-- Tabuľka: `Table` s `TableHeader` `bg-muted/30` a `text-[11px] uppercase tracking-wide`, riadky `h-9 hover:bg-muted/50`
-- Collapse stav per sekcia (Set<string> alebo 3 boolean states)
-
-**Farby sekcií** (zladené s app paletou):
-- **Projekty**: `border-green-200`, header `bg-green-50/80`, badge zelený (ako "direct" v Zaměstnanci)
-- **Režie**: `border-purple-200`, header `bg-purple-50/80`, badge fialový (ako "provoz")
-- **Nespárované**: `border-[#F5A971]`, header `bg-[#FDE2C7]/60`, badge amber + `AlertTriangle` ikona
-
-### 3. Footer "Celkem"
-Sticky tfoot odstrániť (lebo už nie je jedna tabuľka). Namiesto toho na konci pod 3 kartami pridať jednoduchý sumárny riadok: `"Celkem: X h"` v `bg-muted/50` Card s rovnakým štýlom ako footer v Zaměstnanci.
-
-### 4. Skupinové režimy "Osoba" a "Činnosť"
-Nezdieľajú projekty/režie/nespárované rozdelenie — ostávajú v **jednej karte** (rovnaký vizuál ako sekcie vyššie, len jedna), bez pruhov.
-
-### 5. Hover/font/typografia konzistentná s Zaměstnanci
-- Header strip: `text-[11px] font-semibold` pre badge, `text-[12px] font-medium` pre count, `text-[11px] text-muted-foreground` pre meta
-- Table head: `h-9 text-[11px] uppercase tracking-wide`
-- Riadky: `text-xs` (13px efektívne na hlavnom obsahu, 11px na meta)
-- Project ID: `font-mono text-xs text-primary` (zachovať klikateľnosť)
-- Stav badge: zachovať existujúce (Spárováno zelený, Nespárováno amber)
-
-### 6. Súbor
-- `src/components/analytics/VykazReport.tsx` — len tento súbor
-  - Reorder JSX (summary nad graf)
-  - Nahradiť `<ProjektRows>` jednou tabuľkou trojicou samostatných `<section>` cards
-  - Pridať `collapsedSections` state (Set: `"projekty" | "rezie" | "nesparovane"`)
-  - Extrahovať helper `<VykazSection>` pre opakovateľný card layout
-  - Odstrániť sticky tfoot, nahradiť jednoduchým "Celkem" riadkom pod kartami
+### Súbory
+- `src/components/analytics/VykazReport.tsx` — jediný súbor.
+- Importy navyše: `ChevronLeft`, `ChevronRight`, `CalendarIcon`, `Trash2` (lucide-react), `Calendar`, `Popover/PopoverContent/PopoverTrigger`, `parseAppDate`, `formatAppDate`.
 
 ### Bez zmien
-- Žiadne zmeny v dátach, fetchingu, filtroch, grouping logike, exporte CSV, expand/collapse riadkov
-- Žiadne zmeny v DB / RLS
-- Žiadne zmeny v iných súboroch
-- Graf "Hodiny v čase" zostáva nezmenený (len presunutý)
-
+- Žiadne zmeny v data fetchingu, summary, grafe, sekciách tabuľky (Projekty/Režije/Nespárované), CSV exporte, RLS ani v iných súboroch.
+- Žiadne nové závislosti.
