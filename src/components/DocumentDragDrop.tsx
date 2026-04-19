@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { X, MoveRight, Check } from "lucide-react";
+import { X, MoveRight, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { SPFile } from "@/hooks/useSharePointDocs";
@@ -59,31 +59,32 @@ interface FileSelectionBarProps {
   currentCategory: string;
   onMoveTo: (destKey: string) => void;
   onClear: () => void;
+  onDeleteSelected?: () => void;
 }
 
-export function FileSelectionBar({ selectedCount, categories, currentCategory, onMoveTo, onClear }: FileSelectionBarProps) {
+export function FileSelectionBar({ selectedCount, categories, currentCategory, onMoveTo, onClear, onDeleteSelected }: FileSelectionBarProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   if (selectedCount === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-primary/10 border border-primary/20 text-xs">
-      <span className="text-primary font-medium whitespace-nowrap">
-        Vybráno: {selectedCount} {selectedCount === 1 ? "soubor" : selectedCount < 5 ? "soubory" : "souborů"}
+    <div className="sticky bottom-2 z-30 flex items-center gap-2 py-2 px-3 rounded-md bg-background border border-border shadow-md text-xs">
+      <span className="text-foreground font-medium whitespace-nowrap">
+        {selectedCount} {selectedCount === 1 ? "vybraný" : "vybraných"}
       </span>
-      <div className="relative ml-auto" ref={dropdownRef}>
+      <div className="relative" ref={dropdownRef}>
         <Button
           size="sm"
           variant="outline"
-          className="h-6 text-[10px] gap-1 px-2"
+          className="h-7 text-[11px] gap-1 px-2"
           onClick={() => setShowDropdown((p) => !p)}
         >
           <MoveRight className="h-3 w-3" />
           Přesunout do…
         </Button>
         {showDropdown && (
-          <div className="absolute bottom-full right-0 mb-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50 py-1">
+          <div className="absolute bottom-full left-0 mb-1 w-48 bg-popover border border-border rounded-md shadow-lg z-50 py-1">
             {categories
               .filter((c) => c.key !== currentCategory)
               .map((c) => (
@@ -103,9 +104,19 @@ export function FileSelectionBar({ selectedCount, categories, currentCategory, o
           </div>
         )}
       </div>
+      {onDeleteSelected && (
+        <Button
+          size="sm"
+          className="h-7 text-[11px] gap-1 px-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          onClick={onDeleteSelected}
+        >
+          <Trash2 className="h-3 w-3" />
+          Smazat vybrané
+        </Button>
+      )}
       <button
         type="button"
-        className="text-muted-foreground hover:text-foreground transition-colors"
+        className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
         onClick={onClear}
         title="Zrušit výběr"
       >

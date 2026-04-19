@@ -309,7 +309,8 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
   const locInputRef = useRef<HTMLInputElement>(null);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [openCategory, setOpenCategory] = useState<string | null>(null);
-  const [deletingFile, setDeletingFile] = useState<string | null>(null);
+  const [deletingFile, setDeletingFile] = useState<{ categoryKey: string; fileName: string } | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<{ categoryKey: string; files: SPFile[] } | null>(null);
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck(project?.id);
 
   const sp = useSharePointDocs(project?.project_id ?? "");
@@ -787,6 +788,27 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setDeletingFile(null);
+  };
+
+  const handleDeleteMany = async (categoryKey: string, filesToDelete: SPFile[]) => {
+    if (filesToDelete.length === 0) return;
+    const catLabel = DOC_CATEGORIES.find(c => c.key === categoryKey)?.label ?? categoryKey;
+    let succeeded = 0;
+    let failed = 0;
+    for (const f of filesToDelete) {
+      try {
+        await sp.deleteFile(categoryKey, f.name);
+        logActivity({ projectId: project!.project_id, actionType: "document_deleted", oldValue: f.name, detail: catLabel });
+        succeeded++;
+      } catch {
+        failed++;
+      }
+    }
+    if (succeeded > 0) dispatchDocCountUpdate(project!.project_id, -succeeded);
+    if (failed === 0) toast({ title: `Smazáno ${succeeded} souborů` });
+    else toast({ title: `Smazáno ${succeeded}, ${failed} selhalo`, variant: "destructive" });
+    fileSelection.clearSelection();
+    setBulkDeleteConfirm(null);
   };
 
   // ── Move files between folders ──────────────────────────────
@@ -1641,7 +1663,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     files={files}
                                     maxHeight="260px"
                                     canDelete={canUploadDocuments}
-                                    onDelete={(f) => { handleDeleteFile("fotky", f.name); }}
+                                    onDelete={(f) => setDeletingFile({ categoryKey: "fotky", fileName: f.name })}
                                     onOpenLightbox={(index) => {
                                       const imageFiles = files.filter((f) => isImageFile(f.name));
                                       if (imageFiles[index]) {
@@ -1663,6 +1685,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       currentCategory="fotky"
                                       onMoveTo={handleSelectionBarMove}
                                       onClear={fileSelection.clearSelection}
+                                      onDeleteSelected={canUploadDocuments ? () => {
+                                        const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
+                                        if (selectedFiles.length > 0) setBulkDeleteConfirm({ categoryKey: "fotky", files: selectedFiles });
+                                      } : undefined}
                                     />
                                   )}
                                   </>
@@ -1673,21 +1699,9 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                     if (e.target === e.currentTarget) fileSelection.clearSelection();
                                   }}>
                                     {files.map((f) => {
-                                      const fileKey = `${cat.key}:${f.name}`;
-                                      const isDeleting = deletingFile === fileKey;
                                       const isFileSelected = fileSelection.isSelected(f.itemId);
                                       const isBeingDragged = fileDragActive && isFileSelected && fileDragSourceCat === cat.key;
-                                      
-                                      if (isDeleting) {
-                                        return (
-                                          <div key={f.name} className="flex items-center gap-2 py-1 px-1 rounded bg-accent/50 text-xs">
-                                            <span className="text-muted-foreground">Smazat soubor?</span>
-                                            <button type="button" className="text-destructive font-medium hover:underline" onClick={() => setDeletingFile(null)}>Zrušit</button>
-                                            <button type="button" className="text-muted-foreground font-medium hover:underline" onClick={() => handleDeleteFile(cat.key, f.name)}>Smazat</button>
-                                          </div>
-                                        );
-                                      }
-                                      
+
                                       return (
                                         <div
                                           key={f.name}
@@ -1712,7 +1726,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                             }
                                           }}
                                         >
-                                          {/* Selection checkbox */}
+                                          {/* Selection checkbox — always visible if any selection, else on hover */}
                                           {canUploadDocuments && !isMobile && (
                                             <button
                                               type="button"
@@ -1740,10 +1754,12 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                           {canUploadDocuments && (
                                             <button
                                               type="button"
-                                              className="hidden group-hover:block shrink-0 text-muted-foreground/30 hover:text-destructive transition-colors"
-                                              onClick={(e) => { e.stopPropagation(); setDeletingFile(fileKey); }}
+                                              className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-0.5 -m-0.5 rounded"
+                                              onClick={(e) => { e.stopPropagation(); setDeletingFile({ categoryKey: cat.key, fileName: f.name }); }}
+                                              title="Smazat soubor"
+                                              aria-label="Smazat soubor"
                                             >
-                                              <Trash2 className="h-3.5 w-3.5" />
+                                              <Trash2 className="h-4 w-4" />
                                             </button>
                                           )}
                                         </div>
@@ -1758,6 +1774,10 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                                       currentCategory={cat.key}
                                       onMoveTo={handleSelectionBarMove}
                                       onClear={fileSelection.clearSelection}
+                                      onDeleteSelected={canUploadDocuments ? () => {
+                                        const selectedFiles = files.filter((f) => fileSelection.isSelected(f.itemId));
+                                        if (selectedFiles.length > 0) setBulkDeleteConfirm({ categoryKey: cat.key, files: selectedFiles });
+                                      } : undefined}
                                     />
                                   )}
                                 </>
@@ -1955,6 +1975,34 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
           return { files: updated, index: Math.min(prev.index, updated.length - 1) };
         });
       }}
+    />
+    {/* Single file delete confirmation */}
+    <ConfirmDialog
+      open={!!deletingFile}
+      onConfirm={() => { if (deletingFile) handleDeleteFile(deletingFile.categoryKey, deletingFile.fileName); }}
+      onCancel={() => setDeletingFile(null)}
+      title="Smazat soubor?"
+      description={deletingFile?.fileName ?? ""}
+      confirmLabel="Smazat"
+      cancelLabel="Zrušit"
+      variant="destructive"
+    />
+    {/* Bulk delete confirmation */}
+    <ConfirmDialog
+      open={!!bulkDeleteConfirm}
+      onConfirm={() => { if (bulkDeleteConfirm) handleDeleteMany(bulkDeleteConfirm.categoryKey, bulkDeleteConfirm.files); }}
+      onCancel={() => setBulkDeleteConfirm(null)}
+      title={`Smazat ${bulkDeleteConfirm?.files.length ?? 0} ${(bulkDeleteConfirm?.files.length ?? 0) === 1 ? "soubor" : (bulkDeleteConfirm?.files.length ?? 0) < 5 ? "soubory" : "souborů"}?`}
+      description={
+        <ul className="mt-1 max-h-48 overflow-y-auto list-disc pl-5 space-y-0.5 text-xs">
+          {bulkDeleteConfirm?.files.map((f) => (
+            <li key={f.itemId} className="truncate">{f.name}</li>
+          ))}
+        </ul>
+      }
+      confirmLabel="Smazat vybrané"
+      cancelLabel="Zrušit"
+      variant="destructive"
     />
     </>
   );

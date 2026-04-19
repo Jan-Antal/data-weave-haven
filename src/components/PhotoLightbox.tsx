@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type { SPFile } from "@/hooks/useSharePointDocs";
 
 // ─── Helpers ────────────────────────────────────────────────────
@@ -254,6 +255,8 @@ export function PhotoTimelineGrid({
                         isSelected={selectedIds?.has(f.itemId)}
                         onToggleSelect={onToggleSelect ? (e) => onToggleSelect(f.itemId, flatFiles, e) : undefined}
                         hasAnySelection={(selectedIds?.size ?? 0) > 0}
+                        onDelete={onDelete}
+                        canDelete={canDelete}
                       />
                     );
                   })}
@@ -281,7 +284,7 @@ interface LazyThumbnailProps {
   hasAnySelection?: boolean;
 }
 
-function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isBeingDragged, isSelected, onToggleSelect, hasAnySelection }: LazyThumbnailProps) {
+function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isBeingDragged, isSelected, onToggleSelect, hasAnySelection, onDelete, canDelete }: LazyThumbnailProps & { onDelete?: (file: SPFile) => void; canDelete?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [loaded, setLoaded] = useState(() => thumbCache.has(file.itemId));
@@ -374,15 +377,15 @@ function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isB
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
           {isRec && (
-            <span className="absolute top-1 left-1 bg-red-500 text-white text-[8px] px-1 py-0.5 rounded font-semibold leading-none">
+            <span className="absolute bottom-1 left-1 bg-red-500 text-white text-[8px] px-1 py-0.5 rounded font-semibold leading-none">
               REC
             </span>
           )}
-          {/* Selection checkbox overlay */}
+          {/* Selection checkbox overlay (top-left) */}
           {isDraggable && (
             <div
               className={cn(
-                "absolute top-1 right-1 w-4 h-4 rounded border flex items-center justify-center transition-all z-10",
+                "absolute top-1 left-1 w-4 h-4 rounded border flex items-center justify-center transition-all z-10",
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
                   : hasAnySelection
@@ -393,6 +396,18 @@ function LazyThumbnail({ file, onClick, isDraggable, onDragStart, onDragEnd, isB
             >
               {isSelected && <span className="text-[9px] leading-none font-bold">✓</span>}
             </div>
+          )}
+          {/* Delete button overlay (top-right, hover only, no selection) */}
+          {canDelete && onDelete && !hasAnySelection && (
+            <button
+              type="button"
+              className="absolute top-1 right-1 w-6 h-6 rounded-md bg-black/50 text-white hover:bg-destructive flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              onClick={(e) => { e.stopPropagation(); onDelete(file); }}
+              title="Smazat fotku"
+              aria-label="Smazat fotku"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           )}
         </>
       ) : (
@@ -735,25 +750,27 @@ export const PhotoLightbox = memo(function PhotoLightbox({
           </Button>
         )}
         {canDelete && onDelete && (
-          confirmDelete ? (
-            <div className="flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5">
-              <span className="text-white/80 text-xs">Smazat tuto fotku?</span>
-              <button type="button" className="text-red-400 text-xs font-medium hover:underline" onClick={handleDelete}>Smazat</button>
-              <button type="button" className="text-white/50 text-xs hover:underline" onClick={() => setConfirmDelete(false)}>Zrušit</button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-xs text-white/60 hover:text-red-400 hover:bg-white/10"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1" />
-              Smazat
-            </Button>
-          )
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs text-white/60 hover:text-red-400 hover:bg-white/10"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Smazat
+          </Button>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+        title="Smazat soubor?"
+        description={file?.name ?? ""}
+        confirmLabel="Smazat"
+        cancelLabel="Zrušit"
+        variant="destructive"
+      />
     </div>
   );
 
