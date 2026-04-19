@@ -34,12 +34,14 @@ export interface ItemPlanHours {
 export interface PlanHoursResult {
   hodiny_plan: number;
   tpv_hours: number;
+  tpv_hours_raw: number;
   project_hours: number;
   source: "TPV" | "Project" | "None";
   warning_low_tpv: boolean;
   marze_used: number;
   prodpct_used: number;
   eur_rate_used: number;
+  scale_ratio: number;
   item_hours: ItemPlanHours[];
 }
 
