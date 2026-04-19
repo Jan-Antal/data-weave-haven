@@ -86,6 +86,13 @@ export function VykazReport() {
     return m;
   }, [projectsList]);
 
+  const { data: overheadList = [] } = useOverheadProjects();
+  const overheadMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of overheadList) if (o.is_active) m.set(o.project_code, o.label);
+    return m;
+  }, [overheadList]);
+
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ["vykaz-log", from, to],
     queryFn: async (): Promise<LogRow[]> => {
