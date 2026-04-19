@@ -1,21 +1,23 @@
 import { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Download, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronLeft, Download, AlertTriangle, Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TableSearchBar } from "@/components/TableSearchBar";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
 import { useProjects } from "@/hooks/useProjects";
 import { useOverheadProjects } from "@/hooks/useOverheadProjects";
 import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
+import { formatAppDate } from "@/lib/dateFormat";
 
 type DateRange = "week" | "month" | "3months" | "custom";
 type GroupBy = "projekt" | "osoba" | "cinnost";
@@ -48,26 +50,51 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function getRangeBounds(range: DateRange, customFrom: string, customTo: string): { from: string; to: string } {
+function addDays(d: Date, days: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+}
+
+function addMonths(d: Date, months: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + months, d.getDate());
+}
+
+function getRangeBounds(
+  range: DateRange,
+  customFrom: string,
+  customTo: string,
+  offset: number,
+): { from: string; to: string } {
   const now = new Date();
   if (range === "custom") {
-    return { from: customFrom || toLocalDateStr(now), to: customTo || toLocalDateStr(now) };
+    const f = customFrom ? new Date(customFrom + "T00:00:00") : now;
+    const t = customTo ? new Date(customTo + "T00:00:00") : now;
+    const spanDays = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
+    const shifted = offset * spanDays;
+    return { from: toLocalDateStr(addDays(f, shifted)), to: toLocalDateStr(addDays(t, shifted)) };
   }
   let start: Date;
+  let end: Date = now;
   if (range === "week") {
     const day = now.getDay();
     const diff = day === 0 ? 6 : day - 1;
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+    end = addDays(start, 6);
+    if (offset !== 0) {
+      start = addDays(start, offset * 7);
+      end = addDays(end, offset * 7);
+    }
   } else if (range === "month") {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
   } else {
-    start = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    start = new Date(now.getFullYear(), now.getMonth() - 3 + offset * 3, now.getDate());
+    end = offset === 0 ? now : addMonths(start, 3);
   }
-  return { from: toLocalDateStr(start), to: toLocalDateStr(now) };
+  return { from: toLocalDateStr(start), to: toLocalDateStr(end) };
 }
 
 export function VykazReport() {
-  const [dateRange, setDateRange] = useState<DateRange>("month");
+  const [dateRange, setDateRangeRaw] = useState<DateRange>("month");
   const [customFrom, setCustomFrom] = useState<string>(() => toLocalDateStr(new Date()));
   const [customTo, setCustomTo] = useState<string>(() => toLocalDateStr(new Date()));
   const [groupBy, setGroupBy] = useState<GroupBy>("projekt");
@@ -76,6 +103,13 @@ export function VykazReport() {
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
   const [bucketMode, setBucketMode] = useState<"auto" | "day" | "week">("auto");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [rangeOffset, setRangeOffset] = useState(0);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const setDateRange = useCallback((r: DateRange) => {
+    setDateRangeRaw(r);
+    setRangeOffset(0);
+  }, []);
 
   const toggleSection = useCallback((key: string) => {
     setCollapsedSections((prev) => {
@@ -87,8 +121,8 @@ export function VykazReport() {
   }, []);
 
   const { from, to } = useMemo(
-    () => getRangeBounds(dateRange, customFrom, customTo),
-    [dateRange, customFrom, customTo],
+    () => getRangeBounds(dateRange, customFrom, customTo, rangeOffset),
+    [dateRange, customFrom, customTo, rangeOffset],
   );
 
   const { data: projectsList = [] } = useProjects();
@@ -383,7 +417,16 @@ export function VykazReport() {
       {/* Toolbar */}
       <div className="shrink-0 border-b bg-card px-4 py-2 flex items-center gap-3">
         {/* Left: date range */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setRangeOffset((o) => o - 1)}
+            title="Předchozí období"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
           <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
             <SelectTrigger className="h-8 w-[170px] text-xs">
               <SelectValue />
@@ -395,22 +438,86 @@ export function VykazReport() {
               <SelectItem value="custom" className="text-xs">Vlastní</SelectItem>
             </SelectContent>
           </Select>
-          {dateRange === "custom" && (
-            <>
-              <Input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-8 w-[140px] text-xs"
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setRangeOffset((o) => o + 1)}
+            title="Další období"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-8 px-3 text-xs gap-1.5",
+                  dateRange !== "custom" && "text-muted-foreground",
+                )}
+                onClick={() => {
+                  if (dateRange !== "custom") setDateRangeRaw("custom");
+                }}
+              >
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {dateRange === "custom" && customFrom && customTo ? (
+                  <span>
+                    {formatAppDate(new Date(customFrom + "T00:00:00"))}
+                    {" – "}
+                    {formatAppDate(new Date(customTo + "T00:00:00"))}
+                  </span>
+                ) : (
+                  <span>Vyberte rozsah</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 z-[99999]" align="start">
+              <Calendar
+                mode="range"
+                numberOfMonths={2}
+                weekStartsOn={1}
+                defaultMonth={customFrom ? new Date(customFrom + "T00:00:00") : new Date()}
+                selected={{
+                  from: customFrom ? new Date(customFrom + "T00:00:00") : undefined,
+                  to: customTo ? new Date(customTo + "T00:00:00") : undefined,
+                }}
+                onSelect={(range: any) => {
+                  setRangeOffset(0);
+                  setCustomFrom(range?.from ? toLocalDateStr(range.from) : "");
+                  setCustomTo(range?.to ? toLocalDateStr(range.to) : "");
+                }}
+                className="p-3 pointer-events-auto"
               />
-              <span className="text-xs text-muted-foreground">–</span>
-              <Input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="h-8 w-[140px] text-xs"
-              />
-            </>
+              <div className="flex items-center justify-between border-t p-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs gap-1.5 text-muted-foreground"
+                  onClick={() => {
+                    setCustomFrom("");
+                    setCustomTo("");
+                    setRangeOffset(0);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Smazat
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-7 px-3 text-xs"
+                  onClick={() => setCalendarOpen(false)}
+                >
+                  Hotovo
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          {rangeOffset !== 0 && (
+            <span className="text-[11px] text-muted-foreground tabular-nums ml-1">
+              {formatAppDate(new Date(from + "T00:00:00"))} – {formatAppDate(new Date(to + "T00:00:00"))}
+            </span>
           )}
         </div>
 
