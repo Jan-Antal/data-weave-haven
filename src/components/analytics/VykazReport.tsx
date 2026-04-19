@@ -550,9 +550,14 @@ function ProjektRows({
       ))}
       {unmatched.length > 0 && (
         <>
-          <TableRow className="bg-amber-500/10 hover:bg-amber-500/15">
-            <TableCell colSpan={6} className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-              Nespárované záznamy z Alvena · {unmatched.length} {unmatched.length === 1 ? "projekt" : "projektů"}
+          <TableRow className="hover:bg-transparent">
+            <TableCell colSpan={6} className="p-0">
+              <div className="bg-[#FEF3C7] border-l-[3px] border-l-[#F59E0B] px-4 py-2 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
+                <span className="font-semibold text-[12px] text-[#92400E]">
+                  Nespárované záznamy z Alvena · {unmatched.length} {unmatched.length === 1 ? "projekt" : "projektů"}
+                </span>
+              </div>
             </TableCell>
           </TableRow>
           {unmatched.map((g) => (
