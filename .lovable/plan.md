@@ -2,100 +2,161 @@
 
 ## Rozsah
 
-Obnoviť **chain bundles per projekt** ako one-off operáciu (žiadny budúci midflight import, žiadna aktualizácia importeru). Per-item split a bundle split budú rešpektovať existujúci projektový chain (5/5 → 5/6 + 6/6).
+One-off SQL oprava aktuálnych hodnôt v inboxe + budúcich silo bundles pre projekty s midflight chainom + trvalá zmena v `recalculateProductionHours.ts` aby budúce kliky na "Přepočítat" už chain-aware odpočet aplikovali automaticky a nerozbili to.
 
-## Pravidlo chain
+## Pravidlo
 
-- **Chain = projekt** (jeden `split_group_id` zdieľaný cez midflight history + pending inbox + future silo bundles).
-- `split_part / split_total` = poradie unique `scheduled_week` ascending. Všetky položky v rovnakom týždni majú rovnaké čísla.
-- Inbox položky (bez `scheduled_week`) → `split_part = NULL`, `split_total = počet týždňov v chain`.
-- Per-item split / bundle split **nikdy nezakladá nový `split_group_id`** ak zdroj už chain má — preberá existujúci a prečísluje cez `renumberProjectChain`.
+Pre každý projekt s `chain_group_id` (existuje vďaka predchádzajúcej migrácii):
+- **`hodiny_plan` projektu** = celkový plán z TPV/Project price (nemení sa, ostáva v `project_plan_hours`).
+- **`midflightChainHours`** = `SUM(scheduled_hours)` všetkých `production_schedule` riadkov v rámci `split_group_id` kde `is_midflight = true`.
+- **`remainingPlanHours`** = `MAX(0, hodiny_plan - midflightChainHours)`.
+- **`remainingScale`** = `remainingPlanHours / hodiny_plan` (alebo 1 ak chain neexistuje).
 
-## Zmena 1 — One-off SQL migrácia (chain backfill)
+Tento `remainingScale` sa aplikuje **iba** na inbox + non-midflight schedule riadky (hodiny aj CZK). Midflight historické riadky sa nikdy neprepisujú, slúžia ako zdroj pravdy „už spotrebované".
 
-Jednorazová migrácia cez supabase migration tool:
+## Zmena 1 — One-off SQL oprava aktuálneho stavu
 
-1. Pre každý projekt s aspoň 1 riadkom `production_schedule.is_midflight=true`:
-   - vygenerovať `chainGroupId = gen_random_uuid()`
-   - update **všetkých** `production_schedule` riadkov projektu (midflight aj non-midflight, status != 'cancelled') → `split_group_id = chainGroupId`
-   - update všetkých `production_inbox` riadkov projektu so `status='pending'` → `split_group_id = chainGroupId`
-2. Pre každý chain spočítať cez SQL window function (`DENSE_RANK() OVER (PARTITION BY split_group_id ORDER BY scheduled_week)`) → updatnúť `split_part` / `split_total` na schedule riadkoch.
-3. Inbox riadky chainu → `split_part = NULL`, `split_total = total weeks`.
-4. Projekty bez midflight histórie ostávajú nedotknuté.
+Migration cez supabase migration tool:
 
-**Midflight importer (`midflightImportPlanVyroby.ts`) sa nemení** — je to legacy funkcia, do budúcnosti sa už nespúšťa.
+```sql
+DO $$
+DECLARE
+  proj RECORD;
+  hodiny_plan_full numeric;
+  midflight_hours numeric;
+  remaining_hours numeric;
+  scale_factor numeric;
+  chain_id uuid;
+BEGIN
+  FOR proj IN
+    SELECT DISTINCT project_id
+    FROM production_schedule
+    WHERE is_midflight = true
+  LOOP
+    -- chain_group_id projektu (z migrácie sa už nastavilo, je rovnaký pre všetky riadky)
+    SELECT split_group_id INTO chain_id
+    FROM production_schedule
+    WHERE project_id = proj.project_id AND is_midflight = true
+    LIMIT 1;
 
-## Zmena 2 — Nový helper `renumberProjectChain`
+    IF chain_id IS NULL THEN CONTINUE; END IF;
 
-V `src/lib/splitChainHelpers.ts` pridať:
+    -- plný hodiny_plan z project_plan_hours
+    SELECT hodiny_plan INTO hodiny_plan_full
+    FROM project_plan_hours
+    WHERE project_id = proj.project_id;
 
-```ts
-export async function renumberProjectChain(
-  projectId: string,
-  chainGroupId: string
-): Promise<void>
+    IF hodiny_plan_full IS NULL OR hodiny_plan_full = 0 THEN CONTINUE; END IF;
+
+    -- midflight chain hodiny
+    SELECT COALESCE(SUM(scheduled_hours), 0) INTO midflight_hours
+    FROM production_schedule
+    WHERE split_group_id = chain_id AND is_midflight = true;
+
+    remaining_hours := GREATEST(0, hodiny_plan_full - midflight_hours);
+    scale_factor := remaining_hours / hodiny_plan_full;
+
+    -- škálovať pending inbox
+    UPDATE production_inbox
+    SET estimated_hours = ROUND(estimated_hours * scale_factor, 1),
+        estimated_czk = ROUND(estimated_czk * scale_factor)
+    WHERE project_id = proj.project_id
+      AND status = 'pending';
+
+    -- škálovať non-midflight active schedule
+    UPDATE production_schedule
+    SET scheduled_hours = ROUND(scheduled_hours * scale_factor, 1),
+        scheduled_czk = ROUND(scheduled_czk * scale_factor)
+    WHERE project_id = proj.project_id
+      AND is_midflight = false
+      AND status IN ('scheduled', 'in_progress');
+  END LOOP;
+END $$;
 ```
 
-Logika:
-1. Načíta z `production_schedule` riadky projektu so `split_group_id = chainGroupId` a `status != 'cancelled'`.
-2. Načíta z `production_inbox` pending riadky so `split_group_id = chainGroupId`.
-3. Zoradí unique `scheduled_week` ascending → `weekIndex` mapa.
-4. Schedule rows: `split_part = weekIndex(scheduled_week) + 1`, `split_total = total unique weeks`.
-5. Inbox rows: `split_part = NULL`, `split_total = total unique weeks`.
+## Zmena 2 — `recalculateProductionHours.ts` chain-aware odpočet
 
-Existujúce `renumberChain` (per item_code) a `renumberBundleChain` ostávajú v exporte pre fallback (projekty bez chainu / single-item splity bez histórie).
+V `src/lib/recalculateProductionHours.ts`:
 
-## Zmena 3 — Inbox → silo preberá projektový chain
+**A) Po načítaní `allSched` pridať `midflightHoursByChain`:**
 
-V `src/hooks/useProductionDragDrop.ts`:
-- `moveInboxItemToWeek` a `moveInboxProjectToWeek`: po inserte do `production_schedule` zistiť či zdrojový inbox row má `split_group_id`.
-  - Ak **áno** → `renumberProjectChain(projectId, splitGroupId)`.
-  - Ak **nie** (projekt bez chainu) → správanie ostáva ako dnes (žiadne číslovanie).
+```ts
+const midflightHoursByChain = new Map<string, number>();
+for (const s of allSched) {
+  if (!s.is_midflight || !s.split_group_id) continue;
+  midflightHoursByChain.set(
+    s.split_group_id,
+    (midflightHoursByChain.get(s.split_group_id) || 0) + Number(s.scheduled_hours || 0),
+  );
+}
+```
 
-## Zmena 4 — Per-item split (`SplitItemDialog`) rešpektuje chain
+**B) V hlavnej slučke `for (const proj of projects)` pridať:**
 
-V `src/components/production/SplitItemDialog.tsx` (`handleSplit`):
-- Ak zdrojová položka má `split_group_id` → použiť **existujúci** ID pre nový riadok, **nevytvárať** nový group.
-- Po inserte zavolať `renumberProjectChain(projectId, existingSplitGroupId)` namiesto `renumberChain`.
-- Ak zdroj nemá `split_group_id` → fallback na dnešnú logiku (nový group + `renumberChain`).
+```ts
+function resolveChainGroupId(projectId: string): string | null {
+  const inbox = inboxByProject.get(projectId) || [];
+  const sched = schedByProject.get(projectId) || [];
+  const midflightSched = allSched.filter(
+    s => s.project_id === projectId && s.is_midflight && s.split_group_id
+  );
+  for (const r of midflightSched) if (r.split_group_id) return r.split_group_id;
+  for (const r of inbox) if (r.split_group_id) return r.split_group_id;
+  for (const r of sched) if (r.split_group_id) return r.split_group_id;
+  return null;
+}
 
-Výsledok: chain 5/5 + nová časť → 5/6 + 6/6.
+const chainGroupId = resolveChainGroupId(proj.project_id);
+const consumedChainHours = chainGroupId
+  ? (midflightHoursByChain.get(chainGroupId) || 0)
+  : 0;
+const remainingPlanHours = Math.max(0, result.hodiny_plan - consumedChainHours);
+const remainingScale = result.hodiny_plan > 0
+  ? remainingPlanHours / result.hodiny_plan
+  : 1;
+```
 
-## Zmena 5 — Bundle split (`SplitBundleDialog`) rešpektuje chain
+**C) Pri update inbox a non-midflight schedule:**
+- `tpvFullHours = (tpvHoursById.get(tpv.id) ?? 0) * remainingScale`
+- CZK počítať analogicky × `remainingScale`.
 
-V `src/components/production/SplitBundleDialog.tsx` (`handleSplitBundle`):
-- Ak items v bundli majú `split_group_id` (projektový chain) → použiť tento existujúci ID pre nové split rows, **nie** nový `bundleGroupId = randomUUID()`.
-- Po inserte zavolať `renumberProjectChain(projectId, existingSplitGroupId)` namiesto `renumberBundleChain`.
-- Ak bundle nemá `split_group_id` → fallback na dnešnú logiku (nový group + `renumberBundleChain`).
+**D) HIST_ branch + midflight rows ostávajú nezmenené** (žiadny scale, sú zdroj pravdy).
 
-## Zmena 6 — Read-side vo `Vyroba.tsx`
+**E) Orphan distribúcia používa `remainingPlanHours`:**
 
-Žiadna zmena. `findPriorChainLog`, `getChainWindow`, `splitGroupsByBundle` už dnes pracujú nad `split_group_id`. Po Zmenách 1–5 budú midflight + inbox + silo + post-split bundle všetky zdieľať projektový chain → kontinuita % funguje automaticky (read-only fallback, žiadny zápis do `production_daily_logs`).
+```ts
+const remainingProjectHours = Math.max(0, remainingPlanHours - assignedHours);
+```
+
+**F) `project_plan_hours.hodiny_plan` ostáva plný (490h)** — detail projektu naďalej zobrazí celkový plán.
+
+## Zmena 3 — Rozdeliť scale medzi viac inbox/silo riadkov
+
+`remainingScale` sa aplikuje na per-item TPV hodiny **pred** delením cez `partsCount` (`activePartsByCode`). Existujúce delenie split chainu (5/6 + 6/6) ostáva korektné, len pracuje s menším základom.
 
 ## Edge cases
 
-- **Projekt bez midflight histórie**: nemá chain, nič sa nemení.
-- **Cancelled riadky**: filtrované cez `status != 'cancelled'`, neovplyvnia číslovanie.
-- **Per-item split dvakrát za sebou**: každý ďalší split prečísluje celý chain (5/6 → 5/7 + 6/7 + 7/7).
-- **Recycle / move späť do inboxu**: scheduled_week sa zmaže, prečíslovanie ho vyhodí z týždenného počtu → inbox row dostane `split_part = NULL`.
-- **Nový projekt bez histórie**: bude fungovať bez chainu (legacy správanie). Ak v budúcnosti vznikne potreba projektového chainu pre nové projekty, riešiť samostatne.
+- **Projekt bez chainu**: `chainGroupId = null`, `remainingScale = 1`, správanie nezmenené.
+- **Midflight > hodiny_plan**: `remainingPlanHours = 0`, inbox + future silo dostane 0h. Detail projektu stále ukazuje plný plán + indikuje "vyčerpané".
+- **Po pridaní midflight riadku** (cez `production_schedule` insert s `is_midflight=true` a rovnaký `split_group_id`): ďalší klik na "Přepočítat" automaticky odpočíta novú sumu.
+- **Per-item / bundle split**: prečíslovanie chainu cez `renumberProjectChain` ostáva, hodiny per riadok recalculate dopočíta proporčne.
+- **`hours_log` z Alveno** (`consumedByProject`): ostáva nezmenené v existujúcom kóde, používa sa inde (Analytics). Recalculate distribúciu chain odpočtu robí cez **plánovanú** midflight spotrebu, nie reálne odpracované.
 
 ## Dotknuté súbory
 
-- **Nová SQL migrácia** — one-off backfill `split_group_id` + prečíslovanie pre projekty s midflight históriou.
-- `src/lib/splitChainHelpers.ts` — pridať `renumberProjectChain`.
-- `src/hooks/useProductionDragDrop.ts` — inbox→silo volá `renumberProjectChain` ak existuje chain.
-- `src/components/production/SplitItemDialog.tsx` — preberá existujúci `split_group_id`, volá `renumberProjectChain`.
-- `src/components/production/SplitBundleDialog.tsx` — preberá existujúci `split_group_id`, volá `renumberProjectChain`.
-- `src/lib/midflightImportPlanVyroby.ts` — **bez zmeny** (legacy, už sa nespúšťa).
+- **Nová one-off SQL migrácia** — okamžitá oprava aktuálnych inbox + non-midflight schedule hodnôt pre projekty s midflight chainom.
+- `src/lib/recalculateProductionHours.ts` — chain-aware odpočet pre budúce "Přepočítat" kliky.
 
 ## Overenie po nasadení
 
-1. **Migrácia**: v DB overiť že napr. Z-2607-008 má rovnaký `split_group_id` na všetkých midflight schedule + non-midflight schedule + pending inbox riadkoch.
-2. Otvoriť projekt s históriou: T-2 ručne uložiť 60% log.
-3. Naplánovať inbox položku do T+1 → silo bundle preberie projektový chain a `renumberProjectChain` priradí správne `split_part/total`.
-4. Vo Výrobe v T+1 overiť že `findPriorChainLog` vráti 60% z T-2 (read fallback, žiadny DB write).
-5. **Per-item split test**: bundle 5/5 → split TK.05 do T+1 → overiť že chain je teraz 5/6 + 6/6 (nie nový group).
-6. **Bundle split test**: 5/5 bundle → split do ďalšieho týždňa → overiť že číslovanie je 5/6 + 6/6 a všetky položky bundle zdieľajú projektový `split_group_id`.
-7. End-to-end: midflight história → inbox → silo → split → ručný log → kontinuita % naprieč všetkými týždňami.
+1. **SQL migrácia**: v DB overiť pre Z-2607-008:
+   - `SUM(scheduled_hours) FROM production_schedule WHERE project_id='Z-2607-008' AND is_midflight=true` = midflight hodiny (napr. 220h).
+   - `SUM(estimated_hours) FROM production_inbox WHERE project_id='Z-2607-008' AND status='pending'` + `SUM(scheduled_hours) FROM production_schedule WHERE project_id='Z-2607-008' AND is_midflight=false AND status IN ('scheduled','in_progress')` ≈ **270h** (490 - 220).
+   - `project_plan_hours.hodiny_plan` = **490h** (nezmenené).
+2. UI Inbox: Z-2607-008 zobrazí súčet **270h** (zostatok), nie 490h.
+3. Detail projektu zobrazí **490h** plán.
+4. **Klik "Přepočítat hodiny" (vše vrátane histórie)** → overiť že sumy sa **nezmenia** (recalculate správne aplikuje `remainingScale`).
+5. **Klik "Přepočítat hodiny" druhýkrát** → opäť bez zmeny (idempotent).
+6. Projekt bez midflight histórie → recalculate ho nezmení.
+7. Pridať per-item split v silo bundle pre projekt s chainom → kontinuita čísel (5/6 + 6/6) + súčet hodín ostáva = remaining.
 
