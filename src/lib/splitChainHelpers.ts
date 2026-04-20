@@ -42,10 +42,11 @@ export async function fetchChainRows(splitGroupId: string): Promise<ChainRow[]> 
       .eq("split_group_id", splitGroupId),
   ]);
 
-  // Historické midflight bundle riadky sú agregované týždenné súčty,
-  // nie splity konkrétnej položky → nezapočítavajú sa do chainu.
+  // Midflight riadky (historické agregované týždenné súčty) SÚ súčasťou
+  // bundle chainu — každý midflight týždeň = jedna bundle časť. Vďaka tomu
+  // nový split bundlu nadviaže na historické splity (napr. 5/5 → 6/6).
   const sched: ChainRow[] = (schedRes.data || [])
-    .filter((r: any) => r.status !== "cancelled" && !r.is_midflight)
+    .filter((r: any) => r.status !== "cancelled")
     .map((r: any) => ({
       id: r.id,
       table: "production_schedule" as const,
