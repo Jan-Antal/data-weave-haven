@@ -1,46 +1,91 @@
 
 
-## Rozsah
+## Logika výpočtu hodín v projekte (BEZ historických odpočtov)
 
-Implementujem len **bod A** z predošlého plánu — fallback Inbox hodín z ceny projektu pre "siroty" (inbox položky bez TPV matchu a bez `adhoc_reason`). Manuálnu editáciu (bod B) odkladáme.
+### Krok 1 — Plán hodín projektu (`computePlanHours`)
 
-## Zmeny
+Vstupy z DB:
+- `tpv_items` projektu (cena, počet, status)
+- `projects.prodejni_cena`, `marze`, `cost_production_pct`, `currency`, `created_at`
+- `production_settings.hourly_rate` (default 550 Kč/h)
+- `exchange_rates` (pre EUR projekty)
+- `formula_config` (vzorce s defaultmi)
 
-### `src/lib/recalculateProductionHours.ts`
+Vzorce (defaulty):
+```
+itemCostCzk     = cena × pocet × (eurRate ak EUR)
+scheduled_hours = floor(itemCostCzk × (1 − marze) × production_pct / hourly_rate)
+hodiny_plan_proj = floor(prodejni_cena × (1 − marze) × production_pct / hourly_rate)
 
-V sekcii inbox prepočtu (~r. 290–340), kde aktuálne `if (!tpv) continue;` preskočí siroty:
+tpv_hours_raw = SUM(scheduled_hours pre všetky TPV položky so statusom != Zrušeno a cena > 0)
+project_hours = hodiny_plan_proj
 
-1. Najprv identifikovať siroty pre projekt: `inboxItems.filter(i => !tpvItems.find(t => t.item_code === i.item_code) && !i.adhoc_reason)`.
-2. Vypočítať `assignedHours` = súčet hodín všetkých TPV-mapovaných inbox + schedule položiek (z `result.itemBreakdown`).
-3. `consumedTotal` = už počítané (log + midflight).
-4. `remainingProjectHours = max(0, result.hodiny_plan − assignedHours − consumedTotal)`.
-5. Distribuovať rovnomerne: každá sirota dostane `remainingProjectHours / orphanCount` hodín a `× hourlyRate` CZK.
-6. Pridať update do batch poľa `inboxUpdates` (rovnakým mechanizmom ako TPV-mapované položky).
-
-Ad-hoc položky s `adhoc_reason` (oprava/dodatecna/jine) ostávajú **nedotknuté**.
-
-### Cleanup pre Z-2604-004 a Z-2601-004
-
-Po nasadení spustiť `recalculateProductionHours` len pre tieto dva projekty (cez SQL migráciu volajúcu RPC, alebo priamo SQL UPDATE):
-
-```sql
-UPDATE production_inbox
-SET estimated_hours = 4, estimated_czk = 2200
-WHERE project_id IN ('Z-2604-004', 'Z-2601-004')
-  AND status = 'pending'
-  AND adhoc_reason IS NULL;
+hodiny_plan = MAX(tpv_hours_raw, project_hours)   // nikdy nestratíme hodiny pod cenu projektu
 ```
 
-(4h vychádza z `project_plan_hours.hodiny_plan = 4` pre oba projekty — žiadne TPV položky, žiadny consumed log → celý plán pripadne sirote T01.)
+Ak `project_hours > tpv_hours_raw`, scale_ratio = `project_hours / tpv_hours_raw` a per-item TPV hodiny sa proporcionálne zväčšia (posledná položka dostane zvyšok aby sum sedel presne).
 
-## Dotknuté súbory
+### Krok 2 — Distribúcia hodín do Inbox + Schedule (BEZ histórie)
 
-- `src/lib/recalculateProductionHours.ts` — fallback logika v inbox sekcii.
-- Migrácia: jednorazový SQL UPDATE pre Z-2604-004 a Z-2601-004.
+Pre každý projekt po `computePlanHours`:
 
-## Výsledok
+1. **TPV-mapované položky** (inbox + non-midflight schedule majú `item_code` čo existuje v `tpv_items`):
+   - `tpv_full_hours` = `result.item_hours[i].hodiny_plan` (už škálované).
+   - `activeParts` = počet **aktívnych** chain rows pre ten istý `item_code` (inbox `status=pending` + schedule `status≠cancelled` a `is_midflight=false`).
+   - `per_row_hours = tpv_full_hours / activeParts`
+   - `per_row_czk = per_row_hours × hourly_rate`
 
-- **Z-2604-004 / Z-2601-004**: po cleanupe inbox T01 zobrazí 4h / 2200 Kč.
-- **Budúce siroty**: pri každom recalcu automaticky dostanú hodiny z `project_plan_hours.hodiny_plan` proporcionálne k počtu sirôt.
-- **Manuálna editácia hodín** sa rieši v samostatnej iterácii.
+2. **Orphan položky** (inbox bez TPV match, bez `adhoc_reason`):
+   - `assigned = SUM(per_row_hours všetkých TPV-mapovaných)`
+   - `remainingProjectHours = max(0, hodiny_plan − assigned)`
+   - `per_orphan_hours = remainingProjectHours / orphanCount`
+
+3. **Adhoc položky** (`adhoc_reason IS NOT NULL`): nedotknuté, manuálne zadané.
+4. **Midflight rows** (`is_midflight=true`): nedotknuté, len historický záznam — **nezapočítavajú sa do `assigned` ani neuberajú z `hodiny_plan`**.
+
+### Príklad — Z-2605-001
+
+DB stav:
+- `prodejni_cena = 924 000 CZK`, `marze = 15%`, `cost_production_pct = 25%`, hourly_rate = 550
+- TPV items: T01 (36h), T02 (133h), TK01 (37h) — `tpv_hours_raw = 206h`
+- `project_hours = floor(924000 × 0.85 × 0.25 / 550) = 357h`
+- `hodiny_plan = MAX(206, 357) = 357h` (scale_ratio = 1.733)
+
+Po škálovaní:
+- T01 → 62h, T02 → 230h, TK01 → 65h (sum = 357h)
+
+Aktuálne aktívne chains v inboxe (všetky bundle vrátené do inboxu):
+- T01: 1 inbox row → `62 / 1 = 62h`
+- T02: 1 inbox row → `230 / 1 = 230h`
+- TK01: 1 inbox row → `65 / 1 = 65h`
+- **Inbox total = 357h** ✅ presne sedí na plán projektu.
+
+Ak by bol T02 rozdelený na 2 aktívne časti (split_total=2 v inboxe alebo 1 inbox + 1 schedule), tak každá dostane `230 / 2 = 115h`. Súčet stále 357h.
+
+**Midflight rows v `production_schedule` (is_midflight=true)** sa do tohto výpočtu vôbec nezapojujú — neuberajú hodiny, len existujú ako historický záznam.
+
+### Krok 3 — Zápis späť do DB
+
+- `production_inbox.estimated_hours / estimated_czk` = per_row_hours / per_row_czk
+- `production_schedule.scheduled_hours / scheduled_czk` (non-midflight) = per_row_hours / per_row_czk
+- `project_plan_hours` upsert s `hodiny_plan, tpv_hours, project_hours, source, marze_used, prodpct_used, eur_rate_used`
+
+### Čo sa zmení v `recalculateProductionHours.ts`
+
+1. **Odstrániť `consumedTotal` a `consumptionRatio`** zo schedule aj inbox slučky (cca r. 290–340).
+2. **Build `activePartsByCode` raz pred slučkami** (inbox pending + schedule non-cancelled non-midflight pre daný `item_code`).
+3. **Schedule per-item update** (non-midflight only): `tpv_full_hours / activePartsByCode[item_code]`.
+4. **Inbox per-item update**: identický vzorec.
+5. **Orphan fallback**: `(hodiny_plan − assignedToTpv) / orphanCount`, bez consumed odpočtu.
+6. **Midflight rows**: úplne preskočiť update (len čítané pre kontext, nemenia sa).
+
+### Dotknuté súbory
+
+- `src/lib/recalculateProductionHours.ts` — zjednodušiť per-item logiku, odstrániť consumed odpočet.
+
+### Po nasadení
+
+1. Spustiť **„Přepočítat → Vše vč. historie"** na PlanVyroby.
+2. Overiť že súčet aktívnych inbox + non-midflight schedule rows pre daný projekt = `hodiny_plan` v `project_plan_hours`.
+3. Príklady na overenie: Z-2605-001 (357h), Z-2504-019, Z-2604-004 (4h), Z-2601-004 (4h).
 
