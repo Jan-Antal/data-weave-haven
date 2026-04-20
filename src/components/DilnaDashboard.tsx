@@ -281,6 +281,7 @@ function useDilnaData(weekOffset: number) {
           loggedHours,
           trackedPct,
           completionPct,
+          expectedPct: isUnmatched ? null : expectedFor(pid, plannedHours),
           slipStatus,
           valueCzk,
           usekBreakdown,
