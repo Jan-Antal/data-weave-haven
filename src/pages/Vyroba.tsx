@@ -750,19 +750,25 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
     if (logs.length > 0) {
-      // Use the LATEST log by day_index (then logged_at) — not the max percent.
-      // This ensures the week % reflects the most recent daylog entry,
-      // even when a later log corrects (lowers) a previous value.
       const sorted = [...logs].sort((a, b) => {
-        if (b.day_index !== a.day_index) return b.day_index - a.day_index;
-        return new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime();
+        if (a.day_index !== b.day_index) return b.day_index - a.day_index;
+        const ta = a.logged_at ? new Date(a.logged_at).getTime() : 0;
+        const tb = b.logged_at ? new Date(b.logged_at).getTime() : 0;
+        return tb - ta;
       });
       return sorted[0].percent;
     }
     // Fallback: only for split bundles — find latest non-MF log from a PRIOR week
     // belonging to the same split_group_id chain.
     const prior = findPriorChainLog(pid, weekKey);
-    return prior ? prior.percent : 0;
+    if (!prior) return 0;
+    // Chain-safe: if prior chain log was completed (≥95%), this week starts a new
+    // chunk — start at this week's chain window start, not inherit 100%.
+    const cw = getChainWindow(pid);
+    if (cw && prior.percent >= 95) {
+      return Math.round(cw.start);
+    }
+    return prior.percent;
   }
 
   function getLatestPhase(pid: string): string | null {
@@ -858,10 +864,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getWeeklyGoal(pid: string): number {
     const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
     if (projectForGoal?.isSpilled) return 100;
-    if (!scheduleData) return 100;
+    if (!scheduleData) return 0;
+
+    // If bundle is part of a split chain → goal = chain window end for this week
+    const cw = getChainWindow(pid);
+    if (cw) return Math.round(cw.end);
 
     // hodiny_plan from project_plan_hours
-    const hPlan = planHoursMap?.get(pid);
+    if (!planHoursMap) return 0; // loading — avoid flashing 100%
+    const hPlan = planHoursMap.get(pid);
     if (!hPlan || hPlan <= 0) return 100;
 
     // Day fraction: Mon=1/5, Tue=2/5, ..., Fri=5/5; weekends=5/5
