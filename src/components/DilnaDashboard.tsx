@@ -590,22 +590,34 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                       {/* Progress bar — gradient palette (Plan Výroby style) */}
                       <div className="space-y-1">
                         <div
-                          className="h-2.5 rounded-full overflow-hidden bg-muted"
+                          className="relative h-2.5 rounded-full bg-muted overflow-visible"
                           title={
-                            card.completionPct != null
-                              ? `Hodiny ${card.trackedPct}% · Dokončeno ${card.completionPct}%`
-                              : `Hodiny ${card.trackedPct}%`
+                            `Hodiny ${card.trackedPct}%` +
+                            (card.completionPct != null ? ` · Dokončeno ${card.completionPct}%` : "") +
+                            (card.expectedPct != null ? ` · Očekávané ${card.expectedPct}%` : "")
                           }
                         >
                           <div
-                            className="h-full rounded-full transition-all"
+                            className="h-full rounded-full transition-all overflow-hidden"
                             style={{ width: `${barWidthPct}%`, background: styles.bg }}
                           />
+                          {/* Vertical teal marker = expected progress today */}
+                          {card.expectedPct != null && (
+                            <div
+                              className="absolute top-[-2px] bottom-[-2px] w-[2px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
+                              style={{ left: `${Math.min(100, Math.max(0, card.expectedPct))}%` }}
+                            />
+                          )}
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground tabular-nums">
                           <span>
                             Hodiny <span className="font-medium text-foreground">{card.trackedPct}%</span>
                           </span>
+                          {card.expectedPct != null && (
+                            <span>
+                              Očekáváno <span className="font-medium text-teal-600">{card.expectedPct}%</span>
+                            </span>
+                          )}
                           {card.completionPct != null ? (
                             <span>
                               Dokončeno <span className="font-medium text-foreground">{card.completionPct}%</span>
