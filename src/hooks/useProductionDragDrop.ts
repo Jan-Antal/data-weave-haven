@@ -606,11 +606,11 @@ export function useProductionDragDrop() {
               });
             }
           }
-          // Undo separate-conflict moves: restore original week + item_code
-          for (const [itemId, codes] of separateCodeMap) {
+          // Undo separate-conflict moves: restore original week (item_code untouched)
+          if (uniqueSeparateIds.length > 0) {
             await supabase.from("production_schedule")
-              .update({ scheduled_week: sourceWeekDate, item_code: codes.oldCode })
-              .eq("id", itemId);
+              .update({ scheduled_week: sourceWeekDate })
+              .in("id", uniqueSeparateIds);
           }
           invalidateAll();
         },
@@ -633,10 +633,10 @@ export function useProductionDragDrop() {
               .in("id", uniquePlainMoveIds);
           }
           // Redo separate-conflict moves
-          for (const [itemId, codes] of separateCodeMap) {
+          if (uniqueSeparateIds.length > 0) {
             await supabase.from("production_schedule")
-              .update({ scheduled_week: targetWeekDate, item_code: codes.newCode })
-              .eq("id", itemId);
+              .update({ scheduled_week: targetWeekDate })
+              .in("id", uniqueSeparateIds);
           }
           invalidateAll();
         },
