@@ -229,7 +229,31 @@ export async function recalculateProductionHours(
         }
       }
 
+      // ===== Build active parts count per item_code (inbox pending + non-midflight schedule) =====
+      const inboxItemsAll = inboxByProject.get(proj.project_id) || [];
+      const inboxItems = inboxItemsAll.filter((it: any) => !it.item_code?.startsWith('HIST_'));
+      const fullSchedForProject = allSched.filter((s: any) => s.project_id === proj.project_id);
+
+      const activePartsByCode = new Map<string, number>();
+      for (const it of inboxItems) {
+        if (!it.item_code) continue;
+        activePartsByCode.set(it.item_code, (activePartsByCode.get(it.item_code) || 0) + 1);
+      }
+      for (const s of fullSchedForProject) {
+        if (!s.item_code || s.is_midflight) continue;
+        if (s.item_code.startsWith('HIST_')) continue;
+        if (s.status === 'cancelled') continue;
+        activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
+      }
+
+      // Map: tpv.id → final hodiny_plan (already scaled in computePlanHours.item_hours)
+      const tpvHoursById = new Map<string, number>();
+      for (const ih of result.item_hours) tpvHoursById.set(ih.id, ih.hodiny_plan);
+
+      // ===== SCHEDULE: update non-midflight rows; HIST_ rows get CZK refresh only =====
       for (const item of schedItems) {
+        if (item.is_midflight) continue; // historical, never modify
+
         if (item.item_code?.startsWith('HIST_')) {
           const histHours = Number(item.scheduled_hours) || 0;
           const totalPlanHours = result.hodiny_plan || 0;
@@ -245,32 +269,20 @@ export async function recalculateProductionHours(
           }
           continue;
         }
+
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
         if (!tpv) continue;
 
         const rawCena = Number(tpv.cena) || 0;
-        const cenaCzk = isEur ? rawCena * eurRate : rawCena;
-        const itemCostCzk = cenaCzk * (Number(tpv.pocet) || 1);
-        const correctCzk = Math.floor(evaluateFormula(
+        const correctCzkFull = Math.floor(evaluateFormula(
           formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
           { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
         ));
-        const rawTotalHours =
-          itemCostCzk > 0
-            ? Math.floor(evaluateFormula(
-                formulas['scheduled_hours'] ?? FORMULA_DEFAULTS['scheduled_hours'],
-                { itemCostCzk, marze: result.marze_used, production_pct: result.prodpct_used, hourly_rate: hourlyRate }
-              ))
-            : 0;
-        const totalHours = Math.floor(rawTotalHours * scaleRatio);
-        const splitGroupId = item.split_group_id;
-        const correctHours = (() => {
-          if (!splitGroupId || !splitGroupTotals[splitGroupId]) {
-            return Math.floor(totalHours / (Number(item.split_total) || 1));
-          }
-          const ratio = Number(item.scheduled_hours) / splitGroupTotals[splitGroupId];
-          return Math.floor(totalHours * ratio);
-        })();
+
+        const tpvFullHours = tpvHoursById.get(tpv.id) ?? 0;
+        const partsCount = Math.max(1, activePartsByCode.get(item.item_code!) || 1);
+        const correctHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
+        const correctCzk = partsCount > 1 ? Math.floor(correctCzkFull / partsCount) : correctCzkFull;
 
         if (
           correctCzk !== Number(item.scheduled_czk) ||
@@ -281,62 +293,27 @@ export async function recalculateProductionHours(
         }
       }
 
-      // ===== INBOX: direct mirror of TPV item hours =====
-      // Each inbox item with an item_code mapped to a TPV item gets:
-      //   estimated_hours = tpv.hodiny_plan (already accounts for pocet & margin via computePlanHours)
-      //   estimated_czk   = cena × pocet (via scheduled_czk_tpv formula)
-      // For chained items (split_group_id) → split tpv hours by active parts count for that item_code.
-      // Ad-hoc items (no TPV match) keep their existing values.
-      const inboxItemsAll = inboxByProject.get(proj.project_id) || [];
-      const inboxItems = inboxItemsAll.filter((it: any) => !it.item_code?.startsWith('HIST_'));
-
-      // Map: tpv.id → final hodiny_plan (already scaled in computePlanHours.item_hours)
-      const tpvHoursById = new Map<string, number>();
-      for (const ih of result.item_hours) tpvHoursById.set(ih.id, ih.hodiny_plan);
-
-      // Count active chain parts per item_code (inbox + non-midflight schedule)
-      const fullSchedForProject = allSched.filter((s: any) => s.project_id === proj.project_id);
-      const activePartsByCode = new Map<string, number>();
-      for (const it of inboxItems) {
-        if (!it.item_code) continue;
-        activePartsByCode.set(it.item_code, (activePartsByCode.get(it.item_code) || 0) + 1);
-      }
-      for (const s of fullSchedForProject) {
-        if (!s.item_code || s.is_midflight) continue;
-        if (s.item_code.startsWith('HIST_')) continue;
-        activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
-      }
-
-      // Consumption ratio: skutočne odpracované hodiny + midflight história / plán
-      const planTotalForRatio = tpvItems.reduce((s: number, t: any) => s + (Number(t.hodiny_plan) || 0), 0);
-      const consumedTotal = consumedByProject.get(proj.project_id) || 0;
-      const consumptionRatio = planTotalForRatio > 0 ? Math.min(1, consumedTotal / planTotalForRatio) : 0;
-
-      // Identify orphans (no TPV match, no adhoc_reason) for project-price fallback
+      // ===== INBOX: per-item = tpv_full_hours / activeParts (no consumed deduction) =====
       const orphans: any[] = [];
 
       for (const item of inboxItems) {
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
         if (!tpv) {
-          // Skip true ad-hoc items (user-entered with reason)
-          if (item.adhoc_reason) continue;
+          if (item.adhoc_reason) continue; // ad-hoc untouched
           orphans.push(item);
           continue;
         }
 
         const rawCena = Number(tpv.cena) || 0;
-        const correctCzk = Math.floor(evaluateFormula(
+        const correctCzkFull = Math.floor(evaluateFormula(
           formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
           { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
         ));
 
-        const tpvHoursTotal = tpvHoursById.get(tpv.id) ?? 0;
-        const itemRemaining = Math.max(0, tpvHoursTotal * (1 - consumptionRatio));
+        const tpvFullHours = tpvHoursById.get(tpv.id) ?? 0;
         const partsCount = Math.max(1, activePartsByCode.get(item.item_code!) || 1);
-        const newHours = Math.round((itemRemaining / partsCount) * 10) / 10;
-
-        // For chained items, also split CZK proportionally
-        const newCzk = item.split_group_id ? Math.floor(correctCzk / partsCount) : correctCzk;
+        const newHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
+        const newCzk = partsCount > 1 ? Math.floor(correctCzkFull / partsCount) : correctCzkFull;
 
         if (
           newCzk !== Number(item.estimated_czk) ||
@@ -347,17 +324,10 @@ export async function recalculateProductionHours(
         }
       }
 
-      // ===== ORPHAN FALLBACK: distribute remaining project plan hours =====
-      // Inbox items with item_code that has no TPV match and no adhoc_reason
-      // get a fair share of (hodiny_plan − assigned − consumed).
+      // ===== ORPHAN FALLBACK: (hodiny_plan − assignedToTpv) / orphanCount, no consumed =====
       if (orphans.length > 0 && result.hodiny_plan > 0) {
-        // Assigned = TPV-mapped hours already accounted for in result.item_hours
         const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0);
-        const consumedTotal = consumedByProject.get(proj.project_id) || 0;
-        const remainingProjectHours = Math.max(
-          0,
-          result.hodiny_plan - assignedHours - consumedTotal
-        );
+        const remainingProjectHours = Math.max(0, result.hodiny_plan - assignedHours);
         const perOrphanHours = Math.round((remainingProjectHours / orphans.length) * 10) / 10;
         const perOrphanCzk = Math.floor(perOrphanHours * hourlyRate);
 
