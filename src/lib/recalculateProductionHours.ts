@@ -240,6 +240,16 @@ export async function recalculateProductionHours(
     projectResults.push({ project_id: proj.project_id, result });
     allItemHourUpdates.push(...result.item_hours);
 
+    // Chain-aware remaining hours: subtract midflight chain hours from full plan
+    // before distributing into inbox + non-midflight schedule.
+    const chainGroupId = resolveChainGroupId(proj.project_id);
+    const consumedChainHours = chainGroupId
+      ? (midflightHoursByChain.get(chainGroupId) || 0)
+      : 0;
+    const remainingPlanHours = Math.max(0, result.hodiny_plan - consumedChainHours);
+    const remainingScale = result.hodiny_plan > 0
+      ? remainingPlanHours / result.hodiny_plan
+      : 1;
     if (tpvItems.length || result.hodiny_plan !== 0) {
       // EUR conversion for this project
       const isEur = proj.currency === 'EUR';
