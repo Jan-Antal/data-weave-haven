@@ -749,7 +749,16 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
-    if (logs.length > 0) return Math.max(...logs.map((l) => l.percent));
+    if (logs.length > 0) {
+      // Use the LATEST log by day_index (then logged_at) — not the max percent.
+      // This ensures the week % reflects the most recent daylog entry,
+      // even when a later log corrects (lowers) a previous value.
+      const sorted = [...logs].sort((a, b) => {
+        if (b.day_index !== a.day_index) return b.day_index - a.day_index;
+        return new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime();
+      });
+      return sorted[0].percent;
+    }
     // Fallback: only for split bundles — find latest non-MF log from a PRIOR week
     // belonging to the same split_group_id chain.
     const prior = findPriorChainLog(pid, weekKey);
@@ -815,7 +824,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return items;
   }
 
-  // ── BUNDLE PROGRESS: prefer latest daily log percent, fallback to completed hours ──
+  // ── BUNDLE PROGRESS: tied to the latest daily log of the viewed week ──
+  // The week % must always reflect the most recent daylog entry for that week.
+  // Completion-based progress is only used as a fallback when no logs exist for
+  // the current week (and no prior chain log applies), to avoid showing 0% for
+  // bundles whose items are all already done via expedice/midflight.
   function getBundleProgress(pid: string): { totalHours: number; completedHours: number; bundleProgress: number } {
     const allItems = getAllItemsForProject(pid);
     const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
@@ -823,19 +836,22 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       .filter((e) => isItemDone(e.item))
       .reduce((s, e) => s + e.item.scheduled_hours, 0);
 
-    // Check daily logs for the latest percent — this reflects actual logged progress
-    const latestLogPct = getLatestPercent(pid);
-
     // Spilled projects use carried-forward log % as their starting progress
     const project = enrichedProjects.find(p => p.projectId === pid);
     if (project?.isSpilled) {
-      return { totalHours, completedHours: 0, bundleProgress: latestLogPct };
+      return { totalHours, completedHours: 0, bundleProgress: getLatestPercent(pid) };
     }
 
+    // Primary signal: latest daylog of the viewed week (or chain fallback inside getLatestPercent).
+    const logsThisWeek = getLogsForProject(pid);
+    const hasLogThisWeekOrChain = logsThisWeek.length > 0 || findPriorChainLog(pid, weekKey) !== null;
+    if (hasLogThisWeekOrChain) {
+      return { totalHours, completedHours, bundleProgress: getLatestPercent(pid) };
+    }
+
+    // Fallback only when no daylog/chain context exists.
     const completionPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
-    // Use whichever is higher: logged progress or completion-based progress
-    const bundleProgress = Math.max(latestLogPct, completionPct);
-    return { totalHours, completedHours, bundleProgress };
+    return { totalHours, completedHours, bundleProgress: completionPct };
   }
 
   // ── WEEKLY GOAL: cumulative expected progress as % of hodiny_plan ──
