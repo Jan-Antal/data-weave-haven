@@ -3191,9 +3191,8 @@ function ProjectRow({
   const phase = getLatestPhase(project.projectId);
   const borderColor = project.color;
 
-  // Goal-based color logic
-  const goalDiff = pct - weeklyGoal;
-  const progressColor = goalDiff >= 0 ? "#3a8a36" : goalDiff >= -10 ? "#d97706" : "#dc2626";
+  // Progress bar color — aligned with expanded project card (status-based traffic light)
+  const progressColor = statusColors[status];
 
   // Deadline urgency color for project name
   const now = new Date();
