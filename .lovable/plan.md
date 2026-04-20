@@ -2,55 +2,100 @@
 
 ## Rozsah
 
-Úplne odstrániť všetky automatické zápisy do `production_daily_logs`. Logy budú výhradne ručné z modulu Výroba. Aj midflight import prestane vytvárať syntetické log riadky.
+Obnoviť **chain bundles per projekt** ako one-off operáciu (žiadny budúci midflight import, žiadna aktualizácia importeru). Per-item split a bundle split budú rešpektovať existujúci projektový chain (5/5 → 5/6 + 6/6).
 
-## Zmena 1 — Odstrániť `autoUpdateProjectPercent` z flow
+## Pravidlo chain
 
-**`src/lib/autoProjectPercent.ts`** — celý súbor zmazať (alebo ponechať prázdny no-op s deprecation komentárom pre prípadné staré importy).
+- **Chain = projekt** (jeden `split_group_id` zdieľaný cez midflight history + pending inbox + future silo bundles).
+- `split_part / split_total` = poradie unique `scheduled_week` ascending. Všetky položky v rovnakom týždni majú rovnaké čísla.
+- Inbox položky (bez `scheduled_week`) → `split_part = NULL`, `split_total = počet týždňov v chain`.
+- Per-item split / bundle split **nikdy nezakladá nový `split_group_id`** ak zdroj už chain má — preberá existujúci a prečísluje cez `renumberProjectChain`.
 
-**`src/components/production/CompletionDialog.tsx`** — odstrániť volanie `autoUpdateProjectPercent(projectId)` v `handleComplete`. Completion bude meniť len `production_schedule.status` a `production_expedice` riadky, **nie** percent v daily logs.
+## Zmena 1 — One-off SQL migrácia (chain backfill)
 
-**`src/hooks/useProductionDragDrop.ts`** — odstrániť volania `autoUpdateProjectPercents(...)` v `completeItems` (a kdekoľvek inde — undo/redo handlery tiež).
+Jednorazová migrácia cez supabase migration tool:
 
-## Zmena 2 — Midflight import prestane zapisovať daily logs
+1. Pre každý projekt s aspoň 1 riadkom `production_schedule.is_midflight=true`:
+   - vygenerovať `chainGroupId = gen_random_uuid()`
+   - update **všetkých** `production_schedule` riadkov projektu (midflight aj non-midflight, status != 'cancelled') → `split_group_id = chainGroupId`
+   - update všetkých `production_inbox` riadkov projektu so `status='pending'` → `split_group_id = chainGroupId`
+2. Pre každý chain spočítať cez SQL window function (`DENSE_RANK() OVER (PARTITION BY split_group_id ORDER BY scheduled_week)`) → updatnúť `split_part` / `split_total` na schedule riadkoch.
+3. Inbox riadky chainu → `split_part = NULL`, `split_total = total weeks`.
+4. Projekty bez midflight histórie ostávajú nedotknuté.
 
-**`src/lib/midflightImportPlanVyroby.ts`** — odstrániť celý blok ktorý vytvára `production_daily_logs` riadky s `bundle_id = ::MF_${monday}`. Midflight import bude generovať len:
-- `production_schedule` (is_midflight=true) — historické bundle
-- `production_expedice` (is_midflight=true) — markery
-- update `production_inbox.estimated_hours` — ratio konzumácie
+**Midflight importer (`midflightImportPlanVyroby.ts`) sa nemení** — je to legacy funkcia, do budúcnosti sa už nespúšťa.
 
-Žiadne syntetické % logy. Ak používateľ chce historický progress vidieť, doplní ho ručne vo Výrobe.
+## Zmena 2 — Nový helper `renumberProjectChain`
 
-## Zmena 3 — UI fallback vo Vyroba.tsx (read-only)
+V `src/lib/splitChainHelpers.ts` pridať:
 
-**`src/pages/Vyroba.tsx`** — `getLatestPercent`, `getBundleProgress`, `findPriorChainLog`, `getChainWindow` ostávajú nezmenené v read logike, ale:
-- `production_daily_logs` je **jediný** zdroj pravdy pre uložené %.
-- Ak v aktuálnom týždni nie je log a v chain (`split_group_id`) existuje predchádzajúci log → zobraziť ho ako fallback (kontinuita pri split bundle).
-- Ak nikde v chain nie je log → zobraziť 0% (alebo computed `completedHours/totalHours` len ako sivý hint, **bez** zápisu do DB).
+```ts
+export async function renumberProjectChain(
+  projectId: string,
+  chainGroupId: string
+): Promise<void>
+```
 
-Žiadny kód v aplikácii nesmie volať `saveDailyLog()` mimo explicitného user kliku vo Výrobe.
+Logika:
+1. Načíta z `production_schedule` riadky projektu so `split_group_id = chainGroupId` a `status != 'cancelled'`.
+2. Načíta z `production_inbox` pending riadky so `split_group_id = chainGroupId`.
+3. Zoradí unique `scheduled_week` ascending → `weekIndex` mapa.
+4. Schedule rows: `split_part = weekIndex(scheduled_week) + 1`, `split_total = total unique weeks`.
+5. Inbox rows: `split_part = NULL`, `split_total = total unique weeks`.
 
-## Zmena 4 — Audit volaní `saveDailyLog`
+Existujúce `renumberChain` (per item_code) a `renumberBundleChain` ostávajú v exporte pre fallback (projekty bez chainu / single-item splity bez histórie).
 
-Prejsť cez `code--search_files` všetky volania `saveDailyLog`. Povolené ostávajú len:
-- `Vyroba.tsx` → `handleSaveLog` (ručný zápis %)
-- `Vyroba.tsx` → "Bez výroby" toggle (ručný zápis 0%)
+## Zmena 3 — Inbox → silo preberá projektový chain
 
-Všetko ostatné odstrániť.
+V `src/hooks/useProductionDragDrop.ts`:
+- `moveInboxItemToWeek` a `moveInboxProjectToWeek`: po inserte do `production_schedule` zistiť či zdrojový inbox row má `split_group_id`.
+  - Ak **áno** → `renumberProjectChain(projectId, splitGroupId)`.
+  - Ak **nie** (projekt bez chainu) → správanie ostáva ako dnes (žiadne číslovanie).
+
+## Zmena 4 — Per-item split (`SplitItemDialog`) rešpektuje chain
+
+V `src/components/production/SplitItemDialog.tsx` (`handleSplit`):
+- Ak zdrojová položka má `split_group_id` → použiť **existujúci** ID pre nový riadok, **nevytvárať** nový group.
+- Po inserte zavolať `renumberProjectChain(projectId, existingSplitGroupId)` namiesto `renumberChain`.
+- Ak zdroj nemá `split_group_id` → fallback na dnešnú logiku (nový group + `renumberChain`).
+
+Výsledok: chain 5/5 + nová časť → 5/6 + 6/6.
+
+## Zmena 5 — Bundle split (`SplitBundleDialog`) rešpektuje chain
+
+V `src/components/production/SplitBundleDialog.tsx` (`handleSplitBundle`):
+- Ak items v bundli majú `split_group_id` (projektový chain) → použiť tento existujúci ID pre nové split rows, **nie** nový `bundleGroupId = randomUUID()`.
+- Po inserte zavolať `renumberProjectChain(projectId, existingSplitGroupId)` namiesto `renumberBundleChain`.
+- Ak bundle nemá `split_group_id` → fallback na dnešnú logiku (nový group + `renumberBundleChain`).
+
+## Zmena 6 — Read-side vo `Vyroba.tsx`
+
+Žiadna zmena. `findPriorChainLog`, `getChainWindow`, `splitGroupsByBundle` už dnes pracujú nad `split_group_id`. Po Zmenách 1–5 budú midflight + inbox + silo + post-split bundle všetky zdieľať projektový chain → kontinuita % funguje automaticky (read-only fallback, žiadny zápis do `production_daily_logs`).
+
+## Edge cases
+
+- **Projekt bez midflight histórie**: nemá chain, nič sa nemení.
+- **Cancelled riadky**: filtrované cez `status != 'cancelled'`, neovplyvnia číslovanie.
+- **Per-item split dvakrát za sebou**: každý ďalší split prečísluje celý chain (5/6 → 5/7 + 6/7 + 7/7).
+- **Recycle / move späť do inboxu**: scheduled_week sa zmaže, prečíslovanie ho vyhodí z týždenného počtu → inbox row dostane `split_part = NULL`.
+- **Nový projekt bez histórie**: bude fungovať bez chainu (legacy správanie). Ak v budúcnosti vznikne potreba projektového chainu pre nové projekty, riešiť samostatne.
 
 ## Dotknuté súbory
 
-- `src/lib/autoProjectPercent.ts` — zmazať / no-op
-- `src/components/production/CompletionDialog.tsx` — odstrániť auto write
-- `src/hooks/useProductionDragDrop.ts` — odstrániť auto write z `completeItems` + undo/redo
-- `src/lib/midflightImportPlanVyroby.ts` — odstrániť `production_daily_logs` insert blok
-- `src/pages/Vyroba.tsx` — verifikovať že fallback nezapisuje do DB
+- **Nová SQL migrácia** — one-off backfill `split_group_id` + prečíslovanie pre projekty s midflight históriou.
+- `src/lib/splitChainHelpers.ts` — pridať `renumberProjectChain`.
+- `src/hooks/useProductionDragDrop.ts` — inbox→silo volá `renumberProjectChain` ak existuje chain.
+- `src/components/production/SplitItemDialog.tsx` — preberá existujúci `split_group_id`, volá `renumberProjectChain`.
+- `src/components/production/SplitBundleDialog.tsx` — preberá existujúci `split_group_id`, volá `renumberProjectChain`.
+- `src/lib/midflightImportPlanVyroby.ts` — **bez zmeny** (legacy, už sa nespúšťa).
 
 ## Overenie po nasadení
 
-1. Označiť položku ako Hotovo / Expedice → overiť že v `production_daily_logs` **nepribudol** žiadny riadok.
-2. Spustiť midflight import → overiť že tabuľka `production_daily_logs` zostala nezmenená (bez `::MF_` riadkov).
-3. Vo Výrobe ručne uložiť denný log → overiť že riadok **vznikol**.
-4. Otestovať split bundle scenár: projekt v T-2 má ručný log 60% → split do T-1 → overiť že T-1 zobrazí 60% z chainu (read fallback) bez zápisu do DB.
-5. Po ručnom uložení 75% v T-1 overiť že T-1 zobrazí 75% a T-2 zostáva na 60%.
+1. **Migrácia**: v DB overiť že napr. Z-2607-008 má rovnaký `split_group_id` na všetkých midflight schedule + non-midflight schedule + pending inbox riadkoch.
+2. Otvoriť projekt s históriou: T-2 ručne uložiť 60% log.
+3. Naplánovať inbox položku do T+1 → silo bundle preberie projektový chain a `renumberProjectChain` priradí správne `split_part/total`.
+4. Vo Výrobe v T+1 overiť že `findPriorChainLog` vráti 60% z T-2 (read fallback, žiadny DB write).
+5. **Per-item split test**: bundle 5/5 → split TK.05 do T+1 → overiť že chain je teraz 5/6 + 6/6 (nie nový group).
+6. **Bundle split test**: 5/5 bundle → split do ďalšieho týždňa → overiť že číslovanie je 5/6 + 6/6 a všetky položky bundle zdieľajú projektový `split_group_id`.
+7. End-to-end: midflight história → inbox → silo → split → ručný log → kontinuita % naprieč všetkými týždňami.
 
