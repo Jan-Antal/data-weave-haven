@@ -1527,6 +1527,7 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
       type: "inbox-item" as const, itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
       projectId: item.project_id, projectName, hours: item.estimated_hours, stageId: item.stage_id,
       scheduledCzk: item.estimated_czk,
+      splitGroupId: item.split_group_id ?? null,
     },
   });
 

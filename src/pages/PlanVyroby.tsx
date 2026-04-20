@@ -90,6 +90,7 @@ interface AutoSplitState {
   spillWeekNum: number;
   source: "inbox" | "schedule";
   inboxItemId?: string;
+  splitGroupId?: string | null;
   onInsertWhole: () => Promise<void>;
 }
 
@@ -598,6 +599,7 @@ export default function PlanVyroby() {
             spillWeekNum: spillWeek.weekNum,
             source: dragData.type === "inbox-item" ? "inbox" : "schedule",
             inboxItemId: dragData.type === "inbox-item" ? dragData.itemId : undefined,
+            splitGroupId: dragData.splitGroupId ?? null,
             onInsertWhole: doInsertWhole,
           });
           return;

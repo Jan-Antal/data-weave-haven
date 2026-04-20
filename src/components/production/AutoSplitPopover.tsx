@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { renumberChain } from "@/lib/splitChainHelpers";
 
 interface AutoSplitPopoverProps {
   open: boolean;
@@ -25,6 +26,7 @@ interface AutoSplitPopoverProps {
   spillWeekNum: number;
   /** "inbox" or "schedule" */
   source: "inbox" | "schedule";
+  splitGroupId?: string | null;
   /** Original inbox item ID if from inbox */
   inboxItemId?: string;
   /** Callback for "insert whole" (existing drag behavior) */
@@ -35,6 +37,7 @@ export function AutoSplitPopover({
   open, onOpenChange, itemId, itemName, itemCode, itemHours, projectId, stageId, czkPerHour,
   targetWeekKey, targetWeekNum, availableHours, spillWeekKey, spillWeekNum,
   source, inboxItemId, onInsertWhole,
+  splitGroupId,
 }: AutoSplitPopoverProps) {
   const part1Hours = Math.min(Math.max(availableHours, 0), itemHours);
   const part2Hours = itemHours - part1Hours;
@@ -62,17 +65,19 @@ export function AutoSplitPopover({
 
       const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
 
-      if (source === "inbox") {
+        const groupId = splitGroupId || itemId;
+
+        if (source === "inbox") {
         // Mark inbox as scheduled
         if (inboxItemId) {
           await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", inboxItemId);
         }
 
         // Create Part 1 in target week
-        const { data: inserted, error: e1 } = await supabase.from("production_schedule").insert({
+          const { error: e1 } = await supabase.from("production_schedule").insert({
           project_id: projectId,
           stage_id: stageId,
-          item_name: `${cleanName} (1/2)`,
+            item_name: cleanName,
           item_code: itemCode,
           scheduled_week: targetWeekKey,
           scheduled_hours: part1Hours,
@@ -81,23 +86,15 @@ export function AutoSplitPopover({
           status: "scheduled",
           created_by: user.id,
           inbox_item_id: inboxItemId || null,
-          split_part: 1,
-          split_total: 2,
-        }).select("id").single();
+            split_group_id: groupId,
+          });
         if (e1) throw e1;
-
-        const groupId = inserted!.id;
-
-        // Update Part 1 with split_group_id
-        await supabase.from("production_schedule")
-          .update({ split_group_id: groupId })
-          .eq("id", groupId);
 
         // Create Part 2 in spill week
         const { error: e2 } = await supabase.from("production_schedule").insert({
           project_id: projectId,
           stage_id: stageId,
-          item_name: `${cleanName} (2/2)`,
+            item_name: cleanName,
           item_code: itemCode,
           scheduled_week: spillWeekKey,
           scheduled_hours: part2Hours,
@@ -106,8 +103,6 @@ export function AutoSplitPopover({
           status: "scheduled",
           created_by: user.id,
           split_group_id: groupId,
-          split_part: 2,
-          split_total: 2,
         });
         if (e2) throw e2;
       } else {
@@ -116,10 +111,8 @@ export function AutoSplitPopover({
           scheduled_hours: part1Hours,
           scheduled_czk: part1Hours * czkPerHour,
           scheduled_week: targetWeekKey,
-          item_name: `${cleanName} (1/2)`,
-          split_group_id: itemId,
-          split_part: 1,
-          split_total: 2,
+            item_name: cleanName,
+            split_group_id: groupId,
         }).eq("id", itemId);
         if (e1) throw e1;
 
@@ -127,7 +120,7 @@ export function AutoSplitPopover({
         const { error: e2 } = await supabase.from("production_schedule").insert({
           project_id: projectId,
           stage_id: stageId,
-          item_name: `${cleanName} (2/2)`,
+            item_name: cleanName,
           item_code: itemCode,
           scheduled_week: spillWeekKey,
           scheduled_hours: part2Hours,
@@ -135,12 +128,12 @@ export function AutoSplitPopover({
           position: 999,
           status: "scheduled",
           created_by: user.id,
-          split_group_id: itemId,
-          split_part: 2,
-          split_total: 2,
+            split_group_id: groupId,
         });
         if (e2) throw e2;
       }
+
+        await renumberChain(groupId);
 
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
@@ -152,9 +145,9 @@ export function AutoSplitPopover({
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [choice, onInsertWhole, itemId, itemName, projectId, stageId, czkPerHour,
+  }, [choice, onInsertWhole, itemId, itemName, itemCode, projectId, stageId, czkPerHour,
     targetWeekKey, targetWeekNum, spillWeekKey, spillWeekNum, part1Hours, part2Hours,
-    source, inboxItemId, qc, onOpenChange]);
+    source, inboxItemId, splitGroupId, qc, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
