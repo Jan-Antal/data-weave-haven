@@ -2474,7 +2474,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                             <Slider
                               min={0}
                               max={100}
-                              step={5}
+                              step={1}
                               value={[logPercent]}
                               onValueChange={([v]) => {
                                 setHotovostTouched(true);
