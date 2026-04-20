@@ -918,11 +918,52 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return { incomplete: incomplete.length, total: matching.length, weekNums };
   }
 
-  function getExpectedPct(_dayIndex: number, weeklyGoal: number = 100): number {
+  // ── CHAIN WINDOW: for split bundles, calc % window relative to whole chain ──
+  function getChainWindow(pid: string): { start: number; end: number } | null {
+    if (!scheduleData) return null;
+    const currentSilo = scheduleData.get(weekKey);
+    if (!currentSilo) return null;
+    const currentBundle = currentSilo.bundles.find((b: any) => b.project_id === pid);
+    if (!currentBundle) return null;
+    const splitGroupIds = new Set<string>(
+      currentBundle.items
+        .filter((i: ScheduleItem) => i.split_group_id && i.status !== "cancelled")
+        .map((i: ScheduleItem) => i.split_group_id as string)
+    );
+    if (splitGroupIds.size === 0) return null;
+
+    let chainTotalHours = 0;
+    let priorPartsHours = 0;
+    let currentPartHours = 0;
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== pid) continue;
+        for (const item of bundle.items as ScheduleItem[]) {
+          if (item.status === "cancelled") continue;
+          if (!item.split_group_id || !splitGroupIds.has(item.split_group_id)) continue;
+          chainTotalHours += item.scheduled_hours;
+          if (wk < weekKey) priorPartsHours += item.scheduled_hours;
+          else if (wk === weekKey) currentPartHours += item.scheduled_hours;
+        }
+      }
+    }
+    if (chainTotalHours <= 0) return null;
+    return {
+      start: (priorPartsHours / chainTotalHours) * 100,
+      end: ((priorPartsHours + currentPartHours) / chainTotalHours) * 100,
+    };
+  }
+
+  function getExpectedPct(_dayIndex: number, weeklyGoal: number = 100, pid?: string): number {
     const today = new Date();
     const dow = today.getDay(); // 0=Sun..6=Sat
     const workingDaysElapsed = dow === 0 || dow === 6 ? 5 : dow; // weekend → treat as Friday
-    return Math.round(weeklyGoal * (workingDaysElapsed / 5));
+    const fraction = workingDaysElapsed / 5;
+    if (pid) {
+      const cw = getChainWindow(pid);
+      if (cw) return Math.round(cw.start + (cw.end - cw.start) * fraction);
+    }
+    return Math.round(weeklyGoal * fraction);
   }
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
@@ -946,7 +987,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       }
       return hasDelayed ? "behind" : "on-track";
     }
-    const expected = getExpectedPct(todayDayIndex, goal);
+    const expected = getExpectedPct(todayDayIndex, goal, pid);
     if (bundleProgress >= expected - 10) return "on-track";
     if (bundleProgress >= expected - 25) return "at-risk";
     return "behind";
@@ -2188,6 +2229,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   onToggleItem={toggleItemComplete}
                   getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
                   getExpectedPct={getExpectedPct}
+                  chainWindow={getChainWindow(selectedProject.projectId)}
                   status={getProjectStatus(selectedProject.projectId)}
                   latestPct={getLatestPercent(selectedProject.projectId)}
                   latestPhase={getLatestPhase(selectedProject.projectId)}
@@ -2295,6 +2337,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     onToggleItem={toggleItemComplete}
                     getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
                     getExpectedPct={getExpectedPct}
+                    chainWindow={getChainWindow(selectedProject.projectId)}
                     status={getProjectStatus(selectedProject.projectId)}
                     latestPct={getLatestPercent(selectedProject.projectId)}
                     latestPhase={getLatestPhase(selectedProject.projectId)}
@@ -3266,6 +3309,7 @@ function DetailPanel({
   onToggleItem,
   getCumulativeForDay,
   getExpectedPct,
+  chainWindow,
   status,
   latestPct,
   latestPhase,
@@ -3298,7 +3342,8 @@ function DetailPanel({
   onOpenExpedice: () => void;
   onToggleItem: (id: string, status: string) => void;
   getCumulativeForDay: (dayIndex: number) => CumulativeInfo | null;
-  getExpectedPct: (dayIndex: number, weeklyGoal?: number) => number;
+  getExpectedPct: (dayIndex: number, weeklyGoal?: number, pid?: string) => number;
+  chainWindow?: { start: number; end: number } | null;
   status: "on-track" | "at-risk" | "behind";
   latestPct: number;
   latestPhase: string | null;
@@ -3329,7 +3374,7 @@ function DetailPanel({
     if (item.is_midflight) return true;
     return item.status === "completed" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
-  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
+  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal, project.projectId) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", behind: "#dc2626" };
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", behind: "Pozadu" };
@@ -3444,6 +3489,11 @@ function DetailPanel({
             <div className="text-xs" style={{ color: isWeeklyGoalMet ? "#3a8a36" : "#99a5a3" }}>
               Týdenní cíl: {weeklyGoal}%
             </div>
+            {chainWindow && chainWindow.start > 0 && (
+              <div className="text-[10px]" style={{ color: "#99a5a3" }}>
+                Okno: {Math.round(chainWindow.start)}% → {Math.round(chainWindow.end)}%
+              </div>
+            )}
             {isWeeklyGoalMet && (
               <div className="text-[10px] font-medium" style={{ color: "#3a8a36" }}>
                 🎉 Týdenní cíl splněn!
@@ -3473,13 +3523,30 @@ function DetailPanel({
               </TooltipContent>
             </Tooltip>
           )}
+          {/* Chain window start marker — light gray dashed line */}
+          {chainWindow && chainWindow.start > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="absolute top-[-2px] h-[8px] w-[2px] cursor-help"
+                  style={{ left: `${chainWindow.start}%`, background: "#9ca3af", opacity: 0.4 }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Začátek aktuálního splitu: {Math.round(chainWindow.start)}%
+              </TooltipContent>
+            </Tooltip>
+          )}
           {/* Expected progress marker — blue/muted */}
           {(() => {
             const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
             const now = new Date();
             const dow = now.getDay();
             const wde = dow === 0 || dow === 6 ? 5 : dow;
-            const exp = Math.round(weeklyGoal * (wde / 5));
+            const fraction = wde / 5;
+            const exp = chainWindow
+              ? Math.round(chainWindow.start + (chainWindow.end - chainWindow.start) * fraction)
+              : Math.round(weeklyGoal * fraction);
             const dayName = DAY_NAMES[dow] || "dnes";
             if (exp <= 0) return null;
             return (
