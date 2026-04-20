@@ -6,7 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { autoUpdateProjectPercents } from "@/lib/autoProjectPercent";
-import { renumberChain } from "@/lib/splitChainHelpers";
+import { renumberChain, renumberBundleChain } from "@/lib/splitChainHelpers";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -1160,6 +1160,175 @@ export function useProductionDragDrop() {
     qc.invalidateQueries({ queryKey: ["production-expedice"] });
   }, [mergeSplitItems, pushUndo, qc, invalidateAll]);
 
+  /**
+   * Bundle-level merge across two weeks: for a project, fold all items in
+   * `sourceWeekDate` into `targetWeekDate` as ONE atomic bundle merge.
+   * - Items with same item_code present in both weeks → sum hours+czk into target, delete source.
+   * - Items only in source → move scheduled_week to target.
+   * - All affected rows share/get a single bundleGroupId so the bundle chain
+   *   renumbers as one unit (per-week N/M, not per-item).
+   */
+  const mergeBundleAcrossWeeks = useCallback(async (
+    projectId: string,
+    sourceWeekDate: string,
+    targetWeekDate: string,
+  ): Promise<void> => {
+    try {
+      const [{ data: sourceItems }, { data: targetItems }] = await Promise.all([
+        supabase.from("production_schedule").select("*")
+          .eq("project_id", projectId).eq("scheduled_week", sourceWeekDate)
+          .in("status", ["scheduled", "in_progress"]),
+        supabase.from("production_schedule").select("*")
+          .eq("project_id", projectId).eq("scheduled_week", targetWeekDate)
+          .in("status", ["scheduled", "in_progress"]),
+      ]);
+      if (!sourceItems || sourceItems.length === 0) return;
+
+      const sourceSnapshot = sourceItems.map(i => ({ ...i }));
+      const targetSnapshot = (targetItems || []).map(i => ({ ...i }));
+
+      // Pick a shared bundleGroupId: prefer existing one from either week's chain.
+      const existingGid =
+        sourceItems.find(i => i.split_group_id)?.split_group_id ||
+        (targetItems || []).find(i => i.split_group_id)?.split_group_id ||
+        null;
+      const bundleGroupId: string = existingGid ||
+        (typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `bundle-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+
+      // Pair source ↔ target by item_code; null/blank codes use unique fallback so they never pair.
+      const targetByCode = new Map<string, any>();
+      for (const t of (targetItems || [])) {
+        const k = t.item_code ?? `__nocode__${t.id}`;
+        if (!targetByCode.has(k)) targetByCode.set(k, t);
+      }
+
+      const toDelete: string[] = [];
+      const targetUpdates = new Map<string, { hours: number; czk: number }>();
+      const toMove: string[] = [];
+
+      for (const src of sourceItems) {
+        const k = src.item_code ?? `__nocode__source__${src.id}`;
+        const pair = src.item_code ? targetByCode.get(k) : null;
+        if (pair) {
+          const cur = targetUpdates.get(pair.id) ?? { hours: pair.scheduled_hours, czk: pair.scheduled_czk };
+          targetUpdates.set(pair.id, {
+            hours: cur.hours + src.scheduled_hours,
+            czk: cur.czk + src.scheduled_czk,
+          });
+          toDelete.push(src.id);
+        } else {
+          toMove.push(src.id);
+        }
+      }
+
+      // Apply target merges + deletes + plain moves in parallel.
+      const ops: Promise<any>[] = [];
+      for (const [tid, agg] of targetUpdates) {
+        ops.push(
+          supabase.from("production_schedule").update({
+            scheduled_hours: agg.hours,
+            scheduled_czk: agg.czk,
+            split_group_id: bundleGroupId,
+          }).eq("id", tid)
+        );
+      }
+      if (toDelete.length > 0) {
+        ops.push(supabase.from("production_schedule").delete().in("id", toDelete));
+      }
+      if (toMove.length > 0) {
+        ops.push(
+          supabase.from("production_schedule").update({
+            scheduled_week: targetWeekDate,
+            split_group_id: bundleGroupId,
+          }).in("id", toMove)
+        );
+      }
+      // Ensure ALL remaining target items also share the bundleGroupId (so chain is unified).
+      const remainingTargetIds = (targetItems || [])
+        .filter(t => !targetUpdates.has(t.id))
+        .map(t => t.id);
+      if (remainingTargetIds.length > 0) {
+        ops.push(
+          supabase.from("production_schedule").update({
+            split_group_id: bundleGroupId,
+          }).in("id", remainingTargetIds)
+        );
+      }
+      await Promise.all(ops);
+
+      // Renumber the whole chain → bundle shrinks by one week.
+      await renumberBundleChain(bundleGroupId);
+
+      invalidateAll();
+      toast({ title: `Bundle sloučen do ${weekLabel(targetWeekDate)}` });
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "merge_bundle_across_weeks",
+        description: `Sloučení bundle ${projectId} → ${weekLabel(targetWeekDate)}`,
+        undo: async () => {
+          // Restore target hours/czk
+          await Promise.all(
+            targetSnapshot.map(t =>
+              supabase.from("production_schedule").update({
+                scheduled_hours: t.scheduled_hours,
+                scheduled_czk: t.scheduled_czk,
+                split_group_id: t.split_group_id,
+                split_part: t.split_part,
+                split_total: t.split_total,
+              }).eq("id", t.id)
+            )
+          );
+          // Re-insert deleted source rows
+          const { data: { user } } = await supabase.auth.getUser();
+          const reins = sourceSnapshot
+            .filter(s => toDelete.includes(s.id))
+            .map(s => ({
+              project_id: s.project_id, stage_id: s.stage_id,
+              item_name: s.item_name, item_code: s.item_code,
+              scheduled_week: s.scheduled_week, scheduled_hours: s.scheduled_hours,
+              scheduled_czk: s.scheduled_czk, position: s.position,
+              status: s.status, created_by: user?.id,
+              split_group_id: s.split_group_id, split_part: s.split_part, split_total: s.split_total,
+            }));
+          if (reins.length > 0) {
+            await supabase.from("production_schedule").insert(reins);
+          }
+          // Move plain-moved rows back
+          if (toMove.length > 0) {
+            await supabase.from("production_schedule")
+              .update({ scheduled_week: sourceWeekDate })
+              .in("id", toMove);
+            // Restore prior split metadata for moved rows
+            await Promise.all(
+              sourceSnapshot.filter(s => toMove.includes(s.id)).map(s =>
+                supabase.from("production_schedule").update({
+                  split_group_id: s.split_group_id,
+                  split_part: s.split_part,
+                  split_total: s.split_total,
+                }).eq("id", s.id)
+              )
+            );
+          }
+          invalidateAll();
+        },
+        redo: async () => {
+          // Re-apply: simplest = re-run the merge
+          await mergeBundleAcrossWeeksRef.current?.(projectId, sourceWeekDate, targetWeekDate);
+        },
+      });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [invalidateAll, pushUndo]);
+
+  // Self-reference for redo
+  const mergeBundleAcrossWeeksRef = { current: null as null | typeof mergeBundleAcrossWeeks };
+  mergeBundleAcrossWeeksRef.current = mergeBundleAcrossWeeks;
+
   return {
     moveInboxItemToWeek,
     moveInboxProjectToWeek,
@@ -1172,6 +1341,7 @@ export function useProductionDragDrop() {
     returnBundleToInbox,
     mergeSplitItems,
     mergeBundleSplitGroups,
+    mergeBundleAcrossWeeks,
   };
 }
 
