@@ -483,12 +483,12 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                     <div
                       key={card.projectId}
                       className="bg-background rounded-lg border border-border/60 p-3 flex flex-col gap-2"
-                      style={{ borderLeftWidth: 3, borderLeftColor: card.isUnmatched ? "#94a3b8" : projectColor }}
+                      style={{ borderLeftWidth: 3, borderLeftColor: warningBorderColor(card.warning, projectColor) }}
                     >
                       {/* Top: name + slip badge */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          {card.isUnmatched ? (
+                          {card.warning === "unmatched" ? (
                             <>
                               <p className="text-[11px] font-mono text-foreground truncate">{card.projectId}</p>
                               <p className="text-[12px] text-muted-foreground italic flex items-center gap-1 mt-0.5">
@@ -499,15 +499,25 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                             <>
                               <p className="text-[14px] font-medium leading-tight truncate" title={card.projectName}>{card.projectName}</p>
                               <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{card.projectId}</p>
+                              {card.warning === "off_plan" && (
+                                <p className={cn(
+                                  "text-[10px] font-semibold flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full w-fit",
+                                  warningPillClass(card.warning)
+                                )}>
+                                  <AlertCircle className="w-3 h-3" /> {warningLabel(card.warning)}
+                                </p>
+                              )}
                             </>
                           )}
                         </div>
-                        <span className={cn(
-                          "shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
-                          slipPillClass(card.slipStatus)
-                        )}>
-                          {slipLabel(card.slipStatus)}
-                        </span>
+                        {card.warning === "none" && (
+                          <span className={cn(
+                            "shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
+                            slipPillClass(card.slipStatus)
+                          )}>
+                            {slipLabel(card.slipStatus)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Progress bar — gradient palette (Plan Výroby style) */}
