@@ -436,11 +436,15 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
               <span className="text-muted-foreground mx-1">/</span>
               <span className="text-[#b1232f]">{delayCount}</span>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2">Z {cards.filter(c => !c.isUnmatched).length} naplánovaných projektů</div>
+            <div className="text-[11px] text-muted-foreground mt-2">Z {cards.filter(c => c.warning === "none").length} naplánovaných projektů</div>
           </Card>
           <Card className="p-4 shadow-sm">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárované</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{unmatchedCount}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Mimo plán / Nespárované</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">
+              <span className="text-[#b65d05]">{offPlanCount}</span>
+              <span className="text-muted-foreground mx-1">/</span>
+              <span className="text-slate-600">{unmatchedCount}</span>
+            </div>
             <div className="text-[11px] text-muted-foreground mt-2">
               Aktualizováno {fmtTimestamp(lastSync)}
             </div>
