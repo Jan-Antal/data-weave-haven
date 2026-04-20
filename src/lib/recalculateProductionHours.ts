@@ -107,7 +107,7 @@ export async function recalculateProductionHours(
     return out;
   }
 
-  const [allTpv, allSched, allInbox] = await Promise.all([
+  const [allTpv, allSched, allInbox, allHoursLog] = await Promise.all([
     bulkFetchIn<any>(
       "tpv_items",
       "id, item_code, nazev, cena, pocet, status, project_id",
@@ -117,7 +117,7 @@ export async function recalculateProductionHours(
     ),
     bulkFetchIn<any>(
       "production_schedule",
-      "id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id, project_id, status",
+      "id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id, project_id, status, is_midflight",
       "project_id",
       filteredProjectIds,
       (q) => q.in("status", ["scheduled", "in_progress", "completed"]),
@@ -129,7 +129,31 @@ export async function recalculateProductionHours(
       filteredProjectIds,
       (q) => q.eq("status", "pending"),
     ),
+    bulkFetchIn<any>(
+      "production_hours_log",
+      "ami_project_id, hodiny, cinnost_kod",
+      "ami_project_id",
+      filteredProjectIds,
+    ),
   ]);
+
+  // Per-project consumed hours: hours_log (excl TPV/ENG/PRO) + midflight schedule hours
+  const consumedByProject = new Map<string, number>();
+  for (const r of allHoursLog) {
+    const code = String(r.cinnost_kod || "").toUpperCase();
+    if (code === "TPV" || code === "ENG" || code === "PRO") continue;
+    consumedByProject.set(
+      r.ami_project_id,
+      (consumedByProject.get(r.ami_project_id) || 0) + (Number(r.hodiny) || 0),
+    );
+  }
+  for (const s of allSched) {
+    if (!s.is_midflight) continue;
+    consumedByProject.set(
+      s.project_id,
+      (consumedByProject.get(s.project_id) || 0) + (Number(s.scheduled_hours) || 0),
+    );
+  }
 
   // Group by project
   const tpvByProject = new Map<string, any[]>();
@@ -283,6 +307,11 @@ export async function recalculateProductionHours(
         activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
       }
 
+      // Consumption ratio: skutočne odpracované hodiny + midflight história / plán
+      const planTotalForRatio = tpvItems.reduce((s: number, t: any) => s + (Number(t.hodiny_plan) || 0), 0);
+      const consumedTotal = consumedByProject.get(proj.project_id) || 0;
+      const consumptionRatio = planTotalForRatio > 0 ? Math.min(1, consumedTotal / planTotalForRatio) : 0;
+
       for (const item of inboxItems) {
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
         if (!tpv) continue; // ad-hoc inbox item — leave untouched
@@ -294,8 +323,9 @@ export async function recalculateProductionHours(
         ));
 
         const tpvHoursTotal = tpvHoursById.get(tpv.id) ?? 0;
+        const itemRemaining = Math.max(0, tpvHoursTotal * (1 - consumptionRatio));
         const partsCount = Math.max(1, activePartsByCode.get(item.item_code!) || 1);
-        const newHours = Math.round((tpvHoursTotal / partsCount) * 10) / 10;
+        const newHours = Math.round((itemRemaining / partsCount) * 10) / 10;
 
         // For chained items, also split CZK proportionally
         const newCzk = item.split_group_id ? Math.floor(correctCzk / partsCount) : correctCzk;
