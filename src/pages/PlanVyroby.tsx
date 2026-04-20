@@ -664,9 +664,11 @@ export default function PlanVyroby() {
               setMergeState({
                 itemName: sourceBundle.project_name || dragData.projectName || "Bundle",
                 splitGroupIds: uniqueGroupIds,
-                mergeItemCount: splitItems.length,
+                mergeItemCount: sourceBundle.items.length,
                 draggedItemId: splitItems[0].id,
                 targetWeekKey: weekDate,
+                sourceProjectId: dragData.projectId,
+                sourceWeekKey: dragData.weekDate,
                 onKeepSeparate: async () => {
                   await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
                 },
@@ -680,9 +682,11 @@ export default function PlanVyroby() {
               setMergeState({
                 itemName: sourceBundle?.project_name || dragData.projectName || "Bundle",
                 splitGroupIds: result.splitGroupIds,
-                mergeItemCount: result.splitGroupIds.length,
+                mergeItemCount: sourceBundle?.items.length ?? result.splitGroupIds.length,
                 draggedItemId: sourceBundle?.items[0]?.id || "",
                 targetWeekKey: weekDate,
+                sourceProjectId: dragData.projectId,
+                sourceWeekKey: dragData.weekDate,
                 onKeepSeparate: async () => {
                   await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
                 },
