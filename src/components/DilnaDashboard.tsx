@@ -239,6 +239,15 @@ function useDilnaData(weekOffset: number) {
         chainWindowByProject.set(pid, { start: Math.round(start), end: Math.round(end) });
       }
 
+      // ── Spilled projects: have prior weeks with active status (in_progress/paused) ──
+      const spilledProjects = new Set<string>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled" || row.status === "completed") continue;
+        if (row.scheduled_week < weekInfo.weekKey && (row.status === "in_progress" || row.status === "paused")) {
+          spilledProjects.add(row.project_id);
+        }
+      }
+
       // ── dayFraction: how far into the displayed week we are ──
       const todayDate = new Date();
       const isCurrentWeek = weekOffset === 0;
