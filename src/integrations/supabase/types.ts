@@ -1047,6 +1047,96 @@ export type Database = {
           },
         ]
       }
+      production_schedule_backup_20250420: {
+        Row: {
+          adhoc_reason: string | null
+          cancel_reason: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          created_by: string | null
+          expediced_at: string | null
+          id: string | null
+          inbox_item_id: string | null
+          is_blocker: boolean | null
+          is_historical: boolean | null
+          is_midflight: boolean | null
+          item_code: string | null
+          item_name: string | null
+          pause_expected_date: string | null
+          pause_reason: string | null
+          position: number | null
+          project_id: string | null
+          scheduled_czk: number | null
+          scheduled_hours: number | null
+          scheduled_week: string | null
+          split_group_id: string | null
+          split_part: number | null
+          split_total: number | null
+          stage_id: string | null
+          status: string | null
+          tpv_expected_date: string | null
+        }
+        Insert: {
+          adhoc_reason?: string | null
+          cancel_reason?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expediced_at?: string | null
+          id?: string | null
+          inbox_item_id?: string | null
+          is_blocker?: boolean | null
+          is_historical?: boolean | null
+          is_midflight?: boolean | null
+          item_code?: string | null
+          item_name?: string | null
+          pause_expected_date?: string | null
+          pause_reason?: string | null
+          position?: number | null
+          project_id?: string | null
+          scheduled_czk?: number | null
+          scheduled_hours?: number | null
+          scheduled_week?: string | null
+          split_group_id?: string | null
+          split_part?: number | null
+          split_total?: number | null
+          stage_id?: string | null
+          status?: string | null
+          tpv_expected_date?: string | null
+        }
+        Update: {
+          adhoc_reason?: string | null
+          cancel_reason?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expediced_at?: string | null
+          id?: string | null
+          inbox_item_id?: string | null
+          is_blocker?: boolean | null
+          is_historical?: boolean | null
+          is_midflight?: boolean | null
+          item_code?: string | null
+          item_name?: string | null
+          pause_expected_date?: string | null
+          pause_reason?: string | null
+          position?: number | null
+          project_id?: string | null
+          scheduled_czk?: number | null
+          scheduled_hours?: number | null
+          scheduled_week?: string | null
+          split_group_id?: string | null
+          split_part?: number | null
+          split_total?: number | null
+          stage_id?: string | null
+          status?: string | null
+          tpv_expected_date?: string | null
+        }
+        Relationships: []
+      }
       production_settings: {
         Row: {
           default_margin_pct: number

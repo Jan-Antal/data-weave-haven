@@ -490,27 +490,52 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     [weekKeyStr(addWeeks(currentMonday,  2))]: pagerWk4.data,
   }), [pagerWk0.data, pagerWk1.data, pagerWk2.data, pagerWk3.data, pagerWk4.data, currentMonday]);
 
-  // Fetch latest daily log per project across ALL weeks (for spilled projects)
+  // Fetch ALL daily logs per project across ALL weeks (excluding synthetic MF logs)
+  // Sorted desc by week_key, day_index, logged_at — so first match in iteration is most recent.
   const { data: allLatestLogs } = useQuery({
-    queryKey: ["production-daily-logs-latest-all"],
+    queryKey: ["production-daily-logs-all-non-mf"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("production_daily_logs" as any)
         .select("*")
+        .order("week_key", { ascending: false })
+        .order("day_index", { ascending: false })
         .order("logged_at", { ascending: false });
       if (error) throw error;
-      // Group by bundle_id prefix (project_id) — bundle_id format is "projectId::weekKey"
-      const latestByProject = new Map<string, DailyLog>();
+      const byProject = new Map<string, DailyLog[]>();
       for (const row of (data || []) as any[]) {
         const log = row as DailyLog;
+        // Skip synthetic Midflight backfill logs
+        if (log.bundle_id.includes("::MF_")) continue;
         const pid = log.bundle_id.split("::")[0];
-        if (!latestByProject.has(pid)) {
-          latestByProject.set(pid, log);
-        }
+        const arr = byProject.get(pid) ?? [];
+        arr.push(log);
+        byProject.set(pid, arr);
       }
-      return latestByProject;
+      return byProject;
     },
   });
+
+  // Build maps for split-aware fallback:
+  //   splitGroupsByBundle: `${pid}::${weekKey}` -> Set of split_group_id present in that bundle
+  //   scheduleByProjectWeek: `${pid}::${weekKey}` -> items[] (for chain-overlap lookup)
+  const { splitGroupsByBundle, scheduleByProjectWeek } = useMemo(() => {
+    const splitMap = new Map<string, Set<string>>();
+    const itemsMap = new Map<string, ScheduleItem[]>();
+    if (!scheduleData) return { splitGroupsByBundle: splitMap, scheduleByProjectWeek: itemsMap };
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        const key = `${bundle.project_id}::${wk}`;
+        itemsMap.set(key, bundle.items);
+        const groups = new Set<string>();
+        for (const it of bundle.items) {
+          if (it.split_group_id) groups.add(it.split_group_id);
+        }
+        if (groups.size > 0) splitMap.set(key, groups);
+      }
+    }
+    return { splitGroupsByBundle: splitMap, scheduleByProjectWeek: itemsMap };
+  }, [scheduleData]);
 
   // Build projects from schedule for this week + spilled from previous weeks
   const projects = useMemo<VyrobaProject[]>(() => {
@@ -725,10 +750,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
     if (logs.length > 0) return Math.max(...logs.map((l) => l.percent));
-    // Fallback: check all-weeks latest log (for spilled projects)
-    const allLog = allLatestLogs?.get(pid);
-    if (allLog) return allLog.percent;
-    return 0;
+    // Fallback: only for split bundles — find latest non-MF log from a PRIOR week
+    // belonging to the same split_group_id chain.
+    const prior = findPriorChainLog(pid, weekKey);
+    return prior ? prior.percent : 0;
   }
 
   function getLatestPhase(pid: string): string | null {
@@ -737,9 +762,27 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
       return sorted[0].phase;
     }
-    // Fallback: check all-weeks latest log (for spilled projects)
-    const allLog = allLatestLogs?.get(pid);
-    if (allLog) return allLog.phase;
+    // Fallback: only for split bundles
+    const prior = findPriorChainLog(pid, weekKey);
+    return prior ? prior.phase : null;
+  }
+
+  // Find latest non-MF daily log from a PRIOR week belonging to the same split chain
+  // as the current bundle (pid, currentWeekKey). Returns null if the current bundle
+  // is not part of a split chain or no overlapping chain log exists.
+  function findPriorChainLog(pid: string, currentWeekKey: string): DailyLog | null {
+    const bundleSplitGroups = splitGroupsByBundle.get(`${pid}::${currentWeekKey}`);
+    if (!bundleSplitGroups || bundleSplitGroups.size === 0) return null;
+    const all = allLatestLogs?.get(pid);
+    if (!all) return null;
+    for (const log of all) {
+      if (log.week_key >= currentWeekKey) continue;
+      const logWeekItems = scheduleByProjectWeek.get(`${pid}::${log.week_key}`);
+      const overlap = logWeekItems?.some(
+        (i) => i.split_group_id && bundleSplitGroups.has(i.split_group_id),
+      );
+      if (overlap) return log;
+    }
     return null;
   }
 
