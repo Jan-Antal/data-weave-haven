@@ -280,8 +280,10 @@ export async function midflightImportPlanVyroby(
   // Inbox items mirror their TPV item directly:
   //   estimated_hours = tpv.hodiny_plan / activeChainParts
   //   estimated_czk   = (cena × pocet) / activeChainParts (only if chained)
-  // Midflight historical bundles are linked into the chain group so
-  // split badges (N/N per item_code) stay correct via renumberChain.
+  // Historické midflight bundle riadky (is_midflight=true) sú agregované
+  // týždenné súčty — NEPRIPÁJAJÚ sa do split chainu konkrétnej položky a
+  // nedostávajú split badge. Per-item chain (1/N..N/N) sa počíta len cez
+  // aktívne riadky inbox + non-midflight schedule, zoskupené podľa item_code.
   onProgress?.("[midflight] Dorovnávam Inbox per projekt...");
 
   const projectIds = [...projectWeeklyHours.keys()];
@@ -307,7 +309,7 @@ export async function midflightImportPlanVyroby(
 
     const { data: schedRows } = await (supabaseClient as any)
       .from("production_schedule")
-      .select("project_id, item_code, is_midflight, status")
+      .select("id, project_id, item_code, is_midflight, status, split_group_id, created_at")
       .in("project_id", projectIds)
       .in("status", ["scheduled", "in_progress", "completed"]);
 
@@ -341,8 +343,12 @@ export async function midflightImportPlanVyroby(
       const schedList = schedByProject.get(projectId) || [];
       if (mfList.length === 0) continue;
 
-      const head = mfList.find((r) => !r.split_group_id) || mfList[0];
-      const firstBundleId: string = head.id;
+      // Vyčisti split metadata na historických bundle riadkoch — nie sú splity.
+      await (supabaseClient as any)
+        .from("production_schedule")
+        .update({ split_group_id: null, split_part: null, split_total: null })
+        .eq("is_midflight", true)
+        .eq("project_id", projectId);
 
       // Count active parts per item_code (inbox + non-midflight schedule)
       const activePartsByCode = new Map<string, number>();
@@ -380,18 +386,59 @@ export async function midflightImportPlanVyroby(
         if (upErr) errors.push(`Inbox update ${it.id}: ${upErr.message}`);
       }
 
-      // Link midflight schedule rows to chain group (so renumberChain sees them)
-      await (supabaseClient as any)
-        .from("production_schedule")
-        .update({ split_group_id: firstBundleId })
-        .eq("is_midflight", true)
-        .eq("project_id", projectId)
-        .neq("id", firstBundleId);
+      // Per-item-code chain: pre každý item_code s N>1 aktívnymi časťami
+      // priraď spoločný split_group_id (= id prvej časti) a zavolaj renumberChain.
+      // Ak N==1, vyčisti split metadata.
+      type Part = { table: "production_schedule" | "production_inbox"; id: string; existingGid: string | null; ts: string };
+      const partsByCode = new Map<string, Part[]>();
+      for (const s of schedList) {
+        if (!s.item_code || s.is_midflight) continue;
+        if (s.item_code.startsWith('HIST_')) continue;
+        if (!partsByCode.has(s.item_code)) partsByCode.set(s.item_code, []);
+        partsByCode.get(s.item_code)!.push({
+          table: "production_schedule", id: s.id,
+          existingGid: s.split_group_id ?? null, ts: s.created_at || "",
+        });
+      }
+      for (const it of inboxList) {
+        if (!it.item_code) continue;
+        if (!partsByCode.has(it.item_code)) partsByCode.set(it.item_code, []);
+        partsByCode.get(it.item_code)!.push({
+          table: "production_inbox", id: it.id,
+          existingGid: it.split_group_id ?? null, ts: it.sent_at || "",
+        });
+      }
 
-      try {
-        await renumberChain(firstBundleId);
-      } catch (e: any) {
-        errors.push(`renumberChain (${projectId}): ${e?.message || e}`);
+      const groupsToRenumber = new Set<string>();
+      for (const [, parts] of partsByCode) {
+        if (parts.length <= 1) {
+          for (const p of parts) {
+            await (supabaseClient as any)
+              .from(p.table)
+              .update({ split_group_id: null, split_part: null, split_total: null })
+              .eq("id", p.id);
+          }
+          continue;
+        }
+        const sorted = [...parts].sort((a, b) => a.ts.localeCompare(b.ts));
+        const gid = sorted.find((p) => p.existingGid)?.existingGid || sorted[0].id;
+        for (const p of sorted) {
+          if (p.existingGid !== gid) {
+            await (supabaseClient as any)
+              .from(p.table)
+              .update({ split_group_id: gid })
+              .eq("id", p.id);
+          }
+        }
+        groupsToRenumber.add(gid);
+      }
+
+      for (const gid of groupsToRenumber) {
+        try {
+          await renumberChain(gid);
+        } catch (e: any) {
+          errors.push(`renumberChain (${projectId}/${gid}): ${e?.message || e}`);
+        }
       }
 
       onProgress?.(`[midflight] ${projectId}: ${mfList.length} historických + ${inboxList.length} inbox`);
