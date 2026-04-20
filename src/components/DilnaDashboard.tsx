@@ -77,6 +77,7 @@ interface ProjectCard {
   loggedHours: number;         // sum of production_hours_log for the displayed week
   trackedPct: number;          // logged / planned (0–∞)
   completionPct: number | null; // latest daily-log percent (0–100), null = no log
+  expectedPct: number | null;   // expected progress today (chain-window aware)
   slipStatus: SlipStatus;
   valueCzk: number;
   usekBreakdown: UsekRow[];
