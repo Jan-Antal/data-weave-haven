@@ -1,71 +1,118 @@
 
 
-## Problém
+## Rozsah
 
-Projekt Z-2607-008 po obnove zo zálohy stratil chain väzbu (`split_group_id = NULL` na všetkých riadkoch) a má duplicitné dáta v T18 schedule + Inboxe. Recalculate preto napočíta 2× plán namiesto remaining.
+V `src/components/DilnaDashboard.tsx` rozšíriť zobrazené dlaždice o **všetky projekty s reálne odpracovanými hodinami** v zvolenom týždni — nielen tie zo `production_schedule`. Pridať dva varovné stavy:
 
-## Aktuálny stav v DB
+- **„Mimo Plán výroby"** — projekt existuje v `projects` tabuľke, má hodiny v `production_hours_log`, ale nie je v `production_schedule` pre daný týždeň. Žltá výstraha.
+- **„Nespárované"** — `ami_project_id` z `production_hours_log` neexistuje v `projects` (už implementované, len doladiť styling). Sivá/červená výstraha.
 
-| Zdroj | Počet | Súčet h | split_group_id |
-|---|---|---|---|
-| `production_schedule` T16 midflight | 1 | 33.9 | NULL |
-| `production_schedule` T18 (obnovené zo zálohy) | 0 (zmazané) | 0 | — |
-| `production_inbox` pending | 33 | 586.0 | NULL |
-| `project_plan_hours.hodiny_plan` | — | 586 | — |
+## Zmeny v `DilnaDashboard.tsx`
 
-T18 schedule riadky sú **duplicitné** s Inboxom (po obnove zo zálohy zostali aj v inboxe aj v schedule). Aktuálne sú T18 v schedule už zmazané (predchádzajúca cleanup), v DB ostal len T16 midflight.
+### 1. Rozšíriť typ `ProjectCard`
 
-## Cieľ
+Nahradiť `isUnmatched: boolean` enumom `cardWarning`:
 
-1. T16 midflight (33.9h) zostáva.
-2. Inbox 33 položiek (552.1h zostatok = 586 − 33.9) plus T16 = 586h plán ✓.
-3. Všetky tri (T16 schedule + Inbox) zdieľajú jeden `split_group_id` → chain obnovený → recalculate bude správne škálovať.
+```ts
+type CardWarning = "none" | "off_plan" | "unmatched";
 
-## Zmena 1 — One-off SQL data fix (cez insert tool)
-
-```sql
--- 1. Nastaviť spoločný chain group_id na T16 midflight + všetky pending inbox riadky
-WITH new_chain AS (
-  SELECT gen_random_uuid() AS chain_id
-)
-UPDATE production_schedule
-SET split_group_id = (SELECT chain_id FROM new_chain)
-WHERE project_id = 'Z-2607-008' AND is_midflight = true;
-
--- 2. Použiť rovnaký chain_id na inbox (cez priame priradenie z midflight riadku)
-UPDATE production_inbox
-SET split_group_id = (
-  SELECT split_group_id FROM production_schedule
-  WHERE project_id = 'Z-2607-008' AND is_midflight = true LIMIT 1
-)
-WHERE project_id = 'Z-2607-008' AND status = 'pending';
-
--- 3. Škálovať inbox hodiny: remaining = 586 - 33.9 = 552.1; scale = 552.1/586
-UPDATE production_inbox
-SET estimated_hours = ROUND((estimated_hours * 552.1 / 586.0)::numeric, 1),
-    estimated_czk = ROUND(estimated_czk * 552.1 / 586.0)
-WHERE project_id = 'Z-2607-008' AND status = 'pending';
-
--- 4. Prečíslovať chain (T16 = 1/2, inbox = NULL/2)
-UPDATE production_schedule
-SET split_part = 1, split_total = 2
-WHERE project_id = 'Z-2607-008' AND is_midflight = true;
-
-UPDATE production_inbox
-SET split_part = NULL, split_total = 2
-WHERE project_id = 'Z-2607-008' AND status = 'pending';
+interface ProjectCard {
+  ...
+  warning: CardWarning;  // namiesto isUnmatched
+  ...
+}
 ```
+
+### 2. Doplniť tretiu vetvu v `useDilnaData`
+
+Po existujúcich dvoch slučkách (scheduled + unmatched) pridať:
+
+```ts
+// 3) Off-plan: projekt JE v DB (matched), má hodiny tento týždeň, ale nie je v schedule
+for (const [pid, loggedHours] of hoursByProject) {
+  if (scheduledProjects.has(pid)) continue;
+  if (!knownProjectIds.has(pid)) continue;  // unmatched už spracované vyššie
+  if (loggedHours < 0.05) continue;
+  const proj = projMap.get(pid)!;
+  const usekMap = usekByProject.get(pid);
+  const usekBreakdown = usekMap
+    ? Array.from(usekMap.values()).sort(...)
+    : [];
+  const prodPct = (proj.cost_production_pct ?? 30) / 100;
+  const valueCzk = (proj.prodejni_cena ?? 0) * prodPct;
+  cards.push({
+    projectId: pid,
+    projectName: proj.project_name || pid,
+    warning: "off_plan",
+    plannedHours: 0,
+    loggedHours,
+    trackedPct: 0,
+    completionPct: null,
+    slipStatus: "none",
+    valueCzk,
+    usekBreakdown,
+  });
+}
+```
+
+Z prvej slučky odstrániť `isUnmatched` priradenie z `proj === null` (scheduled vždy má proj alebo nie — ak nie, je to skôr `unmatched` v scheduli, ostáva ako warning `unmatched`).
+
+### 3. Helpery pre warning UI
+
+```ts
+function warningLabel(w: CardWarning): string {
+  if (w === "off_plan") return "Mimo Plán výroby";
+  if (w === "unmatched") return "Nespárované";
+  return "";
+}
+
+function warningPillClass(w: CardWarning): string {
+  if (w === "off_plan") return "bg-amber-100 text-amber-800 border border-amber-300";
+  if (w === "unmatched") return "bg-slate-200 text-slate-700 border border-slate-300";
+  return "";
+}
+
+function warningBorderColor(w: CardWarning, projectColor: string): string {
+  if (w === "off_plan") return "#d97706";   // amber
+  if (w === "unmatched") return "#94a3b8";  // slate
+  return projectColor;
+}
+```
+
+### 4. Render dlaždice
+
+V mapovaní `cards.map(...)`:
+- Ľavý border: `warningBorderColor(card.warning, projectColor)`.
+- Pre `off_plan`: zobrazí plný `projectName` + `projectId` (rovnako ako naplánované) + pod ním ikonku `AlertCircle` s textom „Mimo Plán výroby" v amber pille.
+- Pre `unmatched`: ostáva existujúce zobrazenie (mono ID + sivý label).
+- Pre `none`: bez varovania, ako dnes.
+- Pri `off_plan` aj `unmatched` skryť slip pill (nemá zmysel bez plánu).
+
+### 5. Sumárna karta „Nespárované"
+
+Premenovať na **„Mimo plán / Nespárované"** s rozdelením `offPlanCount / unmatchedCount`:
+
+```tsx
+<span className="text-[#b65d05]">{offPlanCount}</span>
+<span className="mx-1">/</span>
+<span className="text-slate-600">{unmatchedCount}</span>
+```
+
+Spočítať `offPlanCount = cards.filter(c => c.warning === "off_plan").length`.
+
+### 6. Triedenie
+
+Upraviť: delays → slips → ok → off_plan → unmatched → none.
 
 ## Overenie
 
-1. `SUM(scheduled_hours)` midflight T16 + `SUM(estimated_hours)` inbox ≈ **586h** (= plán).
-2. Všetky riadky (T16 + Inbox) zdieľajú rovnaký `split_group_id`.
-3. UI Inbox: Z-2607-008 zobrazí ~552h (zostatok), nie 586h.
-4. T16 zobrazí badge `1/2`.
-5. **Klik "Přepočítat hodiny"** → idempotentný (recalculate detekuje chain, `consumedChainHours = 33.9`, `remainingScale = 552.1/586 ≈ 0.942`, súčet inbox zostane 552h).
-6. Naplánovať inbox položku do silo → silo bundle preberie chain, prečíslovanie cez `renumberProjectChain` → 1/3 + 2/3 (NULL inbox).
+1. T15 (`weekOffset = -1`): zobraziť dlaždice projektov z `production_hours_log` ktoré nie sú v `production_schedule` pre 2026-04-13. Tie známe projekty dostanú amber border + pill „Mimo Plán výroby". Neznáme `ami_project_id` ostanú „Nespárované".
+2. Aktuálny týždeň: dlaždice projektov v pláne (zelená/žltá/červená) zobrazia sa prvé, off-plan/unmatched za nimi.
+3. Sumár: „Mimo plán / Nespárované" počty sedia s počtom dlaždíc.
+4. Úsek breakdown rozbalený funguje aj pre off-plan dlaždice.
+5. Žiadny projekt z `overhead_projects` (REZ, ENG, PM…) sa nezobrazí ako off-plan (filter `overheadSet` ostáva).
 
 ## Dotknuté súbory
 
-Iba data fix cez insert tool, žiadne zmeny v kóde.
+- `src/components/DilnaDashboard.tsx`
 
