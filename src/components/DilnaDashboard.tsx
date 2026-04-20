@@ -195,6 +195,64 @@ function useDilnaData(weekOffset: number) {
       const projMap = new Map(projects.map(p => [p.project_id, p]));
       const knownProjectIds = new Set(projMap.keys());
 
+      // ── Chain windows for split projects (chain-window-aware expected progress) ──
+      // Group all schedule rows by project_id, then by week_key (sum of scheduled_hours).
+      // For each project compute cumulative-share window covering the displayed week.
+      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string }>);
+      const chainByProject = new Map<string, Array<{ week: string; hours: number }>>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled") continue;
+        const pid = row.project_id;
+        if (!chainByProject.has(pid)) chainByProject.set(pid, []);
+        const arr = chainByProject.get(pid)!;
+        const existing = arr.find(w => w.week === row.scheduled_week);
+        if (existing) existing.hours += Number(row.scheduled_hours);
+        else arr.push({ week: row.scheduled_week, hours: Number(row.scheduled_hours) });
+      }
+      const chainWindowByProject = new Map<string, { start: number; end: number }>();
+      for (const [pid, weeks] of chainByProject) {
+        weeks.sort((a, b) => a.week.localeCompare(b.week));
+        const total = weeks.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) {
+          chainWindowByProject.set(pid, { start: 0, end: 100 });
+          continue;
+        }
+        let cum = 0;
+        let start = 0;
+        let end = 100;
+        let found = false;
+        for (const w of weeks) {
+          const share = (w.hours / total) * 100;
+          if (w.week === weekInfo.weekKey) {
+            start = cum;
+            end = cum + share;
+            found = true;
+            break;
+          }
+          cum += share;
+        }
+        if (!found) {
+          // displayed week not in chain — fall back to cumulative position at displayed week
+          start = 0;
+          end = 100;
+        }
+        chainWindowByProject.set(pid, { start: Math.round(start), end: Math.round(end) });
+      }
+
+      // ── dayFraction: how far into the displayed week we are ──
+      const today = new Date();
+      const isCurrentWeek = weekOffset === 0;
+      const isPastWeek = weekOffset < 0;
+      const dayOfWeek = today.getDay(); // 0=Ne … 6=So
+      const workdayIdx = dayOfWeek === 0 ? 5 : Math.min(dayOfWeek, 5); // Po=1 … Pá=5
+      const dayFraction = isPastWeek ? 1 : isCurrentWeek ? workdayIdx / 5 : 0;
+
+      function expectedFor(pid: string, plannedHours: number): number | null {
+        if (plannedHours <= 0) return null;
+        const cw = chainWindowByProject.get(pid) ?? { start: 0, end: 100 };
+        return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
+      }
+
       const cards: ProjectCard[] = [];
 
       // 1) Scheduled (planned) projects — primary cards
