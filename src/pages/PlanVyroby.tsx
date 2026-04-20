@@ -976,11 +976,18 @@ export default function PlanVyroby() {
           itemName={mergeState.itemName}
           mergeItemCount={mergeState.mergeItemCount}
           onMerge={async () => {
-            if (mergeState.splitGroupIds.length === 1 && mergeState.draggedItemId) {
+            if (mergeState.splitGroupIds.length === 1 && mergeState.draggedItemId && mergeState.mergeItemCount === 1) {
               // Single item merge — hook handles it directly
               await moveScheduleItemToWeek(mergeState.draggedItemId, mergeState.targetWeekKey, 'merge');
+            } else if (mergeState.sourceProjectId && mergeState.sourceWeekKey) {
+              // Bundle merge: atomic bundle-level merge across two weeks.
+              await mergeBundleAcrossWeeks(
+                mergeState.sourceProjectId,
+                mergeState.sourceWeekKey,
+                mergeState.targetWeekKey,
+              );
             } else {
-              // Bundle merge — move with 'separate' first, then merge split groups
+              // Fallback (legacy): per-group merge
               await mergeState.onKeepSeparate();
               const moveEntry = popLastUndo("plan-vyroby");
               await mergeBundleSplitGroups(mergeState.splitGroupIds, mergeState.targetWeekKey, moveEntry);
