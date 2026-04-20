@@ -2438,7 +2438,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       })()}{" "}
                       — Operace
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                       {PHASES.map((p) => (
                         <button
                           key={p.name}
@@ -2448,7 +2448,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               setLogPercent(p.pct);
                             }
                           }}
-                          className="px-2.5 py-1 rounded-full text-xs font-medium transition-all"
+                          className="shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap"
                           style={{
                             background: logPhase === p.name ? p.color : "hsl(var(--muted))",
                             color: logPhase === p.name ? "#fff" : "hsl(var(--foreground))",
