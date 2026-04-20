@@ -353,17 +353,16 @@ export function useProductionDragDrop() {
               detail: JSON.stringify({ item_name: oldItem.item_name, from_week: weekLabel(oldWeek || ""), to_week: weekLabel(newWeekDate) }),
             });
             invalidateAll();
-            const capturedOldItemCode = oldItem.item_code;
             pushUndo({
               page: "plan-vyroby",
               actionType: "move_silo_item",
               description: `Přesun ${oldItem?.item_name || "položky"} → ${weekLabel(newWeekDate)}`,
               undo: async () => {
-                await supabase.from("production_schedule").update({ scheduled_week: oldWeek, item_code: capturedOldItemCode }).eq("id", scheduleItemId);
+                await supabase.from("production_schedule").update({ scheduled_week: oldWeek }).eq("id", scheduleItemId);
                 invalidateAll();
               },
               redo: async () => {
-                await supabase.from("production_schedule").update({ scheduled_week: newWeekDate, item_code: newItemCode }).eq("id", scheduleItemId);
+                await supabase.from("production_schedule").update({ scheduled_week: newWeekDate }).eq("id", scheduleItemId);
                 invalidateAll();
               },
             });
