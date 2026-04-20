@@ -577,7 +577,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                                   className="h-full rounded-full transition-all"
                                   style={{
                                     width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
-                                    backgroundColor: card.isUnmatched ? "#94a3b8" : projectColor,
+                                    backgroundColor: warningBorderColor(card.warning, projectColor),
                                   }}
                                 />
                               </div>
