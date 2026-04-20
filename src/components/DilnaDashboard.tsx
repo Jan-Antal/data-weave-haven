@@ -58,9 +58,9 @@ function usekSortKey(kod: string): number {
   return idx >= 0 ? idx : USEK_ORDER.length;
 }
 
-/** Slip tolerance thresholds (in % points). */
-const SLIP_OK_TOL = 5;     // tracked − completion ≤ 5 %  → green
-const SLIP_RED = 20;       // tracked − completion > 20 % → red
+/** Slip tolerance thresholds (in % points) — aligned with Vyroba module. */
+const SLIP_OK_TOL = 10;    // completion ≥ expected − 10  → green (on-track)
+const SLIP_RED = 25;       // completion ≥ expected − 25  → orange (at-risk); else red (behind)
 
 /* ── types ───────────────────────────────────────────────────────── */
 
@@ -239,6 +239,15 @@ function useDilnaData(weekOffset: number) {
         chainWindowByProject.set(pid, { start: Math.round(start), end: Math.round(end) });
       }
 
+      // ── Spilled projects: have prior weeks with active status (in_progress/paused) ──
+      const spilledProjects = new Set<string>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled" || row.status === "completed") continue;
+        if (row.scheduled_week < weekInfo.weekKey && (row.status === "in_progress" || row.status === "paused")) {
+          spilledProjects.add(row.project_id);
+        }
+      }
+
       // ── dayFraction: how far into the displayed week we are ──
       const todayDate = new Date();
       const isCurrentWeek = weekOffset === 0;
@@ -262,7 +271,9 @@ function useDilnaData(weekOffset: number) {
         const loggedHours = hoursByProject.get(pid) || 0;
         const trackedPct = plannedHours > 0 ? Math.round((loggedHours / plannedHours) * 100) : 0;
         const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
-        const slipStatus = isUnmatched ? "none" : computeSlip(trackedPct, completionPct, loggedHours);
+        const expectedPctVal = isUnmatched ? null : expectedFor(pid, plannedHours);
+        const isSpilled = spilledProjects.has(pid);
+        const slipStatus = isUnmatched ? "none" : computeSlip(completionPct, expectedPctVal, loggedHours, isSpilled);
 
         const prodPct = (proj?.cost_production_pct ?? 30) / 100;
         const cena = proj?.prodejni_cena ?? 0;
@@ -281,7 +292,7 @@ function useDilnaData(weekOffset: number) {
           loggedHours,
           trackedPct,
           completionPct,
-          expectedPct: isUnmatched ? null : expectedFor(pid, plannedHours),
+          expectedPct: expectedPctVal,
           slipStatus,
           valueCzk,
           usekBreakdown,
@@ -372,14 +383,20 @@ function useDilnaData(weekOffset: number) {
   });
 }
 
-/** Compute slip status from tracked-% vs completion-%. */
-function computeSlip(trackedPct: number, completionPct: number | null, loggedHours: number): SlipStatus {
-  if (loggedHours <= 0) return "none";
+/** Compute slip status using completion-% vs expected-% (aligned with Vyroba module). */
+function computeSlip(
+  completionPct: number | null,
+  expectedPct: number | null,
+  loggedHours: number,
+  isSpilled: boolean,
+): SlipStatus {
+  if (isSpilled) return "delay";
+  if (loggedHours <= 0 && expectedPct === null) return "none";
   if (completionPct == null) return "none";
-  const diff = trackedPct - completionPct;     // > 0 = burning hours faster than completing work
-  if (diff > SLIP_RED) return "delay";
-  if (diff > SLIP_OK_TOL) return "slip";
-  return "ok";
+  const ref = expectedPct ?? 100;
+  if (completionPct >= ref - SLIP_OK_TOL) return "ok";
+  if (completionPct >= ref - SLIP_RED) return "slip";
+  return "delay";
 }
 
 /* ── color helpers (gradient palette aligned with PlanVyrobyTableView) ── */
