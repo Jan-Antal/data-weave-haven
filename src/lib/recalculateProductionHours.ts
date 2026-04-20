@@ -307,6 +307,11 @@ export async function recalculateProductionHours(
         activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
       }
 
+      // Consumption ratio: skutočne odpracované hodiny + midflight história / plán
+      const planTotalForRatio = tpvItems.reduce((s: number, t: any) => s + (Number(t.hodiny_plan) || 0), 0);
+      const consumedTotal = consumedByProject.get(proj.project_id) || 0;
+      const consumptionRatio = planTotalForRatio > 0 ? Math.min(1, consumedTotal / planTotalForRatio) : 0;
+
       for (const item of inboxItems) {
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
         if (!tpv) continue; // ad-hoc inbox item — leave untouched
@@ -318,8 +323,9 @@ export async function recalculateProductionHours(
         ));
 
         const tpvHoursTotal = tpvHoursById.get(tpv.id) ?? 0;
+        const itemRemaining = Math.max(0, tpvHoursTotal * (1 - consumptionRatio));
         const partsCount = Math.max(1, activePartsByCode.get(item.item_code!) || 1);
-        const newHours = Math.round((tpvHoursTotal / partsCount) * 10) / 10;
+        const newHours = Math.round((itemRemaining / partsCount) * 10) / 10;
 
         // For chained items, also split CZK proportionally
         const newCzk = item.split_group_id ? Math.floor(correctCzk / partsCount) : correctCzk;
