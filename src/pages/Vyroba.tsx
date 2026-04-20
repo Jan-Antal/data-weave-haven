@@ -864,10 +864,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getWeeklyGoal(pid: string): number {
     const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
     if (projectForGoal?.isSpilled) return 100;
-    if (!scheduleData) return 100;
+    if (!scheduleData) return 0;
+
+    // If bundle is part of a split chain → goal = chain window end for this week
+    const cw = getChainWindow(pid);
+    if (cw) return Math.round(cw.end);
 
     // hodiny_plan from project_plan_hours
-    const hPlan = planHoursMap?.get(pid);
+    if (!planHoursMap) return 0; // loading — avoid flashing 100%
+    const hPlan = planHoursMap.get(pid);
     if (!hPlan || hPlan <= 0) return 100;
 
     // Day fraction: Mon=1/5, Tue=2/5, ..., Fri=5/5; weekends=5/5
