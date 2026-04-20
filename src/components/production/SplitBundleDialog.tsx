@@ -98,12 +98,10 @@ export function SplitBundleDialog({
         else toSplit.push(item);
       }
 
-      // One shared chain id for the whole bundle. Reuse an existing group id
-      // from any selected item if present; otherwise generate a fresh uuid.
-      const sharedGroupId =
-        items.find((i) => i.split_group_id)?.split_group_id ||
-        items[0]?.id ||
-        crypto.randomUUID();
+      // Per-item chain: each item_code keeps its own split_group_id, so each
+      // code is numbered independently (e.g. TK.05 1/2+2/2, TK.07 1/2+2/2).
+      const groupIdFor = (item: BundleSplitItem): string =>
+        item.split_group_id || item.id;
 
       if (toMove.length > 0) {
         await Promise.all(
@@ -112,7 +110,7 @@ export function SplitBundleDialog({
               .from("production_schedule")
               .update({
                 scheduled_week: targetWeek,
-                split_group_id: sharedGroupId,
+                split_group_id: groupIdFor(item),
               })
               .eq("id", item.id)
           )
@@ -126,11 +124,12 @@ export function SplitBundleDialog({
             const keepHours = item.scheduled_hours - spillHours;
             const czkPerHour = item.scheduled_hours > 0 ? item.scheduled_czk / item.scheduled_hours : 550;
             const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
+            const gid = groupIdFor(item);
             return [
               supabase.from("production_schedule").update({
                 scheduled_hours: keepHours,
                 scheduled_czk: keepHours * czkPerHour,
-                split_group_id: sharedGroupId,
+                split_group_id: gid,
                 item_name: cleanName,
               }).eq("id", item.id),
               supabase.from("production_schedule").insert({
@@ -139,15 +138,18 @@ export function SplitBundleDialog({
                 scheduled_week: targetWeek, scheduled_hours: spillHours,
                 scheduled_czk: spillHours * czkPerHour, position: 999,
                 status: "scheduled", created_by: user.id,
-                split_group_id: sharedGroupId,
+                split_group_id: gid,
               }),
             ];
           })
         );
       }
 
-      // Single chain renumbering for the whole bundle (numbers all parts globally).
-      await renumberChain(sharedGroupId);
+      // Renumber each item_code's chain independently.
+      const uniqueGroupIds = Array.from(
+        new Set([...toMove, ...toSplit].map((i) => groupIdFor(i)))
+      );
+      await Promise.all(uniqueGroupIds.map((gid) => renumberChain(gid)));
 
       const changedItems = toMove.length + toSplit.length;
 
