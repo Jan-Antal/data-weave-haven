@@ -1,131 +1,81 @@
 
 
+## Diagnóza
+
+V projekte Allianz vznikli tri samostatné, ale prepojené chyby v split chaine:
+
+1. **Nový split na už splitnutom bundli začína od 1/2 namiesto pokračovania chainu**  
+   `SplitBundleDialog.handleSplitBundle` (riadok 103) pri voľbe `groupIdFor` síce zachová existujúci `split_group_id`, ALE `renumberChain` v `splitChainHelpers.ts` **zoskupuje per `item_code`** (`chainKey`). Keď bundle obsahuje viacero rôznych `item_code` a každý má vlastnú dvojicu (1/2, 2/2), nový split ich opäť rozdelí len na 1/2 + 2/2 lokálne, namiesto toho aby sa nadviazalo na predošlý bundle chain (mal by byť 6/6, lebo predtým bolo 5/5). Bundle ako celok teda nemá spoločné číslovanie.
+
+2. **Merge bundlu rozpadáva položky po prvkoch**  
+   `mergeBundleSplitGroups` iteruje per `split_group_id` (ktorý je per item_code), takže merge sa vykoná zvlášť pre každý code. Ak má bundle 5 rôznych codeov, merge spraví 5 nezávislých zlúčení a UI zobrazí mess (rôzne /N na každom riadku).
+
+3. **Drag-to-merge funguje len po jednotlivých položkách**  
+   V `PlanVyroby.handleDragEnd` (riadok 650) sa pre `silo-bundle` drag detekuje merge len keď bundle obsahuje aspoň jednu položku so split siblingom v cieľovom týždni — ALE merge dialog následne zavolá `mergeBundleSplitGroups([sgId1, sgId2, ...])` s per-code groupami, takže výsledok je zase rozpadnutý po prvkoch. Vizuálne sa tak pre user-a javí, že drag merge "nefunguje" pre celý bundle a musí ťahať položku po položke.
+
+Koreň všetkých troch problémov: **chain je definovaný per `item_code`, nie per bundle**. Užívateľ chce **bundle-level chain** — všetky položky bundlu zdieľajú jeden spoločný chain s jedným číslovaním (napr. celý bundle Multisport má 5/5 → po splite 6/6).
+
 ## Cieľ
 
-Pre **split bundle** (časť chainu, napr. `2/3`) musí týždenný cieľ a očakávaný progress rešpektovať pozíciu v chaine:
+Zaviesť **bundle-level chain** ako prvotriednu jednotku:
 
-- **Štart okna** = súčet % hodín z **predošlých splitov** v chaine (napr. split 1/3 mal 50 % celkového plánu chainu → štart = 50 %).
-- **Koniec okna** = štart + % hodín **aktuálneho splitu** (napr. 2/3 = 30 % → koniec = 80 %).
-- **Day-by-day expected** sa lineárne pohybuje v rámci `[štart, koniec]` podľa dňa v týždni (Po=1/5 … Pia=5/5).
-
-Pre nesplitnuté bundles ostáva logika nezmenená (`weeklyGoal` vs. `hodiny_plan`, štart 0 → koniec = goal).
-
-## Logika
-
-### Definícia chainu
-
-Chain = všetky položky v `production_schedule` zdieľajúce rovnaký `split_group_id` (naprieč týždňami, vrátane completed/expediced). Bundle v aktuálnom týždni má jeden alebo viac `split_group_id`.
-
-### Výpočet okna pre split bundle
-
-```text
-chainTotalHours = SUM(hours všetkých položiek v chaine)
-priorPartsHours = SUM(hours položiek z chainu so scheduled_week < weekKey)
-currentPartHours = SUM(hours položiek z chainu so scheduled_week === weekKey)
-
-windowStart = (priorPartsHours / chainTotalHours) * 100
-windowEnd   = ((priorPartsHours + currentPartHours) / chainTotalHours) * 100
-```
-
-Ak má bundle **viac chainov** (paralelné splits v jednom týždni), `windowStart` a `windowEnd` sa počítajú **vážene** cez sumu hodín všetkých chainov:
-
-```text
-windowStart = SUM(priorPartsHours_i) / SUM(chainTotalHours_i) * 100
-windowEnd   = SUM((priorPartsHours_i + currentPartHours_i)) / SUM(chainTotalHours_i) * 100
-```
-
-Položky v bundli **bez `split_group_id`** sa v týchto sumách ignorujú (nie sú súčasťou chainu) — pre čistotu, hybridné bundles (split + nesplit) budú držať len chain logiku, lebo split-aware cieľ má zmysel len pre chained časť.
-
-Ak bundle **neobsahuje žiadny split** → `windowStart = 0`, `windowEnd = weeklyGoal` (existujúce správanie).
-
-### Day-by-day expected
-
-```ts
-expectedPct(dayIndex) = windowStart + (windowEnd - windowStart) * (workingDaysElapsed / 5)
-```
-
-`weeklyGoal` (zobrazené ako „Týdenní cíl: X %" v hlavičke) = `windowEnd`.
-
-### Status (on-track / at-risk / behind)
-
-Nezmenené prahy, len voči novému `expected`:
-
-- `bundleProgress >= expected - 10` → on-track
-- `bundleProgress >= expected - 25` → at-risk
-- inak → behind
+- Split bundlu pokračuje v existujúcom bundle chaine → ak bol bundle časť 5/5, nový split spraví 6/6 (a prečísluje predošlé na 1/6 … 5/6).
+- Merge bundlu zlúči celý bundle ako jednu operáciu — všetky položky sa spoja s ich pármi v cieľovom týždni v jednom kroku.
+- Drag celého bundlu na iný bundle (rovnaký projekt) ponúkne merge celého bundlu, nie po položkách.
+- Per-item chain ostáva ako fallback len keď bundle obsahuje **iba jednu** položku v split chaine (legacy prípady).
 
 ## Implementácia
 
-### `src/pages/Vyroba.tsx`
+### 1. `src/lib/splitChainHelpers.ts` — bundle-aware chain
 
-**1. Nová helper funkcia `getChainWindow(pid, weekKey): { start: number; end: number } | null`**
+- Pridať novú funkciu `renumberBundleChain(splitGroupId)`:
+  - Načíta všetky riadky chainu (rovnaká logika ako `fetchChainRows`).
+  - **Zoskupí per `(project_id, scheduled_week)` namiesto per `item_code`** — každý unikátny týždeň = jedna „časť bundlu".
+  - Zoradí týždne ASC podľa `scheduled_week`.
+  - Pre každú položku v týždni nastaví rovnaké `split_part = idx + 1` a `split_total = počet_týždňov`. Všetky položky bundlu v jednom týždni tak zdieľajú rovnaké `N/M`.
+- `renumberChain` zostáva pre legacy single-item chainy. `SplitBundleDialog` bude volať novú `renumberBundleChain`.
 
-- Pre projekt `pid` a aktuálny `weekKey` zozbieraj zo `scheduleData` všetky `split_group_id` prítomné v bundli daného týždňa.
-- Pre každý `split_group_id` prejdi všetky týždne v `scheduleData` a sčítaj `scheduled_hours` (ignoruj `cancelled`):
-  - `chainTotalHours += active.hours`
-  - ak `wk < weekKey` → `priorPartsHours += active.hours`
-  - ak `wk === weekKey` → `currentPartHours += active.hours`
-- Ak žiadny chain → vráť `null`.
-- Inak vráť `{ start: prior/total*100, end: (prior+current)/total*100 }`.
+### 2. `src/components/production/SplitBundleDialog.tsx` — pokračovanie chainu
 
-**2. Úprava `getWeeklyGoal(pid)` (riadok 842)**
+- Zmena `groupIdFor`: namiesto per-item `item.split_group_id || item.id` použiť **jeden zdieľaný `bundleGroupId`** pre celý bundle:
+  - Ak ktorákoľvek položka už má `split_group_id` → použiť ho ako spoločný `bundleGroupId` (zachová sa väzba na predošlý bundle split).
+  - Inak vygenerovať `crypto.randomUUID()` raz pre celý bundle.
+- Po inserte všetkých nových rowov zavolať `renumberBundleChain(bundleGroupId)` jediný raz.
+- Výsledok: bundle 5/5 → split → 1/6, 2/6, …, 5/6 (pôvodné týždne) + 6/6 (nový týždeň).
 
-```ts
-const chainWindow = getChainWindow(pid, weekKey);
-if (chainWindow) {
-  return Math.min(100, Math.round(chainWindow.end));
-}
-// existujúca hodiny_plan logika ostáva pre nesplit bundle
-```
+### 3. `src/hooks/useProductionDragDrop.ts` — bundle merge
 
-**3. Úprava `getExpectedPct` na split-aware verziu**
+- Nová funkcia `mergeBundleAcrossWeeks(bundleGroupId, sourceWeek, targetWeek)`:
+  - Načíta všetky položky chainu v `sourceWeek` a v `targetWeek`.
+  - Pre každý `item_code` zo source: nájdi pár v targete s rovnakým `item_code` → zlúč hodiny + CZK do target rowu, zmaž source row. Položky bez páru → presuň `scheduled_week` na target.
+  - Po zlúčení zavolaj `renumberBundleChain(bundleGroupId)` → chain sa skráti o 1 týždeň.
+- Existujúca `mergeBundleSplitGroups` sa nahradí volaním `mergeBundleAcrossWeeks`. Per-code `mergeSplitItems` zostáva pre legacy single-item merge.
 
-Premenovať podpis aby prijala aj `pid`:
+### 4. `src/pages/PlanVyroby.tsx` — drag merge celého bundlu
 
-```ts
-function getExpectedPct(_dayIndex: number, pid: string): number {
-  const today = new Date();
-  const dow = today.getDay();
-  const wde = dow === 0 || dow === 6 ? 5 : dow;
-  const fraction = wde / 5;
+- V `handleDragEnd` vetva `silo-bundle` (riadok 650):
+  - Detekciu merge urobiť na úrovni **bundle chainu**: ak source bundle a target week obsahujú položky s rovnakým `split_group_id` (ktorýkoľvek bundle chain), ponúknuť merge celého bundlu.
+  - `MergePopover.onMerge` zavolá nové `mergeBundleAcrossWeeks(bundleGroupId, sourceWeek, targetWeek)` namiesto `mergeBundleSplitGroups`.
+  - `onKeepSeparate` zostáva `moveBundleToWeek(..., 'separate')`.
+- Texty `MergePopover` upraviť: „Spojit celý bundle ({n} položek) do T{X}".
 
-  const chainWindow = getChainWindow(pid, weekKey);
-  if (chainWindow) {
-    return Math.round(chainWindow.start + (chainWindow.end - chainWindow.start) * fraction);
-  }
-  const goal = getWeeklyGoal(pid);
-  return Math.round(goal * fraction);
-}
-```
+### 5. Edge cases
 
-Zmeniť volania v `getProjectStatus` (riadok 949) a v `BundleDetail` (`getExpectedPct={getExpectedPct}` props na riadkoch 2190, 2297) — interne sa odovzdá `pid` z parent scope.
-
-**4. UI hint v hlavičke bundle (riadky 3441–3498)**
-
-- Zobraziť okno: pod „Týdenní cíl: X %" pridať drobný riadok pre split bundle: „Okno: 50 % → 80 %" (len ak `chainWindow != null` a `start > 0`).
-- Progress bar: pridať druhý subtílny marker na pozícii `windowStart` (svetlosivá čiarka, opacity 0.3) — vizuálne ukazuje „štartovú čiaru" aktuálneho splitu.
-- Tooltip pri „Očekávaný stav k …" prepísať na novú hodnotu z `getExpectedPct(dayIndex, pid)`.
-
-**5. Aktualizovať `BundleDetailProps`**
-
-Zmeniť signature `getExpectedPct: (dayIndex: number) => number` (pid sa pridá pri uzavretí v parent komponente, alebo ako druhý parameter). V `BundleDetail` na riadku 3332 nahradiť volaním nového variantu.
-
-## Edge cases
-
-- **Bundle bez splitu** → `getChainWindow` vráti `null`, nemení sa nič.
-- **Hybridný bundle** (chain + nesplit položky v rovnakom týždni) → použije sa chainové okno (vážený priemer položiek v chaine), nesplit položky sa ignorujú v štart/end výpočte.
-- **Split 1/3** → `priorPartsHours = 0`, takže `windowStart = 0`, `windowEnd = 50`. Day-by-day od 0 do 50 %.
-- **Split 3/3** → `priorPartsHours = 80 %`, `windowEnd = 100 %`. Day-by-day 80 → 100 %.
-- **Spilled projekt** → `getWeeklyGoal` vracia 100 ako doteraz (spilled má prednosť pred chain windowom).
-- **Bundle progress < windowStart** (chain bol nesprávne preskočený) → status pôjde do `behind`, čo je korektné.
+- **Bundle bez splitu (chain neexistuje)**: drag bundlu na week s rovnakým projektom → fallback na existujúce `moveBundleToWeek` s duplicate-key konfliktom (sloučit/oddělit).
+- **Bundle s mixom split + nesplit položiek**: split-aware merge zlúči len chain položky, nesplit položky sa presunú/zlúčia bežne podľa item_code.
+- **Cancelled / completed / paused riadky**: `renumberBundleChain` ich preskočí (rovnako ako súčasná logika).
+- **Per-item dialog `SplitItemDialog`** ostáva nezmenený — single-item splity budú stále per-code chain (legacy správanie pre individuálne položky).
 
 ## Dotknuté súbory
 
-- `src/pages/Vyroba.tsx` — nová `getChainWindow`, úprava `getWeeklyGoal`, úprava `getExpectedPct`, úprava props `BundleDetail` + UI hint a štart-marker na progress bare.
+- `src/lib/splitChainHelpers.ts` — pridať `renumberBundleChain`.
+- `src/components/production/SplitBundleDialog.tsx` — zdieľaný `bundleGroupId` + nový renumber.
+- `src/hooks/useProductionDragDrop.ts` — pridať `mergeBundleAcrossWeeks`, exportovať z hooku, upraviť `mergeBundleSplitGroups` aby delegovala (alebo nahradiť volania).
+- `src/pages/PlanVyroby.tsx` — drag-end vetva `silo-bundle` použije bundle merge namiesto per-group merge.
 
 ## Výsledok
 
-- Split bundle 2/3 (po prvom 50 %, aktuálny 30 %) → cieľ pre tento týždeň = **80 %**, štart = **50 %**, day-by-day v stredu = `50 + 30 * 3/5 = 68 %`.
-- Split bundle 3/3 (predošlé 70 %, aktuálny 30 %) → cieľ = **100 %**, štart = **70 %**, day-by-day v utorok = `70 + 30 * 2/5 = 82 %`.
-- Nesplit bundle → bez zmeny správania.
+- **Multisport**: nový split splitnutého bundlu (5 týždňov) vytvorí 6/6, predošlé sa prečíslujú na 1/6…5/6 — všetky položky v každom týždni zdieľajú rovnaký badge.
+- **Allianz merge mess**: merge celého bundlu sa vykoná ako jedna atómová operácia, nie 5 nezávislých per-code merges.
+- **Drag-to-merge**: ťahanie celého bundlu ponúkne merge dialóg pre celý bundle; nie je potrebné ťahať po jednej položke.
 
