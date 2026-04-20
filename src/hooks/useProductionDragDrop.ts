@@ -5,7 +5,7 @@ import { useCallback } from "react";
 import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
-import { renumberChain, renumberBundleChain } from "@/lib/splitChainHelpers";
+import { renumberChain, renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -70,9 +70,9 @@ export function useProductionDragDrop() {
         detail: JSON.stringify({ item_name: item.item_name, item_code: item.item_code, week: weekLabel(weekDate), scheduled_hours: item.estimated_hours, scheduled_czk: item.estimated_czk }),
       });
 
-      // If item is part of a chain, renumber so badges stay consistent.
+      // If item is part of a project chain, renumber across schedule + inbox.
       if (item.split_group_id) {
-        try { await renumberChain(item.split_group_id); } catch { /* silent */ }
+        try { await renumberProjectChain(item.project_id, item.split_group_id); } catch { /* silent */ }
       }
 
       invalidateAll();
@@ -192,10 +192,10 @@ export function useProductionDragDrop() {
         });
       }
 
-      // Renumber any chains touched by this bulk move.
+      // Renumber any project chains touched by this bulk move.
       const chainIds = new Set(items.map((i: any) => i.split_group_id).filter(Boolean) as string[]);
       for (const g of chainIds) {
-        try { await renumberChain(g); } catch { /* silent */ }
+        try { await renumberProjectChain(projectId, g); } catch { /* silent */ }
       }
 
       invalidateAll();
@@ -698,9 +698,9 @@ export function useProductionDragDrop() {
         detail: JSON.stringify({ item_name: schedItem.item_name, item_code: schedItem.item_code, from_week: weekLabel(schedItem.scheduled_week) }),
       });
 
-      // Keep chain badges consistent across schedule + inbox.
+      // Keep project chain consistent across schedule + inbox.
       if (schedItem.split_group_id) {
-        try { await renumberChain(schedItem.split_group_id); } catch { /* silent */ }
+        try { await renumberProjectChain(schedItem.project_id, schedItem.split_group_id); } catch { /* silent */ }
       }
 
       invalidateAll();
@@ -940,10 +940,17 @@ export function useProductionDragDrop() {
         });
       }
 
-      // Renumber any chains touched by this return.
-      const chainIds = new Set(items.map((i: any) => i.split_group_id).filter(Boolean) as string[]);
-      for (const g of chainIds) {
-        try { await renumberChain(g); } catch { /* silent */ }
+      // Renumber any project chains touched by this return.
+      const byProject = new Map<string, Set<string>>();
+      for (const it of items as any[]) {
+        if (!it.split_group_id) continue;
+        if (!byProject.has(it.project_id)) byProject.set(it.project_id, new Set());
+        byProject.get(it.project_id)!.add(it.split_group_id);
+      }
+      for (const [pid, groups] of byProject) {
+        for (const g of groups) {
+          try { await renumberProjectChain(pid, g); } catch { /* silent */ }
+        }
       }
 
       invalidateAll();
