@@ -262,6 +262,11 @@ export async function recalculateProductionHours(
       const tpvHoursById = new Map<string, number>();
       for (const ih of result.item_hours) tpvHoursById.set(ih.id, ih.hodiny_plan);
 
+      const fallbackRows: Array<
+        | { table: "production_schedule"; id: string; currentHours: number; currentCzk: number }
+        | { table: "production_inbox"; id: string; currentHours: number; currentCzk: number }
+      > = [];
+
       // ===== SCHEDULE: update non-midflight rows; HIST_ rows get CZK refresh only =====
       for (const item of schedItems) {
         if (item.is_midflight) continue; // historical, never modify
@@ -284,7 +289,15 @@ export async function recalculateProductionHours(
 
         const itemCodeNorm = normalizeItemCode(item.item_code);
         const tpv = tpvItems.find((t: any) => t.item_code === itemCodeNorm);
-        if (!tpv) continue;
+        if (!tpv || !tpvHoursById.has(tpv.id)) {
+          fallbackRows.push({
+            table: "production_schedule",
+            id: item.id,
+            currentHours: Number(item.scheduled_hours),
+            currentCzk: Number(item.scheduled_czk),
+          });
+          continue;
+        }
 
         const rawCena = Number(tpv.cena) || 0;
         const correctCzkFull = Math.floor(evaluateFormula(
@@ -312,9 +325,14 @@ export async function recalculateProductionHours(
       for (const item of inboxItems) {
         const itemCodeNorm = normalizeItemCode(item.item_code);
         const tpv = tpvItems.find((t: any) => t.item_code === itemCodeNorm);
-        if (!tpv) {
+        if (!tpv || !tpvHoursById.has(tpv.id)) {
           if (item.adhoc_reason) continue; // ad-hoc untouched
-          orphans.push(item);
+          fallbackRows.push({
+            table: "production_inbox",
+            id: item.id,
+            currentHours: Number(item.estimated_hours),
+            currentCzk: Number(item.estimated_czk),
+          });
           continue;
         }
 
@@ -339,11 +357,34 @@ export async function recalculateProductionHours(
       }
 
       // ===== ORPHAN FALLBACK: (hodiny_plan − assignedToTpv) / orphanCount, no consumed =====
-      if (orphans.length > 0 && result.hodiny_plan > 0) {
+      const fallbackCount = fallbackRows.length + orphans.length;
+      if (fallbackCount > 0 && result.hodiny_plan > 0) {
         const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0);
         const remainingProjectHours = Math.max(0, result.hodiny_plan - assignedHours);
-        const perOrphanHours = Math.round((remainingProjectHours / orphans.length) * 10) / 10;
+        const perOrphanHours = Math.round((remainingProjectHours / fallbackCount) * 10) / 10;
         const perOrphanCzk = Math.floor(perOrphanHours * hourlyRate);
+
+        for (const row of fallbackRows) {
+          if (
+            perOrphanHours !== row.currentHours ||
+            perOrphanCzk !== row.currentCzk
+          ) {
+            if (row.table === "production_schedule") {
+              scheduleUpdates.push({
+                id: row.id,
+                scheduled_hours: perOrphanHours,
+                scheduled_czk: perOrphanCzk,
+              });
+            } else {
+              inboxUpdates.push({
+                id: row.id,
+                estimated_hours: perOrphanHours,
+                estimated_czk: perOrphanCzk,
+              });
+            }
+            updated++;
+          }
+        }
 
         for (const item of orphans) {
           if (
