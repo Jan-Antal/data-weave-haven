@@ -402,7 +402,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
     );
   }
 
-  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, unmatchedCount, delayCount, slipCount } = data;
+  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
   const todayPct = dailyTarget > 0 ? Math.min(100, Math.round((todayHours / dailyTarget) * 100)) : 0;
 
