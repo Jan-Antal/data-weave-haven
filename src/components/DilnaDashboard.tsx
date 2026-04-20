@@ -240,10 +240,10 @@ function useDilnaData(weekOffset: number) {
       }
 
       // ── dayFraction: how far into the displayed week we are ──
-      const today = new Date();
+      const todayDate = new Date();
       const isCurrentWeek = weekOffset === 0;
       const isPastWeek = weekOffset < 0;
-      const dayOfWeek = today.getDay(); // 0=Ne … 6=So
+      const dayOfWeek = todayDate.getDay(); // 0=Ne … 6=So
       const workdayIdx = dayOfWeek === 0 ? 5 : Math.min(dayOfWeek, 5); // Po=1 … Pá=5
       const dayFraction = isPastWeek ? 1 : isCurrentWeek ? workdayIdx / 5 : 0;
 
