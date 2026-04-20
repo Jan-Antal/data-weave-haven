@@ -96,7 +96,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes] = await Promise.all([
+      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -134,6 +134,11 @@ function useDilnaData(weekOffset: number) {
           .from("overhead_projects" as any)
           .select("project_code")
           .eq("is_active", true),
+        // All schedule rows (across weeks) for chain-window calculation
+        supabase
+          .from("production_schedule")
+          .select("project_id, scheduled_week, scheduled_hours, status")
+          .not("status", "eq", "cancelled"),
       ]);
 
       const weeklyCapacity =
