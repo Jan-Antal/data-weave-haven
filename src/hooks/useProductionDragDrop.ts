@@ -1224,7 +1224,7 @@ export function useProductionDragDrop() {
       }
 
       // Apply target merges + deletes + plain moves in parallel.
-      const ops: Promise<any>[] = [];
+      const ops: any[] = [];
       for (const [tid, agg] of targetUpdates) {
         ops.push(
           supabase.from("production_schedule").update({
