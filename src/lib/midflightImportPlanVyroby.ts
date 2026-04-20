@@ -277,45 +277,39 @@ export async function midflightImportPlanVyroby(
   }
 
   // ━━━ INBOX RECONCILIATION (per project) ━━━
-  // Bundle = project: midflight (N weeks) + pending inbox (M items) → split_total = N+M.
-  // Inbox items: shared split_group_id (= firstBundleId), split_part = N+1..N+M,
-  // estimated_hours redistributed proportionally to estimated_czk so
-  // Σ inbox + Σ midflight = hodiny_plan exactly. Items are never deleted.
+  // Inbox items mirror their TPV item directly:
+  //   estimated_hours = tpv.hodiny_plan / activeChainParts
+  //   estimated_czk   = (cena × pocet) / activeChainParts (only if chained)
+  // Midflight historical bundles are linked into the chain group so
+  // split badges (N/N per item_code) stay correct via renumberChain.
   onProgress?.("[midflight] Dorovnávam Inbox per projekt...");
 
   const projectIds = [...projectWeeklyHours.keys()];
   if (projectIds.length > 0) {
-    const { data: planRows } = await (supabaseClient as any)
-      .from("project_plan_hours")
-      .select("project_id, hodiny_plan")
-      .in("project_id", projectIds);
-    const planMap = new Map<string, number>();
-    for (const r of planRows || []) planMap.set(r.project_id, Number(r.hodiny_plan) || 0);
-
     const { data: inboxRows } = await (supabaseClient as any)
       .from("production_inbox")
-      .select("id, project_id, estimated_czk, item_code, sent_at")
+      .select("id, project_id, estimated_czk, estimated_hours, item_code, sent_at, split_group_id")
       .in("project_id", projectIds)
       .eq("status", "pending")
       .order("sent_at", { ascending: true });
 
     const { data: mfRows } = await (supabaseClient as any)
       .from("production_schedule")
-      .select("id, project_id, split_group_id")
+      .select("id, project_id, split_group_id, item_code")
       .eq("is_midflight", true)
       .in("project_id", projectIds);
 
-    // Pending TPV CZK = TPV items not in inbox and not in (non-midflight) schedule
     const { data: tpvRows } = await (supabaseClient as any)
       .from("tpv_items")
-      .select("project_id, item_code, cena, pocet, status")
+      .select("id, project_id, item_code, cena, pocet, hodiny_plan, status")
       .in("project_id", projectIds)
       .is("deleted_at", null);
 
     const { data: schedRows } = await (supabaseClient as any)
       .from("production_schedule")
-      .select("project_id, item_code, is_midflight")
-      .in("project_id", projectIds);
+      .select("project_id, item_code, is_midflight, status")
+      .in("project_id", projectIds)
+      .in("status", ["scheduled", "in_progress", "completed"]);
 
     const inboxByProject = new Map<string, any[]>();
     for (const r of inboxRows || []) {
@@ -327,98 +321,66 @@ export async function midflightImportPlanVyroby(
       if (!mfByProject.has(r.project_id)) mfByProject.set(r.project_id, []);
       mfByProject.get(r.project_id)!.push(r);
     }
-
-    const inboxCodesByProject = new Map<string, Set<string>>();
-    for (const r of inboxRows || []) {
-      if (!r.item_code) continue;
-      if (!inboxCodesByProject.has(r.project_id)) inboxCodesByProject.set(r.project_id, new Set());
-      inboxCodesByProject.get(r.project_id)!.add(r.item_code);
+    const tpvByProject = new Map<string, any[]>();
+    for (const r of tpvRows || []) {
+      if (!tpvByProject.has(r.project_id)) tpvByProject.set(r.project_id, []);
+      tpvByProject.get(r.project_id)!.push(r);
     }
-    const schedCodesByProject = new Map<string, Set<string>>();
+    const schedByProject = new Map<string, any[]>();
     for (const r of schedRows || []) {
-      if (!r.item_code || r.is_midflight) continue;
-      if (!schedCodesByProject.has(r.project_id)) schedCodesByProject.set(r.project_id, new Set());
-      schedCodesByProject.get(r.project_id)!.add(r.item_code);
-    }
-    const pendingTpvCzkByProject = new Map<string, number>();
-    for (const t of tpvRows || []) {
-      const status = (t.status || "").toLowerCase();
-      if (status === "zrušeno" || status === "zruseno" || status === "cancelled") continue;
-      const code = t.item_code;
-      const inboxCodes = inboxCodesByProject.get(t.project_id);
-      const schedCodes = schedCodesByProject.get(t.project_id);
-      if (code && inboxCodes?.has(code)) continue;
-      if (code && schedCodes?.has(code)) continue;
-      const cena = Number(t.cena) || 0;
-      const pocet = Number(t.pocet) || 1;
-      pendingTpvCzkByProject.set(
-        t.project_id,
-        (pendingTpvCzkByProject.get(t.project_id) || 0) + cena * pocet
-      );
+      if (!schedByProject.has(r.project_id)) schedByProject.set(r.project_id, []);
+      schedByProject.get(r.project_id)!.push(r);
     }
 
-    // Lazy import to avoid cycles
     const { renumberChain } = await import("./splitChainHelpers");
 
     for (const projectId of projectIds) {
       const mfList = mfByProject.get(projectId) || [];
       const inboxList = inboxByProject.get(projectId) || [];
+      const tpvList = tpvByProject.get(projectId) || [];
+      const schedList = schedByProject.get(projectId) || [];
       if (mfList.length === 0) continue;
 
       const head = mfList.find((r) => !r.split_group_id) || mfList[0];
       const firstBundleId: string = head.id;
 
-      const hodinyPlan = planMap.get(projectId) || 0;
-      const mfHours = [...projectWeeklyHours.get(projectId)!.values()].reduce((a, b) => a + b, 0);
-      const inboxRemainder = Math.max(0, hodinyPlan - mfHours);
-      const totalCzk = inboxList.reduce((s, r) => s + (Number(r.estimated_czk) || 0), 0);
-      const pendingTpvCzk = pendingTpvCzkByProject.get(projectId) || 0;
-
-      // Inbox share: proportional to inbox CZK vs (inbox + pending TPV) CZK.
-      // No pending TPV → inbox absorbs full remainder (preserves Z-2515-001 behavior).
-      const denom = totalCzk + pendingTpvCzk;
-      const inboxShare = denom > 0
-        ? Math.round(((inboxRemainder * totalCzk) / denom) * 10) / 10
-        : 0;
-
-      // Distribute inbox hours proportionally (last item carries remainder).
-      if (inboxList.length > 0) {
-        const perItem: { id: string; hours: number }[] = [];
-        let allocated = 0;
-        for (let i = 0; i < inboxList.length; i++) {
-          const r = inboxList[i];
-          const isLast = i === inboxList.length - 1;
-          let h: number;
-          if (isLast) {
-            h = Math.max(0, Math.round((inboxShare - allocated) * 10) / 10);
-          } else if (inboxShare === 0) {
-            h = 0;
-          } else if (totalCzk > 0) {
-            const share = (Number(r.estimated_czk) || 0) / totalCzk;
-            h = Math.round(inboxShare * share * 10) / 10;
-          } else {
-            h = Math.round((inboxShare / inboxList.length) * 10) / 10;
-          }
-          allocated += h;
-          perItem.push({ id: r.id, hours: h });
-        }
-
-        for (const { id, hours } of perItem) {
-          // Assign chain group; renumberChain will set part/total below.
-          const { error: upErr } = await (supabaseClient as any)
-            .from("production_inbox")
-            .update({
-              estimated_hours: hours,
-              split_group_id: firstBundleId,
-            })
-            .eq("id", id);
-          if (upErr) errors.push(`Inbox update ${id}: ${upErr.message}`);
-        }
+      // Count active parts per item_code (inbox + non-midflight schedule)
+      const activePartsByCode = new Map<string, number>();
+      for (const it of inboxList) {
+        if (!it.item_code) continue;
+        activePartsByCode.set(it.item_code, (activePartsByCode.get(it.item_code) || 0) + 1);
+      }
+      for (const s of schedList) {
+        if (!s.item_code || s.is_midflight) continue;
+        if (s.item_code.startsWith('HIST_')) continue;
+        activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
       }
 
-      // Ensure all midflight schedule rows belong to this chain group too.
-      // Head row has split_group_id = null in our insert above; set it now so
-      // renumberChain sees the full chain via the .or(...) query.
+      // Update each inbox item: direct TPV mirror
+      for (const it of inboxList) {
+        const tpv = tpvList.find((t) => t.item_code === it.item_code);
+        if (!tpv) continue; // ad-hoc — leave untouched
+
+        const cena = Number(tpv.cena) || 0;
+        const pocet = Number(tpv.pocet) || 1;
+        const tpvHours = Number(tpv.hodiny_plan) || 0;
+        const partsCount = Math.max(1, activePartsByCode.get(it.item_code!) || 1);
+
+        const newHours = Math.round((tpvHours / partsCount) * 10) / 10;
+        const baseCzk = Math.floor(cena * pocet);
+        const newCzk = it.split_group_id ? Math.floor(baseCzk / partsCount) : baseCzk;
+
+        const { error: upErr } = await (supabaseClient as any)
+          .from("production_inbox")
+          .update({
+            estimated_hours: newHours,
+            estimated_czk: newCzk,
+          })
+          .eq("id", it.id);
+        if (upErr) errors.push(`Inbox update ${it.id}: ${upErr.message}`);
+      }
+
+      // Link midflight schedule rows to chain group (so renumberChain sees them)
       await (supabaseClient as any)
         .from("production_schedule")
         .update({ split_group_id: firstBundleId })
@@ -426,14 +388,13 @@ export async function midflightImportPlanVyroby(
         .eq("project_id", projectId)
         .neq("id", firstBundleId);
 
-      // Project-wide chain renumbering (schedule + inbox).
       try {
         await renumberChain(firstBundleId);
       } catch (e: any) {
         errors.push(`renumberChain (${projectId}): ${e?.message || e}`);
       }
 
-      onProgress?.(`[midflight] ${projectId}: chain ${mfList.length}+${inboxList.length} (share=${inboxShare}h z ${inboxRemainder}h, pendingTPV=${Math.round(pendingTpvCzk)}Kč)`);
+      onProgress?.(`[midflight] ${projectId}: ${mfList.length} historických + ${inboxList.length} inbox`);
     }
   }
   // ━━━ END INBOX RECONCILIATION ━━━
