@@ -299,6 +299,7 @@ export default function PlanVyroby() {
     returnBundleToInbox,
     mergeSplitItems,
     mergeBundleSplitGroups,
+    mergeBundleAcrossWeeks,
   } = useProductionDragDrop();
 
   const weeklyCapacity = Math.round((settings?.monthly_capacity_hours ?? 3500) / 4);
