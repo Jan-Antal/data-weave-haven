@@ -271,7 +271,9 @@ function useDilnaData(weekOffset: number) {
         const loggedHours = hoursByProject.get(pid) || 0;
         const trackedPct = plannedHours > 0 ? Math.round((loggedHours / plannedHours) * 100) : 0;
         const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
-        const slipStatus = isUnmatched ? "none" : computeSlip(trackedPct, completionPct, loggedHours);
+        const expectedPctVal = isUnmatched ? null : expectedFor(pid, plannedHours);
+        const isSpilled = spilledProjects.has(pid);
+        const slipStatus = isUnmatched ? "none" : computeSlip(completionPct, expectedPctVal, loggedHours, isSpilled);
 
         const prodPct = (proj?.cost_production_pct ?? 30) / 100;
         const cena = proj?.prodejni_cena ?? 0;
