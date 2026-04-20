@@ -3521,13 +3521,30 @@ function DetailPanel({
               </TooltipContent>
             </Tooltip>
           )}
+          {/* Chain window start marker — light gray dashed line */}
+          {chainWindow && chainWindow.start > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="absolute top-[-2px] h-[8px] w-[2px] cursor-help"
+                  style={{ left: `${chainWindow.start}%`, background: "#9ca3af", opacity: 0.4 }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Začátek aktuálního splitu: {Math.round(chainWindow.start)}%
+              </TooltipContent>
+            </Tooltip>
+          )}
           {/* Expected progress marker — blue/muted */}
           {(() => {
             const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
             const now = new Date();
             const dow = now.getDay();
             const wde = dow === 0 || dow === 6 ? 5 : dow;
-            const exp = Math.round(weeklyGoal * (wde / 5));
+            const fraction = wde / 5;
+            const exp = chainWindow
+              ? Math.round(chainWindow.start + (chainWindow.end - chainWindow.start) * fraction)
+              : Math.round(weeklyGoal * fraction);
             const dayName = DAY_NAMES[dow] || "dnes";
             if (exp <= 0) return null;
             return (
