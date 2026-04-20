@@ -165,6 +165,31 @@ export async function recalculateProductionHours(
     );
   }
 
+  // Chain-aware midflight hours: sum scheduled_hours per split_group_id (chain).
+  // Used to subtract already-consumed history from inbox + future silo bundles.
+  const midflightHoursByChain = new Map<string, number>();
+  for (const s of allSched) {
+    if (!s.is_midflight || !s.split_group_id) continue;
+    midflightHoursByChain.set(
+      s.split_group_id,
+      (midflightHoursByChain.get(s.split_group_id) || 0) + (Number(s.scheduled_hours) || 0),
+    );
+  }
+
+  // Resolve project chain group id from any of: midflight schedule, inbox, non-midflight schedule.
+  // After backfill migration these all share the same id for projects with midflight history.
+  function resolveChainGroupId(projectId: string): string | null {
+    for (const s of allSched) {
+      if (s.project_id === projectId && s.is_midflight && s.split_group_id) return s.split_group_id;
+    }
+    const inbox = (allInbox as any[]).filter(i => i.project_id === projectId);
+    for (const r of inbox) if (r.split_group_id) return r.split_group_id;
+    for (const s of allSched) {
+      if (s.project_id === projectId && s.split_group_id) return s.split_group_id;
+    }
+    return null;
+  }
+
   // Group by project
   const tpvByProject = new Map<string, any[]>();
   for (const t of allTpv) {
@@ -215,6 +240,16 @@ export async function recalculateProductionHours(
     projectResults.push({ project_id: proj.project_id, result });
     allItemHourUpdates.push(...result.item_hours);
 
+    // Chain-aware remaining hours: subtract midflight chain hours from full plan
+    // before distributing into inbox + non-midflight schedule.
+    const chainGroupId = resolveChainGroupId(proj.project_id);
+    const consumedChainHours = chainGroupId
+      ? (midflightHoursByChain.get(chainGroupId) || 0)
+      : 0;
+    const remainingPlanHours = Math.max(0, result.hodiny_plan - consumedChainHours);
+    const remainingScale = result.hodiny_plan > 0
+      ? remainingPlanHours / result.hodiny_plan
+      : 1;
     if (tpvItems.length || result.hodiny_plan !== 0) {
       // EUR conversion for this project
       const isEur = proj.currency === 'EUR';
@@ -305,10 +340,10 @@ export async function recalculateProductionHours(
           { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
         ));
 
-        const tpvFullHours = tpvHoursById.get(tpv.id) ?? 0;
+        const tpvFullHours = (tpvHoursById.get(tpv.id) ?? 0) * remainingScale;
         const partsCount = Math.max(1, activePartsByCode.get(itemCodeNorm) || 1);
         const correctHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
-        const correctCzk = partsCount > 1 ? Math.floor(correctCzkFull / partsCount) : correctCzkFull;
+        const correctCzk = partsCount > 1 ? Math.floor((correctCzkFull * remainingScale) / partsCount) : Math.floor(correctCzkFull * remainingScale);
 
         if (
           correctCzk !== Number(item.scheduled_czk) ||
@@ -342,10 +377,10 @@ export async function recalculateProductionHours(
           { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
         ));
 
-        const tpvFullHours = tpvHoursById.get(tpv.id) ?? 0;
+        const tpvFullHours = (tpvHoursById.get(tpv.id) ?? 0) * remainingScale;
         const partsCount = Math.max(1, activePartsByCode.get(itemCodeNorm) || 1);
         const newHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
-        const newCzk = partsCount > 1 ? Math.floor(correctCzkFull / partsCount) : correctCzkFull;
+        const newCzk = partsCount > 1 ? Math.floor((correctCzkFull * remainingScale) / partsCount) : Math.floor(correctCzkFull * remainingScale);
 
         if (
           newCzk !== Number(item.estimated_czk) ||
@@ -364,9 +399,9 @@ export async function recalculateProductionHours(
       // where stale inbox sums were echoed back into project_plan_hours.
       const fallbackCount = fallbackRows.length + orphans.length;
       const allowOrphanDistribution = result.source === "Project";
-      if (allowOrphanDistribution && fallbackCount > 0 && result.hodiny_plan > 0) {
-        const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0);
-        const remainingProjectHours = Math.max(0, result.hodiny_plan - assignedHours);
+      if (allowOrphanDistribution && fallbackCount > 0 && remainingPlanHours > 0) {
+        const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0) * remainingScale;
+        const remainingProjectHours = Math.max(0, remainingPlanHours - assignedHours);
         const perOrphanHours = Math.round((remainingProjectHours / fallbackCount) * 10) / 10;
         const perOrphanCzk = Math.floor(perOrphanHours * hourlyRate);
 
