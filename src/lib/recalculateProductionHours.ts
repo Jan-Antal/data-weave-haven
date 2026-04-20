@@ -340,10 +340,10 @@ export async function recalculateProductionHours(
           { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
         ));
 
-        const tpvFullHours = tpvHoursById.get(tpv.id) ?? 0;
+        const tpvFullHours = (tpvHoursById.get(tpv.id) ?? 0) * remainingScale;
         const partsCount = Math.max(1, activePartsByCode.get(itemCodeNorm) || 1);
         const correctHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
-        const correctCzk = partsCount > 1 ? Math.floor(correctCzkFull / partsCount) : correctCzkFull;
+        const correctCzk = partsCount > 1 ? Math.floor((correctCzkFull * remainingScale) / partsCount) : Math.floor(correctCzkFull * remainingScale);
 
         if (
           correctCzk !== Number(item.scheduled_czk) ||
