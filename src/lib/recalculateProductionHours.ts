@@ -3,6 +3,16 @@ import { computePlanHours, type PlanHoursResult } from "./computePlanHours";
 import { createNotification, getUserIdsByRole } from "./createNotification";
 import { loadFormulas, evaluateFormula, FORMULA_DEFAULTS } from "./formulaEngine";
 
+/**
+ * Strip legacy drag-drop suffix (_xxxx..xxxxxxxx) so item_code matches TPV catalogue.
+ * The suffix was previously appended on conflict-separate moves before the unique
+ * constraint was dropped; this normalization stays as a defensive read-side guard.
+ */
+function normalizeItemCode(code: string | null | undefined): string {
+  if (!code) return "";
+  return code.replace(/_[a-z0-9]{4,8}$/i, "");
+}
+
 function getCurrentWeekKey(): string {
   const now = new Date();
   const day = now.getDay();
@@ -236,14 +246,16 @@ export async function recalculateProductionHours(
 
       const activePartsByCode = new Map<string, number>();
       for (const it of inboxItems) {
-        if (!it.item_code) continue;
-        activePartsByCode.set(it.item_code, (activePartsByCode.get(it.item_code) || 0) + 1);
+        const codeNorm = normalizeItemCode(it.item_code);
+        if (!codeNorm) continue;
+        activePartsByCode.set(codeNorm, (activePartsByCode.get(codeNorm) || 0) + 1);
       }
       for (const s of fullSchedForProject) {
-        if (!s.item_code || s.is_midflight) continue;
-        if (s.item_code.startsWith('HIST_')) continue;
+        const codeNorm = normalizeItemCode(s.item_code);
+        if (!codeNorm || s.is_midflight) continue;
+        if (codeNorm.startsWith('HIST_')) continue;
         if (s.status === 'cancelled') continue;
-        activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
+        activePartsByCode.set(codeNorm, (activePartsByCode.get(codeNorm) || 0) + 1);
       }
 
       // Map: tpv.id → final hodiny_plan (already scaled in computePlanHours.item_hours)
@@ -270,7 +282,8 @@ export async function recalculateProductionHours(
           continue;
         }
 
-        const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
+        const itemCodeNorm = normalizeItemCode(item.item_code);
+        const tpv = tpvItems.find((t: any) => t.item_code === itemCodeNorm);
         if (!tpv) continue;
 
         const rawCena = Number(tpv.cena) || 0;
@@ -280,7 +293,7 @@ export async function recalculateProductionHours(
         ));
 
         const tpvFullHours = tpvHoursById.get(tpv.id) ?? 0;
-        const partsCount = Math.max(1, activePartsByCode.get(item.item_code!) || 1);
+        const partsCount = Math.max(1, activePartsByCode.get(itemCodeNorm) || 1);
         const correctHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
         const correctCzk = partsCount > 1 ? Math.floor(correctCzkFull / partsCount) : correctCzkFull;
 
@@ -297,7 +310,8 @@ export async function recalculateProductionHours(
       const orphans: any[] = [];
 
       for (const item of inboxItems) {
-        const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
+        const itemCodeNorm = normalizeItemCode(item.item_code);
+        const tpv = tpvItems.find((t: any) => t.item_code === itemCodeNorm);
         if (!tpv) {
           if (item.adhoc_reason) continue; // ad-hoc untouched
           orphans.push(item);
@@ -311,7 +325,7 @@ export async function recalculateProductionHours(
         ));
 
         const tpvFullHours = tpvHoursById.get(tpv.id) ?? 0;
-        const partsCount = Math.max(1, activePartsByCode.get(item.item_code!) || 1);
+        const partsCount = Math.max(1, activePartsByCode.get(itemCodeNorm) || 1);
         const newHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
         const newCzk = partsCount > 1 ? Math.floor(correctCzkFull / partsCount) : correctCzkFull;
 
