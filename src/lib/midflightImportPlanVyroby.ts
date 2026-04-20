@@ -365,6 +365,12 @@ export async function midflightImportPlanVyroby(
         .eq("is_midflight", true)
         .eq("project_id", projectId);
 
+      // Consumption ratio: (hours_log non-TPV) + (midflight schedule hours) / sum(tpv.hodiny_plan)
+      const midflightHours = mfList.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
+      const consumedTotal = (consumedByProject.get(projectId) || 0) + midflightHours;
+      const planTotal = tpvList.reduce((s, t) => s + (Number(t.hodiny_plan) || 0), 0);
+      const consumptionRatio = planTotal > 0 ? Math.min(1, consumedTotal / planTotal) : 0;
+
       // Count active parts per item_code (inbox + non-midflight schedule)
       const activePartsByCode = new Map<string, number>();
       for (const it of inboxList) {
@@ -377,7 +383,7 @@ export async function midflightImportPlanVyroby(
         activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
       }
 
-      // Update each inbox item: direct TPV mirror
+      // Update each inbox item: TPV mirror MINUS proportional consumed hours
       for (const it of inboxList) {
         const tpv = tpvList.find((t) => t.item_code === it.item_code);
         if (!tpv) continue; // ad-hoc — leave untouched
@@ -385,9 +391,10 @@ export async function midflightImportPlanVyroby(
         const cena = Number(tpv.cena) || 0;
         const pocet = Number(tpv.pocet) || 1;
         const tpvHours = Number(tpv.hodiny_plan) || 0;
+        const itemRemaining = Math.max(0, tpvHours * (1 - consumptionRatio));
         const partsCount = Math.max(1, activePartsByCode.get(it.item_code!) || 1);
 
-        const newHours = Math.round((tpvHours / partsCount) * 10) / 10;
+        const newHours = Math.round((itemRemaining / partsCount) * 10) / 10;
         const baseCzk = Math.floor(cena * pocet);
         const newCzk = it.split_group_id ? Math.floor(baseCzk / partsCount) : baseCzk;
 
