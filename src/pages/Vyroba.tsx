@@ -7,7 +7,7 @@ import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useProductionSchedule, getISOWeekNumber, type ScheduleItem } from "@/hooks/useProductionSchedule";
 import { useCompletedScheduleIds } from "@/hooks/useProductionExpedice";
 import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/useProductionDailyLogs";
-import { useWeeklyCapacity, useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
+import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
