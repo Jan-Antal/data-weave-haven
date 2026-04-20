@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { renumberChain } from "@/lib/splitChainHelpers";
+import { renumberBundleChain } from "@/lib/splitChainHelpers";
 
 interface WeekOption {
   key: string;
@@ -98,10 +98,15 @@ export function SplitBundleDialog({
         else toSplit.push(item);
       }
 
-      // Per-item chain: each item_code keeps its own split_group_id, so each
-      // code is numbered independently (e.g. TK.05 1/2+2/2, TK.07 1/2+2/2).
-      const groupIdFor = (item: BundleSplitItem): string =>
-        item.split_group_id || item.id;
+      // Bundle-level chain: ALL items in this bundle share ONE split_group_id,
+      // so the entire bundle has unified N/M numbering (per week, not per item_code).
+      // If any item already belongs to a chain, reuse that group id to extend the
+      // existing bundle chain (5/5 → 6/6). Otherwise mint a new shared id.
+      const existingGroupId = items.find((i) => i.split_group_id)?.split_group_id ?? null;
+      const bundleGroupId: string =
+        existingGroupId || (typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `bundle-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
       if (toMove.length > 0) {
         await Promise.all(
@@ -110,7 +115,7 @@ export function SplitBundleDialog({
               .from("production_schedule")
               .update({
                 scheduled_week: targetWeek,
-                split_group_id: groupIdFor(item),
+                split_group_id: bundleGroupId,
               })
               .eq("id", item.id)
           )
@@ -124,12 +129,11 @@ export function SplitBundleDialog({
             const keepHours = item.scheduled_hours - spillHours;
             const czkPerHour = item.scheduled_hours > 0 ? item.scheduled_czk / item.scheduled_hours : 550;
             const cleanName = item.item_name.replace(/\s*\(\d+\/\d+\)$/, "");
-            const gid = groupIdFor(item);
             return [
               supabase.from("production_schedule").update({
                 scheduled_hours: keepHours,
                 scheduled_czk: keepHours * czkPerHour,
-                split_group_id: gid,
+                split_group_id: bundleGroupId,
                 item_name: cleanName,
               }).eq("id", item.id),
               supabase.from("production_schedule").insert({
@@ -138,18 +142,15 @@ export function SplitBundleDialog({
                 scheduled_week: targetWeek, scheduled_hours: spillHours,
                 scheduled_czk: spillHours * czkPerHour, position: 999,
                 status: "scheduled", created_by: user.id,
-                split_group_id: gid,
+                split_group_id: bundleGroupId,
               }),
             ];
           })
         );
       }
 
-      // Renumber each item_code's chain independently.
-      const uniqueGroupIds = Array.from(
-        new Set([...toMove, ...toSplit].map((i) => groupIdFor(i)))
-      );
-      await Promise.all(uniqueGroupIds.map((gid) => renumberChain(gid)));
+      // Renumber the whole bundle chain once: every week becomes one part (N/M).
+      await renumberBundleChain(bundleGroupId);
 
       const changedItems = toMove.length + toSplit.length;
 
