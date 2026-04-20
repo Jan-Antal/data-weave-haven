@@ -356,9 +356,15 @@ export async function recalculateProductionHours(
         }
       }
 
-      // ===== ORPHAN FALLBACK: (hodiny_plan − assignedToTpv) / orphanCount, no consumed =====
+      // ===== ORPHAN FALLBACK =====
+      // Only distribute leftover hours to orphans when the plan source is "Project"
+      // (project_hours > tpv_hours_raw). When source is "TPV", the TPV catalogue is
+      // authoritative — orphan rows (no TPV match) get 0h and are NOT inflated to
+      // make inbox sum match hodiny_plan. This prevents the cyclical inflation bug
+      // where stale inbox sums were echoed back into project_plan_hours.
       const fallbackCount = fallbackRows.length + orphans.length;
-      if (fallbackCount > 0 && result.hodiny_plan > 0) {
+      const allowOrphanDistribution = result.source === "Project";
+      if (allowOrphanDistribution && fallbackCount > 0 && result.hodiny_plan > 0) {
         const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0);
         const remainingProjectHours = Math.max(0, result.hodiny_plan - assignedHours);
         const perOrphanHours = Math.round((remainingProjectHours / fallbackCount) * 10) / 10;
