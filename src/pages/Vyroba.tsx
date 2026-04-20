@@ -5812,12 +5812,20 @@ function WeekPickerPopup({
     return result;
   }, [currentWeekOffset]);
 
-  // Calculate position from container ref
-  const [pos, setPos] = useState({ top: 0, right: 0 });
+  // Calculate position from container ref — clamp to viewport so popup never goes off-screen on mobile
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 240 });
   useEffect(() => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+      const margin = 8;
+      const width = Math.min(240, window.innerWidth - margin * 2);
+      // Prefer aligning popup's right edge with trigger's right edge
+      let left = rect.right - width;
+      if (left < margin) left = margin;
+      if (left + width > window.innerWidth - margin) {
+        left = window.innerWidth - width - margin;
+      }
+      setPos({ top: rect.bottom + 4, left, width });
     }
   }, [containerRef]);
 
@@ -5825,7 +5833,7 @@ function WeekPickerPopup({
     <div
       ref={popupRef}
       className="fixed z-[99999] rounded-lg shadow-lg py-1 overflow-y-auto"
-      style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", maxHeight: 320, width: 240, top: pos.top, right: pos.right }}
+      style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", maxHeight: 320, width: pos.width, top: pos.top, left: pos.left }}
     >
       {weeks.map((w) => (
         <button
