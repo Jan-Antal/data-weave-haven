@@ -3599,7 +3599,7 @@ function DetailPanel({
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5" style={{ background: "#f8f7f4" }}>
+      <div className="flex-1 overflow-y-auto px-5 py-4 pb-24 space-y-5" style={{ background: "#f8f7f4" }}>
         {/* ── Week Progress ── */}
         <div>
           <div className="text-[10px] uppercase font-semibold mb-2" style={{ color: "#99a5a3" }}>
