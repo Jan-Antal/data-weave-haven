@@ -45,6 +45,12 @@ export interface PlanHoursResult {
   item_hours: ItemPlanHours[];
 }
 
+function resolvePocet(value: number | null | undefined): number {
+  if (value == null) return 1;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 1;
+}
+
 export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
   const {
     tpvItems,
@@ -96,7 +102,7 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
 
   for (const item of validItems) {
     const cenaCzk = isEur ? Number(item.cena) * eurRate : Number(item.cena);
-    const itemCzk = cenaCzk * (Number(item.pocet) || 1);
+    const itemCzk = cenaCzk * resolvePocet(item.pocet);
     const itemHours =
       itemCzk > 0
         ? formulas
