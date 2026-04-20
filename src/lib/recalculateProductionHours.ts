@@ -453,7 +453,7 @@ export async function recalculateProductionHours(
       const proj = projects.find((p: any) => p.project_id === r.project_id);
       return {
         project_id: r.project_id,
-        tpv_hours: r.result.tpv_hours,
+        tpv_hours: r.result.tpv_hours_raw,
         project_hours: r.result.project_hours,
         hodiny_plan: r.result.hodiny_plan,
         source: r.result.source,
