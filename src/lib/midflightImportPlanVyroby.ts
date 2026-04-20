@@ -200,8 +200,10 @@ export async function midflightImportPlanVyroby(
 
   // ━━━ CREATE MIDFLIGHT HISTORICAL BUNDLES (isolated, status=scheduled, is_midflight=true) ━━━
   // No reconciliation against normal inbox items — they remain untouched.
+  // NOTE: production_daily_logs is strictly manual — midflight import does NOT
+  // create synthetic 100% log rows. Historical progress must be entered by
+  // the user manually in Výroba if desired.
   const scheduleInserts: any[] = [];
-  const dailyLogInserts: any[] = [];
 
   for (const [projectId, weeklyMap] of projectWeeklyHours) {
     const projectInfo = validProjectMap.get(projectId);
@@ -233,16 +235,6 @@ export async function midflightImportPlanVyroby(
         split_total: totalParts,
         stage_id: null,
       });
-
-      const bundleId = `${projectId}::MF_${monday}`;
-      dailyLogInserts.push({
-        bundle_id: bundleId,
-        week_key: monday,
-        day_index: 4,
-        percent: 100,
-        phase: "Expedice",
-        logged_by: userId,
-      });
     }
 
     onProgress?.(`[midflight] ${projectId}: ${sortedWeeks.length} historických týždňov`);
@@ -259,19 +251,6 @@ export async function midflightImportPlanVyroby(
         errors.push(`Schedule insert error (batch ${i}): ${insErr.message}`);
       } else {
         created += chunk.length;
-      }
-    }
-  }
-
-  if (dailyLogInserts.length > 0) {
-    onProgress?.(`Vkládám ${dailyLogInserts.length} daily logov...`);
-    for (let i = 0; i < dailyLogInserts.length; i += 200) {
-      const chunk = dailyLogInserts.slice(i, i + 200);
-      const { error: insErr } = await (supabaseClient as any)
-        .from("production_daily_logs")
-        .insert(chunk);
-      if (insErr) {
-        errors.push(`Daily log insert error (batch ${i}): ${insErr.message}`);
       }
     }
   }
