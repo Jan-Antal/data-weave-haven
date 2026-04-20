@@ -749,7 +749,16 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
-    if (logs.length > 0) return Math.max(...logs.map((l) => l.percent));
+    if (logs.length > 0) {
+      // Use the LATEST log by day_index (then logged_at) — not the max percent.
+      // This ensures the week % reflects the most recent daylog entry,
+      // even when a later log corrects (lowers) a previous value.
+      const sorted = [...logs].sort((a, b) => {
+        if (b.day_index !== a.day_index) return b.day_index - a.day_index;
+        return new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime();
+      });
+      return sorted[0].percent;
+    }
     // Fallback: only for split bundles — find latest non-MF log from a PRIOR week
     // belonging to the same split_group_id chain.
     const prior = findPriorChainLog(pid, weekKey);
