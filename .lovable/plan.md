@@ -2,80 +2,59 @@
 
 ## Diagnóza
 
-V projekte Allianz vznikli tri samostatné, ale prepojené chyby v split chaine:
+V DB pre projekt Z-2617-001 vidím presne tento stav:
 
-1. **Nový split na už splitnutom bundli začína od 1/2 namiesto pokračovania chainu**  
-   `SplitBundleDialog.handleSplitBundle` (riadok 103) pri voľbe `groupIdFor` síce zachová existujúci `split_group_id`, ALE `renumberChain` v `splitChainHelpers.ts` **zoskupuje per `item_code`** (`chainKey`). Keď bundle obsahuje viacero rôznych `item_code` a každý má vlastnú dvojicu (1/2, 2/2), nový split ich opäť rozdelí len na 1/2 + 2/2 lokálne, namiesto toho aby sa nadviazalo na predošlý bundle chain (mal by byť 6/6, lebo predtým bolo 5/5). Bundle ako celok teda nemá spoločné číslovanie.
+- **Historické midflight riadky** (T13–T16): `item_code = 'Z-2617-001'`, `is_midflight = true` (agregované týždenné súčty), `split_part 1..4 / 5`.
+- **Aktuálne split riadky** (T17 = 2026-04-27, T18 = 2026-05-04): per-item codes (T.01, T.03, T.04, T.05, T.06), `split_part 1..2 / 2`.
 
-2. **Merge bundlu rozpadáva položky po prvkoch**  
-   `mergeBundleSplitGroups` iteruje per `split_group_id` (ktorý je per item_code), takže merge sa vykoná zvlášť pre každý code. Ak má bundle 5 rôznych codeov, merge spraví 5 nezávislých zlúčení a UI zobrazí mess (rôzne /N na každom riadku).
+Všetky riadky **zdieľajú rovnaký `split_group_id`** `37f0f762-...`. 
 
-3. **Drag-to-merge funguje len po jednotlivých položkách**  
-   V `PlanVyroby.handleDragEnd` (riadok 650) sa pre `silo-bundle` drag detekuje merge len keď bundle obsahuje aspoň jednu položku so split siblingom v cieľovom týždni — ALE merge dialog následne zavolá `mergeBundleSplitGroups([sgId1, sgId2, ...])` s per-code groupami, takže výsledok je zase rozpadnutý po prvkoch. Vizuálne sa tak pre user-a javí, že drag merge "nefunguje" pre celý bundle a musí ťahať položku po položke.
+**Prečo nový split spravil 1/2 + 2/2 a nie 5/6 + 6/6:**
 
-Koreň všetkých troch problémov: **chain je definovaný per `item_code`, nie per bundle**. Užívateľ chce **bundle-level chain** — všetky položky bundlu zdieľajú jeden spoločný chain s jedným číslovaním (napr. celý bundle Multisport má 5/5 → po splite 6/6).
+V `splitChainHelpers.ts` `fetchChainRows` (riadok 47–48) má filter:
 
-## Cieľ
+```ts
+.filter((r: any) => r.status !== "cancelled" && !r.is_midflight)
+```
 
-Zaviesť **bundle-level chain** ako prvotriednu jednotku:
+Midflight riadky (historické T13–T16) sú teda **vyradené z chainu**. `renumberBundleChain` potom vidí len 2 týždne (T17, T18), zoradí ich a vyrenderuje 1/2 + 2/2 — historické 1/5..4/5 sa vôbec neaktualizujú a zostávajú v starom stave.
 
-- Split bundlu pokračuje v existujúcom bundle chaine → ak bol bundle časť 5/5, nový split spraví 6/6 (a prečísluje predošlé na 1/6 … 5/6).
-- Merge bundlu zlúči celý bundle ako jednu operáciu — všetky položky sa spoja s ich pármi v cieľovom týždni v jednom kroku.
-- Drag celého bundlu na iný bundle (rovnaký projekt) ponúkne merge celého bundlu, nie po položkách.
-- Per-item chain ostáva ako fallback len keď bundle obsahuje **iba jednu** položku v split chaine (legacy prípady).
+Užívateľ chce, aby sa **bundle-level chain počítal vrátane midflight historických týždňov** — má byť 4 staré (1/6..4/6) + 2 nové (5/6, 6/6).
 
-## Implementácia
+## Riešenie
 
-### 1. `src/lib/splitChainHelpers.ts` — bundle-aware chain
+### `src/lib/splitChainHelpers.ts`
 
-- Pridať novú funkciu `renumberBundleChain(splitGroupId)`:
-  - Načíta všetky riadky chainu (rovnaká logika ako `fetchChainRows`).
-  - **Zoskupí per `(project_id, scheduled_week)` namiesto per `item_code`** — každý unikátny týždeň = jedna „časť bundlu".
-  - Zoradí týždne ASC podľa `scheduled_week`.
-  - Pre každú položku v týždni nastaví rovnaké `split_part = idx + 1` a `split_total = počet_týždňov`. Všetky položky bundlu v jednom týždni tak zdieľajú rovnaké `N/M`.
-- `renumberChain` zostáva pre legacy single-item chainy. `SplitBundleDialog` bude volať novú `renumberBundleChain`.
+**1. `fetchChainRows`** — odstrániť `!r.is_midflight` filter, ponechať len `status !== "cancelled"`. Midflight riadky musia byť súčasťou chainu pre bundle-level renumber. Komentár hore (riadky 14–16) upraviť: midflight sú _súčasťou_ bundle chainu (každý midflight týždeň = jedna bundle časť).
 
-### 2. `src/components/production/SplitBundleDialog.tsx` — pokračovanie chainu
+**2. `renumberBundleChain`** — logika ostáva (group by `scheduled_week`), ale teraz správne uvidí všetkých 6 týždňov a vyprodukuje 1/6..6/6 zdieľané všetkými riadkami v danom týždni. Midflight týždne (kde je len jeden agregovaný riadok s `item_code = project_id`) takisto dostanú správny `split_part`.
 
-- Zmena `groupIdFor`: namiesto per-item `item.split_group_id || item.id` použiť **jeden zdieľaný `bundleGroupId`** pre celý bundle:
-  - Ak ktorákoľvek položka už má `split_group_id` → použiť ho ako spoločný `bundleGroupId` (zachová sa väzba na predošlý bundle split).
-  - Inak vygenerovať `crypto.randomUUID()` raz pre celý bundle.
-- Po inserte všetkých nových rowov zavolať `renumberBundleChain(bundleGroupId)` jediný raz.
-- Výsledok: bundle 5/5 → split → 1/6, 2/6, …, 5/6 (pôvodné týždne) + 6/6 (nový týždeň).
+**3. `renumberChain` (per-item legacy)** — môže ostať ako je (single-item splits naďalej ignorujú midflight, lebo midflight nie je per-code chain). Pre istotu pridať do filtra v `renumberChain` lokálny `!r.is_midflight` aby legacy správanie ostalo nezmenené, alebo nechať midflight položky započítavať aj tu (správa už chcela midflight započítať do per-item totalu — viď komentár v hlavičke). **Default:** ponechať midflight v chaine aj pre per-item, aby sa správanie zjednotilo.
 
-### 3. `src/hooks/useProductionDragDrop.ts` — bundle merge
+### Cleanup existujúcich dát Z-2617-001
 
-- Nová funkcia `mergeBundleAcrossWeeks(bundleGroupId, sourceWeek, targetWeek)`:
-  - Načíta všetky položky chainu v `sourceWeek` a v `targetWeek`.
-  - Pre každý `item_code` zo source: nájdi pár v targete s rovnakým `item_code` → zlúč hodiny + CZK do target rowu, zmaž source row. Položky bez páru → presuň `scheduled_week` na target.
-  - Po zlúčení zavolaj `renumberBundleChain(bundleGroupId)` → chain sa skráti o 1 týždeň.
-- Existujúca `mergeBundleSplitGroups` sa nahradí volaním `mergeBundleAcrossWeeks`. Per-code `mergeSplitItems` zostáva pre legacy single-item merge.
+Po nasadení opravy spustiť jednorazové prečíslovanie chainu `37f0f762-9985-4d65-a6aa-d6b2577d508f` (volaním `renumberBundleChain` z migrácie alebo manuálnou SQL aktualizáciou):
 
-### 4. `src/pages/PlanVyroby.tsx` — drag merge celého bundlu
+- T13 (2026-03-23) → 1/6 pre midflight riadok
+- T14 (2026-03-30) → 2/6
+- T15 (2026-04-06) → 3/6
+- T16 (2026-04-13) → 4/6
+- T17 (2026-04-27) → 5/6 pre všetkých 5 položiek
+- T18 (2026-05-04) → 6/6 pre všetkých 5 položiek
 
-- V `handleDragEnd` vetva `silo-bundle` (riadok 650):
-  - Detekciu merge urobiť na úrovni **bundle chainu**: ak source bundle a target week obsahujú položky s rovnakým `split_group_id` (ktorýkoľvek bundle chain), ponúknuť merge celého bundlu.
-  - `MergePopover.onMerge` zavolá nové `mergeBundleAcrossWeeks(bundleGroupId, sourceWeek, targetWeek)` namiesto `mergeBundleSplitGroups`.
-  - `onKeepSeparate` zostáva `moveBundleToWeek(..., 'separate')`.
-- Texty `MergePopover` upraviť: „Spojit celý bundle ({n} položek) do T{X}".
+### Edge cases
 
-### 5. Edge cases
-
-- **Bundle bez splitu (chain neexistuje)**: drag bundlu na week s rovnakým projektom → fallback na existujúce `moveBundleToWeek` s duplicate-key konfliktom (sloučit/oddělit).
-- **Bundle s mixom split + nesplit položiek**: split-aware merge zlúči len chain položky, nesplit položky sa presunú/zlúčia bežne podľa item_code.
-- **Cancelled / completed / paused riadky**: `renumberBundleChain` ich preskočí (rovnako ako súčasná logika).
-- **Per-item dialog `SplitItemDialog`** ostáva nezmenený — single-item splity budú stále per-code chain (legacy správanie pre individuálne položky).
+- **Cancelled riadky** zostávajú vyradené z chainu.
+- **Inbox riadky** stále nie sú súčasťou bundle weekChainu (riadok 192–202 ich resetuje na null).
+- **Bundle merge naprieč týždňami** (`mergeBundleAcrossWeeks`) automaticky využije nový `fetchChainRows`, takže merge tiež zohľadní midflight týždne v finálnom prečíslovaní.
 
 ## Dotknuté súbory
 
-- `src/lib/splitChainHelpers.ts` — pridať `renumberBundleChain`.
-- `src/components/production/SplitBundleDialog.tsx` — zdieľaný `bundleGroupId` + nový renumber.
-- `src/hooks/useProductionDragDrop.ts` — pridať `mergeBundleAcrossWeeks`, exportovať z hooku, upraviť `mergeBundleSplitGroups` aby delegovala (alebo nahradiť volania).
-- `src/pages/PlanVyroby.tsx` — drag-end vetva `silo-bundle` použije bundle merge namiesto per-group merge.
+- `src/lib/splitChainHelpers.ts` — odstrániť `!r.is_midflight` filter v `fetchChainRows`, aktualizovať doc komentár.
+- Migrácia: jednorazový SQL update split_part/split_total pre všetky existujúce midflight chainy v projekte (alebo widely — všetky chainy s midflight riadkami).
 
 ## Výsledok
 
-- **Multisport**: nový split splitnutého bundlu (5 týždňov) vytvorí 6/6, predošlé sa prečíslujú na 1/6…5/6 — všetky položky v každom týždni zdieľajú rovnaký badge.
-- **Allianz merge mess**: merge celého bundlu sa vykoná ako jedna atómová operácia, nie 5 nezávislých per-code merges.
-- **Drag-to-merge**: ťahanie celého bundlu ponúkne merge dialóg pre celý bundle; nie je potrebné ťahať po jednej položke.
+- **Z-2617-001**: po cleanupe a opätovnom splite uvidíš správne 1/6..6/6 naprieč všetkými týždňami chainu.
+- **Budúce splity** na bundloch s midflight históriou budú pokračovať (5/5 → 6/6, nie reset na 1/2).
 
