@@ -43,6 +43,7 @@ export function SplitBundleDialog({
   weeks,
 }: SplitBundleDialogProps) {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
   const [pct, setPct] = useState(50);
   const [targetWeek, setTargetWeek] = useState("");
   const [submitting, setSubmitting] = useState(false);
