@@ -1,90 +1,76 @@
 
 
-## Diagnóza (potvrdené z DB)
+## Upresnenie
 
-| Projekt | Plán | Inbox | Midflight | Odpracované (hours_log) | Mal by byť Inbox |
-|---|---|---|---|---|---|
-| Z-2607-008 | 586 h | **586 h** | 0 h | 33.88 h | ~552 h |
-| Z-2617-001 | 1214 h | 346 h | 0 h | 77.75 h | ~268 h |
+Carry-forward % z minulého týždňa sa aplikuje **iba pre splitnuté bundles** (časti rovnakého `item_code` / `split_group_id` chainu naprieč viacerými týždňami). Pre samostatné, nesplitnuté bundles žiadny fallback neexistuje — bez vlastného daily logu zostávajú na 0 % (resp. len `completionPct` z dokončených/expedovaných položiek).
 
-Inbox dnes ukazuje **plnú TPV pracnosť položiek**, akoby sa ešte nič neurobilo. Skutočne odpracované hodiny z `production_hours_log` sa od inboxu nikdy neodratávajú.
+## Logika
 
-V `midflightImportPlanVyroby.ts` (riadok 365–387) sa pre každý inbox riadok počíta:
-```
-estimated_hours = tpv.hodiny_plan / partsCount
-```
-Žiadny člen typu `− odpracované hodiny`. Historické midflight bundle hodiny existujú ako samostatné riadky v `production_schedule (is_midflight=true)`, ale do výpočtu inbox položiek nevstupujú.
+Pre bundle v týždni X bez vlastného daily logu:
 
-## Cieľ
+1. **Ak bundle obsahuje split items** (aspoň jedna položka má `split_group_id != null`):
+   - Nájdi najnovší non-MF daily log zo **skoršieho týždňa** patriaci k tomu istému `split_group_id` (cez `bundle_id` projektu, ale obmedzené na chainy zdieľané s aktuálnym bundlom).
+   - Použi jeho `percent` ako fallback.
+2. **Inak (nesplitnutý bundle)**:
+   - Žiadny fallback. `latestLogPct = 0`.
+   - Výsledok = `Math.max(0, completionPct)`.
 
-**Inbox položka = zostatok TPV pracnosti po odpočítaní toho, čo už bolo na danej položke (alebo projekte) odpracované.**
+MF logy (`bundle_id` obsahuje `::MF_`) sú vždy ignorované.
 
-Per item:
-```
-estimated_hours = max(0, tpv.hodiny_plan − consumed_hours_for_item) / activeChainParts
-```
+## Implementácia
 
-Kde `consumed_hours_for_item` je podiel skutočne odpracovaných hodín pripadajúci na tento `item_code`.
+### `src/pages/Vyroba.tsx`
 
-## Problém s alokáciou
+**1. `allLatestLogs` query** — vracia `Map<projectId, DailyLog[]>`, sorted desc by `week_key, day_index, logged_at`, vyfiltrované MF logy. (bez zmeny oproti predošlému plánu)
 
-`production_hours_log` eviduje hodiny **per projekt**, nie per `item_code`. Nedokážeme presne povedať, koľko z 33.88 h Z-2607-008 šlo na T.01 vs. T.02. Preto:
+**2. Nová pomocná query / map: `splitGroupsByBundle`**
 
-**Riešenie: pomerné rozdelenie v rámci projektu.**
+Pre každý projekt v aktuálnom týždni zistiť, či bundle obsahuje split položky a aké `split_group_id` to sú. Zdroj: `production_schedule` rows pre daný `(project_id, scheduled_week)` → `split_group_ids = items.filter(i => i.split_group_id).map(i => i.split_group_id)`.
 
-```
-project_consumed_total = SUM(hours_log) + SUM(midflight schedule hours) pre projekt
-                       (oba zdroje, lebo midflight = staré odpracované, hours_log = nové)
-project_plan_total     = SUM(tpv.hodiny_plan) pre projekt
-consumption_ratio      = min(1, project_consumed_total / project_plan_total)
-item_consumed          = tpv.hodiny_plan × consumption_ratio
-item_remaining         = max(0, tpv.hodiny_plan − item_consumed)
-inbox.estimated_hours  = item_remaining / activeChainParts
-```
+**3. `getLatestPercent(pid, weekKey)` — split-aware fallback**
 
-Pre Z-2607-008: ratio = 33.88/586 = 5.78 % → každá položka stratí 5.78 % zo svojej pracnosti → inbox total spadne z 586h na ~552h ✓
-
-## Plán implementácie
-
-### 1. `src/lib/recalculateProductionHours.ts`
-Toto je primárne miesto, kde sa pravidelne aktualizujú inbox hodiny (volá sa pri „Prepočítať hodiny", po edite TPV počtu, atď.).
-
-V sekcii **„INBOX: direct mirror of TPV item hours"** (riadky 230–290 podľa pôvodného kontextu) doplniť:
-
-a) Pred slučkou cez projekty raz načítať mapu `consumedByProject`:
-   - SUM `production_hours_log.hodiny` (vylúčiť TPV/ENG/PRO) per `ami_project_id` → normalizovať
-   - PLUS SUM `production_schedule.scheduled_hours WHERE is_midflight=true` per `project_id`
-
-b) Pre každý projekt vypočítať `consumption_ratio`.
-
-c) V calculation per item:
 ```ts
-const tpvHoursTotal = tpvHoursById.get(tpv.id) ?? 0;
-const itemConsumed  = tpvHoursTotal * consumptionRatio;
-const itemRemaining = Math.max(0, tpvHoursTotal - itemConsumed);
-const newHours      = Math.round((itemRemaining / partsCount) * 10) / 10;
+function getLatestPercent(pid: string, weekKey: string): number {
+  const logs = getLogsForProject(pid); // logs v aktuálnom týždni
+  if (logs.length > 0) return Math.max(...logs.map(l => l.percent));
+
+  // Fallback len pre split bundles
+  const bundleSplitGroups = splitGroupsByBundle.get(`${pid}::${weekKey}`);
+  if (!bundleSplitGroups || bundleSplitGroups.size === 0) return 0;
+
+  // Nájdi prior non-MF log patriaci k niektorému z týchto split_group_id
+  const all = allLatestLogs?.get(pid);
+  if (!all) return 0;
+  for (const log of all) {
+    if (log.week_key >= weekKey) continue;
+    // overiť, či log.bundle_id patrí k chainu (cez schedule lookup podľa week_key + project_id)
+    const logWeekItems = scheduleByProjectWeek.get(`${pid}::${log.week_key}`);
+    const logHasChainOverlap = logWeekItems?.some(i =>
+      i.split_group_id && bundleSplitGroups.has(i.split_group_id)
+    );
+    if (logHasChainOverlap) return log.percent;
+  }
+  return 0;
+}
 ```
 
-### 2. `src/lib/midflightImportPlanVyroby.ts`
-V inbox reconciliation (riadky 365–387) aplikovať tú istú logiku — `consumption_ratio` per projekt → odrátať podiel z každej inbox položky.
+To isté pre `getLatestPhase`.
 
-### 3. UI bez zmeny
-- Inbox bude prirodzene zobrazovať „zostatok do dokončenia" a celkový súčet sa bude zhodovať s `plán − odpracované`.
-- ProjectProgressBar a header metriky používajú už existujúce `hodiny_plan` (zostáva 586h ako celkový plán) — to nemeníme. Mení sa len **inbox „čo zostáva naplánovať"**.
+**4. `getBundleProgress`** zostáva: `Math.max(latestLogPct, completionPct)`.
 
 ## Edge cases
 
-- Ak `consumption_ratio ≥ 1` (overrun): inbox = 0 pre všetky položky, ale neodstraňujeme ich (nech zostane viditeľné, že treba dokončiť). Voliteľne pridáme info hlášku „Plán prečerpaný".
-- Položky v inbox bez TPV match (ad-hoc) zostávajú netknuté.
-- Po dokončení (status=completed v schedule) by sa odpočítané hodiny mali aj tak držať — `consumed` zahŕňa midflight a hours_log, oba sú kumulatívne historické zdroje, takže po novom logovaní hodín ratio prirodzene rastie.
+- Split bundle bez prior loga v chaine → 0 %.
+- Nesplitnutý bundle so spilled hodinami z T-1 (nie chain split, len `is_spilled`) → momentálne tiež 0 %, lebo nemá `split_group_id`. Ak treba aj toto pokrývať fallbackom, povedz a doplním samostatnú vetvu pre `is_spilled`.
+- Projekt s viacerými paralelnými chainmi v jednom týždni → fallback berie prvý nájdený log, ktorý zdieľa **aspoň jeden** chain.
 
 ## Dotknuté súbory
 
-- `src/lib/recalculateProductionHours.ts` (hlavná zmena — inbox prepočet)
-- `src/lib/midflightImportPlanVyroby.ts` (rovnaká logika v reconciliation)
+- `src/pages/Vyroba.tsx` — `allLatestLogs` (filter MF + array per project), nová mapa `splitGroupsByBundle` + `scheduleByProjectWeek`, split-aware `getLatestPercent` / `getLatestPhase`.
 
-## Výsledok pre Z-2607-008
+## Výsledok
 
-Pred: inbox 586 h, história 34 h → spolu 620 h (nezmysel, projekt má len 586 h plán)  
-Po: inbox 552 h, história 34 h → spolu 586 h ✓
+- Z-2504-019 T17 bez splitu, bez logu → **0 %** (predtým chybne 100 %).
+- Splitnutý bundle TK.05 1/2 v T16 = 50 %, TK.05 2/2 v T17 bez logu → fallback **50 %** z T16 chainu.
+- Nesplitnutý bundle s logom 30 % v T16 a žiadnym v T17 → T17 ukáže **0 %** (resp. completionPct).
 
