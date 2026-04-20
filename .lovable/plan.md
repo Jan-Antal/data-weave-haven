@@ -1,89 +1,100 @@
 
 
-## Problém
+## Rozšírenie — tretia metrika "Očakávaný progress dnes"
 
-V `src/pages/Vyroba.tsx` % logika ukazuje nesprávne hodnoty v týchto scenároch:
+Doplniť k existujúcim dvom kumulatívnym metrikám (`Hodiny %` a `Dokončeno %`) tretiu — **`Očakávaný progress dnes`** — rovnakú, akú už počíta `Vyroba.tsx` cez `getExpectedPct`. Vizualizovať ako **vertikálnu tyrkysovú rysku** na horizontálnom progress bare karty (rovnako ako vo Výrobe).
 
-1. **„Týdenní cíl: 100%" nesprávne** — `getWeeklyGoal` má fallback `return 100` keď `planHoursMap` ešte nie je načítané (React Query loading) alebo keď `hPlan` chýba. Z-2607-008 v T17 zobrazí 100% namiesto reálneho ~9%.
+## Cieľ
 
-2. **Chain bundle ukazuje progress prevzatý z completed predošlého týždňa** — v split chain projektoch (Z-2607-008: T16 midflight Expedice 100% + T17 nové splity), `getLatestPercent` cez `findPriorChainLog` vráti 100% (z T16 Expedice logu), aj keď T17 je nový kus chainu (chain window 6→20%). Bundle progress potom ukazuje 100% miesto reálneho stavu T17 (ktorý buď nemá log = 0% v rámci okna, alebo má vlastný log 6%).
+Pre každú kartu projektu v `DilnaDashboard`:
 
-3. **Týdenní cíl ignoruje chain window** — pre split chain projekt by „týždenný cieľ" mal byť koniec chain okna pre tento týždeň (`chainWindow.end`), nie projekt-globálne %. Aktuálne `getWeeklyGoal` používa `expectedHours / hodiny_plan`, čo pre chain bundle dáva nezmyslné nízke číslo (lebo súčet T17 je len 83h zo 586h).
+- **`expectedPct`** = očakávaný % postup k aktuálnemu dňu v zobrazenom týždni
+  - Pre **aktuálny týždeň**: lineárna interpolácia medzi začiatkom a koncom týždňa podľa `dayFraction` (Po=0.2, Út=0.4, … Pá=1.0).
+  - Pre **minulé týždne** (weekOffset &lt; 0): `expectedPct = 100%` voči koncu daného týždňa (mal byť hotový).
+  - Pre **budúce týždne** (weekOffset &gt; 0): `expectedPct = 0%` (ešte sa nezačal).
+  - Pre **split chain** projekty: `cw.start + (cw.end − cw.start) × dayFraction` (chain-window-aware, presne ako `getExpectedPct` vo `Vyroba.tsx`).
+  - Pre **off-plan / unmatched / bez plánu**: `null` (rysku nezobraziť).
 
-## Zmena 1 — `getWeeklyGoal` opravená sémantika
+## Zmena 1 — výpočet `expectedPct` v `useDilnaData`
 
-V `src/pages/Vyroba.tsx` funkcia `getWeeklyGoal(pid)`:
+V `src/components/DilnaDashboard.tsx` v `useDilnaData(weekOffset)`:
+
+1. Doplniť `dayFraction`:
+   ```ts
+   const today = new Date();
+   const isCurrentWeek = weekOffset === 0;
+   const isPastWeek = weekOffset < 0;
+   const dayOfWeek = today.getDay(); // 0=Ne … 6=So
+   const workdayIdx = dayOfWeek === 0 ? 5 : Math.min(dayOfWeek, 5); // Po=1 … Pá=5
+   const dayFraction = isPastWeek ? 1 : isCurrentWeek ? workdayIdx / 5 : 0;
+   ```
+
+2. Načítať **chain windows** pre projekty so splitmi (rovnaká logika ako `getChainWindow` vo `Vyroba.tsx`):
+   - Query `production_schedule` (všetky týždne, `status != 'cancelled'`) zoskupené per `project_id` → určiť poradie `weekKey` a podiel `scheduled_hours` / `Σ scheduled_hours` → `chainWindowByProject: Map<string, {start, end}>`.
+   - Pre projekty bez splitov (jeden týždeň alebo bez schedule) → window = `{ start: 0, end: 100 }`.
+
+3. Per-projekt:
+   ```ts
+   const cw = chainWindowByProject.get(pid) ?? { start: 0, end: 100 };
+   const expectedPct = planTotal > 0
+     ? Math.round(cw.start + (cw.end - cw.start) * dayFraction)
+     : null;
+   ```
+
+## Zmena 2 — `ProjectCard` typ + slip logika
 
 ```ts
-function getWeeklyGoal(pid: string): number {
-  const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
-  if (projectForGoal?.isSpilled) return 100;
-  if (!scheduleData) return 0;            // bolo: 100  (nesprávne)
-
-  // Ak je bundle súčasťou split chainu → cieľ = koniec chain okna
-  const cw = getChainWindow(pid);
-  if (cw) return Math.round(cw.end);
-
-  const hPlan = planHoursMap?.get(pid);
-  if (planHoursMap === undefined) return 0;  // loading — neposielať 100
-  if (!hPlan || hPlan <= 0) return 100;      // projekt bez plánu — pôvodný fallback
-
-  // … existujúci výpočet completedWeeksHours + currentWeekHours * dayFraction
+interface ProjectCard {
+  // … existujúce
+  expectedPct: number | null;
 }
 ```
 
-**Efekt**: Z-2607-008 T17 teraz zobrazí „Týdenní cíl: 20%" (= chain window end), čo zodpovedá realitě (do konca T17 by malo byť hotových 20% celého chainu).
+`computeSlip` ostáva podľa porovnania `trackedPct` ↔ `completionPct` (kumulatívne). `expectedPct` slúži **len na vizualizáciu** rysky — neovplyvňuje farbu karty.
 
-## Zmena 2 — `getBundleProgress` chain-aware
+## Zmena 3 — UI: vertikálna ryska na progress bare
 
-`getLatestPercent` aktuálne v split chain berie posledný non-MF log z prior týždňa (cez `findPriorChainLog`). Ak ten log je 100% (Expedice), bundle T17 zobrazí 100% napriek tomu, že T17 je nový kus chainu, ktorý sa ešte nezačal.
+V renderovacej časti karty, kde sa zobrazuje `barWidthPct` progress bar:
 
-Oprava: prior chain log použiť **iba ak** je menší alebo rovný `chainWindow.start` (= bundle ešte nezačal) **alebo** ak nepatrí do dokončeného chunku. Ak prior log = 100% ale chain pokračuje (existuje neskorší týždeň v chaine), bundle T17 začína na `chainWindow.start` (~6%), nie 100%.
+```tsx
+<div className="relative h-2 rounded-full bg-muted overflow-visible">
+  {/* existujúca farebná výplň trackedPct / completionPct */}
+  <div className="h-full rounded-full" style={{ width: `${barWidthPct}%`, background: barColor }} />
 
-```ts
-function getLatestPercent(pid: string): number {
-  const logs = getLogsForProject(pid);
-  if (logs.length > 0) { /* … existujúce sortovanie … */ }
-
-  const prior = findPriorChainLog(pid, weekKey);
-  if (!prior) return 0;
-
-  // Chain-safe: ak je prior log ≥ chain window end (t.j. predchádzajúci kus chainu
-  // bol dokončený / posunutý k expedíciám), nepokračujeme s ním do nového kusu.
-  // Štartujeme od začiatku okna pre tento týždeň.
-  const cw = getChainWindow(pid);
-  if (cw && prior.percent >= Math.round(cw.start) && prior.percent >= 95) {
-    return Math.round(cw.start);
-  }
-  return prior.percent;
-}
+  {/* NOVÉ: vertikálna ryska expectedPct */}
+  {expectedPct !== null && (
+    <div
+      className="absolute top-[-2px] bottom-[-2px] w-[2px] bg-teal-500"
+      style={{ left: `${Math.min(100, Math.max(0, expectedPct))}%` }}
+      title={`Očakávaný postup dnes: ${expectedPct}%`}
+    />
+  )}
+</div>
 ```
 
-**Efekt**: Z-2607-008 T17 bez vlastného logu zobrazí ~6% (chain window start), nie 100%.
+Tooltip baru rozšíriť: `Hodiny {trackedPct}% · Dokončeno {completionPct}% · Očakávané {expectedPct}%`.
 
-## Zmena 3 — `getExpectedPct` — žiadna zmena potrebná
+Stat row pridať jemnú info: `Očekáváno dnes: {expectedPct}%` (len ak nie je `null`).
 
-Už správne počíta: `cw.start + (cw.end - cw.start) * fraction` pre chain bundle. Ostane.
+## Overenie
 
-## Overenie (vzorka)
+| Týždeň | Projekt | Deň | cw | dayFraction | Očakávané | Ryska na |
+|---|---|---|---|---:|---:|---|
+| T17 (current) | Multisport | Streda | 6→20% | 0.6 | 14% | 14% |
+| T17 (current) | bez splitu | Pondelok | 0→100% | 0.2 | 20% | 20% |
+| T17 (current) | bez splitu | Piatok | 0→100% | 1.0 | 100% | 100% |
+| T16 (past) | ľubovoľný | — | — | 1.0 | 100% (alebo `cw.end`) | 100% |
+| T18 (future) | ľubovoľný | — | — | 0 | `cw.start` | start |
+| Off-plan | — | — | — | — | null | bez rysky |
 
-| Projekt | Týždeň | Stav v DB | Očakávaný „Týdenní cíl" | Očakávaný „Bundle progress" |
-|---|---|---|---|---|
-| Z-2607-008 (Multisport) | T17 | chain 6→20%, bez T17 logu | **20%** (chain end) | **6%** (chain start) |
-| Z-2607-008 | T17 | chain 6→20%, T17 log = 15% | **20%** | **15%** |
-| Z-2607-008 | T18 | chain 20→52%, bez logu | **52%** | **20%** |
-| Projekt bez chainu | T17 | hPlan=200, T16=50h hotové, T17=50h, dnes Po | round(50+50*0.2)/200 = **30%** | podľa logov |
-| Projekt bez chainu, planHoursMap loading | — | — | **0%** (skeleton-friendly) | progress podľa logov |
-| Spilled projekt | — | — | **100%** | latest pct |
-
-Manuálne otestovať:
-1. `/vyroba` → T17 → vybrať Multisport → header musí zobraziť „Týdenní cíl: 20%" (nie 100%) a bundle %, ktoré odpovedá chain oknu (≤20%).
-2. Posunúť na T18 → cieľ ~52%, štart ~20%.
-3. Iný projekt bez chainu → cieľ vypočítaný podľa `expectedHours / hodiny_plan` × dayFraction.
-4. Spilled projekt T-1 → cieľ 100%, status „behind".
-5. Reload stránky → počas načítavania `planHoursMap` sa nezobrazí blesková 100%.
+Manuálne otestovať na `/analytics?tab=dilna`:
+1. Aktuálny týždeň, streda → ryska na ~60% u projektov bez splitu, na ~14% u Multisport.
+2. Posun na minulý týždeň → ryska úplne vpravo (100% / `cw.end`).
+3. Posun na budúci týždeň → ryska na začiatku (0% / `cw.start`).
+4. Off-plan dlaždica → ryska sa nezobrazí.
+5. Tooltip baru ukazuje všetky tri metriky.
 
 ## Dotknuté súbory
 
-- `src/pages/Vyroba.tsx` — funkcie `getWeeklyGoal`, `getLatestPercent`.
+- `src/components/DilnaDashboard.tsx` — `useDilnaData` (chain window query + `dayFraction` + `expectedPct` agregácia), `ProjectCard` interface, render karty (vertikálna ryska + tooltip + stat row).
 
