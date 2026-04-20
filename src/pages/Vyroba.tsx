@@ -3372,7 +3372,7 @@ function DetailPanel({
     if (item.is_midflight) return true;
     return item.status === "completed" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
-  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal) : 0;
+  const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal, project.projectId) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", behind: "#dc2626" };
   const statusLabels = { "on-track": "On track", "at-risk": "At risk", behind: "Pozadu" };
