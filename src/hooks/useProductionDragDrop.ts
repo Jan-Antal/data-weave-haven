@@ -696,6 +696,8 @@ export function useProductionDragDrop() {
             sent_by: user.id,
             status: "pending",
             split_group_id: schedItem.split_group_id ?? null,
+            split_part: schedItem.split_part ?? null,
+            split_total: schedItem.split_total ?? null,
           });
         if (insertErr) throw insertErr;
       }
@@ -938,6 +940,8 @@ export function useProductionDragDrop() {
           sent_by: user.id,
           status: "pending" as const,
           split_group_id: item.split_group_id ?? null,
+          split_part: item.split_part ?? null,
+          split_total: item.split_total ?? null,
         }));
         const { error: insertErr } = await supabase.from("production_inbox").insert(newItems);
         if (insertErr) throw insertErr;
