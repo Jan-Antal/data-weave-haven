@@ -360,6 +360,24 @@ function slipLabel(status: SlipStatus): string {
   }
 }
 
+function warningLabel(w: CardWarning): string {
+  if (w === "off_plan") return "Mimo Plán výroby";
+  if (w === "unmatched") return "Nespárované";
+  return "";
+}
+
+function warningPillClass(w: CardWarning): string {
+  if (w === "off_plan") return "bg-amber-100 text-amber-800 border border-amber-300";
+  if (w === "unmatched") return "bg-slate-200 text-slate-700 border border-slate-300";
+  return "";
+}
+
+function warningBorderColor(w: CardWarning, projectColor: string): string {
+  if (w === "off_plan") return "#d97706";
+  if (w === "unmatched") return "#94a3b8";
+  return projectColor;
+}
+
 /* ── component ───────────────────────────────────────────────────── */
 
 export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
