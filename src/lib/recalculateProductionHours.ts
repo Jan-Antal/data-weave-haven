@@ -257,116 +257,49 @@ export async function recalculateProductionHours(
         }
       }
 
-      // ===== INBOX: proportional redistribution to guarantee
-      //   Σ inbox.estimated_hours + Σ schedule.scheduled_hours == hodiny_plan
-      // First refresh estimated_czk from TPV (so CZK stays accurate),
-      // then distribute the remainder of plan hours proportionally to estimated_czk.
+      // ===== INBOX: direct mirror of TPV item hours =====
+      // Each inbox item with an item_code mapped to a TPV item gets:
+      //   estimated_hours = tpv.hodiny_plan (already accounts for pocet & margin via computePlanHours)
+      //   estimated_czk   = cena × pocet (via scheduled_czk_tpv formula)
+      // For chained items (split_group_id) → split tpv hours by active parts count for that item_code.
+      // Ad-hoc items (no TPV match) keep their existing values.
       const inboxItemsAll = inboxByProject.get(proj.project_id) || [];
       const inboxItems = inboxItemsAll.filter((it: any) => !it.item_code?.startsWith('HIST_'));
 
-      // 1) Refresh estimated_czk per item from TPV when available.
-      //    For chained items (split_group_id present) we DO NOT divide by
-      //    split_total — the bundle-wide chain doesn't map a single inbox
-      //    row to a single TPV item. We keep the existing estimated_czk in
-      //    that case (it was set when the inbox item was created/split).
-      const refreshedCzk = new Map<string, number>();
+      // Map: tpv.id → final hodiny_plan (already scaled in computePlanHours.item_hours)
+      const tpvHoursById = new Map<string, number>();
+      for (const ih of result.item_hours) tpvHoursById.set(ih.id, ih.hodiny_plan);
+
+      // Count active chain parts per item_code (inbox + non-midflight schedule)
+      const fullSchedForProject = allSched.filter((s: any) => s.project_id === proj.project_id);
+      const activePartsByCode = new Map<string, number>();
+      for (const it of inboxItems) {
+        if (!it.item_code) continue;
+        activePartsByCode.set(it.item_code, (activePartsByCode.get(it.item_code) || 0) + 1);
+      }
+      for (const s of fullSchedForProject) {
+        if (!s.item_code || s.is_midflight) continue;
+        if (s.item_code.startsWith('HIST_')) continue;
+        activePartsByCode.set(s.item_code, (activePartsByCode.get(s.item_code) || 0) + 1);
+      }
+
       for (const item of inboxItems) {
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
-        if (tpv && !item.split_group_id) {
-          const rawCena = Number(tpv.cena) || 0;
-          const correctCzk = Math.floor(evaluateFormula(
-            formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
-            { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
-          ));
-          refreshedCzk.set(item.id, correctCzk);
-        } else {
-          refreshedCzk.set(item.id, Number(item.estimated_czk) || 0);
-        }
-      }
+        if (!tpv) continue; // ad-hoc inbox item — leave untouched
 
-      // 2) Compute schedule active hours already locked-in for this project (post-week filter applied earlier may exclude past;
-      //    here we want the FULL active total to know the true remainder).
-      // Re-derive from full schedule list (not the filtered one above).
-      const fullSchedForProject = allSched.filter((s: any) => s.project_id === proj.project_id);
-      const scheduleActiveHours = fullSchedForProject.reduce(
-        (sum: number, s: any) => sum + (Number(s.scheduled_hours) || 0),
-        0,
-      );
+        const rawCena = Number(tpv.cena) || 0;
+        const correctCzk = Math.floor(evaluateFormula(
+          formulas['scheduled_czk_tpv'] ?? FORMULA_DEFAULTS['scheduled_czk_tpv'],
+          { tpv_cena: rawCena, pocet: Number(tpv.pocet) || 1, eur_czk: isEur ? eurRate : 1 }
+        ));
 
-      // 3) Group inbox items by stage_id (null bucket = project-level)
-      const stageBuckets = new Map<string, any[]>();
-      for (const item of inboxItems) {
-        const key = item.stage_id || '__project__';
-        const arr = stageBuckets.get(key) || [];
-        arr.push(item);
-        stageBuckets.set(key, arr);
-      }
+        const tpvHoursTotal = tpvHoursById.get(tpv.id) ?? 0;
+        const partsCount = Math.max(1, activePartsByCode.get(item.item_code!) || 1);
+        const newHours = Math.round((tpvHoursTotal / partsCount) * 10) / 10;
 
-      // For now: stage-specific hodiny_plan is not separately computed here.
-      // We distribute only the inbox SHARE of the remaining plan hours.
-      // The rest stays implicitly on TPV items that are not yet in inbox/schedule,
-      // which prevents a small approved subset from absorbing the whole project plan.
-      const planRemainder = Math.max(0, (result.hodiny_plan || 0) - scheduleActiveHours);
+        // For chained items, also split CZK proportionally
+        const newCzk = item.split_group_id ? Math.floor(correctCzk / partsCount) : correctCzk;
 
-      // Sort by sent_at to identify "last item" deterministically
-      const sortedInbox = [...inboxItems].sort((a: any, b: any) => {
-        const ta = a.sent_at ? new Date(a.sent_at).getTime() : 0;
-        const tb = b.sent_at ? new Date(b.sent_at).getTime() : 0;
-        return ta - tb;
-      });
-
-      const totalInboxCzk = sortedInbox.reduce(
-        (sum, it) => sum + (refreshedCzk.get(it.id) || 0),
-        0,
-      );
-
-      const inboxCodes = new Set(sortedInbox.map((it: any) => it.item_code).filter(Boolean));
-      const scheduledCodes = new Set(
-        fullSchedForProject
-          .filter((s: any) => !s.is_midflight && s.item_code)
-          .map((s: any) => s.item_code)
-      );
-      const pendingTpvCzk = tpvItems.reduce((sum: number, tpv: any) => {
-        const status = String(tpv.status || "").toLowerCase();
-        if (status === "zrušeno" || status === "zruseno" || status === "cancelled") return sum;
-        if (tpv.item_code && inboxCodes.has(tpv.item_code)) return sum;
-        if (tpv.item_code && scheduledCodes.has(tpv.item_code)) return sum;
-        return sum + (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
-      }, 0);
-      const inboxShareDenom = totalInboxCzk + pendingTpvCzk;
-      const inboxShare = inboxShareDenom > 0 ? Math.round((planRemainder * totalInboxCzk / inboxShareDenom) * 10) / 10 : 0;
-
-      const newHoursById = new Map<string, number>();
-
-      if (sortedInbox.length === 0) {
-        // nothing to do
-      } else if (inboxShare <= 0 || (result.hodiny_plan || 0) <= 0) {
-        for (const it of sortedInbox) newHoursById.set(it.id, 0);
-      } else if (totalInboxCzk <= 0) {
-        // Distribute equally
-        const base = Math.floor((inboxShare * 10) / sortedInbox.length) / 10;
-        let assigned = 0;
-        for (let i = 0; i < sortedInbox.length - 1; i++) {
-          newHoursById.set(sortedInbox[i].id, base);
-          assigned += base;
-        }
-        newHoursById.set(sortedInbox[sortedInbox.length - 1].id, Math.max(0, Math.round((inboxShare - assigned) * 10) / 10));
-      } else {
-        let assigned = 0;
-        for (let i = 0; i < sortedInbox.length - 1; i++) {
-          const it = sortedInbox[i];
-          const share = Math.round((inboxShare * (refreshedCzk.get(it.id) || 0) / totalInboxCzk) * 10) / 10;
-          newHoursById.set(it.id, share);
-          assigned += share;
-        }
-        // Last item carries the remainder so the total is exact
-        const last = sortedInbox[sortedInbox.length - 1];
-        newHoursById.set(last.id, Math.max(0, Math.round((inboxShare - assigned) * 10) / 10));
-      }
-
-      for (const item of sortedInbox) {
-        const newCzk = refreshedCzk.get(item.id) ?? Number(item.estimated_czk || 0);
-        const newHours = newHoursById.get(item.id) ?? 0;
         if (
           newCzk !== Number(item.estimated_czk) ||
           newHours !== Number(item.estimated_hours)
