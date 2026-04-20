@@ -198,7 +198,7 @@ function useDilnaData(weekOffset: number) {
         const loggedHours = hoursByProject.get(pid) || 0;
         const trackedPct = plannedHours > 0 ? Math.round((loggedHours / plannedHours) * 100) : 0;
         const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
-        const slipStatus = computeSlip(trackedPct, completionPct, loggedHours);
+        const slipStatus = isUnmatched ? "none" : computeSlip(trackedPct, completionPct, loggedHours);
 
         const prodPct = (proj?.cost_production_pct ?? 30) / 100;
         const cena = proj?.prodejni_cena ?? 0;
@@ -212,7 +212,7 @@ function useDilnaData(weekOffset: number) {
         cards.push({
           projectId: pid,
           projectName: isUnmatched ? "Nespárované" : (proj?.project_name || pid),
-          isUnmatched,
+          warning: isUnmatched ? "unmatched" : "none",
           plannedHours,
           loggedHours,
           trackedPct,
@@ -223,10 +223,10 @@ function useDilnaData(weekOffset: number) {
         });
       }
 
-      // 2) Unmatched: hours logged this week to a project_id that has NO schedule and NO project record
+      // 2) Unmatched: hours logged this week to a project_id with no schedule and no project record
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
-        if (knownProjectIds.has(pid)) continue;          // matched but unscheduled — skip (not a production-floor concern)
+        if (knownProjectIds.has(pid)) continue;          // matched but unscheduled — handled in step 3
         if (loggedHours < 0.05) continue;
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
@@ -235,7 +235,7 @@ function useDilnaData(weekOffset: number) {
         cards.push({
           projectId: pid,
           projectName: "Nespárované",
-          isUnmatched: true,
+          warning: "unmatched",
           plannedHours: 0,
           loggedHours,
           trackedPct: 0,
@@ -246,15 +246,44 @@ function useDilnaData(weekOffset: number) {
         });
       }
 
-      // Sort: delays first, then slips, then ok, then unmatched/no-data last
-      const slipRank: Record<SlipStatus, number> = { delay: 0, slip: 1, ok: 2, none: 3 };
+      // 3) Off-plan: project IS in DB (matched), has hours this week, but is not in production_schedule
+      for (const [pid, loggedHours] of hoursByProject) {
+        if (scheduledProjects.has(pid)) continue;
+        if (!knownProjectIds.has(pid)) continue;        // unmatched handled above
+        if (loggedHours < 0.05) continue;
+        const proj = projMap.get(pid)!;
+        const usekMap = usekByProject.get(pid);
+        const usekBreakdown = usekMap
+          ? Array.from(usekMap.values()).sort((a, b) => usekSortKey(a.kod) - usekSortKey(b.kod))
+          : [];
+        const prodPct = (proj.cost_production_pct ?? 30) / 100;
+        const valueCzk = (proj.prodejni_cena ?? 0) * prodPct;
+        cards.push({
+          projectId: pid,
+          projectName: proj.project_name || pid,
+          warning: "off_plan",
+          plannedHours: 0,
+          loggedHours,
+          trackedPct: 0,
+          completionPct: null,
+          slipStatus: "none",
+          valueCzk,
+          usekBreakdown,
+        });
+      }
+
+      // Sort: delays → slips → ok → off_plan → unmatched → none
+      const slipRank: Record<SlipStatus, number> = { delay: 0, slip: 1, ok: 2, none: 5 };
+      const warningRank: Record<CardWarning, number> = { none: 0, off_plan: 3, unmatched: 4 };
       cards.sort((a, b) => {
-        const r = slipRank[a.slipStatus] - slipRank[b.slipStatus];
-        if (r !== 0) return r;
+        const aRank = a.warning === "none" ? slipRank[a.slipStatus] : warningRank[a.warning];
+        const bRank = b.warning === "none" ? slipRank[b.slipStatus] : warningRank[b.warning];
+        if (aRank !== bRank) return aRank - bRank;
         return b.loggedHours - a.loggedHours;
       });
 
-      const unmatchedCount = cards.filter(c => c.isUnmatched).length;
+      const offPlanCount = cards.filter(c => c.warning === "off_plan").length;
+      const unmatchedCount = cards.filter(c => c.warning === "unmatched").length;
       const delayCount = cards.filter(c => c.slipStatus === "delay").length;
       const slipCount = cards.filter(c => c.slipStatus === "slip").length;
 
@@ -266,6 +295,7 @@ function useDilnaData(weekOffset: number) {
         dailyTarget: weeklyCapacity / 5,
         lastSync,
         cards,
+        offPlanCount,
         unmatchedCount,
         delayCount,
         slipCount,
