@@ -1032,13 +1032,6 @@ export type Database = {
             referencedColumns: ["project_id"]
           },
           {
-            foreignKeyName: "production_schedule_split_group_id_fkey"
-            columns: ["split_group_id"]
-            isOneToOne: false
-            referencedRelation: "production_schedule"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "production_schedule_stage_id_fkey"
             columns: ["stage_id"]
             isOneToOne: false
