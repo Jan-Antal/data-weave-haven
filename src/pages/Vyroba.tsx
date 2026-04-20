@@ -750,10 +750,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
     if (logs.length > 0) return Math.max(...logs.map((l) => l.percent));
-    // Fallback: check all-weeks latest log (for spilled projects)
-    const allLog = allLatestLogs?.get(pid);
-    if (allLog) return allLog.percent;
-    return 0;
+    // Fallback: only for split bundles — find latest non-MF log from a PRIOR week
+    // belonging to the same split_group_id chain.
+    const prior = findPriorChainLog(pid, weekKey);
+    return prior ? prior.percent : 0;
   }
 
   function getLatestPhase(pid: string): string | null {
@@ -762,9 +762,27 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
       return sorted[0].phase;
     }
-    // Fallback: check all-weeks latest log (for spilled projects)
-    const allLog = allLatestLogs?.get(pid);
-    if (allLog) return allLog.phase;
+    // Fallback: only for split bundles
+    const prior = findPriorChainLog(pid, weekKey);
+    return prior ? prior.phase : null;
+  }
+
+  // Find latest non-MF daily log from a PRIOR week belonging to the same split chain
+  // as the current bundle (pid, currentWeekKey). Returns null if the current bundle
+  // is not part of a split chain or no overlapping chain log exists.
+  function findPriorChainLog(pid: string, currentWeekKey: string): DailyLog | null {
+    const bundleSplitGroups = splitGroupsByBundle.get(`${pid}::${currentWeekKey}`);
+    if (!bundleSplitGroups || bundleSplitGroups.size === 0) return null;
+    const all = allLatestLogs?.get(pid);
+    if (!all) return null;
+    for (const log of all) {
+      if (log.week_key >= currentWeekKey) continue;
+      const logWeekItems = scheduleByProjectWeek.get(`${pid}::${log.week_key}`);
+      const overlap = logWeekItems?.some(
+        (i) => i.split_group_id && bundleSplitGroups.has(i.split_group_id),
+      );
+      if (overlap) return log;
+    }
     return null;
   }
 
