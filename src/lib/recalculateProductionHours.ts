@@ -303,9 +303,9 @@ export async function recalculateProductionHours(
       }
 
       // For now: stage-specific hodiny_plan is not separately computed here.
-      // We distribute the project-level remainder across ALL inbox items proportionally,
-      // regardless of stage_id. (Per-stage refinement can be added when project_stages
-      // become first-class in computePlanHours.)
+      // We distribute only the inbox SHARE of the remaining plan hours.
+      // The rest stays implicitly on TPV items that are not yet in inbox/schedule,
+      // which prevents a small approved subset from absorbing the whole project plan.
       const planRemainder = Math.max(0, (result.hodiny_plan || 0) - scheduleActiveHours);
 
       // Sort by sent_at to identify "last item" deterministically
@@ -320,32 +320,48 @@ export async function recalculateProductionHours(
         0,
       );
 
+      const inboxCodes = new Set(sortedInbox.map((it: any) => it.item_code).filter(Boolean));
+      const scheduledCodes = new Set(
+        fullSchedForProject
+          .filter((s: any) => !s.is_midflight && s.item_code)
+          .map((s: any) => s.item_code)
+      );
+      const pendingTpvCzk = tpvItems.reduce((sum: number, tpv: any) => {
+        const status = String(tpv.status || "").toLowerCase();
+        if (status === "zrušeno" || status === "zruseno" || status === "cancelled") return sum;
+        if (tpv.item_code && inboxCodes.has(tpv.item_code)) return sum;
+        if (tpv.item_code && scheduledCodes.has(tpv.item_code)) return sum;
+        return sum + (Number(tpv.cena) || 0) * (Number(tpv.pocet) || 1);
+      }, 0);
+      const inboxShareDenom = totalInboxCzk + pendingTpvCzk;
+      const inboxShare = inboxShareDenom > 0 ? Math.round((planRemainder * totalInboxCzk / inboxShareDenom) * 10) / 10 : 0;
+
       const newHoursById = new Map<string, number>();
 
       if (sortedInbox.length === 0) {
         // nothing to do
-      } else if (planRemainder <= 0 || (result.hodiny_plan || 0) <= 0) {
+      } else if (inboxShare <= 0 || (result.hodiny_plan || 0) <= 0) {
         for (const it of sortedInbox) newHoursById.set(it.id, 0);
       } else if (totalInboxCzk <= 0) {
         // Distribute equally
-        const base = Math.floor(planRemainder / sortedInbox.length);
+        const base = Math.floor((inboxShare * 10) / sortedInbox.length) / 10;
         let assigned = 0;
         for (let i = 0; i < sortedInbox.length - 1; i++) {
           newHoursById.set(sortedInbox[i].id, base);
           assigned += base;
         }
-        newHoursById.set(sortedInbox[sortedInbox.length - 1].id, planRemainder - assigned);
+        newHoursById.set(sortedInbox[sortedInbox.length - 1].id, Math.max(0, Math.round((inboxShare - assigned) * 10) / 10));
       } else {
         let assigned = 0;
         for (let i = 0; i < sortedInbox.length - 1; i++) {
           const it = sortedInbox[i];
-          const share = Math.floor(planRemainder * (refreshedCzk.get(it.id) || 0) / totalInboxCzk);
+          const share = Math.round((inboxShare * (refreshedCzk.get(it.id) || 0) / totalInboxCzk) * 10) / 10;
           newHoursById.set(it.id, share);
           assigned += share;
         }
         // Last item carries the remainder so the total is exact
         const last = sortedInbox[sortedInbox.length - 1];
-        newHoursById.set(last.id, planRemainder - assigned);
+        newHoursById.set(last.id, Math.max(0, Math.round((inboxShare - assigned) * 10) / 10));
       }
 
       for (const item of sortedInbox) {
