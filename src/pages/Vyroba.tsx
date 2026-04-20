@@ -3339,7 +3339,8 @@ function DetailPanel({
   onOpenExpedice: () => void;
   onToggleItem: (id: string, status: string) => void;
   getCumulativeForDay: (dayIndex: number) => CumulativeInfo | null;
-  getExpectedPct: (dayIndex: number, weeklyGoal?: number) => number;
+  getExpectedPct: (dayIndex: number, weeklyGoal?: number, pid?: string) => number;
+  chainWindow?: { start: number; end: number } | null;
   status: "on-track" | "at-risk" | "behind";
   latestPct: number;
   latestPhase: string | null;
