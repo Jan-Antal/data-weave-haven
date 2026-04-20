@@ -71,10 +71,17 @@ export function SplitBundleDialog({
     return w?.weekNum ?? "?";
   }, [futureWeeks, targetWeek]);
 
+  const totalHours = useMemo(
+    () => Math.round(items.reduce((sum, item) => sum + item.scheduled_hours, 0)),
+    [items]
+  );
+
   const previewHours = useMemo(
     () => items.reduce((sum, item) => sum + Math.round(item.scheduled_hours * pct / 100), 0),
     [items, pct]
   );
+
+  const remainingHours = Math.max(0, totalHours - previewHours);
 
   const canSubmit = items.length > 0 && pct > 0 && targetWeek && targetWeek !== currentWeekKey && !submitting;
 
