@@ -621,9 +621,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     });
   }, [projects, projectDetails]);
 
-  // Capacity for this week
+  // Capacity for this week — same source as Plán Výroby (production_capacity table + holidays)
+  const getWeekCapacityHours = useWeekCapacityLookup();
   const weekCapacity = useMemo(() => {
-    if (!scheduleData) return { used: 0, total: 760 };
+    const total = getWeekCapacityHours(weekKey) || 0;
+    if (!scheduleData) return { used: 0, total };
     const silo = scheduleData.get(weekKey);
     const used = silo
       ? silo.bundles.reduce((s, b) => {
@@ -634,8 +636,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           return s + activeHours;
         }, 0)
       : 0;
-    return { used, total: 760 };
-  }, [scheduleData, weekKey]);
+    return { used, total };
+  }, [scheduleData, weekKey, getWeekCapacityHours]);
 
   const capacityPct = weekCapacity.total > 0 ? Math.round((weekCapacity.used / weekCapacity.total) * 100) : 0;
   const capacityColor = capacityPct > 100 ? "#dc2626" : capacityPct > 85 ? "#d97706" : "#3a8a36";
