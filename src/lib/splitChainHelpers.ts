@@ -135,6 +135,74 @@ export async function renumberChain(splitGroupId: string): Promise<void> {
 }
 
 /**
+ * Bundle-level chain renumbering: groups all chain rows by (project_id, scheduled_week)
+ * — every unique week is one "bundle part". All items in the same week share the same
+ * split_part / split_total, so the whole bundle has unified N/M numbering across weeks.
+ *
+ * Use this for bundle splits/merges where the entire bundle is treated as one chain unit.
+ * For legacy per-item chains (single-item splits) keep using `renumberChain`.
+ */
+export async function renumberBundleChain(splitGroupId: string): Promise<void> {
+  const rows = await fetchChainRows(splitGroupId);
+  if (rows.length === 0) return;
+
+  // Group by week (schedule rows only — inbox rows have no scheduled_week)
+  const weekGroups = new Map<string, ChainRow[]>();
+  for (const r of rows) {
+    if (r.table !== "production_schedule" || !r.scheduled_week) continue;
+    const key = r.scheduled_week;
+    if (!weekGroups.has(key)) weekGroups.set(key, []);
+    weekGroups.get(key)!.push(r);
+  }
+
+  const sortedWeeks = [...weekGroups.keys()].sort();
+  const total = sortedWeeks.length;
+
+  if (total <= 1) {
+    // Single week → clear split metadata on all rows (incl. inbox)
+    await Promise.all(
+      rows.map((r) =>
+        supabase
+          .from(r.table)
+          .update({ split_part: null, split_total: null })
+          .eq("id", r.id)
+      )
+    );
+    return;
+  }
+
+  await Promise.all(
+    sortedWeeks.flatMap((wk, idx) => {
+      const part = idx + 1;
+      const groupRows = weekGroups.get(wk)!;
+      return groupRows.map((r) =>
+        supabase
+          .from(r.table)
+          .update({
+            split_group_id: splitGroupId,
+            split_part: part,
+            split_total: total,
+          })
+          .eq("id", r.id)
+      );
+    })
+  );
+
+  // Inbox rows in the chain → clear numbering (they aren't part of week chain)
+  const inboxRows = rows.filter((r) => r.table === "production_inbox");
+  if (inboxRows.length > 0) {
+    await Promise.all(
+      inboxRows.map((r) =>
+        supabase
+          .from(r.table)
+          .update({ split_part: null, split_total: null })
+          .eq("id", r.id)
+      )
+    );
+  }
+}
+
+/**
  * Project-wide chain renumbering: for every distinct split_group_id present
  * on rows of this project (schedule + inbox), recompute the chain.
  */
