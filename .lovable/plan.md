@@ -1,76 +1,131 @@
 
 
-## Upresnenie
+## Cieľ
 
-Carry-forward % z minulého týždňa sa aplikuje **iba pre splitnuté bundles** (časti rovnakého `item_code` / `split_group_id` chainu naprieč viacerými týždňami). Pre samostatné, nesplitnuté bundles žiadny fallback neexistuje — bez vlastného daily logu zostávajú na 0 % (resp. len `completionPct` z dokončených/expedovaných položiek).
+Pre **split bundle** (časť chainu, napr. `2/3`) musí týždenný cieľ a očakávaný progress rešpektovať pozíciu v chaine:
+
+- **Štart okna** = súčet % hodín z **predošlých splitov** v chaine (napr. split 1/3 mal 50 % celkového plánu chainu → štart = 50 %).
+- **Koniec okna** = štart + % hodín **aktuálneho splitu** (napr. 2/3 = 30 % → koniec = 80 %).
+- **Day-by-day expected** sa lineárne pohybuje v rámci `[štart, koniec]` podľa dňa v týždni (Po=1/5 … Pia=5/5).
+
+Pre nesplitnuté bundles ostáva logika nezmenená (`weeklyGoal` vs. `hodiny_plan`, štart 0 → koniec = goal).
 
 ## Logika
 
-Pre bundle v týždni X bez vlastného daily logu:
+### Definícia chainu
 
-1. **Ak bundle obsahuje split items** (aspoň jedna položka má `split_group_id != null`):
-   - Nájdi najnovší non-MF daily log zo **skoršieho týždňa** patriaci k tomu istému `split_group_id` (cez `bundle_id` projektu, ale obmedzené na chainy zdieľané s aktuálnym bundlom).
-   - Použi jeho `percent` ako fallback.
-2. **Inak (nesplitnutý bundle)**:
-   - Žiadny fallback. `latestLogPct = 0`.
-   - Výsledok = `Math.max(0, completionPct)`.
+Chain = všetky položky v `production_schedule` zdieľajúce rovnaký `split_group_id` (naprieč týždňami, vrátane completed/expediced). Bundle v aktuálnom týždni má jeden alebo viac `split_group_id`.
 
-MF logy (`bundle_id` obsahuje `::MF_`) sú vždy ignorované.
+### Výpočet okna pre split bundle
+
+```text
+chainTotalHours = SUM(hours všetkých položiek v chaine)
+priorPartsHours = SUM(hours položiek z chainu so scheduled_week < weekKey)
+currentPartHours = SUM(hours položiek z chainu so scheduled_week === weekKey)
+
+windowStart = (priorPartsHours / chainTotalHours) * 100
+windowEnd   = ((priorPartsHours + currentPartHours) / chainTotalHours) * 100
+```
+
+Ak má bundle **viac chainov** (paralelné splits v jednom týždni), `windowStart` a `windowEnd` sa počítajú **vážene** cez sumu hodín všetkých chainov:
+
+```text
+windowStart = SUM(priorPartsHours_i) / SUM(chainTotalHours_i) * 100
+windowEnd   = SUM((priorPartsHours_i + currentPartHours_i)) / SUM(chainTotalHours_i) * 100
+```
+
+Položky v bundli **bez `split_group_id`** sa v týchto sumách ignorujú (nie sú súčasťou chainu) — pre čistotu, hybridné bundles (split + nesplit) budú držať len chain logiku, lebo split-aware cieľ má zmysel len pre chained časť.
+
+Ak bundle **neobsahuje žiadny split** → `windowStart = 0`, `windowEnd = weeklyGoal` (existujúce správanie).
+
+### Day-by-day expected
+
+```ts
+expectedPct(dayIndex) = windowStart + (windowEnd - windowStart) * (workingDaysElapsed / 5)
+```
+
+`weeklyGoal` (zobrazené ako „Týdenní cíl: X %" v hlavičke) = `windowEnd`.
+
+### Status (on-track / at-risk / behind)
+
+Nezmenené prahy, len voči novému `expected`:
+
+- `bundleProgress >= expected - 10` → on-track
+- `bundleProgress >= expected - 25` → at-risk
+- inak → behind
 
 ## Implementácia
 
 ### `src/pages/Vyroba.tsx`
 
-**1. `allLatestLogs` query** — vracia `Map<projectId, DailyLog[]>`, sorted desc by `week_key, day_index, logged_at`, vyfiltrované MF logy. (bez zmeny oproti predošlému plánu)
+**1. Nová helper funkcia `getChainWindow(pid, weekKey): { start: number; end: number } | null`**
 
-**2. Nová pomocná query / map: `splitGroupsByBundle`**
+- Pre projekt `pid` a aktuálny `weekKey` zozbieraj zo `scheduleData` všetky `split_group_id` prítomné v bundli daného týždňa.
+- Pre každý `split_group_id` prejdi všetky týždne v `scheduleData` a sčítaj `scheduled_hours` (ignoruj `cancelled`):
+  - `chainTotalHours += active.hours`
+  - ak `wk < weekKey` → `priorPartsHours += active.hours`
+  - ak `wk === weekKey` → `currentPartHours += active.hours`
+- Ak žiadny chain → vráť `null`.
+- Inak vráť `{ start: prior/total*100, end: (prior+current)/total*100 }`.
 
-Pre každý projekt v aktuálnom týždni zistiť, či bundle obsahuje split položky a aké `split_group_id` to sú. Zdroj: `production_schedule` rows pre daný `(project_id, scheduled_week)` → `split_group_ids = items.filter(i => i.split_group_id).map(i => i.split_group_id)`.
-
-**3. `getLatestPercent(pid, weekKey)` — split-aware fallback**
+**2. Úprava `getWeeklyGoal(pid)` (riadok 842)**
 
 ```ts
-function getLatestPercent(pid: string, weekKey: string): number {
-  const logs = getLogsForProject(pid); // logs v aktuálnom týždni
-  if (logs.length > 0) return Math.max(...logs.map(l => l.percent));
+const chainWindow = getChainWindow(pid, weekKey);
+if (chainWindow) {
+  return Math.min(100, Math.round(chainWindow.end));
+}
+// existujúca hodiny_plan logika ostáva pre nesplit bundle
+```
 
-  // Fallback len pre split bundles
-  const bundleSplitGroups = splitGroupsByBundle.get(`${pid}::${weekKey}`);
-  if (!bundleSplitGroups || bundleSplitGroups.size === 0) return 0;
+**3. Úprava `getExpectedPct` na split-aware verziu**
 
-  // Nájdi prior non-MF log patriaci k niektorému z týchto split_group_id
-  const all = allLatestLogs?.get(pid);
-  if (!all) return 0;
-  for (const log of all) {
-    if (log.week_key >= weekKey) continue;
-    // overiť, či log.bundle_id patrí k chainu (cez schedule lookup podľa week_key + project_id)
-    const logWeekItems = scheduleByProjectWeek.get(`${pid}::${log.week_key}`);
-    const logHasChainOverlap = logWeekItems?.some(i =>
-      i.split_group_id && bundleSplitGroups.has(i.split_group_id)
-    );
-    if (logHasChainOverlap) return log.percent;
+Premenovať podpis aby prijala aj `pid`:
+
+```ts
+function getExpectedPct(_dayIndex: number, pid: string): number {
+  const today = new Date();
+  const dow = today.getDay();
+  const wde = dow === 0 || dow === 6 ? 5 : dow;
+  const fraction = wde / 5;
+
+  const chainWindow = getChainWindow(pid, weekKey);
+  if (chainWindow) {
+    return Math.round(chainWindow.start + (chainWindow.end - chainWindow.start) * fraction);
   }
-  return 0;
+  const goal = getWeeklyGoal(pid);
+  return Math.round(goal * fraction);
 }
 ```
 
-To isté pre `getLatestPhase`.
+Zmeniť volania v `getProjectStatus` (riadok 949) a v `BundleDetail` (`getExpectedPct={getExpectedPct}` props na riadkoch 2190, 2297) — interne sa odovzdá `pid` z parent scope.
 
-**4. `getBundleProgress`** zostáva: `Math.max(latestLogPct, completionPct)`.
+**4. UI hint v hlavičke bundle (riadky 3441–3498)**
+
+- Zobraziť okno: pod „Týdenní cíl: X %" pridať drobný riadok pre split bundle: „Okno: 50 % → 80 %" (len ak `chainWindow != null` a `start > 0`).
+- Progress bar: pridať druhý subtílny marker na pozícii `windowStart` (svetlosivá čiarka, opacity 0.3) — vizuálne ukazuje „štartovú čiaru" aktuálneho splitu.
+- Tooltip pri „Očekávaný stav k …" prepísať na novú hodnotu z `getExpectedPct(dayIndex, pid)`.
+
+**5. Aktualizovať `BundleDetailProps`**
+
+Zmeniť signature `getExpectedPct: (dayIndex: number) => number` (pid sa pridá pri uzavretí v parent komponente, alebo ako druhý parameter). V `BundleDetail` na riadku 3332 nahradiť volaním nového variantu.
 
 ## Edge cases
 
-- Split bundle bez prior loga v chaine → 0 %.
-- Nesplitnutý bundle so spilled hodinami z T-1 (nie chain split, len `is_spilled`) → momentálne tiež 0 %, lebo nemá `split_group_id`. Ak treba aj toto pokrývať fallbackom, povedz a doplním samostatnú vetvu pre `is_spilled`.
-- Projekt s viacerými paralelnými chainmi v jednom týždni → fallback berie prvý nájdený log, ktorý zdieľa **aspoň jeden** chain.
+- **Bundle bez splitu** → `getChainWindow` vráti `null`, nemení sa nič.
+- **Hybridný bundle** (chain + nesplit položky v rovnakom týždni) → použije sa chainové okno (vážený priemer položiek v chaine), nesplit položky sa ignorujú v štart/end výpočte.
+- **Split 1/3** → `priorPartsHours = 0`, takže `windowStart = 0`, `windowEnd = 50`. Day-by-day od 0 do 50 %.
+- **Split 3/3** → `priorPartsHours = 80 %`, `windowEnd = 100 %`. Day-by-day 80 → 100 %.
+- **Spilled projekt** → `getWeeklyGoal` vracia 100 ako doteraz (spilled má prednosť pred chain windowom).
+- **Bundle progress < windowStart** (chain bol nesprávne preskočený) → status pôjde do `behind`, čo je korektné.
 
 ## Dotknuté súbory
 
-- `src/pages/Vyroba.tsx` — `allLatestLogs` (filter MF + array per project), nová mapa `splitGroupsByBundle` + `scheduleByProjectWeek`, split-aware `getLatestPercent` / `getLatestPhase`.
+- `src/pages/Vyroba.tsx` — nová `getChainWindow`, úprava `getWeeklyGoal`, úprava `getExpectedPct`, úprava props `BundleDetail` + UI hint a štart-marker na progress bare.
 
 ## Výsledok
 
-- Z-2504-019 T17 bez splitu, bez logu → **0 %** (predtým chybne 100 %).
-- Splitnutý bundle TK.05 1/2 v T16 = 50 %, TK.05 2/2 v T17 bez logu → fallback **50 %** z T16 chainu.
-- Nesplitnutý bundle s logom 30 % v T16 a žiadnym v T17 → T17 ukáže **0 %** (resp. completionPct).
+- Split bundle 2/3 (po prvom 50 %, aktuálny 30 %) → cieľ pre tento týždeň = **80 %**, štart = **50 %**, day-by-day v stredu = `50 + 30 * 3/5 = 68 %`.
+- Split bundle 3/3 (predošlé 70 %, aktuálny 30 %) → cieľ = **100 %**, štart = **70 %**, day-by-day v utorok = `70 + 30 * 2/5 = 82 %`.
+- Nesplit bundle → bez zmeny správania.
 
