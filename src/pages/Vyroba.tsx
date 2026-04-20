@@ -3307,6 +3307,7 @@ function DetailPanel({
   onToggleItem,
   getCumulativeForDay,
   getExpectedPct,
+  chainWindow,
   status,
   latestPct,
   latestPhase,
