@@ -165,6 +165,31 @@ export async function recalculateProductionHours(
     );
   }
 
+  // Chain-aware midflight hours: sum scheduled_hours per split_group_id (chain).
+  // Used to subtract already-consumed history from inbox + future silo bundles.
+  const midflightHoursByChain = new Map<string, number>();
+  for (const s of allSched) {
+    if (!s.is_midflight || !s.split_group_id) continue;
+    midflightHoursByChain.set(
+      s.split_group_id,
+      (midflightHoursByChain.get(s.split_group_id) || 0) + (Number(s.scheduled_hours) || 0),
+    );
+  }
+
+  // Resolve project chain group id from any of: midflight schedule, inbox, non-midflight schedule.
+  // After backfill migration these all share the same id for projects with midflight history.
+  function resolveChainGroupId(projectId: string): string | null {
+    for (const s of allSched) {
+      if (s.project_id === projectId && s.is_midflight && s.split_group_id) return s.split_group_id;
+    }
+    const inbox = (allInbox as any[]).filter(i => i.project_id === projectId);
+    for (const r of inbox) if (r.split_group_id) return r.split_group_id;
+    for (const s of allSched) {
+      if (s.project_id === projectId && s.split_group_id) return s.split_group_id;
+    }
+    return null;
+  }
+
   // Group by project
   const tpvByProject = new Map<string, any[]>();
   for (const t of allTpv) {
