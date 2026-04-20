@@ -5,6 +5,7 @@ import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 
 interface WeekOption {
   key: string;
@@ -42,6 +43,7 @@ export function SplitBundleDialog({
   weeks,
 }: SplitBundleDialogProps) {
   const qc = useQueryClient();
+  const { pushUndo } = useUndoRedo();
   const [pct, setPct] = useState(50);
   const [targetWeek, setTargetWeek] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -115,6 +117,18 @@ export function SplitBundleDialog({
           ? crypto.randomUUID()
           : `bundle-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
+      // Snapshot original state of all items being touched (for undo)
+      const touchedIds = [...toMove, ...toSplit].map((i) => i.id);
+      const { data: originalRows } = touchedIds.length
+        ? await supabase
+            .from("production_schedule")
+            .select("*")
+            .in("id", touchedIds)
+        : { data: [] as any[] };
+      const originalById = new Map<string, any>((originalRows || []).map((r: any) => [r.id, r]));
+
+      const insertedIds: string[] = [];
+
       if (toMove.length > 0) {
         await Promise.all(
           toMove.map((item) =>
@@ -130,7 +144,7 @@ export function SplitBundleDialog({
       }
 
       if (toSplit.length > 0) {
-        await Promise.all(
+        const splitResults = await Promise.all(
           toSplit.flatMap((item) => {
             const spillHours = Math.round(item.scheduled_hours * pct / 100);
             const keepHours = item.scheduled_hours - spillHours;
@@ -150,10 +164,15 @@ export function SplitBundleDialog({
                 scheduled_czk: spillHours * czkPerHour, position: 999,
                 status: "scheduled", created_by: user.id,
                 split_group_id: bundleGroupId,
-              }),
+              }).select("id").single(),
             ];
           })
         );
+        // Collect inserted IDs (every odd index is the insert result)
+        for (let i = 1; i < splitResults.length; i += 2) {
+          const r: any = splitResults[i];
+          if (r?.data?.id) insertedIds.push(r.data.id);
+        }
       }
 
       // Renumber: project chain → renumberProjectChain (unified across project),
@@ -171,6 +190,49 @@ export function SplitBundleDialog({
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
 
+      // Push undo: deletes the spill rows + restores original state of touched rows
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "split_bundle",
+        description: `✂ Bundle rozdělen: ${bundleName} → T${targetWeekNum}`,
+        undo: async () => {
+          // 1. Delete spill rows (inserts from toSplit + moved rows that returned to current week below)
+          if (insertedIds.length > 0) {
+            await supabase.from("production_schedule").delete().in("id", insertedIds);
+          }
+          // 2. Restore original state of every touched row (week, hours, czk, group, name, parts)
+          await Promise.all(
+            (originalRows || []).map((orig: any) =>
+              supabase
+                .from("production_schedule")
+                .update({
+                  scheduled_week: orig.scheduled_week,
+                  scheduled_hours: orig.scheduled_hours,
+                  scheduled_czk: orig.scheduled_czk,
+                  split_group_id: orig.split_group_id,
+                  split_part: orig.split_part,
+                  split_total: orig.split_total,
+                  item_name: orig.item_name,
+                })
+                .eq("id", orig.id)
+            )
+          );
+          // 3. Re-renumber the original chain (if any) so badges stay correct
+          if (isProjectChain && projectId) {
+            await renumberProjectChain(projectId, bundleGroupId);
+          } else {
+            await renumberBundleChain(bundleGroupId);
+          }
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-inbox"] });
+          qc.invalidateQueries({ queryKey: ["production-expedice"] });
+        },
+        redo: async () => {
+          qc.invalidateQueries({ queryKey: ["production-schedule"] });
+          qc.invalidateQueries({ queryKey: ["production-inbox"] });
+        },
+      });
+
       toast({ title: `Rozděleno ${changedItems} položek do T${targetWeekNum}` });
       onOpenChange(false);
     } catch (err: any) {
@@ -178,7 +240,7 @@ export function SplitBundleDialog({
     }
 
     setSubmitting(false);
-  }, [canSubmit, items, onOpenChange, pct, qc, targetWeek, targetWeekNum]);
+  }, [canSubmit, items, onOpenChange, pct, qc, targetWeek, targetWeekNum, bundleName, pushUndo]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
