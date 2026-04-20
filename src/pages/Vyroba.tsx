@@ -3487,6 +3487,11 @@ function DetailPanel({
             <div className="text-xs" style={{ color: isWeeklyGoalMet ? "#3a8a36" : "#99a5a3" }}>
               Týdenní cíl: {weeklyGoal}%
             </div>
+            {chainWindow && chainWindow.start > 0 && (
+              <div className="text-[10px]" style={{ color: "#99a5a3" }}>
+                Okno: {Math.round(chainWindow.start)}% → {Math.round(chainWindow.end)}%
+              </div>
+            )}
             {isWeeklyGoalMet && (
               <div className="text-[10px] font-medium" style={{ color: "#3a8a36" }}>
                 🎉 Týdenní cíl splněn!
