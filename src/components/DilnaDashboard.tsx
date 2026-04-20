@@ -566,18 +566,17 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                             <>
                               <p className="text-[14px] font-medium leading-tight truncate" title={card.projectName}>{card.projectName}</p>
                               <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{card.projectId}</p>
-                              {card.warning === "off_plan" && (
-                                <p className={cn(
-                                  "text-[10px] font-semibold flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full w-fit",
-                                  warningPillClass(card.warning)
-                                )}>
-                                  <AlertCircle className="w-3 h-3" /> {warningLabel(card.warning)}
-                                </p>
-                              )}
                             </>
                           )}
                         </div>
-                        {card.warning === "none" && (
+                        {card.warning === "off_plan" ? (
+                          <span className={cn(
+                            "shrink-0 text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-full whitespace-nowrap",
+                            warningPillClass(card.warning)
+                          )}>
+                            <AlertCircle className="w-3 h-3" /> {warningLabel(card.warning)}
+                          </span>
+                        ) : card.warning === "none" && (
                           <span className={cn(
                             "shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
                             slipPillClass(card.slipStatus)
