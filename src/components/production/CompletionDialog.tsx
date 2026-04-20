@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { renumberSiblings } from "./SplitItemDialog";
 import type { ScheduleItem } from "@/hooks/useProductionSchedule";
-import { autoUpdateProjectPercent } from "@/lib/autoProjectPercent";
 
 interface CompletionDialogProps {
   open: boolean;
@@ -179,9 +178,7 @@ export function CompletionDialog({
         });
       }
 
-      // Auto-recalc project completion %
-      await autoUpdateProjectPercent(projectId);
-
+      // NOTE: production_daily_logs is manual-only — completion does not write progress %.
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
