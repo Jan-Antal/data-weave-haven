@@ -174,6 +174,16 @@ export function DocumentPreviewModal({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {(downloadUrl || webUrl) && (
+              <Button
+                size="sm"
+                className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => window.open(downloadUrl || webUrl!, "_blank")}
+              >
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Stáhnout
+              </Button>
+            )}
             {webUrl && (
               <Button
                 variant="outline"
@@ -182,17 +192,8 @@ export function DocumentPreviewModal({
                 onClick={() => window.open(webUrl, "_blank")}
               >
                 <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                Otevřít v SharePointu
-              </Button>
-            )}
-            {downloadUrl && (
-              <Button
-                size="sm"
-                className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => window.open(downloadUrl, "_blank")}
-              >
-                <Download className="h-3.5 w-3.5 mr-1" />
-                Stáhnout
+                <span className="hidden sm:inline">Otevřít v SharePointu</span>
+                <span className="sm:hidden">SharePoint</span>
               </Button>
             )}
           </div>
