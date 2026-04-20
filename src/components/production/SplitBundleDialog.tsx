@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { renumberBundleChain } from "@/lib/splitChainHelpers";
+import { renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
 
 interface WeekOption {
   key: string;
@@ -105,11 +105,11 @@ export function SplitBundleDialog({
         else toSplit.push(item);
       }
 
-      // Bundle-level chain: ALL items in this bundle share ONE split_group_id,
-      // so the entire bundle has unified N/M numbering (per week, not per item_code).
-      // If any item already belongs to a chain, reuse that group id to extend the
-      // existing bundle chain (5/5 → 6/6). Otherwise mint a new shared id.
+      // If items in the bundle already share a project chain (split_group_id),
+      // REUSE it so the chain stays unified (5/5 → 5/6 + 6/6, not a new branch).
+      // Only when no chain exists do we mint a new bundle group.
       const existingGroupId = items.find((i) => i.split_group_id)?.split_group_id ?? null;
+      const isProjectChain = !!existingGroupId;
       const bundleGroupId: string =
         existingGroupId || (typeof crypto !== "undefined" && "randomUUID" in crypto
           ? crypto.randomUUID()
@@ -156,8 +156,14 @@ export function SplitBundleDialog({
         );
       }
 
-      // Renumber the whole bundle chain once: every week becomes one part (N/M).
-      await renumberBundleChain(bundleGroupId);
+      // Renumber: project chain → renumberProjectChain (unified across project),
+      // otherwise legacy bundle chain (per-week N/M for this bundle only).
+      const projectId = items[0]?.project_id;
+      if (isProjectChain && projectId) {
+        await renumberProjectChain(projectId, bundleGroupId);
+      } else {
+        await renumberBundleChain(bundleGroupId);
+      }
 
       const changedItems = toMove.length + toSplit.length;
 
