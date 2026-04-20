@@ -172,16 +172,16 @@ export function computePlanHours(input: PlanHoursInput): PlanHoursResult {
   if (scale_ratio > 1 && item_hours.length > 0) {
     let runningSum = 0;
     for (let i = 0; i < item_hours.length - 1; i++) {
-      const scaled = Math.floor(item_hours[i].hodiny_plan * scale_ratio);
+      const scaled = Math.round(item_hours[i].hodiny_plan * scale_ratio * 10) / 10;
       item_hours[i].hodiny_plan = scaled;
       item_hours[i].hodiny_source = "project";
       runningSum += scaled;
     }
     // Last item gets remainder so sum equals hodiny_plan exactly
     const last = item_hours[item_hours.length - 1];
-    last.hodiny_plan = Math.max(0, hodiny_plan - runningSum);
+    last.hodiny_plan = Math.max(0, Math.round((hodiny_plan - runningSum) * 10) / 10);
     last.hodiny_source = "project";
-    tpv_hours = item_hours.reduce((s, i) => s + i.hodiny_plan, 0);
+    tpv_hours = Math.round(item_hours.reduce((s, i) => s + i.hodiny_plan, 0) * 10) / 10;
   }
 
   return {

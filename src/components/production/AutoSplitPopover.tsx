@@ -39,9 +39,10 @@ export function AutoSplitPopover({
   source, inboxItemId, onInsertWhole,
   splitGroupId,
 }: AutoSplitPopoverProps) {
-  const part1Hours = Math.min(Math.max(availableHours, 0), itemHours);
-  const part2Hours = itemHours - part1Hours;
-  const overloadHours = itemHours - availableHours;
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+  const part1Hours = round1(Math.min(Math.max(availableHours, 0), itemHours));
+  const part2Hours = round1(itemHours - part1Hours);
+  const overloadHours = round1(itemHours - availableHours);
 
   // Guard: if split would create a 0-hour part, force "whole" only
   const splitViable = part1Hours > 0 && part2Hours > 0;
