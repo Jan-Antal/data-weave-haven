@@ -1,70 +1,80 @@
 
 
-## Diagnóza Z-2617-001 (potvrdená z DB + kódu)
+## Diagnóza
 
-**TPV položky T.01–T.06 (Schváleno → v Inboxe):**
-| Kód | Pocet | Cena | TPV.hodiny_plan | Inbox.estimated_hours |
-|-----|-------|------|-----------------|----------------------|
-| T.01 | 25 | 6,559 | **62 h** | **7 h** |
-| T.02 | 13 | 10,017 | **49 h** | **5.6 h** |
-| T.03 | 12 | 8,095 | **36 h** | **4.1 h** |
-| T.04 | 22 | 14,967 | **124 h** | **14 h** |
-| T.05 | 14 | 12,772 | **67 h** | **7.6 h** |
-| T.06 | 1 | 22,663 | **8 h** | **1 h** |
-| **Σ** | | | **346 h** | **39.3 h** ❌ |
+**Problém 1: Historické midflight dáta číslujú per-bundle namiesto per-item**
 
-**Príčina (v `recalculateProductionHours.ts` riadky 309–337 a v Midflight `lines 371–382`):**
+V `midflightImportPlanVyroby.ts` (riadky cca 350–410) sa pre každý historický týždenný bundle vytvorí JEDEN riadok v `production_schedule` s `item_name = "Bundle T15 (4 položky)"` a `item_code = NULL`. Takto v `splitChainHelpers.renumberChain` padne celý bundle pod jeden „chain key" (`name::Bundle T15 (...)`) — a keď sú 3 historické bundle + 1 aktívny inbox riadok TK.01, dostávajú čísla `1/4, 2/4, 3/4, 4/4` naprieč rôznymi item_code.
 
-Inbox dostane iba „pomerný podiel" zo zvyšku `hodiny_plan`:
-```
-inboxShare = planRemainder × (inboxCzk / (inboxCzk + pendingTpvCzk))
-           = 1136 × (92k / (92k + ~2,7M)) ≈ 37 h
-```
+To presne produkuje to, čo vidíš: TK.01=1/3, TK.02=2/3, TK.03=3/3 — pretože per-item logika funguje, ale historické bundle riadky nemajú `item_code`, takže sa miešajú do nesprávneho chainu.
 
-`pendingTpvCzk` zahŕňa aj všetky TPV položky T.07+, TK.*, TO.*, T.30+ ktoré ešte ani nie sú schválené (status `Zpracovává se`, `Připomínky k zapracování`, `Připraveno ke zpracování`). Tým si „nárokujú" obrovský podiel hodín z `hodiny_plan = 1214` a Inbox je „podseknutý" na zlomok.
+**Problém 2: Inbox a week silo nezobrazujú split badge u nových splitov**
 
-**Pritom správna pracnosť T.01–T.06 je už spočítaná v `tpv_items.hodiny_plan` (346 h)** — `computePlanHours` ju počíta korektne z `cena × pocet` cez maržový vzorec, ale Inboxu sa neprenáša.
+Po `renumberChain` sa `split_part`/`split_total` zapisujú do DB, ale:
+- `useProductionInbox` ich číta (`split_part`, `split_total` v selecte ✓)
+- `useProductionSchedule` ich číta tiež ✓
+- Lenže `renumberChain` **vyžaduje, aby riadok mal `split_group_id`** v DB pre fetch (riadok 35–40: `.or(split_group_id.eq.X, id.eq.X)`). Inbox riadky napárované cez TPV po midflight reconciliation často nemajú `split_group_id` nastavené, takže ich `renumberChain` nenájde a čísla sa neaktualizujú.
 
-## Cieľ opravy
+**Problém 3: SplitBundleDialog renumeruje per-item-code, ale historické bundle riadky stále miešajú**
 
-Inbox `estimated_hours` má reflektovať **skutočnú pracnosť danej TPV položky** (`tpv.hodiny_plan` resp. odvodené z `cena × pocet`), nie pomerný podiel zo zvyšku plánu.
+Keď splitnem bundle TK.05+TK.07+TK.08 na 2 časti, `renumberChain` zavolaný pre každý `split_group_id` dá každému item_code správne `1/2, 2/2`. Ale ak je v tom istom `split_group_id` aj historický bundle riadok bez item_code, zaradí sa do svojho vlastného „name-based" chainu a dostane vlastné číslovanie.
+
+## Cieľ
+
+1. Historické midflight bundle riadky **nemajú dostať split badge** (sú to agregované záznamy, nie časti chainu).
+2. Per-item split chain (1/2, 2/2 ...) musí fungovať pre **aktívne** položky bez ohľadu na to, koľko historických bundle riadkov existuje pre projekt.
+3. Inbox aj week silo musia zobrazovať badge pre každú splitnutú položku.
 
 ## Plán
 
-### 1. `src/lib/recalculateProductionHours.ts` (kľúčová zmena)
-Pre **inbox položky s `item_code` napárovaným na TPV** (a bez `split_group_id`):
-- `estimated_hours` = `tpv.hodiny_plan` (priamo z `tpv_items` — už obsahuje `pocet`)
-- `estimated_czk` = `tpv.cena × tpv.pocet` (cez `scheduled_czk_tpv` formulu) 
+### 1. `src/lib/splitChainHelpers.ts` — vyhodiť historické bundle z chainu
 
-Pre chained inbox položky (`split_group_id` existuje → split bundle): rozdeliť `tpv.hodiny_plan` proporcionálne podľa počtu častí v chaine pre daný `item_code` (napr. 2/2 → polovica). Helper `splitChainHelpers` už vie spočítať počet aktívnych častí per item_code.
+V `fetchChainRows`:
+- Filter `production_schedule` rozšíriť o `is_midflight = false` (historické bundle riadky sa do chainu nezapočítajú vôbec).
+- Tieto riadky sú agregované týždenné súčty, nie splity konkrétnej položky.
 
-Pre inbox položky bez TPV párovania (ad-hoc): ponechať existujúce `estimated_hours`/`estimated_czk` (ručne nastavené pri vytvorení).
+V `renumberChain` zachovať per-item-code groupovanie (už je správne).
 
-**Odstrániť** logiku „proportional remainder distribution" (riadky 309–365) — nahradiť priamym použitím `tpv.hodiny_plan`. Suma cez všetky inboxy + schedule sa môže líšiť od `hodiny_plan`, čo je správne — `hodiny_plan` projektu je strop, nie striktné rozdelenie cez aktuálne schválené položky.
+### 2. `src/lib/midflightImportPlanVyroby.ts` — historické bundle nepripájať do chain
 
-### 2. `src/lib/midflightImportPlanVyroby.ts` (riadky 279–438)
-Rovnaká logika v reconciliation:
-- Pre každú novú/existujúcu inbox položku: `estimated_hours` = `tpv.hodiny_plan`, `estimated_czk` = `cena × pocet`.
-- Odstrániť výpočet `inboxShare`/`inboxRemainder` cez `pendingTpvCzk`.
-- Midflight historické bundles ostávajú nedotknuté (`is_midflight=true`, hodiny zo `production_hours_log`).
-- Renumber chain ostáva (per-item logika z minulého kroku).
+V reconciliation (riadky cca 360–430):
+- **Neprenášať `split_group_id` na historické bundle riadky.** Historický bundle = samostatný záznam, nie súčasť chainu aktívnej položky.
+- Zachovať vizuálny indikátor histórie (`is_midflight = true`) cez existujúci UI tag „Historický záznam", nie cez split badge.
+- V Inboxe a v plánovaných silos pre aktívne položky nastaviť `split_group_id` len medzi sebou (ak položka pochádza z chainu/splitu).
+- Po reconciliation zavolať `renumberAllChainsForProject(projectId)` — tým sa per-item logika postará o správne čísla.
 
-### 3. Validácia po nasadení
-Užívateľ klikne **„Prepočítať hodiny"** → over Z-2617-001:
-- T.01 → 62 h ✓
-- T.02 → 49 h ✓
-- T.03 → 36 h ✓
-- T.04 → 124 h ✓
-- T.05 → 67 h ✓
-- T.06 → 8 h ✓
-- **Σ Inbox = 346 h** (namiesto 39.3 h)
-- Historické midflight 4 týždne (77.8 h) ostávajú samostatne v silos.
-- 346 + 77.8 = 423.8 h vs `hodiny_plan` 1214 h → zvyšok (~790 h) ostáva „rezervovaný" v zvyšných TPV položkách, ktoré ešte nie sú schválené. Toto je **správne** správanie.
+### 3. `src/components/production/InboxPanel.tsx` — zobrazenie badge
+
+Skontrolovať, že `DraggableInboxItem` renderuje `split_part/split_total` z `item.split_part/split_total`. Ak chýba, pridať malý badge `{split_part}/{split_total}` vedľa item_code (rovnaký štýl ako vo WeeklySilos).
+
+### 4. `src/components/production/WeeklySilos.tsx` — badge u plánovaných
+
+V `DraggableSiloItem` / `CollapsibleBundleCard` skontrolovať render badge pre `split_part/split_total`. Pravdepodobne tam už je pre completed/midflight, len chýba pre `scheduled/in_progress`. Zjednotiť na všetky stavy okrem `cancelled`.
+
+### 5. Migration / one-shot cleanup (voliteľne)
+
+SQL update: pre existujúce historické bundle riadky vyčistiť `split_group_id`, `split_part`, `split_total` na NULL, aby sa po nasadení správanie ihneď opravilo bez nutnosti midflight re-importu.
+
+```sql
+UPDATE production_schedule
+SET split_group_id = NULL, split_part = NULL, split_total = NULL
+WHERE is_midflight = true;
+```
+
+Potom zavolať `renumberAllChainsForProject` pre dotknuté projekty (alebo užívateľ klikne „Prepočítať hodiny" / Midflight import).
 
 ## Dotknuté súbory
-- `src/lib/recalculateProductionHours.ts`
-- `src/lib/midflightImportPlanVyroby.ts`
 
-## Princíp do budúcna
-**Inbox položka = priame zrkadlo TPV položky** (hodiny aj CZK). Žiadne pomerné prerozdeľovanie zo zvyšku plánu. `hodiny_plan` projektu zostáva ako horný strop pre celkový plán, ale nie ako striktný delič medzi aktuálne schválené položky.
+- `src/lib/splitChainHelpers.ts` (filter midflight z chainu)
+- `src/lib/midflightImportPlanVyroby.ts` (neasociovať historické bundle do chainu)
+- `src/components/production/InboxPanel.tsx` (badge render)
+- `src/components/production/WeeklySilos.tsx` (badge render pre scheduled/in_progress)
+- 1 migration SQL (cleanup existujúcich dát)
+
+## Výsledok po nasadení
+
+- Historický bundle „T15 (4 položky)" zostane samostatný, **bez split badge** (keďže reprezentuje agregované hodiny, nie splitnutú položku).
+- TK.05, TK.07, TK.08 v inboxe → po splite bundle na 2 časti každá ukáže `1/2` a `2/2` nezávisle.
+- Inbox aj week silo zobrazia badge všade, kde existuje aktívny chain.
+- TK.01 už nebude miešané s TK.02/TK.03 cez nesprávny bundle-name chain.
 
