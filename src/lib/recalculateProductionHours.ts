@@ -399,9 +399,9 @@ export async function recalculateProductionHours(
       // where stale inbox sums were echoed back into project_plan_hours.
       const fallbackCount = fallbackRows.length + orphans.length;
       const allowOrphanDistribution = result.source === "Project";
-      if (allowOrphanDistribution && fallbackCount > 0 && result.hodiny_plan > 0) {
-        const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0);
-        const remainingProjectHours = Math.max(0, result.hodiny_plan - assignedHours);
+      if (allowOrphanDistribution && fallbackCount > 0 && remainingPlanHours > 0) {
+        const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0) * remainingScale;
+        const remainingProjectHours = Math.max(0, remainingPlanHours - assignedHours);
         const perOrphanHours = Math.round((remainingProjectHours / fallbackCount) * 10) / 10;
         const perOrphanCzk = Math.floor(perOrphanHours * hourlyRate);
 
