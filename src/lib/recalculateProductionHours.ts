@@ -107,7 +107,7 @@ export async function recalculateProductionHours(
     return out;
   }
 
-  const [allTpv, allSched, allInbox] = await Promise.all([
+  const [allTpv, allSched, allInbox, allHoursLog] = await Promise.all([
     bulkFetchIn<any>(
       "tpv_items",
       "id, item_code, nazev, cena, pocet, status, project_id",
@@ -117,7 +117,7 @@ export async function recalculateProductionHours(
     ),
     bulkFetchIn<any>(
       "production_schedule",
-      "id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id, project_id, status",
+      "id, item_code, scheduled_czk, scheduled_hours, scheduled_week, split_part, split_total, split_group_id, project_id, status, is_midflight",
       "project_id",
       filteredProjectIds,
       (q) => q.in("status", ["scheduled", "in_progress", "completed"]),
@@ -129,7 +129,31 @@ export async function recalculateProductionHours(
       filteredProjectIds,
       (q) => q.eq("status", "pending"),
     ),
+    bulkFetchIn<any>(
+      "production_hours_log",
+      "ami_project_id, hodiny, cinnost_kod",
+      "ami_project_id",
+      filteredProjectIds,
+    ),
   ]);
+
+  // Per-project consumed hours: hours_log (excl TPV/ENG/PRO) + midflight schedule hours
+  const consumedByProject = new Map<string, number>();
+  for (const r of allHoursLog) {
+    const code = String(r.cinnost_kod || "").toUpperCase();
+    if (code === "TPV" || code === "ENG" || code === "PRO") continue;
+    consumedByProject.set(
+      r.ami_project_id,
+      (consumedByProject.get(r.ami_project_id) || 0) + (Number(r.hodiny) || 0),
+    );
+  }
+  for (const s of allSched) {
+    if (!s.is_midflight) continue;
+    consumedByProject.set(
+      s.project_id,
+      (consumedByProject.get(s.project_id) || 0) + (Number(s.scheduled_hours) || 0),
+    );
+  }
 
   // Group by project
   const tpvByProject = new Map<string, any[]>();
