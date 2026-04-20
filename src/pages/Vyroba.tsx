@@ -987,7 +987,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       }
       return hasDelayed ? "behind" : "on-track";
     }
-    const expected = getExpectedPct(todayDayIndex, goal);
+    const expected = getExpectedPct(todayDayIndex, goal, pid);
     if (bundleProgress >= expected - 10) return "on-track";
     if (bundleProgress >= expected - 25) return "at-risk";
     return "behind";
