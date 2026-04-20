@@ -145,9 +145,9 @@ export function AutoSplitPopover({
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [choice, onInsertWhole, itemId, itemName, projectId, stageId, czkPerHour,
+  }, [choice, onInsertWhole, itemId, itemName, itemCode, projectId, stageId, czkPerHour,
     targetWeekKey, targetWeekNum, spillWeekKey, spillWeekNum, part1Hours, part2Hours,
-    source, inboxItemId, qc, onOpenChange]);
+    source, inboxItemId, splitGroupId, qc, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

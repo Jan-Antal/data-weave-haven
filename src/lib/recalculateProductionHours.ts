@@ -365,7 +365,7 @@ export async function recalculateProductionHours(
       }
 
       for (const item of sortedInbox) {
-        const newCzk = refreshedCzk.get(item.id) ?? Number(item.estimated_czk) ?? 0;
+        const newCzk = refreshedCzk.get(item.id) ?? Number(item.estimated_czk || 0);
         const newHours = newHoursById.get(item.id) ?? 0;
         if (
           newCzk !== Number(item.estimated_czk) ||
