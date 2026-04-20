@@ -67,11 +67,12 @@ const SLIP_RED = 20;       // tracked − completion > 20 % → red
 interface UsekRow { kod: string; nazov: string; hodiny: number }
 
 type SlipStatus = "ok" | "slip" | "delay" | "none";
+type CardWarning = "none" | "off_plan" | "unmatched";
 
 interface ProjectCard {
   projectId: string;
   projectName: string;
-  isUnmatched: boolean;
+  warning: CardWarning;
   plannedHours: number;        // sum of scheduled_hours for the displayed week
   loggedHours: number;         // sum of production_hours_log for the displayed week
   trackedPct: number;          // logged / planned (0–∞)
