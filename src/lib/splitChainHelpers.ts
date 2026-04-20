@@ -214,6 +214,67 @@ export async function renumberBundleChain(splitGroupId: string): Promise<void> {
 }
 
 /**
+ * Project-wide chain renumbering: ONE chain per project. All schedule + inbox
+ * rows sharing the given chainGroupId get unified split_part/split_total based
+ * on unique scheduled_week values across the chain.
+ *
+ * Schedule rows: split_part = weekIndex+1, split_total = total unique weeks.
+ * Inbox rows (no scheduled_week): split_part = NULL, split_total = total weeks.
+ *
+ * This is the preferred renumbering for projects with midflight history,
+ * where midflight + non-midflight schedule + pending inbox all share one
+ * project-wide split_group_id (set by the one-off backfill migration).
+ */
+export async function renumberProjectChain(
+  projectId: string,
+  chainGroupId: string
+): Promise<void> {
+  const [schedRes, inboxRes] = await Promise.all([
+    supabase
+      .from("production_schedule")
+      .select("id, scheduled_week, status")
+      .eq("project_id", projectId)
+      .eq("split_group_id", chainGroupId),
+    supabase
+      .from("production_inbox")
+      .select("id, status")
+      .eq("project_id", projectId)
+      .eq("split_group_id", chainGroupId),
+  ]);
+
+  const schedRows = (schedRes.data || []).filter((r: any) => r.status !== "cancelled");
+  const inboxRows = (inboxRes.data || []).filter((r: any) => r.status === "pending");
+
+  const uniqueWeeks = Array.from(
+    new Set(schedRows.map((r: any) => r.scheduled_week).filter(Boolean))
+  ).sort();
+  const total = uniqueWeeks.length;
+  const weekIndex = new Map<string, number>();
+  uniqueWeeks.forEach((w, i) => weekIndex.set(w as string, i + 1));
+
+  await Promise.all([
+    ...schedRows.map((r: any) =>
+      supabase
+        .from("production_schedule")
+        .update({
+          split_part: r.scheduled_week ? weekIndex.get(r.scheduled_week) ?? null : null,
+          split_total: total > 0 ? total : null,
+        })
+        .eq("id", r.id)
+    ),
+    ...inboxRows.map((r: any) =>
+      supabase
+        .from("production_inbox")
+        .update({
+          split_part: null,
+          split_total: total > 0 ? total : null,
+        })
+        .eq("id", r.id)
+    ),
+  ]);
+}
+
+/**
  * Project-wide chain renumbering: for every distinct split_group_id present
  * on rows of this project (schedule + inbox), recompute the chain.
  */

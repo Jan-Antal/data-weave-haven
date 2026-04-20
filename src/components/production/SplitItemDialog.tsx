@@ -7,7 +7,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { Slider } from "@/components/ui/slider";
-import { renumberChain } from "@/lib/splitChainHelpers";
+import { renumberChain, renumberProjectChain } from "@/lib/splitChainHelpers";
 
 interface WeekOption {
   key: string;
@@ -118,7 +118,15 @@ export function SplitItemDialog({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // If the source already belongs to a project chain, REUSE it (don't mint new).
+      // This keeps the chain unified: 5/5 → 5/6 + 6/6 instead of branching off.
+      const isProjectChain = !!splitGroupId;
       const groupId = splitGroupId || itemId;
+
+      // Helper: pick the right renumber strategy. Project chain → projectChain,
+      // legacy per-item → renumberChain.
+      const renumber = (gid: string) =>
+        isProjectChain ? renumberProjectChain(projectId, gid) : renumberChain(gid);
 
       // Capture original state for undo
       let originalItem: any = null;
@@ -131,13 +139,12 @@ export function SplitItemDialog({
       }
 
       if (source === "schedule") {
-        // Update original (keep its current part), insert a NEW row, then renumber whole chain.
         const [, insertResult] = await Promise.all([
           supabase.from("production_schedule").update({
             scheduled_hours: part1Hours,
             scheduled_czk: part1Hours * czkPerHour,
             split_group_id: groupId,
-            item_name: cleanName, // numbering applied by renumberChain
+            item_name: cleanName,
           }).eq("id", itemId),
           supabase.from("production_schedule").insert({
             project_id: projectId,
@@ -156,10 +163,8 @@ export function SplitItemDialog({
 
         const insertedId = insertResult.data?.id;
 
-        // Renumber the entire chain (schedule + inbox) so all parts share total = N+1.
-        await renumberChain(groupId);
+        await renumber(groupId);
 
-        // Push undo first, then invalidate
         pushUndo({
           page: "plan-vyroby",
           actionType: "split_item",
@@ -176,7 +181,7 @@ export function SplitItemDialog({
                 item_name: originalItem.item_name,
               }).eq("id", itemId);
             }
-            if (originalItem?.split_group_id) await renumberChain(originalItem.split_group_id);
+            if (originalItem?.split_group_id) await renumber(originalItem.split_group_id);
             invalidateAll();
           },
           redo: async () => {
@@ -195,18 +200,17 @@ export function SplitItemDialog({
                 split_group_id: groupId,
               }).select().single(),
             ]);
-            await renumberChain(groupId);
+            await renumber(groupId);
             invalidateAll();
           },
         });
 
         invalidateAll();
       } else {
-        // Inbox split: schedule both parts, mark inbox as scheduled. Numbering set by renumberChain.
+        // Inbox split
         const scheduleWeek1 = currentWeekKey || futureWeeks[0]?.key || "";
 
         const [, , insertResult2] = await Promise.all([
-          // Update inbox item
           supabase.from("production_inbox").update({
             estimated_hours: part1Hours,
             estimated_czk: part1Hours * czkPerHour,
@@ -214,7 +218,6 @@ export function SplitItemDialog({
             split_group_id: groupId,
             status: "scheduled",
           }).eq("id", itemId),
-          // Insert schedule part 1
           supabase.from("production_schedule").insert({
             project_id: projectId,
             stage_id: stageId,
@@ -245,7 +248,7 @@ export function SplitItemDialog({
         ]);
 
         const inserted2Id = insertResult2.data?.id;
-        await renumberChain(groupId);
+        await renumber(groupId);
 
         pushUndo({
           page: "plan-vyroby",
@@ -265,7 +268,7 @@ export function SplitItemDialog({
             }
             await supabase.from("production_schedule").delete().eq("inbox_item_id", itemId);
             if (inserted2Id) await supabase.from("production_schedule").delete().eq("id", inserted2Id);
-            if (originalItem?.split_group_id) await renumberChain(originalItem.split_group_id);
+            if (originalItem?.split_group_id) await renumber(originalItem.split_group_id);
             invalidateAll();
           },
           redo: async () => {
@@ -276,7 +279,6 @@ export function SplitItemDialog({
         invalidateAll();
       }
 
-      // Log activity
       logActivity({
         projectId: projectId,
         actionType: "item_split",
@@ -292,7 +294,7 @@ export function SplitItemDialog({
     }
     setSubmitting(false);
   }, [part1Hours, part2Hours, itemId, cleanName, projectId, stageId, czkPerHour,
-    source, currentWeekKey, targetWeek, splitGroupId, qc, onOpenChange, futureWeeks, itemCode, pushUndo, invalidateAll]);
+    source, currentWeekKey, targetWeek, splitGroupId, qc, onOpenChange, futureWeeks, itemCode, pushUndo, invalidateAll, totalHours, currentWeekNum, targetWeekNum]);
 
   const handleHoursClick = (part: 1 | 2) => {
     setEditingPart(part);
