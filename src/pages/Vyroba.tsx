@@ -5428,7 +5428,11 @@ function DayCell({
 
       {hasData ? (
         <>
-          <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-between"
+            style={{ opacity: cumulative?.hasLog ? 1 : 0.4 }}
+            title={cumulative?.hasLog ? undefined : "Chybí denní log – přenesená hodnota"}
+          >
             <div
               className={`font-sans font-bold ${isMobile ? "text-lg" : "text-xl"}`}
               style={{ color: isNoProduction ? "#99a5a3" : pct >= 100 ? "#3a8a36" : "#1a1a1a" }}
@@ -5437,7 +5441,11 @@ function DayCell({
             </div>
           </div>
           {cumulative?.phase && !isNoProduction && (
-            <p className="text-[10px] text-muted-foreground truncate" title={cumulative.phase}>
+            <p
+              className="text-[10px] text-muted-foreground truncate"
+              style={{ opacity: cumulative?.hasLog ? 1 : 0.4 }}
+              title={cumulative.phase}
+            >
               {cumulative.phase}
             </p>
           )}
