@@ -77,6 +77,7 @@ interface ProjectCard {
   loggedHours: number;         // sum of production_hours_log for the displayed week
   trackedPct: number;          // logged / planned (0–∞)
   completionPct: number | null; // latest daily-log percent (0–100), null = no log
+  expectedPct: number | null;   // expected progress today (chain-window aware)
   slipStatus: SlipStatus;
   valueCzk: number;
   usekBreakdown: UsekRow[];
@@ -95,7 +96,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes] = await Promise.all([
+      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -133,6 +134,11 @@ function useDilnaData(weekOffset: number) {
           .from("overhead_projects" as any)
           .select("project_code")
           .eq("is_active", true),
+        // All schedule rows (across weeks) for chain-window calculation
+        supabase
+          .from("production_schedule")
+          .select("project_id, scheduled_week, scheduled_hours, status")
+          .not("status", "eq", "cancelled"),
       ]);
 
       const weeklyCapacity =
@@ -189,6 +195,64 @@ function useDilnaData(weekOffset: number) {
       const projMap = new Map(projects.map(p => [p.project_id, p]));
       const knownProjectIds = new Set(projMap.keys());
 
+      // ── Chain windows for split projects (chain-window-aware expected progress) ──
+      // Group all schedule rows by project_id, then by week_key (sum of scheduled_hours).
+      // For each project compute cumulative-share window covering the displayed week.
+      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string }>);
+      const chainByProject = new Map<string, Array<{ week: string; hours: number }>>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled") continue;
+        const pid = row.project_id;
+        if (!chainByProject.has(pid)) chainByProject.set(pid, []);
+        const arr = chainByProject.get(pid)!;
+        const existing = arr.find(w => w.week === row.scheduled_week);
+        if (existing) existing.hours += Number(row.scheduled_hours);
+        else arr.push({ week: row.scheduled_week, hours: Number(row.scheduled_hours) });
+      }
+      const chainWindowByProject = new Map<string, { start: number; end: number }>();
+      for (const [pid, weeks] of chainByProject) {
+        weeks.sort((a, b) => a.week.localeCompare(b.week));
+        const total = weeks.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) {
+          chainWindowByProject.set(pid, { start: 0, end: 100 });
+          continue;
+        }
+        let cum = 0;
+        let start = 0;
+        let end = 100;
+        let found = false;
+        for (const w of weeks) {
+          const share = (w.hours / total) * 100;
+          if (w.week === weekInfo.weekKey) {
+            start = cum;
+            end = cum + share;
+            found = true;
+            break;
+          }
+          cum += share;
+        }
+        if (!found) {
+          // displayed week not in chain — fall back to cumulative position at displayed week
+          start = 0;
+          end = 100;
+        }
+        chainWindowByProject.set(pid, { start: Math.round(start), end: Math.round(end) });
+      }
+
+      // ── dayFraction: how far into the displayed week we are ──
+      const todayDate = new Date();
+      const isCurrentWeek = weekOffset === 0;
+      const isPastWeek = weekOffset < 0;
+      const dayOfWeek = todayDate.getDay(); // 0=Ne … 6=So
+      const workdayIdx = dayOfWeek === 0 ? 5 : Math.min(dayOfWeek, 5); // Po=1 … Pá=5
+      const dayFraction = isPastWeek ? 1 : isCurrentWeek ? workdayIdx / 5 : 0;
+
+      function expectedFor(pid: string, plannedHours: number): number | null {
+        if (plannedHours <= 0) return null;
+        const cw = chainWindowByProject.get(pid) ?? { start: 0, end: 100 };
+        return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
+      }
+
       const cards: ProjectCard[] = [];
 
       // 1) Scheduled (planned) projects — primary cards
@@ -217,6 +281,7 @@ function useDilnaData(weekOffset: number) {
           loggedHours,
           trackedPct,
           completionPct,
+          expectedPct: isUnmatched ? null : expectedFor(pid, plannedHours),
           slipStatus,
           valueCzk,
           usekBreakdown,
@@ -240,6 +305,7 @@ function useDilnaData(weekOffset: number) {
           loggedHours,
           trackedPct: 0,
           completionPct: null,
+          expectedPct: null,
           slipStatus: "none",
           valueCzk: 0,
           usekBreakdown,
@@ -266,6 +332,7 @@ function useDilnaData(weekOffset: number) {
           loggedHours,
           trackedPct: 0,
           completionPct: null,
+          expectedPct: null,
           slipStatus: "none",
           valueCzk,
           usekBreakdown,
@@ -523,22 +590,34 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                       {/* Progress bar — gradient palette (Plan Výroby style) */}
                       <div className="space-y-1">
                         <div
-                          className="h-2.5 rounded-full overflow-hidden bg-muted"
+                          className="relative h-2.5 rounded-full bg-muted overflow-visible"
                           title={
-                            card.completionPct != null
-                              ? `Hodiny ${card.trackedPct}% · Dokončeno ${card.completionPct}%`
-                              : `Hodiny ${card.trackedPct}%`
+                            `Hodiny ${card.trackedPct}%` +
+                            (card.completionPct != null ? ` · Dokončeno ${card.completionPct}%` : "") +
+                            (card.expectedPct != null ? ` · Očekávané ${card.expectedPct}%` : "")
                           }
                         >
                           <div
-                            className="h-full rounded-full transition-all"
+                            className="h-full rounded-full transition-all overflow-hidden"
                             style={{ width: `${barWidthPct}%`, background: styles.bg }}
                           />
+                          {/* Vertical teal marker = expected progress today */}
+                          {card.expectedPct != null && (
+                            <div
+                              className="absolute top-[-2px] bottom-[-2px] w-[2px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
+                              style={{ left: `${Math.min(100, Math.max(0, card.expectedPct))}%` }}
+                            />
+                          )}
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground tabular-nums">
                           <span>
                             Hodiny <span className="font-medium text-foreground">{card.trackedPct}%</span>
                           </span>
+                          {card.expectedPct != null && (
+                            <span>
+                              Očekáváno <span className="font-medium text-teal-600">{card.expectedPct}%</span>
+                            </span>
+                          )}
                           {card.completionPct != null ? (
                             <span>
                               Dokončeno <span className="font-medium text-foreground">{card.completionPct}%</span>
