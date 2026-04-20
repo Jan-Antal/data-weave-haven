@@ -71,10 +71,17 @@ export function SplitBundleDialog({
     return w?.weekNum ?? "?";
   }, [futureWeeks, targetWeek]);
 
+  const totalHours = useMemo(
+    () => Math.round(items.reduce((sum, item) => sum + item.scheduled_hours, 0)),
+    [items]
+  );
+
   const previewHours = useMemo(
     () => items.reduce((sum, item) => sum + Math.round(item.scheduled_hours * pct / 100), 0),
     [items, pct]
   );
+
+  const remainingHours = Math.max(0, totalHours - previewHours);
 
   const canSubmit = items.length > 0 && pct > 0 && targetWeek && targetWeek !== currentWeekKey && !submitting;
 
@@ -178,7 +185,9 @@ export function SplitBundleDialog({
         <div className="px-5 py-4 space-y-3">
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium text-foreground">Podíl do dalšího týdne</span>
-            <span className="font-sans text-muted-foreground">{pct}% (~{previewHours}h)</span>
+            <span className="font-sans text-muted-foreground">
+              {pct}% (~{previewHours}h) · zůstane {remainingHours}h
+            </span>
           </div>
           <Slider value={[pct]} min={5} max={100} step={5} onValueChange={([v]) => setPct(v)} className="w-full" />
 
