@@ -2075,7 +2075,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   />
                 </div>
                 <span className="text-[10px] font-sans" style={{ color: capacityColor }}>
-                  {Math.round(weekCapacity.used)}h/{Math.round(weekCapacity.total)}h · {capacityPct}%
+                  {formatHours(weekCapacity.used)}h/{formatHours(weekCapacity.total)}h · {capacityPct}%
                 </span>
               </div>
 
@@ -2935,11 +2935,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                                 <span className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
                                   {isFull ? (
                                     <span className="font-semibold" style={{ color: "#d97706" }}>
-                                      {totalHours}h (plná kapacita)
+                                      {formatHours(totalHours)}h (plná kapacita)
                                     </span>
                                   ) : (
                                     <>
-                                      {remaining}h zbývá (z {totalHours}h)
+                                      {formatHours(remaining)}h zbývá (z {formatHours(totalHours)}h)
                                     </>
                                   )}
                                 </span>
@@ -2953,7 +2953,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                                 background: isDone ? "transparent" : isFull ? "rgba(217,119,6,0.12)" : "transparent",
                               }}
                             >
-                              {isDone ? "—" : `${hoursShown}h`}
+                              {isDone ? "—" : `${formatHours(hoursShown)}h`}
                             </span>
                             {/* Full capacity toggle */}
                             {!isDone && (
@@ -3005,9 +3005,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                         <span style={{ color: "hsl(var(--muted-foreground))" }}>
                           T{nextWeekNum}:{" "}
                           <span className="font-semibold" style={{ color: nextColor }}>
-                            {selectedHoursToMove}h přidáno
+                            {formatHours(selectedHoursToMove)}h přidáno
                           </span>{" "}
-                          · {nextTotal}h / 760h celkem
+                          · {formatHours(nextTotal)}h / 760h celkem
                         </span>
                         <span className="font-sans font-semibold" style={{ color: nextColor }}>
                           {nextPct}% využito
@@ -3756,7 +3756,7 @@ function DetailPanel({
                       {item.item_name}
                     </span>
                     <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
-                      {item.scheduled_hours}h
+                      {formatHours(item.scheduled_hours)}h
                     </span>
                   </div>
                 ))}
@@ -3797,7 +3797,7 @@ function DetailPanel({
                         </span>
                         {qcCheck && <QualityCheckFullDisplay check={qcCheck} />}
                         <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
-                          {item.scheduled_hours}h
+                          {formatHours(item.scheduled_hours)}h
                         </span>
                       </div>
                     </div>
@@ -4400,7 +4400,7 @@ function UnifiedItemList({
 
                     {/* Hours */}
                     <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
-                      {thisWeekHours}h
+                      {formatHours(thisWeekHours)}h
                     </span>
 
                     {/* QC badge — clickable only if ALL parts completed across all weeks */}
