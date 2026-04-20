@@ -1,118 +1,89 @@
 
 
-## Rozsah
+## Problém
 
-V `src/components/DilnaDashboard.tsx` rozšíriť zobrazené dlaždice o **všetky projekty s reálne odpracovanými hodinami** v zvolenom týždni — nielen tie zo `production_schedule`. Pridať dva varovné stavy:
+V `src/pages/Vyroba.tsx` % logika ukazuje nesprávne hodnoty v týchto scenároch:
 
-- **„Mimo Plán výroby"** — projekt existuje v `projects` tabuľke, má hodiny v `production_hours_log`, ale nie je v `production_schedule` pre daný týždeň. Žltá výstraha.
-- **„Nespárované"** — `ami_project_id` z `production_hours_log` neexistuje v `projects` (už implementované, len doladiť styling). Sivá/červená výstraha.
+1. **„Týdenní cíl: 100%" nesprávne** — `getWeeklyGoal` má fallback `return 100` keď `planHoursMap` ešte nie je načítané (React Query loading) alebo keď `hPlan` chýba. Z-2607-008 v T17 zobrazí 100% namiesto reálneho ~9%.
 
-## Zmeny v `DilnaDashboard.tsx`
+2. **Chain bundle ukazuje progress prevzatý z completed predošlého týždňa** — v split chain projektoch (Z-2607-008: T16 midflight Expedice 100% + T17 nové splity), `getLatestPercent` cez `findPriorChainLog` vráti 100% (z T16 Expedice logu), aj keď T17 je nový kus chainu (chain window 6→20%). Bundle progress potom ukazuje 100% miesto reálneho stavu T17 (ktorý buď nemá log = 0% v rámci okna, alebo má vlastný log 6%).
 
-### 1. Rozšíriť typ `ProjectCard`
+3. **Týdenní cíl ignoruje chain window** — pre split chain projekt by „týždenný cieľ" mal byť koniec chain okna pre tento týždeň (`chainWindow.end`), nie projekt-globálne %. Aktuálne `getWeeklyGoal` používa `expectedHours / hodiny_plan`, čo pre chain bundle dáva nezmyslné nízke číslo (lebo súčet T17 je len 83h zo 586h).
 
-Nahradiť `isUnmatched: boolean` enumom `cardWarning`:
+## Zmena 1 — `getWeeklyGoal` opravená sémantika
 
-```ts
-type CardWarning = "none" | "off_plan" | "unmatched";
-
-interface ProjectCard {
-  ...
-  warning: CardWarning;  // namiesto isUnmatched
-  ...
-}
-```
-
-### 2. Doplniť tretiu vetvu v `useDilnaData`
-
-Po existujúcich dvoch slučkách (scheduled + unmatched) pridať:
+V `src/pages/Vyroba.tsx` funkcia `getWeeklyGoal(pid)`:
 
 ```ts
-// 3) Off-plan: projekt JE v DB (matched), má hodiny tento týždeň, ale nie je v schedule
-for (const [pid, loggedHours] of hoursByProject) {
-  if (scheduledProjects.has(pid)) continue;
-  if (!knownProjectIds.has(pid)) continue;  // unmatched už spracované vyššie
-  if (loggedHours < 0.05) continue;
-  const proj = projMap.get(pid)!;
-  const usekMap = usekByProject.get(pid);
-  const usekBreakdown = usekMap
-    ? Array.from(usekMap.values()).sort(...)
-    : [];
-  const prodPct = (proj.cost_production_pct ?? 30) / 100;
-  const valueCzk = (proj.prodejni_cena ?? 0) * prodPct;
-  cards.push({
-    projectId: pid,
-    projectName: proj.project_name || pid,
-    warning: "off_plan",
-    plannedHours: 0,
-    loggedHours,
-    trackedPct: 0,
-    completionPct: null,
-    slipStatus: "none",
-    valueCzk,
-    usekBreakdown,
-  });
+function getWeeklyGoal(pid: string): number {
+  const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
+  if (projectForGoal?.isSpilled) return 100;
+  if (!scheduleData) return 0;            // bolo: 100  (nesprávne)
+
+  // Ak je bundle súčasťou split chainu → cieľ = koniec chain okna
+  const cw = getChainWindow(pid);
+  if (cw) return Math.round(cw.end);
+
+  const hPlan = planHoursMap?.get(pid);
+  if (planHoursMap === undefined) return 0;  // loading — neposielať 100
+  if (!hPlan || hPlan <= 0) return 100;      // projekt bez plánu — pôvodný fallback
+
+  // … existujúci výpočet completedWeeksHours + currentWeekHours * dayFraction
 }
 ```
 
-Z prvej slučky odstrániť `isUnmatched` priradenie z `proj === null` (scheduled vždy má proj alebo nie — ak nie, je to skôr `unmatched` v scheduli, ostáva ako warning `unmatched`).
+**Efekt**: Z-2607-008 T17 teraz zobrazí „Týdenní cíl: 20%" (= chain window end), čo zodpovedá realitě (do konca T17 by malo byť hotových 20% celého chainu).
 
-### 3. Helpery pre warning UI
+## Zmena 2 — `getBundleProgress` chain-aware
+
+`getLatestPercent` aktuálne v split chain berie posledný non-MF log z prior týždňa (cez `findPriorChainLog`). Ak ten log je 100% (Expedice), bundle T17 zobrazí 100% napriek tomu, že T17 je nový kus chainu, ktorý sa ešte nezačal.
+
+Oprava: prior chain log použiť **iba ak** je menší alebo rovný `chainWindow.start` (= bundle ešte nezačal) **alebo** ak nepatrí do dokončeného chunku. Ak prior log = 100% ale chain pokračuje (existuje neskorší týždeň v chaine), bundle T17 začína na `chainWindow.start` (~6%), nie 100%.
 
 ```ts
-function warningLabel(w: CardWarning): string {
-  if (w === "off_plan") return "Mimo Plán výroby";
-  if (w === "unmatched") return "Nespárované";
-  return "";
-}
+function getLatestPercent(pid: string): number {
+  const logs = getLogsForProject(pid);
+  if (logs.length > 0) { /* … existujúce sortovanie … */ }
 
-function warningPillClass(w: CardWarning): string {
-  if (w === "off_plan") return "bg-amber-100 text-amber-800 border border-amber-300";
-  if (w === "unmatched") return "bg-slate-200 text-slate-700 border border-slate-300";
-  return "";
-}
+  const prior = findPriorChainLog(pid, weekKey);
+  if (!prior) return 0;
 
-function warningBorderColor(w: CardWarning, projectColor: string): string {
-  if (w === "off_plan") return "#d97706";   // amber
-  if (w === "unmatched") return "#94a3b8";  // slate
-  return projectColor;
+  // Chain-safe: ak je prior log ≥ chain window end (t.j. predchádzajúci kus chainu
+  // bol dokončený / posunutý k expedíciám), nepokračujeme s ním do nového kusu.
+  // Štartujeme od začiatku okna pre tento týždeň.
+  const cw = getChainWindow(pid);
+  if (cw && prior.percent >= Math.round(cw.start) && prior.percent >= 95) {
+    return Math.round(cw.start);
+  }
+  return prior.percent;
 }
 ```
 
-### 4. Render dlaždice
+**Efekt**: Z-2607-008 T17 bez vlastného logu zobrazí ~6% (chain window start), nie 100%.
 
-V mapovaní `cards.map(...)`:
-- Ľavý border: `warningBorderColor(card.warning, projectColor)`.
-- Pre `off_plan`: zobrazí plný `projectName` + `projectId` (rovnako ako naplánované) + pod ním ikonku `AlertCircle` s textom „Mimo Plán výroby" v amber pille.
-- Pre `unmatched`: ostáva existujúce zobrazenie (mono ID + sivý label).
-- Pre `none`: bez varovania, ako dnes.
-- Pri `off_plan` aj `unmatched` skryť slip pill (nemá zmysel bez plánu).
+## Zmena 3 — `getExpectedPct` — žiadna zmena potrebná
 
-### 5. Sumárna karta „Nespárované"
+Už správne počíta: `cw.start + (cw.end - cw.start) * fraction` pre chain bundle. Ostane.
 
-Premenovať na **„Mimo plán / Nespárované"** s rozdelením `offPlanCount / unmatchedCount`:
+## Overenie (vzorka)
 
-```tsx
-<span className="text-[#b65d05]">{offPlanCount}</span>
-<span className="mx-1">/</span>
-<span className="text-slate-600">{unmatchedCount}</span>
-```
+| Projekt | Týždeň | Stav v DB | Očakávaný „Týdenní cíl" | Očakávaný „Bundle progress" |
+|---|---|---|---|---|
+| Z-2607-008 (Multisport) | T17 | chain 6→20%, bez T17 logu | **20%** (chain end) | **6%** (chain start) |
+| Z-2607-008 | T17 | chain 6→20%, T17 log = 15% | **20%** | **15%** |
+| Z-2607-008 | T18 | chain 20→52%, bez logu | **52%** | **20%** |
+| Projekt bez chainu | T17 | hPlan=200, T16=50h hotové, T17=50h, dnes Po | round(50+50*0.2)/200 = **30%** | podľa logov |
+| Projekt bez chainu, planHoursMap loading | — | — | **0%** (skeleton-friendly) | progress podľa logov |
+| Spilled projekt | — | — | **100%** | latest pct |
 
-Spočítať `offPlanCount = cards.filter(c => c.warning === "off_plan").length`.
-
-### 6. Triedenie
-
-Upraviť: delays → slips → ok → off_plan → unmatched → none.
-
-## Overenie
-
-1. T15 (`weekOffset = -1`): zobraziť dlaždice projektov z `production_hours_log` ktoré nie sú v `production_schedule` pre 2026-04-13. Tie známe projekty dostanú amber border + pill „Mimo Plán výroby". Neznáme `ami_project_id` ostanú „Nespárované".
-2. Aktuálny týždeň: dlaždice projektov v pláne (zelená/žltá/červená) zobrazia sa prvé, off-plan/unmatched za nimi.
-3. Sumár: „Mimo plán / Nespárované" počty sedia s počtom dlaždíc.
-4. Úsek breakdown rozbalený funguje aj pre off-plan dlaždice.
-5. Žiadny projekt z `overhead_projects` (REZ, ENG, PM…) sa nezobrazí ako off-plan (filter `overheadSet` ostáva).
+Manuálne otestovať:
+1. `/vyroba` → T17 → vybrať Multisport → header musí zobraziť „Týdenní cíl: 20%" (nie 100%) a bundle %, ktoré odpovedá chain oknu (≤20%).
+2. Posunúť na T18 → cieľ ~52%, štart ~20%.
+3. Iný projekt bez chainu → cieľ vypočítaný podľa `expectedHours / hodiny_plan` × dayFraction.
+4. Spilled projekt T-1 → cieľ 100%, status „behind".
+5. Reload stránky → počas načítavania `planHoursMap` sa nezobrazí blesková 100%.
 
 ## Dotknuté súbory
 
-- `src/components/DilnaDashboard.tsx`
+- `src/pages/Vyroba.tsx` — funkcie `getWeeklyGoal`, `getLatestPercent`.
 
