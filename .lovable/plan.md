@@ -1,60 +1,46 @@
 
 
-## Diagnóza
+## Rozsah
 
-V DB pre projekt Z-2617-001 vidím presne tento stav:
+Implementujem len **bod A** z predošlého plánu — fallback Inbox hodín z ceny projektu pre "siroty" (inbox položky bez TPV matchu a bez `adhoc_reason`). Manuálnu editáciu (bod B) odkladáme.
 
-- **Historické midflight riadky** (T13–T16): `item_code = 'Z-2617-001'`, `is_midflight = true` (agregované týždenné súčty), `split_part 1..4 / 5`.
-- **Aktuálne split riadky** (T17 = 2026-04-27, T18 = 2026-05-04): per-item codes (T.01, T.03, T.04, T.05, T.06), `split_part 1..2 / 2`.
+## Zmeny
 
-Všetky riadky **zdieľajú rovnaký `split_group_id`** `37f0f762-...`. 
+### `src/lib/recalculateProductionHours.ts`
 
-**Prečo nový split spravil 1/2 + 2/2 a nie 5/6 + 6/6:**
+V sekcii inbox prepočtu (~r. 290–340), kde aktuálne `if (!tpv) continue;` preskočí siroty:
 
-V `splitChainHelpers.ts` `fetchChainRows` (riadok 47–48) má filter:
+1. Najprv identifikovať siroty pre projekt: `inboxItems.filter(i => !tpvItems.find(t => t.item_code === i.item_code) && !i.adhoc_reason)`.
+2. Vypočítať `assignedHours` = súčet hodín všetkých TPV-mapovaných inbox + schedule položiek (z `result.itemBreakdown`).
+3. `consumedTotal` = už počítané (log + midflight).
+4. `remainingProjectHours = max(0, result.hodiny_plan − assignedHours − consumedTotal)`.
+5. Distribuovať rovnomerne: každá sirota dostane `remainingProjectHours / orphanCount` hodín a `× hourlyRate` CZK.
+6. Pridať update do batch poľa `inboxUpdates` (rovnakým mechanizmom ako TPV-mapované položky).
 
-```ts
-.filter((r: any) => r.status !== "cancelled" && !r.is_midflight)
+Ad-hoc položky s `adhoc_reason` (oprava/dodatecna/jine) ostávajú **nedotknuté**.
+
+### Cleanup pre Z-2604-004 a Z-2601-004
+
+Po nasadení spustiť `recalculateProductionHours` len pre tieto dva projekty (cez SQL migráciu volajúcu RPC, alebo priamo SQL UPDATE):
+
+```sql
+UPDATE production_inbox
+SET estimated_hours = 4, estimated_czk = 2200
+WHERE project_id IN ('Z-2604-004', 'Z-2601-004')
+  AND status = 'pending'
+  AND adhoc_reason IS NULL;
 ```
 
-Midflight riadky (historické T13–T16) sú teda **vyradené z chainu**. `renumberBundleChain` potom vidí len 2 týždne (T17, T18), zoradí ich a vyrenderuje 1/2 + 2/2 — historické 1/5..4/5 sa vôbec neaktualizujú a zostávajú v starom stave.
-
-Užívateľ chce, aby sa **bundle-level chain počítal vrátane midflight historických týždňov** — má byť 4 staré (1/6..4/6) + 2 nové (5/6, 6/6).
-
-## Riešenie
-
-### `src/lib/splitChainHelpers.ts`
-
-**1. `fetchChainRows`** — odstrániť `!r.is_midflight` filter, ponechať len `status !== "cancelled"`. Midflight riadky musia byť súčasťou chainu pre bundle-level renumber. Komentár hore (riadky 14–16) upraviť: midflight sú _súčasťou_ bundle chainu (každý midflight týždeň = jedna bundle časť).
-
-**2. `renumberBundleChain`** — logika ostáva (group by `scheduled_week`), ale teraz správne uvidí všetkých 6 týždňov a vyprodukuje 1/6..6/6 zdieľané všetkými riadkami v danom týždni. Midflight týždne (kde je len jeden agregovaný riadok s `item_code = project_id`) takisto dostanú správny `split_part`.
-
-**3. `renumberChain` (per-item legacy)** — môže ostať ako je (single-item splits naďalej ignorujú midflight, lebo midflight nie je per-code chain). Pre istotu pridať do filtra v `renumberChain` lokálny `!r.is_midflight` aby legacy správanie ostalo nezmenené, alebo nechať midflight položky započítavať aj tu (správa už chcela midflight započítať do per-item totalu — viď komentár v hlavičke). **Default:** ponechať midflight v chaine aj pre per-item, aby sa správanie zjednotilo.
-
-### Cleanup existujúcich dát Z-2617-001
-
-Po nasadení opravy spustiť jednorazové prečíslovanie chainu `37f0f762-9985-4d65-a6aa-d6b2577d508f` (volaním `renumberBundleChain` z migrácie alebo manuálnou SQL aktualizáciou):
-
-- T13 (2026-03-23) → 1/6 pre midflight riadok
-- T14 (2026-03-30) → 2/6
-- T15 (2026-04-06) → 3/6
-- T16 (2026-04-13) → 4/6
-- T17 (2026-04-27) → 5/6 pre všetkých 5 položiek
-- T18 (2026-05-04) → 6/6 pre všetkých 5 položiek
-
-### Edge cases
-
-- **Cancelled riadky** zostávajú vyradené z chainu.
-- **Inbox riadky** stále nie sú súčasťou bundle weekChainu (riadok 192–202 ich resetuje na null).
-- **Bundle merge naprieč týždňami** (`mergeBundleAcrossWeeks`) automaticky využije nový `fetchChainRows`, takže merge tiež zohľadní midflight týždne v finálnom prečíslovaní.
+(4h vychádza z `project_plan_hours.hodiny_plan = 4` pre oba projekty — žiadne TPV položky, žiadny consumed log → celý plán pripadne sirote T01.)
 
 ## Dotknuté súbory
 
-- `src/lib/splitChainHelpers.ts` — odstrániť `!r.is_midflight` filter v `fetchChainRows`, aktualizovať doc komentár.
-- Migrácia: jednorazový SQL update split_part/split_total pre všetky existujúce midflight chainy v projekte (alebo widely — všetky chainy s midflight riadkami).
+- `src/lib/recalculateProductionHours.ts` — fallback logika v inbox sekcii.
+- Migrácia: jednorazový SQL UPDATE pre Z-2604-004 a Z-2601-004.
 
 ## Výsledok
 
-- **Z-2617-001**: po cleanupe a opätovnom splite uvidíš správne 1/6..6/6 naprieč všetkými týždňami chainu.
-- **Budúce splity** na bundloch s midflight históriou budú pokračovať (5/5 → 6/6, nie reset na 1/2).
+- **Z-2604-004 / Z-2601-004**: po cleanupe inbox T01 zobrazí 4h / 2200 Kč.
+- **Budúce siroty**: pri každom recalcu automaticky dostanú hodiny z `project_plan_hours.hodiny_plan` proporcionálne k počtu sirôt.
+- **Manuálna editácia hodín** sa rieši v samostatnej iterácii.
 
