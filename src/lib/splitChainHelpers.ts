@@ -74,8 +74,18 @@ export async function fetchChainRows(splitGroupId: string): Promise<ChainRow[]> 
   return [...sched, ...inbox];
 }
 
+/**
+ * Strip legacy drag-drop suffix so chain rows of the same item group together
+ * even when historical rows still carry the `_xxxx` mangle.
+ */
+function normalizeItemCode(code: string | null | undefined): string {
+  if (!code) return "";
+  return code.replace(/_[a-z0-9]{4,8}$/i, "");
+}
+
 function chainKey(r: ChainRow): string {
-  return r.item_code ? `code::${r.item_code}` : `name::${r.item_name}`;
+  const norm = normalizeItemCode(r.item_code);
+  return norm ? `code::${norm}` : `name::${r.item_name}`;
 }
 
 function sortChainRows(rows: ChainRow[]): ChainRow[] {
