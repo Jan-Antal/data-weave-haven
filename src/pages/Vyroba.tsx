@@ -750,19 +750,25 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getLatestPercent(pid: string): number {
     const logs = getLogsForProject(pid);
     if (logs.length > 0) {
-      // Use the LATEST log by day_index (then logged_at) — not the max percent.
-      // This ensures the week % reflects the most recent daylog entry,
-      // even when a later log corrects (lowers) a previous value.
       const sorted = [...logs].sort((a, b) => {
-        if (b.day_index !== a.day_index) return b.day_index - a.day_index;
-        return new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime();
+        if (a.day_index !== b.day_index) return b.day_index - a.day_index;
+        const ta = a.logged_at ? new Date(a.logged_at).getTime() : 0;
+        const tb = b.logged_at ? new Date(b.logged_at).getTime() : 0;
+        return tb - ta;
       });
       return sorted[0].percent;
     }
     // Fallback: only for split bundles — find latest non-MF log from a PRIOR week
     // belonging to the same split_group_id chain.
     const prior = findPriorChainLog(pid, weekKey);
-    return prior ? prior.percent : 0;
+    if (!prior) return 0;
+    // Chain-safe: if prior chain log was completed (≥95%), this week starts a new
+    // chunk — start at this week's chain window start, not inherit 100%.
+    const cw = getChainWindow(pid);
+    if (cw && prior.percent >= 95) {
+      return Math.round(cw.start);
+    }
+    return prior.percent;
   }
 
   function getLatestPhase(pid: string): string | null {
