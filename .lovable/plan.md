@@ -1,77 +1,66 @@
 
 
-## Rozsah
+## Diagnóza Z-2607-008
 
-Riešime obe veci naraz:
-- **Bod 1+2**: normalizácia `item_code` pri TPV matchu v recalc-i (oprava 0h pre Z-2607-008, Z-2617-001, Z-2604-004, Z-2601-004).
-- **Bod 3**: zrušiť modifikáciu `item_code` v drag/drop kóde — duplicita sa rieši cez `id` / `split_group_id`, nie cez suffix.
+### Stav v DB
+- `prodejni_cena` = **674 766 CZK**, `marze` = 0.15, `cost_production_pct` = 0.45, currency CZK
+- TPV items: 33 položiek, súčet `cena × pocet` × 0.85 × 0.45 / 550:
+  - **per-item floor súčet** = **490h** (každá položka osobitne zaokrúhlená dole)
+  - **sum-then-floor** = **505h** (najprv súčet, potom raz floor)
+- `project_hours` = floor(674 766 × 0.85 × 0.45 / 550) = **469h**
+- Inbox súčet (33 pending rows): **586h** ✅
+- `project_plan_hours` v DB: `hodiny_plan = 586`, `tpv_hours = 586`, `project_hours = 561`, `source = TPV`, `prodpct_used = 0.45`
 
-## Zmena 1 — `useProductionDragDrop.ts`: nepridávať suffix do `item_code`
+### Kde je rozpor
 
-V `src/hooks/useProductionDragDrop.ts` sú 2 miesta (cca r. 337–340 a r. 566–570) kde sa pri konflikte alebo „separate" móde generuje:
+**Inbox (586h)** = sedí so súčtom riadkov `production_inbox.estimated_hours` (33 položiek). Posledný recalc rozdistribuoval hodiny per-item.
 
-```ts
-item_code: `${original}_${Date.now().toString(36)}`
-```
+**Detail projektu (561h)** = hodnota `project_hours` v `project_plan_hours`, ktorá je ale **uložená ZLE**. Podľa vzorca `floor(674766 × 0.85 × 0.45 / 550) = 469h`, nie 561h. 
 
-Nahradiť: ponechať `item_code` **nezmenený**. Unikátnosť riadku je už zaručená cez `id` (uuid) v DB; UI kľúče v Reacte používajú `id`, nie `item_code`. Split chain rozlíšenie ide cez `split_group_id` + `split_part`.
+Hodnota 561 v DB pravdepodobne pochádza zo staršieho recalc-u keď bol `cost_production_pct` iný (napr. 0.55), prípadne sa použila iná marža. Aktuálny recalc upsertuje len niektoré polia a `project_hours` mohol zostať z predchádzajúceho behu.
 
-Ak by niekde existovala DB unique constraint na `(project_id, item_code)` v `production_inbox` alebo `production_schedule` — overím pred zmenou cez `code--search_files` a `supabase--read_query`. Ak existuje, treba ju zmeniť na `(project_id, item_code, split_group_id)` alebo úplne odstrániť (split parts toho istého kódu sú legitímne).
+**Prečo `hodiny_plan = 586` a nie 469 ani 505?**
+- Logika berie `MAX(tpv_hours_raw, project_hours)`.
+- `tpv_hours_raw` (per-item floor) = 490, `project_hours` = 469 → MAX by malo byť 490, nie 586.
+- 586 vychádza z **inboxu** (suma uložených `estimated_hours`), nie z čerstvého výpočtu z `tpv_items`. Recalc teda číta z inboxu späť do `project_plan_hours`, čo je cyklická chyba — každý ďalší recalc by mohol generovať trochu iné číslo.
 
-## Zmena 2 — `recalculateProductionHours.ts`: normalizácia (defenzívne, pre staré dáta)
+### Skutočná príčina
+1. **`computePlanHours`** vracia `tpv_hours_raw = 490h` (per-item floor zo `tpv_items`), `project_hours = 469h`, `hodiny_plan = MAX = 490h`.
+2. **Distribučná slučka** v `recalculateProductionHours.ts` ale per-item priraďuje `estimated_hours` cez `tpvHoursById` — ktorá obsahuje **už škálované hodnoty** vrátane prípadných remainder add-onov. Tu sa hodnoty pravdepodobne navyšujú navyše v dôsledku:
+   - **scale_ratio nesprávne aplikovaný** keď `project_hours < tpv_hours_raw` (žiadne škálovanie sa nemá konať, ale per-item suma mohla byť počítaná inak),
+   - alebo **starý suffix v jednom item_code** ktorý padá do orphan vetvy a dostáva extra hodiny `(hodiny_plan − assigned) / orphanCount`.
+3. Po distribúcii sa `project_plan_hours.tpv_hours` upsertne na **súčet uložených inbox hodín (586)** namiesto na čistý `tpv_hours_raw` z `computePlanHours` (490).
 
-Aj keď nový kód už nebude generovať suffixy, **existujúce inbox riadky v DB ich majú** (Z-2607-008: 33ks, Z-2617-001: 5ks, atď.). Preto pridať helper na čítanie:
+### Oprava
 
-```ts
-function normalizeItemCode(code: string | null | undefined): string {
-  if (!code) return "";
-  return code.replace(/_[a-z0-9]{4,8}$/i, "");
-}
-```
+**A. `recalculateProductionHours.ts` — neprepisovať `tpv_hours` súčtom z inboxu**
+- Polia `hodiny_plan`, `tpv_hours`, `project_hours` v `project_plan_hours` musia pochádzať **výhradne z `result` z `computePlanHours`**, nie zo súčtu uložených inbox/schedule hodín. Aktuálny upsert už toto robí správne — over že nikde nedochádza k druhému prepisu po distribučnej slučke.
 
-Použiť na 4 miestach v `recalculateProductionHours.ts`:
-1. Build `activePartsByCode` — kľúč = `normalizeItemCode(it.item_code)`.
-2. Schedule loop TPV lookup — `tpvItems.find(t => t.item_code === normalizeItemCode(item.item_code))`.
-3. Inbox loop TPV lookup — to isté.
-4. Schedule loop `activePartsByCode.get(normalizeItemCode(item.item_code))`.
+**B. Distribučná slučka — používať `result.item_hours` priamo, bez orphan navýšenia ak existuje TPV match**
+- Skontroluj či 33 inbox položiek skutočne všetky majú TPV match (po `normalizeItemCode`). Ak `AT.08`, `AT.16`, `TK.xx` v TPV chýba ale v inboxe sú, padajú do orphan vetvy a delia 469−assigned medzi seba → tým vzniká nadhodnotenie na 586h.
+- Riešenie: **orphany (item bez TPV match) dostanú 0h** ak `hodiny_plan` je zo zdroja `TPV`. Iba ak je `source = "Project"` (project_hours > tpv_hours_raw), distribuovať zvyšok na orphany.
 
-## Zmena 3 — `splitChainHelpers.ts`: rovnaká normalizácia pri groupovaní
+**C. Detail projektu — zobraziť `hodiny_plan`, nie `project_hours`**
+- V Project Detail dialógu (a v tabuľkách) sa zobrazuje `project_hours = 561` čo je staré číslo z čistého `prodejni_cena` výpočtu. Správne pole na zobrazenie „plán hodín projektu" je `hodiny_plan` (= 490 po fixe), nie `project_hours`. Over v `ProjectDetailDialog.tsx` ktoré pole čerpá.
 
-V `renumberChain` groupuje rows podľa `item_code`. Pridať `normalizeItemCode` aj tu, aby chain badges (1/N) ostali konzistentné medzi originálnym kódom a starými suffixovanými variantmi.
+### Akčné kroky
 
-## Migrácia existujúcich dát (jednorazovo)
+1. **Audit `recalculateProductionHours.ts`**:
+   - Verifikovať že `project_plan_hours` upsert používa **len** `result.hodiny_plan`, `result.tpv_hours_raw`, `result.project_hours` z `computePlanHours` — nie počítaný súčet inbox/schedule po distribúcii.
+   - Orphan distribúciu vykonať len ak `result.source === "Project"`. Pri `source === "TPV"` orphany (inbox bez TPV match) dostanú `0h` (alebo flag „chýba v TPV").
 
-SQL migrácia ktorá vyčistí staré suffixy v DB:
+2. **Audit `ProjectDetailDialog.tsx` / `ProjectInfoTable.tsx`**:
+   - Zistiť ktoré pole z `project_plan_hours` sa zobrazuje ako „Hodiny plán" v detaile a tabuľkách. Zjednotiť na `hodiny_plan`.
 
-```sql
-UPDATE production_inbox
-SET item_code = regexp_replace(item_code, '_[a-z0-9]{4,8}$', '', 'i')
-WHERE item_code ~ '_[a-z0-9]{4,8}$';
+3. **Migrácia jednorazovo**: po nasadení spustiť **„Přepočítat → Vše vč. historie"**. Očakávaný výsledok pre Z-2607-008:
+   - `tpv_hours = 490` (per-item floor)
+   - `project_hours = 469` (z 674766 × 0.85 × 0.45 / 550)
+   - `hodiny_plan = 490` (TPV vyhráva)
+   - Inbox súčet = 490h presne (sedí na `hodiny_plan`)
+   - Detail projektu zobrazí 490h
 
-UPDATE production_schedule
-SET item_code = regexp_replace(item_code, '_[a-z0-9]{4,8}$', '', 'i')
-WHERE item_code ~ '_[a-z0-9]{4,8}$' AND is_midflight = false;
-```
-
-Midflight rows ostávajú nedotknuté (historické).
-
-Po migrácii aj normalizačný regex v kóde zostáva (defenzívne pre prípadné zvyškové dáta).
-
-## Po nasadení
-
-1. Spustiť SQL migráciu (cleanup suffixov).
-2. Spustiť **„Přepočítat → Vše vč. historie"** v PlanVyroby.
-3. Overiť:
-   - **Z-2607-008** Inbox: súčet aktívnych TPV položiek = 586h.
-   - **Z-2617-001** Inbox: TPV-mapované položky dostanú svoje hodiny (T.01=62h, T.03=36h, T.04=124h, T.05=67h, T.06=8h).
-   - **Z-2604-004 / Z-2601-004**: každý 4h, 2200 Kč (orphan fallback).
-4. Otestovať drag/drop konflikt scenár: presunúť inbox položku do týždňa kde už je rovnaký `item_code` → zvoliť „separate" → overiť že nový schedule riadok má **rovnaký** `item_code` a `split_group_id` ich rozlišuje.
-
-## Dotknuté súbory
-
-- `src/hooks/useProductionDragDrop.ts` — odstrániť suffix generovanie (2 miesta).
-- `src/lib/recalculateProductionHours.ts` — pridať `normalizeItemCode`, použiť pri TPV lookup a `activePartsByCode`.
-- `src/lib/splitChainHelpers.ts` — `normalizeItemCode` pri groupovaní chain rows.
-- Nová migrácia: cleanup suffixov v `production_inbox` + `production_schedule` (non-midflight).
-- Pred migráciou overiť unique constraints na `item_code` v oboch tabuľkách a prípadne ich upraviť.
+### Dotknuté súbory
+- `src/lib/recalculateProductionHours.ts` — opraviť source check pri orphan distribúcii, neprepisovať tpv_hours súčtom z inboxu.
+- `src/components/ProjectDetailDialog.tsx` — overiť ktoré pole zobrazuje (`hodiny_plan` vs `project_hours`).
+- Voliteľne `src/components/ProjectInfoTable.tsx`, `PMStatusTable.tsx` — to isté.
 
