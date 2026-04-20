@@ -1,91 +1,77 @@
 
 
-## Logika výpočtu hodín v projekte (BEZ historických odpočtov)
+## Rozsah
 
-### Krok 1 — Plán hodín projektu (`computePlanHours`)
+Riešime obe veci naraz:
+- **Bod 1+2**: normalizácia `item_code` pri TPV matchu v recalc-i (oprava 0h pre Z-2607-008, Z-2617-001, Z-2604-004, Z-2601-004).
+- **Bod 3**: zrušiť modifikáciu `item_code` v drag/drop kóde — duplicita sa rieši cez `id` / `split_group_id`, nie cez suffix.
 
-Vstupy z DB:
-- `tpv_items` projektu (cena, počet, status)
-- `projects.prodejni_cena`, `marze`, `cost_production_pct`, `currency`, `created_at`
-- `production_settings.hourly_rate` (default 550 Kč/h)
-- `exchange_rates` (pre EUR projekty)
-- `formula_config` (vzorce s defaultmi)
+## Zmena 1 — `useProductionDragDrop.ts`: nepridávať suffix do `item_code`
 
-Vzorce (defaulty):
-```
-itemCostCzk     = cena × pocet × (eurRate ak EUR)
-scheduled_hours = floor(itemCostCzk × (1 − marze) × production_pct / hourly_rate)
-hodiny_plan_proj = floor(prodejni_cena × (1 − marze) × production_pct / hourly_rate)
+V `src/hooks/useProductionDragDrop.ts` sú 2 miesta (cca r. 337–340 a r. 566–570) kde sa pri konflikte alebo „separate" móde generuje:
 
-tpv_hours_raw = SUM(scheduled_hours pre všetky TPV položky so statusom != Zrušeno a cena > 0)
-project_hours = hodiny_plan_proj
-
-hodiny_plan = MAX(tpv_hours_raw, project_hours)   // nikdy nestratíme hodiny pod cenu projektu
+```ts
+item_code: `${original}_${Date.now().toString(36)}`
 ```
 
-Ak `project_hours > tpv_hours_raw`, scale_ratio = `project_hours / tpv_hours_raw` a per-item TPV hodiny sa proporcionálne zväčšia (posledná položka dostane zvyšok aby sum sedel presne).
+Nahradiť: ponechať `item_code` **nezmenený**. Unikátnosť riadku je už zaručená cez `id` (uuid) v DB; UI kľúče v Reacte používajú `id`, nie `item_code`. Split chain rozlíšenie ide cez `split_group_id` + `split_part`.
 
-### Krok 2 — Distribúcia hodín do Inbox + Schedule (BEZ histórie)
+Ak by niekde existovala DB unique constraint na `(project_id, item_code)` v `production_inbox` alebo `production_schedule` — overím pred zmenou cez `code--search_files` a `supabase--read_query`. Ak existuje, treba ju zmeniť na `(project_id, item_code, split_group_id)` alebo úplne odstrániť (split parts toho istého kódu sú legitímne).
 
-Pre každý projekt po `computePlanHours`:
+## Zmena 2 — `recalculateProductionHours.ts`: normalizácia (defenzívne, pre staré dáta)
 
-1. **TPV-mapované položky** (inbox + non-midflight schedule majú `item_code` čo existuje v `tpv_items`):
-   - `tpv_full_hours` = `result.item_hours[i].hodiny_plan` (už škálované).
-   - `activeParts` = počet **aktívnych** chain rows pre ten istý `item_code` (inbox `status=pending` + schedule `status≠cancelled` a `is_midflight=false`).
-   - `per_row_hours = tpv_full_hours / activeParts`
-   - `per_row_czk = per_row_hours × hourly_rate`
+Aj keď nový kód už nebude generovať suffixy, **existujúce inbox riadky v DB ich majú** (Z-2607-008: 33ks, Z-2617-001: 5ks, atď.). Preto pridať helper na čítanie:
 
-2. **Orphan položky** (inbox bez TPV match, bez `adhoc_reason`):
-   - `assigned = SUM(per_row_hours všetkých TPV-mapovaných)`
-   - `remainingProjectHours = max(0, hodiny_plan − assigned)`
-   - `per_orphan_hours = remainingProjectHours / orphanCount`
+```ts
+function normalizeItemCode(code: string | null | undefined): string {
+  if (!code) return "";
+  return code.replace(/_[a-z0-9]{4,8}$/i, "");
+}
+```
 
-3. **Adhoc položky** (`adhoc_reason IS NOT NULL`): nedotknuté, manuálne zadané.
-4. **Midflight rows** (`is_midflight=true`): nedotknuté, len historický záznam — **nezapočítavajú sa do `assigned` ani neuberajú z `hodiny_plan`**.
+Použiť na 4 miestach v `recalculateProductionHours.ts`:
+1. Build `activePartsByCode` — kľúč = `normalizeItemCode(it.item_code)`.
+2. Schedule loop TPV lookup — `tpvItems.find(t => t.item_code === normalizeItemCode(item.item_code))`.
+3. Inbox loop TPV lookup — to isté.
+4. Schedule loop `activePartsByCode.get(normalizeItemCode(item.item_code))`.
 
-### Príklad — Z-2605-001
+## Zmena 3 — `splitChainHelpers.ts`: rovnaká normalizácia pri groupovaní
 
-DB stav:
-- `prodejni_cena = 924 000 CZK`, `marze = 15%`, `cost_production_pct = 25%`, hourly_rate = 550
-- TPV items: T01 (36h), T02 (133h), TK01 (37h) — `tpv_hours_raw = 206h`
-- `project_hours = floor(924000 × 0.85 × 0.25 / 550) = 357h`
-- `hodiny_plan = MAX(206, 357) = 357h` (scale_ratio = 1.733)
+V `renumberChain` groupuje rows podľa `item_code`. Pridať `normalizeItemCode` aj tu, aby chain badges (1/N) ostali konzistentné medzi originálnym kódom a starými suffixovanými variantmi.
 
-Po škálovaní:
-- T01 → 62h, T02 → 230h, TK01 → 65h (sum = 357h)
+## Migrácia existujúcich dát (jednorazovo)
 
-Aktuálne aktívne chains v inboxe (všetky bundle vrátené do inboxu):
-- T01: 1 inbox row → `62 / 1 = 62h`
-- T02: 1 inbox row → `230 / 1 = 230h`
-- TK01: 1 inbox row → `65 / 1 = 65h`
-- **Inbox total = 357h** ✅ presne sedí na plán projektu.
+SQL migrácia ktorá vyčistí staré suffixy v DB:
 
-Ak by bol T02 rozdelený na 2 aktívne časti (split_total=2 v inboxe alebo 1 inbox + 1 schedule), tak každá dostane `230 / 2 = 115h`. Súčet stále 357h.
+```sql
+UPDATE production_inbox
+SET item_code = regexp_replace(item_code, '_[a-z0-9]{4,8}$', '', 'i')
+WHERE item_code ~ '_[a-z0-9]{4,8}$';
 
-**Midflight rows v `production_schedule` (is_midflight=true)** sa do tohto výpočtu vôbec nezapojujú — neuberajú hodiny, len existujú ako historický záznam.
+UPDATE production_schedule
+SET item_code = regexp_replace(item_code, '_[a-z0-9]{4,8}$', '', 'i')
+WHERE item_code ~ '_[a-z0-9]{4,8}$' AND is_midflight = false;
+```
 
-### Krok 3 — Zápis späť do DB
+Midflight rows ostávajú nedotknuté (historické).
 
-- `production_inbox.estimated_hours / estimated_czk` = per_row_hours / per_row_czk
-- `production_schedule.scheduled_hours / scheduled_czk` (non-midflight) = per_row_hours / per_row_czk
-- `project_plan_hours` upsert s `hodiny_plan, tpv_hours, project_hours, source, marze_used, prodpct_used, eur_rate_used`
+Po migrácii aj normalizačný regex v kóde zostáva (defenzívne pre prípadné zvyškové dáta).
 
-### Čo sa zmení v `recalculateProductionHours.ts`
+## Po nasadení
 
-1. **Odstrániť `consumedTotal` a `consumptionRatio`** zo schedule aj inbox slučky (cca r. 290–340).
-2. **Build `activePartsByCode` raz pred slučkami** (inbox pending + schedule non-cancelled non-midflight pre daný `item_code`).
-3. **Schedule per-item update** (non-midflight only): `tpv_full_hours / activePartsByCode[item_code]`.
-4. **Inbox per-item update**: identický vzorec.
-5. **Orphan fallback**: `(hodiny_plan − assignedToTpv) / orphanCount`, bez consumed odpočtu.
-6. **Midflight rows**: úplne preskočiť update (len čítané pre kontext, nemenia sa).
+1. Spustiť SQL migráciu (cleanup suffixov).
+2. Spustiť **„Přepočítat → Vše vč. historie"** v PlanVyroby.
+3. Overiť:
+   - **Z-2607-008** Inbox: súčet aktívnych TPV položiek = 586h.
+   - **Z-2617-001** Inbox: TPV-mapované položky dostanú svoje hodiny (T.01=62h, T.03=36h, T.04=124h, T.05=67h, T.06=8h).
+   - **Z-2604-004 / Z-2601-004**: každý 4h, 2200 Kč (orphan fallback).
+4. Otestovať drag/drop konflikt scenár: presunúť inbox položku do týždňa kde už je rovnaký `item_code` → zvoliť „separate" → overiť že nový schedule riadok má **rovnaký** `item_code` a `split_group_id` ich rozlišuje.
 
-### Dotknuté súbory
+## Dotknuté súbory
 
-- `src/lib/recalculateProductionHours.ts` — zjednodušiť per-item logiku, odstrániť consumed odpočet.
-
-### Po nasadení
-
-1. Spustiť **„Přepočítat → Vše vč. historie"** na PlanVyroby.
-2. Overiť že súčet aktívnych inbox + non-midflight schedule rows pre daný projekt = `hodiny_plan` v `project_plan_hours`.
-3. Príklady na overenie: Z-2605-001 (357h), Z-2504-019, Z-2604-004 (4h), Z-2601-004 (4h).
+- `src/hooks/useProductionDragDrop.ts` — odstrániť suffix generovanie (2 miesta).
+- `src/lib/recalculateProductionHours.ts` — pridať `normalizeItemCode`, použiť pri TPV lookup a `activePartsByCode`.
+- `src/lib/splitChainHelpers.ts` — `normalizeItemCode` pri groupovaní chain rows.
+- Nová migrácia: cleanup suffixov v `production_inbox` + `production_schedule` (non-midflight).
+- Pred migráciou overiť unique constraints na `item_code` v oboch tabuľkách a prípadne ich upraviť.
 
