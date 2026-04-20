@@ -292,7 +292,7 @@ function useDilnaData(weekOffset: number) {
           loggedHours,
           trackedPct,
           completionPct,
-          expectedPct: isUnmatched ? null : expectedFor(pid, plannedHours),
+          expectedPct: expectedPctVal,
           slipStatus,
           valueCzk,
           usekBreakdown,
@@ -383,14 +383,20 @@ function useDilnaData(weekOffset: number) {
   });
 }
 
-/** Compute slip status from tracked-% vs completion-%. */
-function computeSlip(trackedPct: number, completionPct: number | null, loggedHours: number): SlipStatus {
-  if (loggedHours <= 0) return "none";
+/** Compute slip status using completion-% vs expected-% (aligned with Vyroba module). */
+function computeSlip(
+  completionPct: number | null,
+  expectedPct: number | null,
+  loggedHours: number,
+  isSpilled: boolean,
+): SlipStatus {
+  if (isSpilled) return "delay";
+  if (loggedHours <= 0 && expectedPct === null) return "none";
   if (completionPct == null) return "none";
-  const diff = trackedPct - completionPct;     // > 0 = burning hours faster than completing work
-  if (diff > SLIP_RED) return "delay";
-  if (diff > SLIP_OK_TOL) return "slip";
-  return "ok";
+  const ref = expectedPct ?? 100;
+  if (completionPct >= ref - SLIP_OK_TOL) return "ok";
+  if (completionPct >= ref - SLIP_RED) return "slip";
+  return "delay";
 }
 
 /* ── color helpers (gradient palette aligned with PlanVyrobyTableView) ── */
