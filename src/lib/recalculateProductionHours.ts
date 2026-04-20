@@ -312,9 +312,17 @@ export async function recalculateProductionHours(
       const consumedTotal = consumedByProject.get(proj.project_id) || 0;
       const consumptionRatio = planTotalForRatio > 0 ? Math.min(1, consumedTotal / planTotalForRatio) : 0;
 
+      // Identify orphans (no TPV match, no adhoc_reason) for project-price fallback
+      const orphans: any[] = [];
+
       for (const item of inboxItems) {
         const tpv = tpvItems.find((t: any) => t.item_code === item.item_code);
-        if (!tpv) continue; // ad-hoc inbox item — leave untouched
+        if (!tpv) {
+          // Skip true ad-hoc items (user-entered with reason)
+          if (item.adhoc_reason) continue;
+          orphans.push(item);
+          continue;
+        }
 
         const rawCena = Number(tpv.cena) || 0;
         const correctCzk = Math.floor(evaluateFormula(
@@ -336,6 +344,35 @@ export async function recalculateProductionHours(
         ) {
           inboxUpdates.push({ id: item.id, estimated_hours: newHours, estimated_czk: newCzk });
           updated++;
+        }
+      }
+
+      // ===== ORPHAN FALLBACK: distribute remaining project plan hours =====
+      // Inbox items with item_code that has no TPV match and no adhoc_reason
+      // get a fair share of (hodiny_plan − assigned − consumed).
+      if (orphans.length > 0 && result.hodiny_plan > 0) {
+        // Assigned = TPV-mapped hours already accounted for in result.item_hours
+        const assignedHours = result.item_hours.reduce((s, ih) => s + (Number(ih.hodiny_plan) || 0), 0);
+        const consumedTotal = consumedByProject.get(proj.project_id) || 0;
+        const remainingProjectHours = Math.max(
+          0,
+          result.hodiny_plan - assignedHours - consumedTotal
+        );
+        const perOrphanHours = Math.round((remainingProjectHours / orphans.length) * 10) / 10;
+        const perOrphanCzk = Math.floor(perOrphanHours * hourlyRate);
+
+        for (const item of orphans) {
+          if (
+            perOrphanHours !== Number(item.estimated_hours) ||
+            perOrphanCzk !== Number(item.estimated_czk)
+          ) {
+            inboxUpdates.push({
+              id: item.id,
+              estimated_hours: perOrphanHours,
+              estimated_czk: perOrphanCzk,
+            });
+            updated++;
+          }
         }
       }
     }
