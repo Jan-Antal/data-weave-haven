@@ -3516,7 +3516,7 @@ function DetailPanel({
               {bundleProgress.bundleProgress}%
             </div>
             <div className="text-xs" style={{ color: isWeeklyGoalMet ? "#3a8a36" : "#99a5a3" }}>
-              Týdenní cíl: {weeklyGoal}%
+              Dnešní cíl: {weeklyGoal}%
             </div>
             {chainWindow && chainWindow.start > 0 && (
               <div className="text-[10px]" style={{ color: "#99a5a3" }}>
