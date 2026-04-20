@@ -67,11 +67,12 @@ const SLIP_RED = 20;       // tracked − completion > 20 % → red
 interface UsekRow { kod: string; nazov: string; hodiny: number }
 
 type SlipStatus = "ok" | "slip" | "delay" | "none";
+type CardWarning = "none" | "off_plan" | "unmatched";
 
 interface ProjectCard {
   projectId: string;
   projectName: string;
-  isUnmatched: boolean;
+  warning: CardWarning;
   plannedHours: number;        // sum of scheduled_hours for the displayed week
   loggedHours: number;         // sum of production_hours_log for the displayed week
   trackedPct: number;          // logged / planned (0–∞)
@@ -197,7 +198,7 @@ function useDilnaData(weekOffset: number) {
         const loggedHours = hoursByProject.get(pid) || 0;
         const trackedPct = plannedHours > 0 ? Math.round((loggedHours / plannedHours) * 100) : 0;
         const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
-        const slipStatus = computeSlip(trackedPct, completionPct, loggedHours);
+        const slipStatus = isUnmatched ? "none" : computeSlip(trackedPct, completionPct, loggedHours);
 
         const prodPct = (proj?.cost_production_pct ?? 30) / 100;
         const cena = proj?.prodejni_cena ?? 0;
@@ -211,7 +212,7 @@ function useDilnaData(weekOffset: number) {
         cards.push({
           projectId: pid,
           projectName: isUnmatched ? "Nespárované" : (proj?.project_name || pid),
-          isUnmatched,
+          warning: isUnmatched ? "unmatched" : "none",
           plannedHours,
           loggedHours,
           trackedPct,
@@ -222,10 +223,10 @@ function useDilnaData(weekOffset: number) {
         });
       }
 
-      // 2) Unmatched: hours logged this week to a project_id that has NO schedule and NO project record
+      // 2) Unmatched: hours logged this week to a project_id with no schedule and no project record
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
-        if (knownProjectIds.has(pid)) continue;          // matched but unscheduled — skip (not a production-floor concern)
+        if (knownProjectIds.has(pid)) continue;          // matched but unscheduled — handled in step 3
         if (loggedHours < 0.05) continue;
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
@@ -234,7 +235,7 @@ function useDilnaData(weekOffset: number) {
         cards.push({
           projectId: pid,
           projectName: "Nespárované",
-          isUnmatched: true,
+          warning: "unmatched",
           plannedHours: 0,
           loggedHours,
           trackedPct: 0,
@@ -245,15 +246,44 @@ function useDilnaData(weekOffset: number) {
         });
       }
 
-      // Sort: delays first, then slips, then ok, then unmatched/no-data last
-      const slipRank: Record<SlipStatus, number> = { delay: 0, slip: 1, ok: 2, none: 3 };
+      // 3) Off-plan: project IS in DB (matched), has hours this week, but is not in production_schedule
+      for (const [pid, loggedHours] of hoursByProject) {
+        if (scheduledProjects.has(pid)) continue;
+        if (!knownProjectIds.has(pid)) continue;        // unmatched handled above
+        if (loggedHours < 0.05) continue;
+        const proj = projMap.get(pid)!;
+        const usekMap = usekByProject.get(pid);
+        const usekBreakdown = usekMap
+          ? Array.from(usekMap.values()).sort((a, b) => usekSortKey(a.kod) - usekSortKey(b.kod))
+          : [];
+        const prodPct = (proj.cost_production_pct ?? 30) / 100;
+        const valueCzk = (proj.prodejni_cena ?? 0) * prodPct;
+        cards.push({
+          projectId: pid,
+          projectName: proj.project_name || pid,
+          warning: "off_plan",
+          plannedHours: 0,
+          loggedHours,
+          trackedPct: 0,
+          completionPct: null,
+          slipStatus: "none",
+          valueCzk,
+          usekBreakdown,
+        });
+      }
+
+      // Sort: delays → slips → ok → off_plan → unmatched → none
+      const slipRank: Record<SlipStatus, number> = { delay: 0, slip: 1, ok: 2, none: 5 };
+      const warningRank: Record<CardWarning, number> = { none: 0, off_plan: 3, unmatched: 4 };
       cards.sort((a, b) => {
-        const r = slipRank[a.slipStatus] - slipRank[b.slipStatus];
-        if (r !== 0) return r;
+        const aRank = a.warning === "none" ? slipRank[a.slipStatus] : warningRank[a.warning];
+        const bRank = b.warning === "none" ? slipRank[b.slipStatus] : warningRank[b.warning];
+        if (aRank !== bRank) return aRank - bRank;
         return b.loggedHours - a.loggedHours;
       });
 
-      const unmatchedCount = cards.filter(c => c.isUnmatched).length;
+      const offPlanCount = cards.filter(c => c.warning === "off_plan").length;
+      const unmatchedCount = cards.filter(c => c.warning === "unmatched").length;
       const delayCount = cards.filter(c => c.slipStatus === "delay").length;
       const slipCount = cards.filter(c => c.slipStatus === "slip").length;
 
@@ -265,6 +295,7 @@ function useDilnaData(weekOffset: number) {
         dailyTarget: weeklyCapacity / 5,
         lastSync,
         cards,
+        offPlanCount,
         unmatchedCount,
         delayCount,
         slipCount,
@@ -329,6 +360,24 @@ function slipLabel(status: SlipStatus): string {
   }
 }
 
+function warningLabel(w: CardWarning): string {
+  if (w === "off_plan") return "Mimo Plán výroby";
+  if (w === "unmatched") return "Nespárované";
+  return "";
+}
+
+function warningPillClass(w: CardWarning): string {
+  if (w === "off_plan") return "bg-amber-100 text-amber-800 border border-amber-300";
+  if (w === "unmatched") return "bg-slate-200 text-slate-700 border border-slate-300";
+  return "";
+}
+
+function warningBorderColor(w: CardWarning, projectColor: string): string {
+  if (w === "off_plan") return "#d97706";
+  if (w === "unmatched") return "#94a3b8";
+  return projectColor;
+}
+
 /* ── component ───────────────────────────────────────────────────── */
 
 export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
@@ -353,7 +402,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
     );
   }
 
-  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, unmatchedCount, delayCount, slipCount } = data;
+  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
   const todayPct = dailyTarget > 0 ? Math.min(100, Math.round((todayHours / dailyTarget) * 100)) : 0;
 
@@ -387,11 +436,15 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
               <span className="text-muted-foreground mx-1">/</span>
               <span className="text-[#b1232f]">{delayCount}</span>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2">Z {cards.filter(c => !c.isUnmatched).length} naplánovaných projektů</div>
+            <div className="text-[11px] text-muted-foreground mt-2">Z {cards.filter(c => c.warning === "none").length} naplánovaných projektů</div>
           </Card>
           <Card className="p-4 shadow-sm">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Nespárované</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums">{unmatchedCount}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Mimo plán / Nespárované</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums">
+              <span className="text-[#b65d05]">{offPlanCount}</span>
+              <span className="text-muted-foreground mx-1">/</span>
+              <span className="text-slate-600">{unmatchedCount}</span>
+            </div>
             <div className="text-[11px] text-muted-foreground mt-2">
               Aktualizováno {fmtTimestamp(lastSync)}
             </div>
@@ -430,12 +483,12 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                     <div
                       key={card.projectId}
                       className="bg-background rounded-lg border border-border/60 p-3 flex flex-col gap-2"
-                      style={{ borderLeftWidth: 3, borderLeftColor: card.isUnmatched ? "#94a3b8" : projectColor }}
+                      style={{ borderLeftWidth: 3, borderLeftColor: warningBorderColor(card.warning, projectColor) }}
                     >
                       {/* Top: name + slip badge */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          {card.isUnmatched ? (
+                          {card.warning === "unmatched" ? (
                             <>
                               <p className="text-[11px] font-mono text-foreground truncate">{card.projectId}</p>
                               <p className="text-[12px] text-muted-foreground italic flex items-center gap-1 mt-0.5">
@@ -446,15 +499,25 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                             <>
                               <p className="text-[14px] font-medium leading-tight truncate" title={card.projectName}>{card.projectName}</p>
                               <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{card.projectId}</p>
+                              {card.warning === "off_plan" && (
+                                <p className={cn(
+                                  "text-[10px] font-semibold flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full w-fit",
+                                  warningPillClass(card.warning)
+                                )}>
+                                  <AlertCircle className="w-3 h-3" /> {warningLabel(card.warning)}
+                                </p>
+                              )}
                             </>
                           )}
                         </div>
-                        <span className={cn(
-                          "shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
-                          slipPillClass(card.slipStatus)
-                        )}>
-                          {slipLabel(card.slipStatus)}
-                        </span>
+                        {card.warning === "none" && (
+                          <span className={cn(
+                            "shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap",
+                            slipPillClass(card.slipStatus)
+                          )}>
+                            {slipLabel(card.slipStatus)}
+                          </span>
+                        )}
                       </div>
 
                       {/* Progress bar — gradient palette (Plan Výroby style) */}
@@ -514,7 +577,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                                   className="h-full rounded-full transition-all"
                                   style={{
                                     width: `${Math.round((u.hodiny / maxUsekHours) * 100)}%`,
-                                    backgroundColor: card.isUnmatched ? "#94a3b8" : projectColor,
+                                    backgroundColor: warningBorderColor(card.warning, projectColor),
                                   }}
                                 />
                               </div>
