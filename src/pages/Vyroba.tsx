@@ -2337,6 +2337,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     onToggleItem={toggleItemComplete}
                     getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
                     getExpectedPct={getExpectedPct}
+                    chainWindow={getChainWindow(selectedProject.projectId)}
                     status={getProjectStatus(selectedProject.projectId)}
                     latestPct={getLatestPercent(selectedProject.projectId)}
                     latestPhase={getLatestPhase(selectedProject.projectId)}
