@@ -297,9 +297,24 @@ export async function midflightImportPlanVyroby(
 
     const { data: mfRows } = await (supabaseClient as any)
       .from("production_schedule")
-      .select("id, project_id, split_group_id, item_code")
+      .select("id, project_id, split_group_id, item_code, scheduled_hours")
       .eq("is_midflight", true)
       .in("project_id", projectIds);
+
+    // Skutočne odpracované hodiny per projekt (vylúč TPV/ENG/PRO činnosti)
+    const { data: hoursLogRows } = await (supabaseClient as any)
+      .from("production_hours_log")
+      .select("ami_project_id, hodiny, cinnost_kod")
+      .in("ami_project_id", projectIds);
+    const consumedByProject = new Map<string, number>();
+    for (const r of hoursLogRows || []) {
+      const code = String(r.cinnost_kod || "").toUpperCase();
+      if (code === "TPV" || code === "ENG" || code === "PRO") continue;
+      consumedByProject.set(
+        r.ami_project_id,
+        (consumedByProject.get(r.ami_project_id) || 0) + (Number(r.hodiny) || 0),
+      );
+    }
 
     const { data: tpvRows } = await (supabaseClient as any)
       .from("tpv_items")
