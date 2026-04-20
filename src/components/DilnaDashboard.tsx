@@ -305,6 +305,7 @@ function useDilnaData(weekOffset: number) {
           loggedHours,
           trackedPct: 0,
           completionPct: null,
+          expectedPct: null,
           slipStatus: "none",
           valueCzk: 0,
           usekBreakdown,
