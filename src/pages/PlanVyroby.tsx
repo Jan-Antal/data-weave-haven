@@ -100,6 +100,9 @@ interface MergeState {
   mergeItemCount: number;
   draggedItemId: string;
   targetWeekKey: string;
+  /** Set for bundle merges so we can run an atomic bundle-level merge across two weeks. */
+  sourceProjectId?: string;
+  sourceWeekKey?: string;
   onKeepSeparate: () => Promise<void>;
 }
 
