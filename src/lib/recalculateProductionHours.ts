@@ -405,6 +405,25 @@ export async function recalculateProductionHours(
             updated++;
           }
         }
+      } else if (fallbackCount > 0) {
+        // Source is "TPV" or "None" — zero-out orphan rows so inbox sum equals
+        // the TPV-derived hodiny_plan exactly (no inflation).
+        for (const row of fallbackRows) {
+          if (row.currentHours !== 0 || row.currentCzk !== 0) {
+            if (row.table === "production_schedule") {
+              scheduleUpdates.push({ id: row.id, scheduled_hours: 0, scheduled_czk: 0 });
+            } else {
+              inboxUpdates.push({ id: row.id, estimated_hours: 0, estimated_czk: 0 });
+            }
+            updated++;
+          }
+        }
+        for (const item of orphans) {
+          if (Number(item.estimated_hours) !== 0 || Number(item.estimated_czk) !== 0) {
+            inboxUpdates.push({ id: item.id, estimated_hours: 0, estimated_czk: 0 });
+            updated++;
+          }
+        }
       }
     }
 
