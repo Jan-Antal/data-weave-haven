@@ -984,15 +984,16 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }
 
   function getExpectedPct(_dayIndex: number, weeklyGoal: number = 100, pid?: string): number {
-    const today = new Date();
-    const dow = today.getDay(); // 0=Sun..6=Sat
-    const workingDaysElapsed = dow === 0 || dow === 6 ? 5 : dow; // weekend → treat as Friday
-    const fraction = workingDaysElapsed / 5;
     if (pid) {
+      const today = new Date();
+      const dow = today.getDay(); // 0=Sun..6=Sat
+      const workingDaysElapsed = dow === 0 || dow === 6 ? 5 : dow;
+      const fraction = workingDaysElapsed / 5;
       const cw = getChainWindow(pid);
       if (cw) return Math.round(cw.start + (cw.end - cw.start) * fraction);
     }
-    return Math.round(weeklyGoal * fraction);
+    // weeklyGoal already includes dayFraction (from getWeeklyGoal)
+    return Math.round(weeklyGoal);
   }
 
   function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
@@ -3574,7 +3575,7 @@ function DetailPanel({
             const fraction = wde / 5;
             const exp = chainWindow
               ? Math.round(chainWindow.start + (chainWindow.end - chainWindow.start) * fraction)
-              : Math.round(weeklyGoal * fraction);
+              : Math.round(weeklyGoal);
             const dayName = DAY_NAMES[dow] || "dnes";
             if (exp <= 0) return null;
             return (
