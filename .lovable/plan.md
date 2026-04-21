@@ -1,54 +1,76 @@
 
 
-## Oprava label „Dnešní cíl" vo Výrobe
+## Oprava dvojitého škálovania „Dnešní cíl" a markeru „Očekávaný stav"
 
-### Príčina nezhody
+### Príčina chyby
 
-V `src/pages/Vyroba.tsx` (riadok **3517-3519**) sa pod hlavnou percentuálnou hodnotou v hlavičke rozkliknutého projektu zobrazuje:
+Premenná **`weeklyGoal`** (z `getWeeklyGoal()`, riadky 866-900) **už interne aplikuje `dayFraction`** — vracia kumulatívne % `hodiny_plan` zodpovedajúce dnešnej pozícii v týždni:
 
-```tsx
-<div>Dnešní cíl: {weeklyGoal}%</div>
+```
+expectedHours = completedWeeksHours + currentWeekHours * dayFraction
+weeklyGoal    = expectedHours / hPlan
 ```
 
-Tu sa však používa premenná **`weeklyGoal`** z `getWeeklyGoal(pid)` (riadky 866-900), ktorá počíta **kumulatívny TÝŽDENNÝ cieľ konca týždňa** (`expectedHours / hPlan`, kde `dayFraction` ide do plnej hodnoty Pi=5/5). Pre projekt s týždenným plánom blízko 100 % to vracia 100 %, hoci je len utorok.
+Tzn. pre projekt s plánom 100h/týždeň, kde sa už spravilo 0h v predošlých týždňoch, v utorok (2/5):  
+`weeklyGoal = (0 + 100 * 0.4) / 100 = 40%` ← **toto je už dnešný cieľ**.
 
-Dnešný **denný** progress sa už správne počíta funkciou **`getExpectedPct(todayDayIndex, weeklyGoal, pid)`** (riadky 986-996), ktorá aplikuje `workingDaysElapsed / 5` na `weeklyGoal` alebo na chain-window. Hodnota je už dostupná v premennej **`expectedPct`** na riadku **3405** v komponente `ProjectExpandedView`, ale **nikde sa v hlavičke nezobrazuje** — namiesto nej label ukazuje surový `weeklyGoal`.
+Funkcia **`getExpectedPct(_, weeklyGoal, pid)`** (riadky 986-996) ale `weeklyGoal` znova škáluje dayFraction:  
+`return Math.round(weeklyGoal * fraction)` → `40 * 0.4 = 16%` ← **dvojité škálovanie, bug**.
 
-Chyba je teda len v tom, **ktorá premenná sa renderuje** v label „Dnešní cíl".
+Rovnaký bug je v inline výpočte vertikálneho markeru „Očekávaný stav" (riadky 3568-3593): `Math.round(weeklyGoal * fraction)`.
+
+**Chain-window vetva je naopak správna** — `getWeeklyGoal` pre split chain vracia surové `cw.end` (bez dayFraction), a `getExpectedPct` aplikuje `cw.start + (cw.end - cw.start) * fraction`. Tým pádom utorok pre okno 50→100 dáva 70% ✅.
 
 ### Oprava
 
 **Súbor:** `src/pages/Vyroba.tsx`
 
-1. **Hlavička rozkliknutého projektu (riadok ~3517-3519):**
-   - Zmeniť `Dnešní cíl: {weeklyGoal}%` → `Dnešní cíl: {expectedPct}%`
-   - Premenná `expectedPct` je už spočítaná na riadku 3405 a presne reflektuje očakávaný dnešný progress (utorok = 2/5 z týždenného cieľa, alebo chain-window aware fraction).
-   - Príklad pre projekt s chain window 50→100 v utorok: `start + (end-start) * 2/5 = 50 + 50 * 0.4 = 70 %` ✅
+**1. `getExpectedPct` (riadky 986-996):** odstrániť dvojité škálovanie pre non-chain vetvu — `weeklyGoal` je už dnešný cieľ, vrátiť ho priamo:
 
-2. **Podmienka farby `isWeeklyGoalMet` (riadok 3517) ponechať** — zelená zostáva iba ak je celý týždenný cieľ splnený (to je ortogonálna info, nie cieľ pre dnes).
+```ts
+function getExpectedPct(_dayIndex: number, weeklyGoal: number = 100, pid?: string): number {
+  if (pid) {
+    const today = new Date();
+    const dow = today.getDay();
+    const wde = (dow === 0 || dow === 6) ? 5 : dow;
+    const fraction = wde / 5;
+    const cw = getChainWindow(pid);
+    if (cw) return Math.round(cw.start + (cw.end - cw.start) * fraction);
+  }
+  return Math.round(weeklyGoal); // už zahrňuje dayFraction
+}
+```
 
-3. **Optional clarity — premenovanie tooltip „Týdenní cíl"** pri značke pod progress barom (riadky 3540-3553):
-   - Tento marker (zelená vertikálna ryska) ukazuje pozíciu **týždenného cieľa** (`weeklyGoal`) — nie dnešného. To je správne a label „Cíl pro tento týden" je presný. **Nemení sa.**
+**2. Inline marker „Očekávaný stav k dnes" (riadky 3568-3593):** zarovnať s opraveným `getExpectedPct`:
 
-### Kontrola ostatných výskytov (všetko sedí, nemení sa)
+```ts
+const exp = chainWindow
+  ? Math.round(chainWindow.start + (chainWindow.end - chainWindow.start) * fraction)
+  : Math.round(weeklyGoal); // bez * fraction
+```
 
-- **Riadok 1019** (`getProjectStatus`): používa `getExpectedPct(...)` na semafor — správne.
-- **Riadok 3405** (`expectedPct` v expanded view): správne počíta dnešný progress.
-- **Riadok 5425** (DayCell, badge „🎉 DNES"): porovnáva s `weeklyGoal` (= týždenný cieľ) — správne, bunka sa farbí keď je dosiahnutý plný týždenný cieľ.
-- **Riadok 2468-2500** (Day-log dialog, „Celková hotovost"): porovnáva `logPercent` s týždenným `logWeeklyGoal` — správne, slider meria celkovú hotovosť, label v dialógu hovorí „Týdenní cíl".
-- **Collapsed `ProjectRow`** (riadky 3166-3260): nezobrazuje žiaden „Dnešní cíl" label, len `pct` a status farbu — netreba meniť.
-- **DilnaDashboard** (`expectedPct`): už používa rovnaký vzorec (`workingDaysElapsed / 5` cez `getDayFraction`) — sedí s Výrobou.
+**3. Marker „Cíl pro tento týden" (riadky 3540-3553):** **ponechať bezo zmeny** — sémanticky je to ten istý bod ako „Očekávaný stav" pre non-chain projekty (lebo `weeklyGoal` je dnešná pozícia). V praxi obidva markery splynú — to je správne. Pre split chain projekty má marker stále zmysel (ukazuje koniec okna `cw.end` cez `weeklyGoal`).
 
-### Validácia po implementácii
+### Validácia
 
-- Utorok, projekt s `weeklyGoal = 100 %` → label ukáže **„Dnešní cíl: 40 %"** (2/5 týždňa).
-- Utorok, projekt s chain window 50→100 → label ukáže **„Dnešní cíl: 70 %"** ✅ (presne podľa požiadavky).
-- Pondelok, weeklyGoal 100 % → **20 %**.
-- Piatok / víkend → **100 %** (alebo `weeklyGoal` ak < 100).
+Utorok (dayFraction = 0.4):
+
+| Scenár | Pred | Po |
+|---|---|---|
+| Plán 100h/týždeň, žiadne minulé týždne | weeklyGoal=40, expectedPct=**16%** ❌ | weeklyGoal=40, expectedPct=**40%** ✅ |
+| Chain window 50→100 | expectedPct=**70%** ✅ | expectedPct=**70%** ✅ (nezmenené) |
+| Plán s 50h v minulých týždňoch + 50h tento týždeň, projekt 100h | weeklyGoal=70 (50+50*0.4), expected=**28%** ❌ | weeklyGoal=70, expected=**70%** ✅ |
+| Pondelok (0.2) | weeklyGoal=20, exp=**4%** ❌ | weeklyGoal=20, exp=**20%** ✅ |
+| Piatok/víkend (1.0) | weeklyGoal=100, exp=**100%** ✅ | weeklyGoal=100, exp=**100%** ✅ (nezmenené) |
+
+### Vplyv na semafor (`getProjectStatus`, riadok 998-1023)
+
+`bundleProgress >= expected − 10/25` — po oprave je `expected` 2-3× vyšší, takže projekty s nízkym daylogom správne padnú do **at-risk/behind** namiesto falošne **on-track**. To je presne to čo užívateľ chcel pri unifikácii s Dílnou.
 
 ### Mimo scope
 
-- Logika `getExpectedPct`, `getWeeklyGoal`, `getChainWindow` — nemení sa.
-- Týždenný cieľ marker pod progress barom — nemení sa.
-- DilnaDashboard farby/logika — nemení sa.
+- `getWeeklyGoal` — **nemení sa** (jeho hodnota „dnešný kumulatívny cieľ" je správna sémantika).
+- `getChainWindow` — nemení sa.
+- DayCell `weeklyGoal` prop pre badge „🎉" — porovnáva s `cumulative` v rámci dňa, neovplyvnené.
+- DilnaDashboard — nemení sa (už používa správnu logiku cez vlastný `dayFraction`).
 
