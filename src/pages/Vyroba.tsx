@@ -2418,11 +2418,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           const logModalContent = (
             <>
               {/* Scrollable content */}
-              <div className={isMobile ? "flex-1 overflow-y-auto px-4 pb-4" : ""}>
+              <div className={isMobile ? "flex-1 overflow-y-auto px-4 pb-4" : "overflow-y-auto pr-1"}>
                 <DialogHeader className={isMobile ? "pb-2" : "pb-2"}>
-                  <DialogTitle className="flex items-center gap-2">
-                    <span className="font-sans text-xs text-muted-foreground">{selectedProject?.projectId}</span>
-                    <span>{selectedProject?.projectName}</span>
+                  <DialogTitle className="flex items-center gap-2 min-w-0 pr-8">
+                    <span className="font-sans text-xs text-muted-foreground shrink-0">{selectedProject?.projectId}</span>
+                    <span className="truncate">{selectedProject?.projectName}</span>
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
@@ -2568,7 +2568,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               </div>
 
               {!isMobile && (
-                <div>
+                <div className="pt-3 border-t border-border mt-3">
                   <DialogFooter className="flex-col sm:flex-row gap-2">
                     {logDayIndex === todayDayIndex && (
                       <Button variant="outline" onClick={() => setNoProductionOpen(true)} className="text-xs">
@@ -2670,7 +2670,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
           return (
             <Dialog open={mobileDaylogOpen} onOpenChange={setMobileDaylogOpen}>
-              <DialogContent className="sm:max-w-md p-5 gap-0 max-sm:mx-4">{logModalContent}</DialogContent>
+              <DialogContent className="w-[min(94vw,860px)] max-w-[860px] max-h-[90vh] overflow-hidden p-5 gap-0 flex flex-col max-sm:mx-4">{logModalContent}</DialogContent>
             </Dialog>
           );
         })()}
