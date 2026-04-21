@@ -627,11 +627,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const total = getWeekCapacityHours(weekKey) || 0;
     if (!scheduleData) return { used: 0, total };
     const silo = scheduleData.get(weekKey);
+    // Match Plán Výroby: include all items except paused (blockers + cancelled count toward load)
     const used = silo
       ? silo.bundles.reduce((s, b) => {
-          // Don't count paused items
           const activeHours = b.items
-            .filter((i) => i.status !== "paused" && i.status !== "cancelled")
+            .filter((i) => i.status !== "paused")
             .reduce((h, i) => h + i.scheduled_hours, 0);
           return s + activeHours;
         }, 0)
@@ -640,7 +640,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [scheduleData, weekKey, getWeekCapacityHours]);
 
   const capacityPct = weekCapacity.total > 0 ? Math.round((weekCapacity.used / weekCapacity.total) * 100) : 0;
-  const capacityColor = capacityPct > 100 ? "#dc2626" : capacityPct > 85 ? "#d97706" : "#3a8a36";
+  // Match Plán Výroby thresholds: green ≤100%, orange 100–120%, red >120%
+  const capacityColor = capacityPct > 120 ? "#c0392b" : capacityPct > 100 ? "#d97706" : "#3a8a36";
 
   // Today info
   const todayDayIndex = useMemo(() => {
