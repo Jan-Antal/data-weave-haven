@@ -100,7 +100,7 @@ function getRangeBounds(
 }
 
 export function VykazReport() {
-  const [dateRange, setDateRangeRaw] = useState<DateRange>("month");
+  const [dateRange, setDateRangeRaw] = useState<DateRange>("week");
   const [customFrom, setCustomFrom] = useState<string>(() => toLocalDateStr(new Date()));
   const [customTo, setCustomTo] = useState<string>(() => toLocalDateStr(new Date()));
   const [search, setSearch] = useState("");
