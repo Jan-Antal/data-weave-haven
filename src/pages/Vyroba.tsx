@@ -1612,7 +1612,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     ];
     if (p && !p.isPaused) {
       actions.push({
-        label: "⏸ Pozastavit",
+        label: "Pozastavit",
         icon: "⏸",
         onClick: () => {
           const allIds = p.scheduleItems
