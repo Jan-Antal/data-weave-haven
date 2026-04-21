@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export interface ContextMenuAction {
   label: string;
@@ -18,6 +18,7 @@ interface ProductionContextMenuProps {
 
 export function ProductionContextMenu({ x, y, actions, onClose, darkMode }: ProductionContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number }>({ left: x, top: y });
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -34,15 +35,26 @@ export function ProductionContextMenu({ x, y, actions, onClose, darkMode }: Prod
     };
   }, [onClose]);
 
-  const MENU_WIDTH = 220;
-  const MENU_HEIGHT = actions.length * 40;
-  const adjustedLeft = x + MENU_WIDTH > window.innerWidth ? x - MENU_WIDTH : x;
-  const adjustedTop = y + MENU_HEIGHT > window.innerHeight ? y - MENU_HEIGHT : y;
+  // Re-position based on actual rendered size (accounts for variable label widths)
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const pad = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    if (left + rect.width + pad > vw) left = Math.max(pad, vw - rect.width - pad);
+    if (top + rect.height + pad > vh) top = Math.max(pad, vh - rect.height - pad);
+    if (left < pad) left = pad;
+    if (top < pad) top = pad;
+    setPos({ left, top });
+  }, [x, y, actions.length]);
 
   const style: React.CSSProperties = {
     position: "fixed",
-    left: adjustedLeft,
-    top: adjustedTop,
+    left: pos.left,
+    top: pos.top,
     zIndex: 9999,
     backgroundColor: darkMode ? "#1c1f26" : "#ffffff",
     border: darkMode ? "1px solid #3d4558" : "1px solid #e2ddd6",
