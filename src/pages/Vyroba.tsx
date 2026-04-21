@@ -2471,8 +2471,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     return (
                       <div>
                         <div className="text-xs font-semibold mb-2 text-muted-foreground">Celková hotovost</div>
-                        <div className="flex items-center gap-4">
-                          <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
                             <Slider
                               min={0}
                               max={100}
@@ -2492,7 +2492,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                             </div>
                           </div>
                           <span
-                            className="text-2xl font-sans font-bold min-w-[60px] text-right"
+                            className="text-lg font-sans font-bold w-12 text-right shrink-0 tabular-nums"
                             style={{ color: logPercent >= logWeeklyGoal ? "#3a8a36" : "hsl(var(--foreground))" }}
                           >
                             {logPercent}%
