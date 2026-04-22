@@ -275,8 +275,8 @@ export function CompletionDialog({
             const isChecked = checkedIds.has(item.id);
             const config = getConfig(item.id);
             const isSplitOpen = splitOpenId === item.id && isChecked && !isCompleted;
-            const doneH = Math.round(item.scheduled_hours * config.splitPct / 100);
-            const remainH = item.scheduled_hours - doneH;
+            const doneH = roundHours(item.scheduled_hours * config.splitPct / 100);
+            const remainH = roundHours(item.scheduled_hours - doneH);
 
             return (
               <div key={item.id}>
