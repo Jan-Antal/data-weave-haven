@@ -122,34 +122,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get existing logs for today
-    const bundleIds = scheduleItems.map((s: any) => s.id);
+    // If at least one daylog exists for today, the day is considered logged
     const { data: existingLogs } = await supabase
       .from("production_daily_logs")
       .select("bundle_id")
       .eq("week_key", weekKey)
       .eq("day_index", dayIndex)
-      .in("bundle_id", bundleIds);
+      .limit(1);
 
-    const loggedBundles = new Set((existingLogs || []).map((l: any) => l.bundle_id));
-    const missingItems = scheduleItems.filter((s: any) => !loggedBundles.has(s.id));
-
-    if (missingItems.length === 0) {
-      return new Response(JSON.stringify({ message: "All logs filled" }), {
+    if (existingLogs && existingLogs.length > 0) {
+      return new Response(JSON.stringify({ message: "Daylog exists for today, skipping" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Get unique project IDs with missing logs
-    const missingProjectIds = [...new Set(missingItems.map((s: any) => s.project_id))];
-
-    // Get project names
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("project_id, project_name")
-      .in("project_id", missingProjectIds);
-
-    const projectMap = new Map((projects || []).map((p: any) => [p.project_id, p.project_name]));
 
     // Get target users: admin, owner, vyroba roles
     const { data: roleUsers } = await supabase
