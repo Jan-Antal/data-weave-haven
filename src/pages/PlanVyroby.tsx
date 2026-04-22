@@ -307,6 +307,8 @@ export default function PlanVyroby() {
     moveInboxProjectToWeek,
     moveScheduleItemToWeek,
     moveBundleToWeek,
+    moveScheduleItemIntoBundle,
+    moveScheduleItemAsNewBundle,
     moveFullBundleAsNewBundle,
     moveItemBackToInbox,
     returnBundleToInbox,
@@ -435,6 +437,9 @@ export default function PlanVyroby() {
     if (targetId.startsWith("silo-week-")) {
       return targetId.replace("silo-week-", "");
     }
+    if (targetId.startsWith("silo-week-new-bundle-")) {
+      return targetId.replace("silo-week-new-bundle-", "");
+    }
     if (targetId.startsWith("silo-bundle-drop-") || targetId.startsWith("silo-bundle-")) {
       const rawKey = targetId.replace(/^silo-bundle-drop-/, "").replace(/^silo-bundle-/, "");
       const weekKey = rawKey.split("::")[0];
@@ -551,6 +556,22 @@ export default function PlanVyroby() {
 
     const targetId = over.id.toString();
 
+    if (dragData.type === "silo-item" && targetId.startsWith("silo-bundle-drop-")) {
+      const targetData = over.data.current as any;
+      if (
+        dragData.bundleKey !== targetData?.bundleKey &&
+        dragData.projectId === targetData?.projectId &&
+        (dragData.stageId ?? null) === (targetData?.stageId ?? null) &&
+        dragData.bundleType === "full" &&
+        targetData?.bundleType === "full" &&
+        dragData.itemId &&
+        targetData?.itemIds?.length
+      ) {
+        await moveScheduleItemIntoBundle(dragData.itemId, targetData.itemIds);
+      }
+      return;
+    }
+
     if (dragData.type === "silo-bundle" && targetId.startsWith("silo-bundle-drop-")) {
       const targetData = over.data.current as any;
       if (
@@ -597,6 +618,10 @@ export default function PlanVyroby() {
     const weekDate = resolveTargetWeek(targetId, dragData);
     if (!weekDate) return;
 
+      if (dragData.type === "silo-item" && dragData.weekDate === weekDate && targetId.startsWith("silo-week-new-bundle-") && dragData.itemId) {
+        await moveScheduleItemAsNewBundle(dragData.itemId, weekDate);
+        return;
+      }
       if (dragData.type === "silo-item" && dragData.weekDate === weekDate) return;
 
       if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId) {
