@@ -793,25 +793,68 @@ export function useProductionDragDrop() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Capture old statuses for undo
+      // Capture old statuses + full item info for undo and expedice insert
       const { data: oldItems } = await supabase.from("production_schedule")
-        .select("id, status, completed_at, completed_by, item_name, item_code, project_id, scheduled_week")
+        .select("id, status, completed_at, completed_by, item_name, item_code, project_id, scheduled_week, stage_id, split_group_id, split_part, split_total")
         .in("id", itemIds);
 
+      if (!oldItems || oldItems.length === 0) {
+        throw new Error("Položky nebyly nalezeny");
+      }
+
+      // ═══ QC GATE ═══ — require existing production_quality_checks for every item
+      const projectIds = Array.from(new Set(oldItems.map(i => i.project_id)));
+      const { data: qcRows } = await (supabase.from("production_quality_checks" as any) as any)
+        .select("item_id, project_id")
+        .in("item_id", itemIds)
+        .in("project_id", projectIds);
+      const qcSet = new Set((qcRows || []).map((r: any) => `${r.project_id}::${r.item_id}`));
+      const missingQc = oldItems.filter(it => !qcSet.has(`${it.project_id}::${it.id}`));
+      if (missingQc.length > 0) {
+        const labels = missingQc.map(i => i.item_code || i.item_name).slice(0, 5).join(", ");
+        const more = missingQc.length > 5 ? ` (+${missingQc.length - 5} dalších)` : "";
+        toast({
+          title: "Chybí QC kontrola",
+          description: `Nejprve potvrďte QC ve Výrobě pro: ${labels}${more}. Bez QC nelze položku dokončit.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+
+      // Status stays valid ('completed'); expedice presence is the source of truth for "v expedici"
       const { error } = await supabase
         .from("production_schedule")
-        .update({ status: "expedice", completed_at: new Date().toISOString(), completed_by: user.id })
+        .update({ status: "completed", completed_at: nowIso, completed_by: user.id })
         .in("id", itemIds);
       if (error) throw error;
 
+      // Insert expedice rows (mirror CompletionDialog logic)
+      const isIntermediateSplit = (it: { split_group_id: string | null; split_part: number | null; split_total: number | null }) =>
+        !!it.split_group_id && it.split_part != null && it.split_total != null && it.split_part < it.split_total;
+
+      const expediceRows = oldItems.map(it => ({
+        project_id: it.project_id,
+        item_name: it.item_name,
+        item_code: it.item_code || null,
+        source_schedule_id: it.id,
+        stage_id: it.stage_id || null,
+        manufactured_at: nowIso,
+        expediced_at: isIntermediateSplit(it) ? nowIso : null,
+        is_midflight: false,
+      }));
+      const { error: expError } = await (supabase.from("production_expedice") as any).insert(expediceRows);
+      if (expError) throw expError;
+
       // Log activity
-      for (const old of (oldItems || [])) {
+      for (const old of oldItems) {
         logActivity({
           projectId: old.project_id,
           actionType: "item_completed",
           oldValue: "Naplánováno",
           newValue: "Dokončeno",
-          detail: JSON.stringify({ item_name: old.item_name, item_code: old.item_code, week: weekLabel(old.scheduled_week), completed_at: new Date().toISOString() }),
+          detail: JSON.stringify({ item_name: old.item_name, item_code: old.item_code, week: weekLabel(old.scheduled_week), completed_at: nowIso }),
         });
       }
 
@@ -823,8 +866,9 @@ export function useProductionDragDrop() {
         actionType: "complete_items",
         description: `${itemIds.length} položek → Expedice`,
         undo: async () => {
-          // Restore previous statuses
-          for (const old of (oldItems || [])) {
+          // Remove expedice rows + restore previous statuses
+          await (supabase.from("production_expedice") as any).delete().in("source_schedule_id", itemIds);
+          for (const old of oldItems) {
             await supabase.from("production_schedule")
               .update({ status: old.status, completed_at: old.completed_at, completed_by: old.completed_by })
               .eq("id", old.id);
@@ -833,9 +877,11 @@ export function useProductionDragDrop() {
         },
         redo: async () => {
           const { data: { user: u } } = await supabase.auth.getUser();
+          const redoNow = new Date().toISOString();
           await supabase.from("production_schedule")
-            .update({ status: "expedice", completed_at: new Date().toISOString(), completed_by: u?.id })
+            .update({ status: "completed", completed_at: redoNow, completed_by: u?.id })
             .in("id", itemIds);
+          await (supabase.from("production_expedice") as any).insert(expediceRows);
           invalidateAll();
         },
       });

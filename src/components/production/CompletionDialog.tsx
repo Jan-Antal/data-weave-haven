@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { renumberSiblings } from "./SplitItemDialog";
 import type { ScheduleItem } from "@/hooks/useProductionSchedule";
 
@@ -39,6 +39,25 @@ export function CompletionDialog({
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
+  // QC gate: load existing quality checks for this project
+  const { data: qcChecks = [] } = useQuery({
+    queryKey: ["production-quality-checks", projectId],
+    enabled: open && !!projectId,
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from("production_quality_checks" as any) as any)
+        .select("item_id")
+        .eq("project_id", projectId);
+      if (error) throw error;
+      return ((data || []) as any[]).map(r => ({ item_id: r.item_id as string }));
+    },
+  });
+  const qcSet = useMemo(() => new Set(qcChecks.map(r => r.item_id)), [qcChecks]);
+  const missingQcChecked = useMemo(
+    () => items.filter(i => checkedIds.has(i.id) && i.status !== "expedice" && i.status !== "completed" && !qcSet.has(i.id)),
+    [items, checkedIds, qcSet],
+  );
+
   const getConfig = (id: string): ItemCompletionConfig => itemConfigs[id] || { mode: "full", splitPct: 50 };
 
   const setConfig = (id: string, config: Partial<ItemCompletionConfig>) => {
@@ -56,6 +75,7 @@ export function CompletionDialog({
 
   const handleComplete = useCallback(async () => {
     if (checkedIds.size === 0) return;
+    if (missingQcChecked.length > 0) return; // QC gate
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -191,7 +211,7 @@ export function CompletionDialog({
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate]);
+  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate, missingQcChecked.length]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -233,6 +253,20 @@ export function CompletionDialog({
             </div>
           ) : null;
         })()}
+
+        {/* QC gate warning */}
+        {missingQcChecked.length > 0 && (
+          <div
+            className="mx-5 mb-2 px-3 py-2 rounded-md text-[11px]"
+            style={{ backgroundColor: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}
+          >
+            <div className="font-semibold mb-0.5">⚠ Chybí QC kontrola ve Výrobě</div>
+            <div style={{ color: "#991b1b" }}>
+              Bez QC nelze položku dokončit:{" "}
+              {missingQcChecked.map(i => i.item_code || i.item_name).join(", ")}
+            </div>
+          </div>
+        )}
 
         <div className="px-5 pb-3 space-y-1 max-h-[400px] overflow-y-auto">
           {items.map(item => {
@@ -278,6 +312,10 @@ export function CompletionDialog({
                   {isCompleted ? (
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>
                       ✓ Hotovo
+                    </span>
+                  ) : isChecked && !qcSet.has(item.id) ? (
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }}>
+                      ⚠ chybí QC
                     </span>
                   ) : isChecked && config.mode === "split" ? (
                     <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
@@ -359,11 +397,11 @@ export function CompletionDialog({
           </button>
           <button
             onClick={handleComplete}
-            disabled={checkedIds.size === 0 || submitting}
+            disabled={checkedIds.size === 0 || submitting || missingQcChecked.length > 0}
             className="px-3 py-1.5 text-[11px] font-semibold rounded-md text-white transition-colors"
             style={{
-              backgroundColor: checkedIds.size === 0 ? "#99a5a3" : "#3a8a36",
-              cursor: checkedIds.size === 0 ? "not-allowed" : "pointer",
+              backgroundColor: (checkedIds.size === 0 || missingQcChecked.length > 0) ? "#99a5a3" : "#3a8a36",
+              cursor: (checkedIds.size === 0 || missingQcChecked.length > 0) ? "not-allowed" : "pointer",
               opacity: submitting ? 0.7 : 1,
             }}
           >
