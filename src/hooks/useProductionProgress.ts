@@ -23,28 +23,33 @@ export function useProductionProgress() {
       const [tpvRes, inboxRes, scheduleRes] = await Promise.all([
         supabase.from("tpv_items").select("project_id, id, item_code, nazev").is("deleted_at", null),
         supabase.from("production_inbox").select("project_id, id, item_name, item_code, status"),
-        supabase.from("production_schedule").select("project_id, id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)").in("status", ["scheduled", "in_progress", "paused"]),
+        supabase.from("production_schedule").select("project_id, id, inbox_item_id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)").in("status", ["scheduled", "in_progress", "paused", "completed"]),
       ]);
 
       if (tpvRes.error) throw tpvRes.error;
       if (inboxRes.error) throw inboxRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
 
-      const tpvByProject = new Map<string, number>();
+      const itemKey = (row: { id: string; item_code: string | null; item_name?: string | null; inbox_item_id?: string | null }) =>
+        row.item_code ? `code:${row.item_code}` : row.inbox_item_id ? `inbox:${row.inbox_item_id}` : `id:${row.id}`;
+
+      const tpvByProject = new Map<string, Set<string>>();
       for (const row of tpvRes.data || []) {
-        tpvByProject.set(row.project_id, (tpvByProject.get(row.project_id) || 0) + 1);
+        if (!tpvByProject.has(row.project_id)) tpvByProject.set(row.project_id, new Set());
+        tpvByProject.get(row.project_id)!.add(itemKey(row));
       }
 
-      const inboxByProject = new Map<string, number>();
+      const inboxByProject = new Map<string, Set<string>>();
       for (const row of inboxRes.data || []) {
-        if (row.status === "pending") {
-          inboxByProject.set(row.project_id, (inboxByProject.get(row.project_id) || 0) + 1);
+        if (row.status === "pending" || row.status === "returned") {
+          if (!inboxByProject.has(row.project_id)) inboxByProject.set(row.project_id, new Set());
+          inboxByProject.get(row.project_id)!.add(itemKey(row));
         }
       }
 
-      const scheduledByProject = new Map<string, number>();
-      const completedByProject = new Map<string, number>();
-      const pausedByProject = new Map<string, number>();
+      const scheduledByProject = new Map<string, Set<string>>();
+      const completedByProject = new Map<string, Set<string>>();
+      const pausedByProject = new Map<string, Set<string>>();
       const blockerCountByProject = new Map<string, number>();
       const nonBlockerCountByProject = new Map<string, number>();
       const scheduledItemsByProject = new Map<string, ProjectProgress["scheduled_items"]>();
