@@ -1,126 +1,249 @@
 
-## Plán opravy Inbox logiky po „Vrátit do TPV“
+## Plán opravy „Vyrobeno“ položek + správného Inbox progresu
 
 ### Cíl
-Vrátím správné chování Inboxu v Plánu Výroby:
+Opravím data i výpočet Inboxu v Plánu výroby tak, aby:
 
-1. Projekt, který má ještě nějakou položku v TPV a zbytek je už ve výrobě, má zůstat v horní části Inboxu jako „chybí položka“.
-2. Do spodní části Inboxu „Naplánováno“ mají padat jen projekty, které už mají všechny TPV položky přijaté do výroby / naplánované, ale ještě nejsou celé dokončené.
-3. Projekty, které už mají všechno vyrobeno, mají z Inboxu úplně zmizet a pokračovat jen v Expedici / Archivu.
-4. Položka vrácená do TPV má dál v TPV ukazovat stav „Vráceno z výroby“, ale nesmí se počítat jako aktivní Inbox položka k naplánování.
+1. Vybrané TPV položky byly označené jako **Vyrobeno**.
+2. Projekt `Z-2519-001` byl kompletně označený jako vyrobený/vyexpedovaný.
+3. Legacy / historické řádky se už nepočítaly jako reálně naplánované položky v Inbox progresu.
+4. Sekce **Naplánované** v dolní části Inboxu znovu ukazovala projekty, které mají aktivně naplánované položky a nejsou ještě celé vyrobené.
 
-### Problém
-Poslední změna byla příliš tvrdá: `useProductionInbox` teď načítá pouze `status = pending`. Tím sice zmizela položka `T.03` z aktivního Inboxu, ale rozbilo se počítání projektového progresu.
+---
 
-Konkrétně projekt jako Insia:
-- má jednu položku vrácenou do TPV,
-- tedy ještě není kompletně přijatý do výroby,
-- proto má zůstat nahoře v Inboxu jako projekt s chybějící položkou,
-- ale samotná vrácená položka se nemá zobrazit jako plánovatelná Inbox položka.
+## Důležitý nález z kontroly dat
 
-### Implementace
+U projektů `Z-2512-001`, `Z-2519-001`, `Z-2603-001` jsou v `production_schedule` aktuálně hlavně legacy / midflight řádky typu:
 
-#### 1. Oddělit aktivní Inbox od progres výpočtu
-V `src/hooks/useProductionProgress.ts` upravím význam stavů:
-
-- `pending` = položka čeká v Inboxu na naplánování
-- `returned` = položka je zpět v TPV a má se počítat jako „chybí ve výrobě“, ne jako „v Inboxu“
-- `scheduled`, `in_progress`, `paused`, `completed` = položka je už ve výrobním toku
-
-Tedy:
 ```text
-pending  -> in_inbox
-returned -> missing / TPV
-scheduled/in_progress -> scheduled
-paused -> paused
-completed -> completed
+item_code = project_id
+item_name = Projekt — Txx
+is_midflight = true
 ```
 
-Tím se Insia s jednou vrácenou položkou znovu objeví nahoře jako projekt, kterému ještě chybí TPV položka.
+To nejsou skutečné TPV položky typu `AT.02`, `T.05-a`, `TK.01`.
 
-#### 2. Nevracet `returned` do aktivního seznamu k plánování
-V `src/hooks/useProductionInbox.ts` nechám aktivní query pro Inbox položky jen na:
+Proto nebudu označovat tyto legacy řádky jako skutečné položky. Místo toho doplním správné záznamy do výrobní/expediční evidence podle reálných TPV `item_code`.
 
-```ts
-.eq("status", "pending")
-```
+---
 
-To je správně pro horní aktivní seznam položek, které lze plánovat. Vrácené položky nepatří mezi plánovatelné Inbox položky.
+## Datová oprava
 
-#### 3. Opravit výpočet „missing“
-V `useProductionProgress.ts` změním výpočet tak, aby se `returned` položky nepočítaly jako přijaté do výroby.
+### 1. Projekt `Z-2512-001`
+Označím jako **Vyrobeno** tyto TPV položky:
 
-Nová logika:
 ```text
-accountedFor = pending + scheduled + completed + paused
-missing = total_tpv - accountedFor
+AT.02
+AT.03
+AT.07
+C.01
 ```
 
-Ale `returned` nebude v `pending`, takže vrácená položka zůstane jako chybějící TPV položka.
+Pro každou vytvořím chybějící záznam v `production_expedice`:
 
-#### 4. Opravit spodní část Inboxu „Naplánováno“
-V `src/components/production/InboxPanel.tsx` upravím rozdělení projektů:
+```text
+manufactured_at = now()
+expediced_at = null
+is_midflight = false
+source_schedule_id = null
+```
 
-- horní část:
-  - aktivní `pending` položky,
-  - plus projekty s `missing > 0`, které nejsou dokončené,
-- spodní část „Naplánováno“:
-  - jen projekty s `missing === 0`,
-  - `in_inbox === 0`,
-  - mají ještě aktivní výrobní položky (`scheduled`, `in_progress`, `paused`),
-  - nejsou celé dokončené,
-- úplně mimo Inbox:
-  - projekty, kde `missing === 0`,
-  - `in_inbox === 0`,
-  - `scheduled === 0`,
-  - `paused === 0`,
-  - a vše je `completed` / v Expedici.
+Tím budou položky považované za vyrobené a čekající na expedici.
 
-Tím se hotové projekty nebudou zobrazovat v Inboxu, ale budou pokračovat přes Expedici.
+---
 
-#### 5. Zachovat TPV badge „Vráceno z výroby“
-`src/hooks/useProductionStatuses.ts` ponechám tak, aby `returned` z `production_inbox` dál vytvářelo oranžový badge „Vráceno z výroby“ v TPV seznamu.
+### 2. Projekt `Z-2519-001`
+Projekt je podle zadání už vyexpedovaný, takže označím jako vyrobené i expedované **všechny aktivní TPV položky projektu**.
 
-To znamená:
-- položka nebude v aktivním Inboxu,
-- ale v TPV bude pořád vidět, že byla vrácená z výroby.
+Aktuálně jde o položky:
 
-#### 6. Opravit realtime cache pro Inbox
-V `src/hooks/useRealtimeSync.ts` zkontroluji a upravím cache aktualizace pro `production_inbox`, protože aktuální realtime INSERT logika pravděpodobně zapisuje raw řádky do cache, i když hook očekává seskupené `InboxProject[]`.
+```text
+AN03
+AN04a
+AN04b
+AN04c
+AN07
+AN07a
+AN12
+PR1
+W1
+W3
+```
 
-Bezpečnější řešení:
-- při změně `production_inbox` invalidovat:
-  - `production-inbox`
-  - `production-progress`
-- místo přímého `setQueryData` na jiný tvar dat.
+Pro každou vytvořím / doplním záznam v `production_expedice`:
 
-Tím se po vrácení položky do TPV správně přepočítá horní/spodní sekce.
+```text
+manufactured_at = now()
+expediced_at = now()
+is_midflight = false
+source_schedule_id = null
+```
 
-### Očekávané chování po opravě
+Tím projekt vypadne z Inboxu a bude patřit jen do Expedice / Archivu.
 
-#### Insia s jednou položkou `T.03` vrácenou do TPV
-- `T.03` nebude jako plánovatelná položka v aktivním Inboxu.
-- Projekt Insia zůstane nahoře v Inboxu jako „chybí 1 položka“.
-- V TPV bude `T.03` dál označená jako „Vráceno z výroby“.
+---
 
-#### Projekt, který má vše naplánované, ale není hotový
-- Nebude nahoře mezi chybějícími.
-- Bude dole v sekci „Naplánováno“.
+### 3. Projekt `Z-2603-001`
+Označím jako **Vyrobeno** tyto TPV položky:
 
-#### Projekt, který má vše vyrobeno
-- Z Inboxu zmizí úplně.
-- Bude vidět jen v Expedici, případně následně v archivu.
+```text
+T.05-a
+T.05-b
+T.06-a
+T.06-b
+T.08
+TK.01
+```
 
-### Ověření
+Pro každou vytvořím chybějící záznam v `production_expedice`:
+
+```text
+manufactured_at = now()
+expediced_at = null
+is_midflight = false
+source_schedule_id = null
+```
+
+---
+
+### 4. Ochrana proti duplicitám
+Před vložením záznamu vždy zkontroluji, jestli už pro kombinaci:
+
+```text
+project_id + item_code
+```
+
+neexistuje ne-legacy záznam v `production_expedice`.
+
+Pokud existuje, nebudu ho duplikovat.
+
+---
+
+## Oprava výpočtu Inbox progresu
+
+### Soubor
+`src/hooks/useProductionProgress.ts`
+
+### Změny
+
+#### 1. Nepočítat legacy / midflight řádky jako naplánované položky
+Do dotazu na `production_schedule` doplním:
+
+```text
+is_midflight
+is_historical
+completed_at
+expediced_at
+```
+
+A při výpočtu progresu budu ignorovat řádky, kde:
+
+```text
+is_midflight = true
+nebo
+is_historical = true
+```
+
+Tyto řádky nebudou navyšovat:
+
+```text
+scheduled
+paused
+completed
+scheduled_items
+```
+
+Tím se legacy řádky typu `Projekt — T13` přestanou tvářit jako reálné naplánované TPV položky.
+
+---
+
+#### 2. Počítat `production_expedice` jako vyrobené položky
+Do progresu přidám dotaz na `production_expedice`.
+
+Každý ne-legacy záznam:
+
+```text
+is_midflight = false
+```
+
+se bude počítat jako `completed`, podle `item_code`.
+
+To vyřeší i případy, kdy položka byla označena jako vyrobená bez vazby na konkrétní `production_schedule` řádek.
+
+---
+
+#### 3. Virtuální dokončení schedule řádků
+Pokud existuje záznam v `production_expedice` se `source_schedule_id`, tak daný schedule řádek už nebude počítaný jako `scheduled`.
+
+Bude počítaný jako `completed`.
+
+Tím se odstraní problém, kdy položka už čeká v Expedici, ale v Inbox progresu pořád navyšuje „Naplánováno“.
+
+---
+
+#### 4. Výpočet missing
+Výpočet zůstane principově:
+
+```text
+missing = total_tpv - (in_inbox + scheduled + paused + completed)
+```
+
+Ale `scheduled`, `paused`, `completed` budou už očištěné o legacy data a doplněné o skutečné expedice položky.
+
+---
+
+## Oprava dolní sekce Inboxu „Naplánované“
+
+### Soubor
+`src/components/production/InboxPanel.tsx`
+
+Aktuálně je sekce moc přísně filtrovaná přes týdny `>= currentMonday`. To může schovat projekt, který má položky naplánované v minulém týdnu / je zpožděný, ale pořád není celý vyrobený.
+
+Upravím logiku tak, aby se v sekci **Naplánované** zobrazil projekt, pokud:
+
+```text
+missing === 0
+in_inbox === 0
+scheduled + paused > 0
+is_complete === false
+není blocker-only
+```
+
+Nebude tedy záležet na tom, jestli je naplánovaný týden aktuální, budoucí nebo už zpožděný. Pokud položka není vyrobená, projekt má být v Naplánované sekci vidět.
+
+---
+
+## Očekávané chování po opravě
+
+### `Z-2512-001`
+- `AT.02`, `AT.03`, `AT.07`, `C.01` budou počítané jako vyrobené.
+- Nebudou navyšovat „chybí“.
+- Pokud ostatní položky ještě nejsou ve výrobě, projekt zůstane v Inboxu podle reálného stavu.
+
+### `Z-2519-001`
+- Všechny TPV položky budou vyrobené a expedované.
+- Projekt zmizí z Inboxu.
+- Bude patřit do Expedice / Archivu.
+
+### `Z-2603-001`
+- `T.05-a`, `T.05-b`, `T.06-a`, `T.06-b`, `T.08`, `TK.01` budou počítané jako vyrobené.
+- Zbývající položky budou dál ukazovat reálný stav.
+
+### Legacy data
+- Legacy / midflight řádky už nebudou zkreslovat počet naplánovaných položek.
+- Inbox progres bude počítat skutečné TPV položky, ne historické týdenní placeholdery.
+
+---
+
+## Ověření
+
 Po implementaci ověřím:
 
-1. Insia:
-   - jedna položka vrácená do TPV,
-   - projekt zůstává nahoře jako chybějící položka.
-2. Aktivní Inbox:
-   - neobsahuje vrácené položky jako položky k plánování.
-3. Sekce „Naplánováno“:
-   - obsahuje jen projekty kompletně přijaté do výroby, ale ještě nedokončené.
-4. Expedice:
-   - dokončené projekty nejsou v Inboxu a pokračují pouze v Expedici/Archivu.
-5. Build projde bez TypeScript chyb.
+1. V databázi nevznikly duplicitní `production_expedice` záznamy.
+2. `Z-2512-001` má správně označené 4 vyrobené položky.
+3. `Z-2519-001` má všechny TPV položky označené jako vyrobené + expedované.
+4. `Z-2603-001` má správně označených 6 vyrobených položek.
+5. Legacy / midflight schedule řádky se nepočítají jako naplánované TPV položky.
+6. Sekce **Naplánované** v Inboxu znovu zobrazuje projekty, které mají aktivní nevyrobené položky.
+7. Hotové projekty z Inboxu mizí a pokračují jen v Expedici / Archivu.
+8. Build projde bez TypeScript chyb.
