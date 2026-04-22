@@ -40,6 +40,11 @@ export interface ScheduleItem {
 export interface ScheduleBundle {
   project_id: string;
   project_name: string;
+  stage_id: string | null;
+  bundle_label: string | null;
+  bundle_type: BundleType | null;
+  split_part: number | null;
+  split_total: number | null;
   items: ScheduleItem[];
   total_hours: number;
 }
@@ -111,17 +116,23 @@ export function useProductionSchedule() {
         const pid = row.project_id;
         const bundleLabel = (row as any).bundle_label ?? fallbackBundleLabel((row as any).split_group_id ?? `${row.project_id}:${row.stage_id ?? "none"}:${row.scheduled_week}:${row.position}`);
         const bundleType = resolveBundleType(row as any);
+        const bundleKey = `${pid}::${row.stage_id ?? "none"}::${bundleLabel}::${(row as any).split_part ?? "full"}`;
         if (!byWeek.has(week)) byWeek.set(week, new Map());
         const weekMap = byWeek.get(week)!;
-        if (!weekMap.has(pid)) {
-          weekMap.set(pid, {
+        if (!weekMap.has(bundleKey)) {
+          weekMap.set(bundleKey, {
             project_id: pid,
             project_name: (row as any).projects?.project_name || pid,
+            stage_id: row.stage_id,
+            bundle_label: bundleLabel,
+            bundle_type: bundleType,
+            split_part: (row as any).split_part ?? null,
+            split_total: (row as any).split_total ?? null,
             items: [],
             total_hours: 0,
           });
         }
-        const bundle = weekMap.get(pid)!;
+        const bundle = weekMap.get(bundleKey)!;
         bundle.items.push({
           id: row.id,
           project_id: row.project_id,
