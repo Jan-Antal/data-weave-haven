@@ -52,6 +52,7 @@ import { DataLogPanel } from "@/components/DataLogPanel";
 import { OverbookWarningDialog, OverbookBadge } from "@/components/production/OverbookWarningDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
+import { buildBundleKey } from "@/lib/productionBundles";
 
 
 export type DisplayMode = "hours" | "czk" | "percent";
@@ -71,6 +72,11 @@ interface ActiveDragData {
   scheduledCzk?: number;
   inboxItemId?: string;
   splitGroupId?: string | null;
+  bundleKey?: string;
+  bundleLabel?: string | null;
+  bundleType?: "full" | "split" | null;
+  splitPart?: number | null;
+  itemIds?: string[];
   /** For inbox-items: array of item IDs to schedule as a batch */
   batchItemIds?: string[];
 }
