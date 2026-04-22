@@ -1766,29 +1766,31 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {!isMidflightBundle && expSeverity && !allCompleted && deadlineInfo?.parsed && (() => {
-              const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
-              const tooltipText = expSeverity === "overdue"
-                ? `${deadlineLabel} ${format(deadlineInfo.parsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), deadlineInfo.parsed)} dní`
-                : `${deadlineLabel} za ${differenceInDays(deadlineInfo.parsed, new Date())} dní (${format(deadlineInfo.parsed, "dd.MM.yyyy")})`;
-              return (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
-                </Tooltip>
-              );
-            })()}
-            {displayMode === "czk" ? (
-              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap, exchangeRates))}</span>
-            ) : displayMode === "percent" ? (
-              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
-            ) : (
-              <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{Math.round(bundle.total_hours)}h</span>
-            )}
-            {!isMidflightBundle && completedCount > 0 && <span className="text-[9px] whitespace-nowrap" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
+          <div className="flex flex-col items-end gap-[1px] shrink-0">
+            <div className="flex items-center gap-1">
+              {!isMidflightBundle && expSeverity && !allCompleted && deadlineInfo?.parsed && (() => {
+                const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
+                const tooltipText = expSeverity === "overdue"
+                  ? `${deadlineLabel} ${format(deadlineInfo.parsed, "dd.MM.yyyy")} — po termínu o ${differenceInDays(new Date(), deadlineInfo.parsed)} dní`
+                  : `${deadlineLabel} za ${differenceInDays(deadlineInfo.parsed, new Date())} dní (${format(deadlineInfo.parsed, "dd.MM.yyyy")})`;
+                return (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertTriangle size={14} style={{ color: warnColor }} className="shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="z-[9999] text-xs">{tooltipText}</TooltipContent>
+                  </Tooltip>
+                );
+              })()}
+              {displayMode === "czk" ? (
+                <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap, exchangeRates))}</span>
+              ) : displayMode === "percent" ? (
+                <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{weeklyCapacity > 0 ? Math.round((bundle.total_hours / weeklyCapacity) * 100) : 0}%</span>
+              ) : (
+                <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{Math.round(bundle.total_hours)}h</span>
+              )}
+            </div>
+            {!isMidflightBundle && completedCount > 0 && <span className="text-[9px] whitespace-nowrap leading-none" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
           </div>
         </div>
       </div>
