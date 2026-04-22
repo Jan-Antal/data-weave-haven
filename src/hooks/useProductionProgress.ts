@@ -40,7 +40,7 @@ export function useProductionProgress() {
 
       const inboxByProject = new Map<string, Set<string>>();
       for (const row of inboxRes.data || []) {
-        if (row.status === "pending" || row.status === "returned") {
+        if (row.status === "pending") {
           if (!inboxByProject.has(row.project_id)) inboxByProject.set(row.project_id, new Set());
           inboxByProject.get(row.project_id)!.add(itemKey(row));
         }
@@ -89,6 +89,7 @@ export function useProductionProgress() {
       }
 
       const allProjectIds = new Set<string>();
+      for (const pid of tpvByProject.keys()) allProjectIds.add(pid);
       for (const pid of inboxByProject.keys()) allProjectIds.add(pid);
       for (const pid of scheduledByProject.keys()) allProjectIds.add(pid);
       for (const pid of completedByProject.keys()) allProjectIds.add(pid);
