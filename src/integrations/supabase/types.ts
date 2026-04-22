@@ -1893,6 +1893,7 @@ export type Database = {
           log_day_date: string
           logged_at: string
           logged_at_day: string
+          note_text: string
           percent: number
           phase: string
           project_id: string
