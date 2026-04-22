@@ -46,6 +46,13 @@ async function isZeroCapacityDay(supabase: any, weekKey: string, dayOfWeek: numb
   return false;
 }
 
+function toLocalDateStr(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -66,7 +73,7 @@ Deno.serve(async (req) => {
     }
 
     const year = now.getFullYear();
-    const todayStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const todayStr = toLocalDateStr(now);
 
     // Check Czech public holidays and company holidays in parallel
     const [publicHoliday, companyHoliday] = await Promise.all([
@@ -92,7 +99,7 @@ Deno.serve(async (req) => {
     const d = new Date(now);
     const day = d.getDay() || 7;
     d.setDate(d.getDate() - day + 1);
-    const weekKey = d.toISOString().split("T")[0];
+    const weekKey = toLocalDateStr(d);
 
     // Check if the week has zero capacity (fully blocked)
     const zeroCapacity = await isZeroCapacityDay(supabase, weekKey, dayOfWeek);
@@ -115,34 +122,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get existing logs for today
-    const bundleIds = scheduleItems.map((s: any) => s.id);
+    // If at least one daylog exists for today, the day is considered logged
     const { data: existingLogs } = await supabase
       .from("production_daily_logs")
       .select("bundle_id")
       .eq("week_key", weekKey)
       .eq("day_index", dayIndex)
-      .in("bundle_id", bundleIds);
+      .limit(1);
 
-    const loggedBundles = new Set((existingLogs || []).map((l: any) => l.bundle_id));
-    const missingItems = scheduleItems.filter((s: any) => !loggedBundles.has(s.id));
-
-    if (missingItems.length === 0) {
-      return new Response(JSON.stringify({ message: "All logs filled" }), {
+    if (existingLogs && existingLogs.length > 0) {
+      return new Response(JSON.stringify({ message: "Daylog exists for today, skipping" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Get unique project IDs with missing logs
-    const missingProjectIds = [...new Set(missingItems.map((s: any) => s.project_id))];
-
-    // Get project names
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("project_id, project_name")
-      .in("project_id", missingProjectIds);
-
-    const projectMap = new Map((projects || []).map((p: any) => [p.project_id, p.project_name]));
 
     // Get target users: admin, owner, vyroba roles
     const { data: roleUsers } = await supabase
@@ -176,29 +168,41 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create notifications
-    const projectNames = missingProjectIds
-      .map((pid: string) => projectMap.get(pid) || pid)
-      .slice(0, 3)
-      .join(", ");
+    const batchKey = `daylog_missing:${todayStr}`;
 
-    const suffix = missingProjectIds.length > 3 ? ` a ${missingProjectIds.length - 3} dalších` : "";
+    const { data: existingNotifications } = await supabase
+      .from("notifications")
+      .select("user_id")
+      .eq("batch_key", batchKey)
+      .eq("type", "daylog_missing")
+      .in("user_id", enabledUsers);
 
-    const rows = enabledUsers.map((userId: string) => ({
+    const alreadyNotified = new Set((existingNotifications || []).map((n: any) => n.user_id));
+    const usersToNotify = enabledUsers.filter((userId: string) => !alreadyNotified.has(userId));
+
+    if (usersToNotify.length === 0) {
+      return new Response(JSON.stringify({ message: "Daylog notification already sent for today" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const rows = usersToNotify.map((userId: string) => ({
       user_id: userId,
       type: "daylog_missing",
-      title: "Chybějící denní log",
-      body: `Projekty bez záznamu: ${projectNames}${suffix}`,
+      title: "Chybí denní log za celý den",
+      body: "Za dnešní pracovní den zatím není zapsaný žádný denní log ve výrobě.",
       actor_name: "Systém",
       actor_initials: "SY",
       read: false,
+      batch_key: batchKey,
+      link_context: { route: "/vyroba" },
     }));
 
     await supabase.from("notifications").insert(rows);
 
     return new Response(
       JSON.stringify({
-        message: `Sent ${rows.length} notifications for ${missingProjectIds.length} projects`,
+        message: `Sent ${rows.length} daylog notifications`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
