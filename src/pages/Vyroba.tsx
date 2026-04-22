@@ -146,6 +146,20 @@ function getExpediceTimestampForCompletedItem(item: ScheduleItem, nowIso: string
   return isIntermediateSplit ? nowIso : null;
 }
 
+async function insertProductionExpediceRowsIfMissing(rows: any[]) {
+  const sourceIds = rows.map((row) => row.source_schedule_id).filter(Boolean);
+  if (sourceIds.length === 0) return;
+  const { data: existing, error: existingError } = await (supabase.from("production_expedice" as any) as any)
+    .select("source_schedule_id")
+    .in("source_schedule_id", sourceIds);
+  if (existingError) throw existingError;
+  const existingIds = new Set((existing || []).map((row: any) => row.source_schedule_id));
+  const rowsToInsert = rows.filter((row) => row.source_schedule_id && !existingIds.has(row.source_schedule_id));
+  if (rowsToInsert.length === 0) return;
+  const { error } = await (supabase.from("production_expedice") as any).insert(rowsToInsert);
+  if (error) throw error;
+}
+
 /** Compute VyrobaProject[] for any given week from the global schedule map */
 function getProjectsForWeek(
   scheduleData: Map<string, any> | undefined,
@@ -1296,8 +1310,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       },
       redo: async () => {
           const redoNow = new Date().toISOString();
-        for (const item of itemsToExpedice) {
-          await (supabase.from("production_expedice") as any).insert({
+        await insertProductionExpediceRowsIfMissing(itemsToExpedice.map((item) => ({
             project_id: pid,
             item_name: item.item_name,
             item_code: item.item_code || null,
@@ -1306,8 +1319,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               manufactured_at: redoNow,
               expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
             is_midflight: false,
-          });
-        }
+        })));
         await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1319,8 +1331,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
     const nowIso = new Date().toISOString();
     // Insert into production_expedice for each active item
-    for (const item of itemsToExpedice) {
-      await (supabase.from("production_expedice") as any).insert({
+    await insertProductionExpediceRowsIfMissing(itemsToExpedice.map((item) => ({
         project_id: pid,
         item_name: item.item_name,
         item_code: item.item_code || null,
@@ -1329,8 +1340,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         manufactured_at: nowIso,
         expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
         is_midflight: false,
-      });
-    }
+    })));
     await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1358,7 +1368,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         undo: async () => {
           if (item) {
             const undoNow = new Date().toISOString();
-            await (supabase.from("production_expedice") as any).insert({
+            await insertProductionExpediceRowsIfMissing([{
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
@@ -1367,7 +1377,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               manufactured_at: undoNow,
               expediced_at: getExpediceTimestampForCompletedItem(item, undoNow),
               is_midflight: false,
-            });
+            }]);
           }
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1396,7 +1406,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         redo: async () => {
           if (item) {
             const redoNow = new Date().toISOString();
-            await (supabase.from("production_expedice") as any).insert({
+            await insertProductionExpediceRowsIfMissing([{
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
@@ -1405,7 +1415,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               manufactured_at: redoNow,
               expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
               is_midflight: false,
-            });
+            }]);
           }
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1413,7 +1423,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         },
       });
       const nowIsoMark = new Date().toISOString();
-      await (supabase.from("production_expedice") as any).insert({
+      await insertProductionExpediceRowsIfMissing([{
         project_id: pid,
         item_name: item?.item_name || "",
         item_code: item?.item_code || null,
@@ -1422,7 +1432,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         manufactured_at: nowIsoMark,
         expediced_at: item ? getExpediceTimestampForCompletedItem(item, nowIsoMark) : null,
         is_midflight: false,
-      });
+      }]);
       // Log item hotovo
       if (selectedProject) {
         logActivity({
@@ -4083,8 +4093,7 @@ function UnifiedItemList({
           },
           redo: async () => {
             const redoNow = new Date().toISOString();
-            for (const { id, item } of itemsToInsert) {
-              await (supabase.from("production_expedice") as any).insert({
+            await insertProductionExpediceRowsIfMissing(itemsToInsert.map(({ id, item }) => ({
                 project_id: projectId,
                 item_name: item.item_name,
                 item_code: item.item_code || null,
@@ -4093,16 +4102,14 @@ function UnifiedItemList({
                 manufactured_at: redoNow,
                 expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
                 is_midflight: false,
-              });
-            }
+            })));
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
             qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
         });
         const nowIso = new Date().toISOString();
-        for (const { id, item } of itemsToInsert) {
-          await (supabase.from("production_expedice") as any).insert({
+        await insertProductionExpediceRowsIfMissing(itemsToInsert.map(({ id, item }) => ({
             project_id: projectId,
             item_name: item.item_name,
             item_code: item.item_code || null,
@@ -4111,8 +4118,7 @@ function UnifiedItemList({
             manufactured_at: nowIso,
             expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
             is_midflight: false,
-          });
-        }
+        })));
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
         qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -4196,8 +4202,7 @@ function UnifiedItemList({
         mids.map((mid) => ({ id: mid, item: currentItems.find((ci) => ci.item.id === mid)?.item })).filter((x): x is { id: string; item: ScheduleItem } => !!x.item)
       );
       const nowIso = new Date().toISOString();
-      for (const { id, item } of itemsToInsert) {
-        await (supabase.from("production_expedice") as any).insert({
+      await insertProductionExpediceRowsIfMissing(itemsToInsert.map(({ id, item }) => ({
           project_id: projectId,
           item_name: item.item_name,
           item_code: item.item_code || null,
@@ -4206,8 +4211,7 @@ function UnifiedItemList({
           manufactured_at: nowIso,
           expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
           is_midflight: false,
-        });
-      }
+      })));
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
