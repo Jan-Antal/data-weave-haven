@@ -108,6 +108,7 @@ interface MergeState {
 
 export default function PlanVyroby() {
   const { isAdmin, isOwner, isTestUser, loading, profile, role } = useAuth();
+  const canUseForecast = isOwner || isAdmin || role === "vedouci_vyroby";
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
@@ -711,7 +712,7 @@ export default function PlanVyroby() {
     );
   }
 
-  if (!isAdmin && !isTester) return null;
+  if (!isAdmin && !isTester && role !== "vedouci_vyroby") return null;
 
   if (isMobile) {
     return (
@@ -764,6 +765,10 @@ export default function PlanVyroby() {
           searchNavGoNext={searchNav.goNext}
           searchNavGoPrev={searchNav.goPrev}
           onForecastToggle={async (v) => {
+            if (v && !canUseForecast) {
+              toast({ title: "Nemáte oprávnění spustit Forecast.", variant: "destructive" });
+              return;
+            }
             forecast.setForecastActive(v);
             if (v) {
               setViewTab("kanban");
@@ -793,7 +798,7 @@ export default function PlanVyroby() {
               await forecast.resetAndRegenerate(weeklyCapacity);
             }
           }}
-          isOwner={isOwner}
+          canUseForecast={canUseForecast}
           isGenerating={forecast.isGenerating}
           forecastBlockCounts={forecast.forecastActive ? (() => {
             // Count real bundles from schedule data (not from forecastBlocks which only has existing_plan in from_scratch mode)
