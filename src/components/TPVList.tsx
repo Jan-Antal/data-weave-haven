@@ -990,8 +990,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                             </TableCell>
                           );
                         }
-                        const pocet = Number(item.pocet) || 0;
-                        const pocetLabel = pocet > 1 ? ` · ${pocet} ks` : "";
                         return (
                           <TableCell key={key} style={cellStyle}>
                             <div className="flex flex-wrap gap-0.5">
@@ -1020,14 +1018,6 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                                 }
                                 return <span key={idx}>{badge}</span>;
                               })}
-                              {pocetLabel && (
-                                <span
-                                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                                  style={{ backgroundColor: "#f0eee9", color: "#6b7a78", borderColor: "#e2ddd6" }}
-                                >
-                                  {pocetLabel.trim().replace("· ", "")}
-                                </span>
-                              )}
                             </div>
                           </TableCell>
                         );
