@@ -3299,27 +3299,30 @@ function ProjectRow({
               {bundleDisplayLabel}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="font-sans" style={{ fontSize: 11, color: "#6b7280" }}>
-              {project.projectId}
-            </span>
-            <span className="font-sans font-semibold shrink-0" style={{ fontSize: 11, color: statusColors[status] }}>
-              · {pct}%
-            </span>
-            {project.deadline && (
-              <span style={{ fontSize: 11, color: "#6b7280" }}>· {fmtDateFull(project.deadline)}</span>
-            )}
-            {phase && (
-              <span
-                style={{
-                  fontSize: 11,
-                  color: PHASES.find((ph) => ph.name === phase)?.color || "#6b7280",
-                  fontWeight: 500,
-                }}
-              >
-                · {phase}
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>
+                {project.projectId}
               </span>
-            )}
+              {project.deadline && (
+                <span className="truncate" style={{ fontSize: 11, color: "#6b7280" }}>· {fmtDateFull(project.deadline)}</span>
+              )}
+              {phase && (
+                <span
+                  className="truncate"
+                  style={{
+                    fontSize: 11,
+                    color: PHASES.find((ph) => ph.name === phase)?.color || "#6b7280",
+                    fontWeight: 500,
+                  }}
+                >
+                  · {phase}
+                </span>
+              )}
+            </div>
+            <span className="font-sans font-semibold shrink-0 text-right" style={{ fontSize: 11, color: statusColors[status] }}>
+              {pct}%
+            </span>
           </div>
           <div className="mt-1.5 relative">
             <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "hsl(var(--border))" }}>
