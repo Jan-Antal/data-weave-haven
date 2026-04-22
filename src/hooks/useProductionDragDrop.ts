@@ -15,6 +15,24 @@ function weekLabel(weekDate: string): string {
   } catch { return weekDate; }
 }
 
+const productionQueryKeys = [["production-inbox"], ["production-schedule"], ["production-expedice"], ["production-expedice-schedule-ids"], ["production-progress"]];
+
+function updatePayload(table: string, records: Record<string, any>[]) {
+  return { table, operation: "update" as const, records, queryKeys: productionQueryKeys };
+}
+
+function deleteRestorePayload(table: string, records: Record<string, any>[]) {
+  return { table, operation: "delete" as const, records, queryKeys: productionQueryKeys };
+}
+
+function insertedRowsPayload(table: string, records: Record<string, any>[]) {
+  return { table, operation: "insert" as const, records, queryKeys: productionQueryKeys };
+}
+
+function multiPayload(records: Record<string, any>[]) {
+  return { operation: "multi" as const, records, queryKeys: productionQueryKeys };
+}
+
 export function useProductionDragDrop() {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
