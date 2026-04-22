@@ -34,6 +34,11 @@ function formatCompactCzk(v: number): string {
 
 type UrgencyLevel = "overdue" | "urgent" | "upcoming" | "ok";
 
+function isDoneProjectStatus(status?: string | null): boolean {
+  const normalized = (status ?? "").trim().toLowerCase();
+  return normalized === "fakturace" || normalized === "dokonceno" || normalized === "dokončeno";
+}
+
 /** For urgency, use the EARLIEST (soonest) deadline across all date fields */
 function getEarliestDeadline(info: { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null } | undefined): Date | null {
   if (!info) return null;
@@ -48,8 +53,7 @@ function getEarliestDeadline(info: { expedice?: string | null; montaz?: string |
 
 function getUrgency(info: { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null; status?: string | null } | undefined): UrgencyLevel {
   if (!info) return "ok";
-  const s = (info.status ?? "").toLowerCase();
-  if (s === "fakturace" || s === "dokonceno" || s === "dokončeno") return "ok";
+  if (isDoneProjectStatus(info.status)) return "ok";
   const d = getEarliestDeadline(info);
   if (!d) return "ok";
   if (isPast(d)) return "overdue";
@@ -291,7 +295,10 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     const activeProjectIds = new Set(projects.map(p => p.project_id));
     const allFromProgress = Array.from(progressData.values()).filter(p => !activeProjectIds.has(p.project_id));
     // Projects with missing items stay in active inbox area
-    const missing = allFromProgress.filter(p => p.missing > 0 && !p.is_blocker_only && !p.is_complete);
+    const missing = allFromProgress.filter(p => {
+      const info = projectInfoMap.get(p.project_id);
+      return p.missing > 0 && !p.is_blocker_only && !p.is_complete && !isDoneProjectStatus(info?.status);
+    });
     const allCompleted = allFromProgress.filter(p => (p.is_complete || p.is_blocker_only));
     // Filter: only show projects that have at least one scheduled item in future weeks
     const regular = allCompleted.filter(p => {
@@ -307,7 +314,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     });
     const reserve = allCompleted.filter(p => p.is_blocker_only);
     return { completedProjects: regular, reserveProjects: reserve, missingItemProjects: missing };
-  }, [progressData, projects, scheduleData, currentMondayISO]);
+  }, [progressData, projects, scheduleData, currentMondayISO, projectInfoMap]);
 
   const allProjectOptions = useMemo(() => {
     const seen = new Set<string>();
