@@ -30,7 +30,7 @@ import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ForecastWeekContent, ForecastSplitDialog } from "./ForecastOverlay";
 import { type SafetyNetProject } from "./ForecastSafetyNet";
-import { buildBundleKey, formatBundleDisplayLabel } from "@/lib/productionBundles";
+import { buildBundleKey, canAcceptBundleDrop, formatBundleDisplayLabel } from "@/lib/productionBundles";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -87,6 +87,16 @@ interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
   overDroppableId?: string | null;
+  activeDrag?: {
+    type?: string;
+    projectId?: string;
+    weekDate?: string;
+    stageId?: string | null;
+    bundleKey?: string;
+    bundleLabel?: string | null;
+    bundleType?: "full" | "split" | null;
+    splitPart?: number | null;
+  } | null;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   displayMode?: DisplayMode;
@@ -179,7 +189,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey, searchMatchedProjectIds, searchActive, onVisibleMonthChange }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey, searchMatchedProjectIds, searchActive, onVisibleMonthChange }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
