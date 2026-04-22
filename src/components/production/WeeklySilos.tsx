@@ -1640,6 +1640,23 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
   const bundleItemIds = bundle.items.map((item) => item.id);
   const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: bundle.split_part, bundle_type: bundle.bundle_type });
+  const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" ? {
+    project_id: activeDrag.projectId || "",
+    weekKey: activeDrag.weekDate ?? null,
+    stage_id: activeDrag.stageId ?? null,
+    bundle_label: activeDrag.bundleLabel ?? null,
+    bundle_type: activeDrag.bundleType ?? null,
+    bundle_key: activeDrag.bundleKey ?? null,
+    split_part: activeDrag.splitPart ?? null,
+  } : null, {
+    project_id: bundle.project_id,
+    weekKey,
+    stage_id: bundle.stage_id ?? null,
+    bundle_label: bundle.bundle_label ?? null,
+    bundle_type: bundle.bundle_type ?? null,
+    bundle_key: bundleKey,
+    split_part: bundle.split_part ?? null,
+  });
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundleKey}`,
     data: { type: "silo-bundle", bundleKey, itemIds: bundleItemIds, projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, hours: bundle.total_hours, itemCount: bundle.items.length, stageId: bundle.stage_id, bundleLabel: bundle.bundle_label, bundleType: bundle.bundle_type, splitPart: bundle.split_part },
@@ -1648,14 +1665,14 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const { setNodeRef: setDropRef, isOver: isBundleOver } = useDroppable({
     id: `silo-bundle-drop-${bundleKey}`,
     data: { type: "silo-bundle-target", bundleKey, itemIds: bundleItemIds, projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, stageId: bundle.stage_id, bundleLabel: bundle.bundle_label, bundleType: bundle.bundle_type, splitPart: bundle.split_part },
-    disabled: bundleDragDisabled || expanded || !!isSpilled,
+    disabled: bundleDragDisabled || expanded || !!isSpilled || !canDropActiveBundle,
   });
   const setBundleNodeRef = useCallback((node: HTMLDivElement | null) => { setDropRef(node); }, [setDropRef]);
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
   const isMatch = searchMatchedProjectIds?.has(bundle.project_id) ?? false;
   const isDimmed = !!searchActive && !isMatch;
   const isHighlighted = isSelected || isFocusedMatch;
-  const isDropHighlighted = isBundleOver && !isDragging;
+  const isDropHighlighted = isBundleOver && canDropActiveBundle && !isDragging;
 
   // Blocker card — special rendering (after all hooks)
   if (isBlockerBundle) {
