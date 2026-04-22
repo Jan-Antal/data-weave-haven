@@ -169,7 +169,7 @@ export function ProductionHeader({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {hasUndo ? `Zpět: ${undoDesc}` : "Nic k vrácení"}
+                {hasUndo ? `Krok späť: ${undoDesc}` : "Nic k vrácení"}
               </TooltipContent>
             </Tooltip>
 
@@ -184,7 +184,7 @@ export function ProductionHeader({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {hasRedo ? `Obnovit: ${redoDesc}` : "Nic k obnovení"}
+                {hasRedo ? `Krok dopredu: ${redoDesc}` : "Nic k obnovení"}
               </TooltipContent>
             </Tooltip>
 
