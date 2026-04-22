@@ -1473,6 +1473,7 @@ export function useProductionDragDrop() {
     returnBundleToInbox,
     mergeSplitItems,
     mergeBundleSplitGroups,
+    mergeFullBundleIntoBundle,
     mergeBundleAcrossWeeks,
   };
 }
