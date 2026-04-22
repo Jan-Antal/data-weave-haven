@@ -22,6 +22,7 @@ export function useProductionDragDrop() {
     qc.invalidateQueries({ queryKey: ["production-inbox"] });
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["production-expedice"] });
+    qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
     qc.invalidateQueries({ queryKey: ["production-progress"] });
   }, [qc]);
 
@@ -844,8 +845,16 @@ export function useProductionDragDrop() {
         expediced_at: isIntermediateSplit(it) ? nowIso : null,
         is_midflight: false,
       }));
-      const { error: expError } = await (supabase.from("production_expedice") as any).insert(expediceRows);
-      if (expError) throw expError;
+      const { data: existingExpedice, error: existingExpediceError } = await (supabase.from("production_expedice" as any) as any)
+        .select("source_schedule_id")
+        .in("source_schedule_id", itemIds);
+      if (existingExpediceError) throw existingExpediceError;
+      const existingExpediceIds = new Set((existingExpedice || []).map((row: any) => row.source_schedule_id));
+      const expediceRowsToInsert = expediceRows.filter(row => !existingExpediceIds.has(row.source_schedule_id));
+      if (expediceRowsToInsert.length > 0) {
+        const { error: expError } = await (supabase.from("production_expedice") as any).insert(expediceRowsToInsert);
+        if (expError) throw expError;
+      }
 
       // Log activity
       for (const old of oldItems) {
