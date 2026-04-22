@@ -1,347 +1,184 @@
 
-## Doplněný plán revize „Step back“ / Undo systému
+## Plán opravy bundle logiky v Plánu výroby
 
-### Cíl
-Rozšířím revizi Step back tak, aby výrobní workflow bylo spolehlivě vratné i po refreshi stránky a aby jedna reálná akce byla vždy jeden krok zpět/dopředu.
+### Problém 1: položka z bundle B nejde přetáhnout do bundle D
 
-Platnost Step back prodloužím z **15 minut na 30 minut**.
-
----
-
-## 1. Centrální Undo/Redo systém
-
-### Soubor
-`src/hooks/useUndoRedo.tsx`
-
-Upravím:
-
-1. Expiraci z 15 na 30 minut.
-2. Bezpečné vykonávání payloadů:
-   - insert restore bude používat původní `id`,
-   - před insertem ověří, jestli řádek už neexistuje,
-   - pokud existuje, použije update místo duplicity,
-   - delete přes neexistující `id` nebude padat,
-   - multi operace poběží v bezpečném pořadí:
-     1. delete nově vzniklých řádků,
-     2. update existujících řádků,
-     3. insert obnovených řádků.
-3. Doplním podporu pro detailnější popis akce v tooltipu:
-   - `undoDescription`
-   - `redoDescription`
-   - případně ponechám `description` jako fallback.
-
-### Hover na šipkách
-V horní liště upravím hover text pro Step back / Step forward tak, aby jasně říkal, co se stane:
+V T19 má projekt `Z-2617-001` bundle `B` a `D`, oba jsou typu `full`, ale nejsou ve stejné etapě:
 
 ```text
-Zpět: Vrátí 4 položky projektu Z-2512-001 z T18 do Inboxu
-Dopředu: Znovu naplánuje 4 položky projektu Z-2512-001 do T18
+B: stage_id = 5dbe6c7d...
+D: stage_id = null
 ```
 
-Soubor:
-`src/components/production/ProductionHeader.tsx`
+Aktuální kontrola dropu nedovolí spojit položky mezi různými `stage_id`, proto přetažení `B → D` skončí jako neplatný drop.
+
+### Úprava
+Upravím pravidlo pro full bundle:
+
+- pokud jsou oba bundle typu `full`,
+- jsou ze stejného projektu,
+- nejsou split,
+- uživatel dropuje položku/bundle do jiného full bundlu,
+
+tak sloučení povolím i tehdy, když se `stage_id` liší nebo je u jednoho `null`.
+
+Výsledkem bude:
+- položka z `B` půjde přetáhnout do `D`,
+- po sloučení převezme položka týden, bundle label a stage cílového bundlu,
+- v undo/redo to zůstane jedna operace.
+
+Split bundle pravidla nechám přísnější:
+- split se nebude míchat s full,
+- různé split série se dál nebudou spojovat.
 
 ---
 
-## 2. Plán výroby: doplněné akce pro Step back
+## Problém 2: stejný bundle label `B` existuje v T17 i T19
 
-### Soubor
-`src/hooks/useProductionDragDrop.ts`
+Aktuální `normalizeFullBundlesForWeek` sjednocuje full bundle pouze v rámci jednoho týdne. To způsobí, že stejný projekt může mít `B` ve více týdnech, pokud se bundle přesune nebo vytvoří v jiném týdnu.
 
-Doplním persistentní undo/redo payloady pro:
-
-1. **Přesun z Inboxu do týdne**
-   - jedna položka,
-   - celý projekt,
-   - bundle jako jedna operace.
-
-2. **Přesun mezi týdny**
-   - jedna položka,
-   - celý bundle,
-   - merge/separate konflikty.
-
-3. **Vrácení do Inboxu / TPV**
-   - `moveItemBackToInbox`
-   - `returnBundleToInbox`
-   - doplním jako jednu undo operaci pro všechny dotčené položky.
-   - Undo vrátí schedule řádky přesně zpět.
-   - Redo znovu vrátí položky do Inboxu bez duplicit.
-
-4. **Dokončení položky**
-   - `completeItems`
-   - dokončení bude jedna undo operace.
-   - Undo:
-     - odstraní odpovídající `production_expedice` záznamy,
-     - vrátí `production_schedule` na původní `status`, `completed_at`, `completed_by`,
-     - pokud dokončení vytvořilo QC záznam, odstraní i tento QC záznam.
-   - Redo:
-     - znovu nastaví dokončení,
-     - obnoví přesné `production_expedice` záznamy,
-     - obnoví přesné QC záznamy, pokud byly součástí původní akce.
-
-5. **Vrácení z Expedice do výroby**
-   - `returnToProduction`
-   - undo znovu vrátí položku do Expedice v původním stavu.
-
----
-
-## 3. Dialogy v Plánu výroby
-
-### `src/components/production/CompletionDialog.tsx`
-
-Doplním Step back pro dokončení přes dialog.
-
-Dnes dialog umí při dokončení automaticky vložit i QC záznam, pokud chybí. To musí být jedna atomická operace.
-
-Jedna akce:
+U projektu `Z-2617-001` jsem ověřil stav:
 
 ```text
-Dokončení 3 položek + QC potvrzení
+T17: bundle B, full, T.23 -B
+T19: bundle B, full, T.23 -A
+T19: bundle D, full, T.07, T.08
 ```
 
-Undo udělá společně:
-- vrátí položky jako nedokončené,
-- odstraní nově vložené `production_expedice`,
-- odstraní nově vložené `production_quality_checks`,
-- u split-at-completion smaže nově vytvořenou zbývající část,
-- obnoví původní hodiny, CZK, split metadata a názvy.
+To je podle nového pravidla chyba: každý samostatný full bundle projektu má mít vlastní označení globálně napříč týdny, ne jen v rámci týdne.
 
-Redo udělá společně:
-- znovu dokončí položky,
-- znovu vloží expedice záznamy,
-- znovu vloží QC záznamy,
-- znovu vytvoří split část, pokud vznikla.
+---
 
-### `src/components/production/CancelItemDialog.tsx`
+## Nové pravidlo pro označování full bundle
 
-Doplním Step back pro **Zrušení položky**.
-
-Undo:
-- vrátí původní `status`,
-- vrátí původní `cancel_reason`,
-- vrátí původní `cancelled_at`,
-- vrátí původní `cancelled_by`.
-
-Pokud se ruší všechny části splitu, bude to pořád jeden krok:
+Pro jeden projekt + etapu bude platit:
 
 ```text
-Zrušení 4 částí položky AT.02
+A, B, C, D...
 ```
 
-### `src/components/production/PauseItemDialog.tsx`
+jsou globální názvy samostatných full bundlů napříč celým plánem.
 
-Doplním Step back pro **Pauzu položky**.
-
-Undo:
-- obnoví původní `status`,
-- obnoví původní `pause_reason`,
-- obnoví původní `pause_expected_date`.
-
-Pokud pauza zasáhne celý bundle nebo split skupinu, bude to jedna operace.
+Tedy:
+- pokud existuje `B` v T17, nově vytvořený/samostatný bundle v T19 nesmí také dostat `B`,
+- pokud se celý bundle přesune z T17 do T19, jeho label zůstane `B`,
+- pokud se položka nebo bundle vloží do existujícího `D`, převezme `D`,
+- pokud se položka vyčlení jako nový bundle, dostane první volný label, který není použitý nikde v projektu.
 
 ---
 
-## 4. Expedice panel
+## Technická úprava
 
-### Soubor
-`src/components/production/ExpedicePanel.tsx`
+### 1. `src/lib/productionBundles.ts`
 
-Doplním persistentní Step back pro tyto akce:
+Upravím helpery:
 
-1. **Expedovat jednu položku**
-   - `markAsExpediced`
-   - Undo vrátí `expediced_at` na původní hodnotu.
+#### `getNextBundleLabel`
+Zůstane globální pro projekt + etapu, ale zpřesním, že ignoruje pouze zrušené/vrácené/dokončené historické řádky, a bere aktivní full/split labely jako obsazené.
 
-2. **Expedovat celý projekt**
-   - `markAllAsExpediced`
-   - jedna operace pro všechny položky.
-   - Undo vrátí každému řádku jeho původní `expediced_at`.
+#### Nový helper
+Doplním funkci například:
 
-3. **Vrátit z Archivu do Expedice**
-   - `unExpedice`
-   - `unExpediceAll`
-   - Undo obnoví původní expedovaný stav.
+```ts
+getAvailableBundleLabel(projectId, stageId, excludeIds?)
+```
 
-4. **Vrátit do Výroby**
-   - `returnToProduction`
-   - `returnAllToProduction`
-   - Undo znovu vloží přesné `production_expedice` záznamy.
-   - Nebude hádat podle názvu položky.
+Použije se při přesunu nebo vyčlenění, aby nevznikla duplicita labelu mimo původní bundle.
 
-5. **Vrátit do Inboxu / TPV**
-   - `returnAllToInbox`
-   - jedna operace, která zaznamená:
-     - odstraněné `production_expedice`,
-     - odstraněné `production_schedule`,
-     - změněné nebo nově vložené `production_inbox`.
-   - Undo obnoví celý stav před vrácením.
-   - Redo znovu provede vrácení bez duplicit.
+#### `validateBundleDrop`
+Upravím tak, aby:
+- full → full sloučení bylo povolené i při rozdílném `stage_id`,
+- split pravidla zůstala chráněná.
+
+#### `canAcceptBundleDrop`
+Upravím stejně jako UI kontrolu:
+- drop full položky/bundlu do full bundlu stejného projektu bude povolený,
+- stage rozdíl nebude blokovat full → full,
+- split logika zůstane beze změny.
 
 ---
 
-## 5. Modul Výroba
+### 2. `src/hooks/useProductionDragDrop.ts`
 
-### Soubor
-`src/pages/Vyroba.tsx`
-
-Doplním persistentní payloady pro existující Step back akce:
-
-1. **Denní log**
-   - změna fáze / procent / poznámky,
-   - Bez výroby.
-
-2. **Přelití do dalšího týdne**
-   - více položek jako jeden krok.
-
-3. **Poslat do Expedice**
-   - `handleConfirmExpedice`
-   - Undo:
-     - vrátí projekt na původní status,
-     - odstraní vložené expedice záznamy,
-     - obnoví původní data.
-   - Redo:
-     - znovu pošle projekt do Expedice pomocí uložených záznamů.
-
-4. **Označit jako Hotovo**
-   - jedna nebo více položek.
-   - Undo odstraní odpovídající expedice záznamy.
-   - Redo je znovu vloží přes původní uložený snapshot.
-
-5. **QC potvrzení**
-   - pokud QC vzniká samostatně, bude mít vlastní Step back.
-   - pokud QC vzniká jako součást dokončení, nebude samostatný druhý krok, ale bude součástí dokončení.
-
----
-
-## 6. Bundle = jedna operace
-
-U všech bundle akcí sjednotím chování:
+Upravím akce:
 
 ```text
-Přesun bundlu Z-2512-001 → T18
+moveScheduleItemIntoBundle
+mergeFullBundleIntoBundle
+moveScheduleItemAsNewBundle
+moveFullBundleAsNewBundle
+moveBundleToWeek
 ```
 
-nebude:
-
-```text
-Přesun AT.01
-Přesun AT.02
-Přesun AT.03
-```
-
-Technicky budu používat snapshoty:
-
-```text
-beforeRows
-afterRows
-```
-
-Undo obnoví `beforeRows`.
-Redo obnoví `afterRows`.
-
-To zabrání tomu, aby redo znovu spouštělo drag/drop logiku, merge dialogy nebo konfliktové větve.
+Konkrétně:
+- při sloučení do cílového bundlu položka převezme i `stage_id` cílového bundlu,
+- při vytvoření nového bundlu se použije globálně volný label,
+- po přesunu se nebude automaticky normalizovat tak, že se omylem sjednotí samostatné full bundle v jednom týdnu,
+- undo/redo payloady zachovají původní `stage_id`, `bundle_label`, `bundle_type`, `scheduled_week`.
 
 ---
 
-## 7. Ochrana proti duplicitám a loop chybám
+### 3. `src/hooks/useProductionSchedule.ts`
 
-Zavedu pravidlo:
+Zkontroluji klíč pro seskupování bundle:
 
-- undo/redo nikdy nevolá `pushUndo`,
-- redo nepřepočítává akci znovu podle aktuálního stavu,
-- redo používá uložený snapshot,
-- insert používá původní `id`,
-- pokud řádek existuje, aktualizuje se,
-- pokud řádek neexistuje při delete, akce pokračuje,
-- pokud řádek chybí při kritickém update, zobrazí se čitelná chyba.
-
-Tím se sníží riziko:
-- duplicit v `production_schedule`,
-- duplicit v `production_inbox`,
-- duplicit v `production_expedice`,
-- duplicit QC záznamů,
-- nekonečného undo/redo loopu.
-
----
-
-## 8. Audit ostatních modulů
-
-Zreviduji i současný stav mimo výrobu:
-
-### Projekty
-- inline edit projektu,
-- status,
-- termíny,
-- PM,
-- konstruktér,
-- cena.
-
-### TPV
-- inline edit položky,
-- mazání položek,
-- bulk status,
-- změna počtu kusů s dopadem na výrobu.
-
-### Nastavení
-Prověřím, kde Step back dává smysl:
-- kapacity,
-- statusy,
-- kurzy,
-- formule,
-- nákladové presety.
-
-Výstupem bude krátká tabulka:
-
-```text
-Modul              Dnes                 Po opravě
-Plán výroby        část session-only    persistent 30 min
-Výroba             část session-only    persistent 30 min
-Expedice           bez Step back        persistent 30 min
-TPV                částečně             audit + doplnění
-Projekty           částečně             ověřeno/doplněno
-Nastavení          různé                rozhodnuto podle akce
+```ts
+project_id + stage_id + bundle_label + split_part
 ```
 
+Pokud po nové logice bude potřeba, upravím ho tak, aby full bundle seskupoval podle stabilního bundle labelu a split bundle podle split metadat. Cílem je, aby UI správně ukázalo:
+- `D` jako jeden bundle po vložení položky z `B`,
+- `B` a `D` jako oddělené bundle, pokud se nesloučily.
+
 ---
 
-## 9. Ověření
+### 4. Oprava existujících dat pro `Z-2617-001`
+
+Připravím jednorázovou bezpečnou opravu aktuální duplicity:
+
+```text
+Z-2617-001
+T17: B ponechat
+T19: B přejmenovat na první volný label, pravděpodobně C nebo E
+```
+
+Ponechám existující `D`, protože už existuje jako samostatný bundle v T19.
+
+Oprava bude cílená jen na projekt `Z-2617-001`, ne globální přepis všech dat.
+
+---
+
+## Očekávané chování po opravě
+
+### Ad 1
+V T19 půjde:
+```text
+položka z B → drop na D
+```
+
+Výsledek:
+```text
+D obsahuje původní položky D + položku z B
+B zmizí, pokud byl prázdný
+```
+
+### Ad 2
+Nebude možné, aby jeden projekt měl samostatný full bundle `B` v T17 a další samostatný full bundle `B` v T19.
+
+Pokud nový bundle vzniká v jiném týdnu, dostane nový volný label.
+
+---
+
+## Ověření
 
 Po implementaci ověřím:
 
-1. Step back po refreshi funguje do 30 minut.
-2. Přesun jedné položky v Plánu výroby jde vrátit po refreshi.
-3. Přesun bundlu je jedna undo operace.
-4. Undo bundlu nevyrobí duplicity.
-5. Redo bundlu nevyvolá merge/conflict dialogy.
-6. Vrácení do Inboxu / TPV jde vrátit i zopakovat.
-7. Zrušení položky jde vrátit.
-8. Pauza položky jde vrátit.
-9. Dokončení položky jde vrátit včetně expedice záznamu.
-10. Pokud dokončení vytvoří QC, Step back odstraní i QC ve stejném kroku.
-11. Step forward QC znovu obnoví jen pokud QC vzniklo danou akcí.
-12. Poslat do Expedice jde vrátit jako jedna operace.
-13. Expedovat jde vrátit jako jedna operace.
-14. Vrácení z Expedice do výroby jde vrátit.
-15. Vrácení z Expedice do Inboxu jde vrátit bez duplicit.
-16. Hover na Step back / Step forward jasně popisuje, co tlačítko udělá.
-17. Build projde bez TypeScript chyb.
-
----
-
-## Soubory k úpravě
-
-```text
-src/hooks/useUndoRedo.tsx
-src/components/production/ProductionHeader.tsx
-src/hooks/useProductionDragDrop.ts
-src/components/production/CompletionDialog.tsx
-src/components/production/CancelItemDialog.tsx
-src/components/production/PauseItemDialog.tsx
-src/components/production/ExpedicePanel.tsx
-src/pages/Vyroba.tsx
-src/hooks/useTPVItems.tsx
-src/hooks/useProjectMutations.tsx
-src/hooks/useCustomColumns.tsx
-```
-
-Databázové schéma `undo_sessions` už existuje. Novou tabulku nepředpokládám.
+1. `Z-2617-001` v T19: položka z `B` jde přetáhnout do `D`.
+2. Po dropu má položka label `D`.
+3. Po dropu se nezmění split bundle `A`.
+4. Full bundle se nespojí se split bundle.
+5. Nový full bundle nedostane label, který už projekt používá v jiném týdnu.
+6. Aktuální duplicita `B` u `Z-2617-001` bude opravena.
+7. Undo vrátí položku zpět do původního bundlu.
+8. Redo ji znovu vloží do cílového bundlu bez duplicit.
+9. Build projde bez TypeScript chyb.
