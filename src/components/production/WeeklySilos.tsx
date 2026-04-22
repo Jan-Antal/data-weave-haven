@@ -1869,7 +1869,7 @@ function CompletedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onCont
       <span style={{ width: 10, fontSize: 9, color: isIntermediateSplit ? "#6366f1" : "#3a8a36", fontWeight: 700 }}>{isIntermediateSplit ? "↻" : "✓"}</span>
       {item.item_code && <span className="font-sans text-[9px] font-bold shrink-0" style={{ color: "#99a5a3" }}>{item.item_code}</span>}
       <span className="text-[10px] flex-1 truncate" style={{ color: isIntermediateSplit ? "#4f46e5" : "#6b7280", textDecoration: isIntermediateSplit ? "none" : "line-through" }}>{item.item_name}</span>
-      {item.item_quantity != null && item.item_quantity > 0 && (
+      {item.item_quantity != null && item.item_quantity > 1 && (
         <span className="text-[8px] font-semibold shrink-0 px-1 py-px rounded" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.24)" }}>
           {item.item_quantity} ks
         </span>
