@@ -37,6 +37,25 @@ export function CompletionDialog({
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set(preCheckedIds ?? []));
   const [itemConfigs, setItemConfigs] = useState<Record<string, ItemCompletionConfig>>({});
   const [splitOpenId, setSplitOpenId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  // Sort items alphabetically by code (with natural numeric ordering: 0 before 1, AT.2 before AT.10)
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const ac = (a.item_code || a.item_name || "").toString();
+      const bc = (b.item_code || b.item_name || "").toString();
+      return ac.localeCompare(bc, undefined, { numeric: true, sensitivity: "base" });
+    });
+  }, [items]);
+
+  const visibleItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sortedItems;
+    return sortedItems.filter(i =>
+      (i.item_code || "").toLowerCase().includes(q) ||
+      (i.item_name || "").toLowerCase().includes(q)
+    );
+  }, [sortedItems, search]);
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
