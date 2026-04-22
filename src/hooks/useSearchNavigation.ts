@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import type { WeekSilo } from "@/hooks/useProductionSchedule";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
+import { buildBundleKey } from "@/lib/productionBundles";
 
 export interface SearchMatch {
   weekKey: string;
@@ -57,7 +58,13 @@ export function useSearchNavigation({
               ...bundle.items.map((i) => i.item_code ?? ""),
             ];
             if (texts.some((t) => t && normalize(t).includes(nq))) {
-              const key = `${weekKey}::${bundle.project_id}`;
+              const key = buildBundleKey({
+                weekKey,
+                project_id: bundle.project_id,
+                stage_id: bundle.stage_id,
+                bundle_label: bundle.bundle_label,
+                split_part: bundle.split_part,
+              });
               if (!seen.has(key)) {
                 seen.add(key);
                 result.push({ weekKey, projectId: bundle.project_id, matchKey: key });
