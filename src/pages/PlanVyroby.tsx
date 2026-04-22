@@ -1065,7 +1065,7 @@ export default function PlanVyroby() {
 
       {!!tpvProjectId && (
         <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
-          <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-auto p-0">
+          <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-hidden p-5 gap-0 flex flex-col">
             <TPVList
               projectId={tpvProjectId}
               projectName={tpvProject?.project_name || tpvProjectId}
