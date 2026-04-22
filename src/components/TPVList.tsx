@@ -380,26 +380,33 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         const skipped: string[] = [];
 
         for (const item of itemsToSend) {
-          // Check if already in inbox/schedule with active (non-cancelled) statuses
+          const itemCode = item.item_code;
+
+          // Check if already planned in schedule, or already waiting in inbox.
+          // A stale inbox row with status "scheduled" but no schedule row is revived below instead of blocking re-send.
           const [inboxCheck, schedCheck] = await Promise.all([
             supabase
               .from("production_inbox")
-              .select("id")
+              .select("id, status")
               .eq("project_id", projectId)
-              .eq("item_code", item.item_code)
+              .eq("item_code", itemCode)
               .not("status", "in", "(cancelled,returned)")
               .limit(1),
             supabase
               .from("production_schedule")
               .select("id")
               .eq("project_id", projectId)
-              .eq("item_code", item.item_code)
+              .eq("item_code", itemCode)
               .in("status", ["scheduled", "in_progress", "completed", "expedice", "paused"])
               .limit(1),
           ]);
 
-          if ((inboxCheck.data && inboxCheck.data.length > 0) || (schedCheck.data && schedCheck.data.length > 0)) {
-            skipped.push(item.item_code);
+          const activeInboxRow = inboxCheck.data?.[0] as { id: string; status: string } | undefined;
+          const isAlreadyScheduled = !!schedCheck.data?.length;
+          const isAlreadyPending = activeInboxRow?.status === "pending";
+
+          if (isAlreadyScheduled || isAlreadyPending) {
+            skipped.push(itemCode);
             continue;
           }
 
@@ -408,15 +415,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             .from("production_inbox")
             .delete()
             .eq("project_id", projectId)
-            .eq("item_code", item.item_code)
+            .eq("item_code", itemCode)
             .in("status", ["cancelled", "returned"]);
           await supabase
             .from("production_schedule")
             .delete()
             .eq("project_id", projectId)
-            .eq("item_code", item.item_code)
+            .eq("item_code", itemCode)
             .in("status", ["cancelled", "returned"]);
-
 
           // Hours = (selling price × (1 - margin) × production%) / hourly rate
           const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
@@ -424,19 +430,23 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           const estimatedHours =
             itemCenaConverted > 0 ? Math.round((itemCenaConverted * (1 - marze) * prodPct) / hourlyRate) : 0;
 
-          // Insert into production_inbox
-          const { error } = await supabase.from("production_inbox").insert({
+          const inboxPayload = {
             project_id: projectId,
+            stage_id: (item as any).stage_id || null,
             item_name: item.nazev || item.item_code,
             item_code: item.item_code,
             estimated_hours: estimatedHours,
             estimated_czk: itemCenaConverted,
             status: "pending",
             sent_by: user.id,
-          } as any);
+          } as any;
+
+          const { error } = activeInboxRow?.status === "scheduled"
+            ? await supabase.from("production_inbox").update(inboxPayload).eq("id", activeInboxRow.id)
+            : await supabase.from("production_inbox").insert(inboxPayload);
 
           if (error) {
-            console.error("Inbox insert error:", error);
+            console.error("Inbox upsert error:", error);
             continue;
           }
 
