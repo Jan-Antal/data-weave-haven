@@ -288,8 +288,27 @@ export function CompletionDialog({
           </div>
         )}
 
+        {/* Search bar — visible for larger bundles */}
+        {items.length > 6 && (
+          <div className="px-5 pb-2">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Hledat kód nebo název…"
+              className="w-full text-[11px] px-2.5 py-1.5 rounded-md bg-transparent outline-none"
+              style={{ border: "1px solid #e2ddd6", color: "#223937" }}
+            />
+          </div>
+        )}
+
         <div className="px-5 pb-3 space-y-1 max-h-[400px] overflow-y-auto">
-          {items.map(item => {
+          {visibleItems.length === 0 && (
+            <div className="text-[11px] italic text-center py-3" style={{ color: "#99a5a3" }}>
+              Žádné položky neodpovídají hledání.
+            </div>
+          )}
+          {visibleItems.map(item => {
             const isCompleted = item.status === "expedice" || item.status === "completed";
             const isChecked = checkedIds.has(item.id);
             const config = getConfig(item.id);
