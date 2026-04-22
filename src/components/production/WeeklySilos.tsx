@@ -1750,9 +1750,6 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                   {urgencyInfo.label}
                 </span>
               )}
-              <span className="font-sans text-[10px] leading-none ml-auto shrink-0" style={{ color: forecastDarkMode ? "#c8d0e0" : "#223937", fontWeight: 700 }}>
-                {bundleDisplayLabel}
-              </span>
             </div>
             <div className="flex items-center gap-1.5 min-w-0 whitespace-nowrap">
               <span className="font-sans shrink-0" style={{ fontSize: 11, color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
