@@ -1731,20 +1731,20 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-sans" style={{ fontSize: 11, color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
+            <div className="flex items-center gap-1.5 min-w-0 whitespace-nowrap">
+              <span className="font-sans shrink-0" style={{ fontSize: 11, color: forecastDarkMode ? "#5a6480" : (allCompleted ? "#b0b7c3" : "#6b7280") }}>{bundle.project_id}</span>
               {(() => {
                 const proj = projectLookup.get(bundle.project_id);
                 const risk = proj?.risk;
                 if (!risk) return null;
                 const r = risk.toLowerCase();
-                if (r === "vysoká") return <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#7f1d1d", color: "#fca5a5" }}>{risk}</span>;
-                if (r === "střední") return <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#7c2d12", color: "#fdba74" }}>{risk}</span>;
-                if (r === "nízká") return <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#14532d", color: "#86efac" }}>{risk}</span>;
+                if (r === "vysoká") return <span className="shrink-0" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#7f1d1d", color: "#fca5a5" }}>{risk}</span>;
+                if (r === "střední") return <span className="shrink-0" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#7c2d12", color: "#fdba74" }}>{risk}</span>;
+                if (r === "nízká") return <span className="shrink-0" style={{ fontSize: 10, padding: "2px 6px", borderRadius: 3, marginLeft: 4, backgroundColor: "#14532d", color: "#86efac" }}>{risk}</span>;
                 return null;
               })()}
               {expDate ? (
-                <span className="truncate" style={{ fontSize: 11, color: !allCompleted && daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : !allCompleted && daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : forecastDarkMode ? "#5a7a76" : "#7aa8a4" }}>
+                <span className="truncate min-w-0" style={{ fontSize: 11, color: !allCompleted && daysUntilExp !== null && daysUntilExp < 0 ? "#dc2626" : !allCompleted && daysUntilExp !== null && daysUntilExp <= 14 ? "#d97706" : forecastDarkMode ? "#5a7a76" : "#7aa8a4" }}>
                   {deadlineLabel}: {expDate}
                 </span>
               ) : !allCompleted && !isProjectDone && (
@@ -1781,7 +1781,6 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 </Tooltip>
               );
             })()}
-            {!isMidflightBundle && completedCount > 0 && <span className="text-[9px]" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
             {displayMode === "czk" ? (
               <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap, exchangeRates))}</span>
             ) : displayMode === "percent" ? (
@@ -1789,6 +1788,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             ) : (
               <span className="font-sans" style={{ fontSize: 15, color: forecastDarkMode ? (allCompleted ? "#4a5168" : "#8899bb") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: 600 }}>{Math.round(bundle.total_hours)}h</span>
             )}
+            {!isMidflightBundle && completedCount > 0 && <span className="text-[9px] whitespace-nowrap" style={{ color: "#3a8a36", fontWeight: 600 }}>{completedCount}/{totalCount} ✓</span>}
           </div>
         </div>
       </div>
