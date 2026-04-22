@@ -91,10 +91,9 @@ async function executePayload(payload: UndoPayload, queryClient: ReturnType<type
       if (error) throw error;
     }
   } else if (payload.operation === "multi") {
-    // Multi combines sub-operations; execute in deterministic order to reduce duplicate/key conflicts.
-    const order = { insert: 0, update: 1, delete: 2, multi: 3 } as const;
+    // Multi combines sub-operations; execute in the order prepared by the caller.
+    // Safe convention for snapshot payloads: insert op = delete new rows, update op = restore existing rows, delete op = restore deleted rows.
     const subPayloads = [...payload.records] as unknown as UndoPayload[];
-    subPayloads.sort((a, b) => order[a.operation] - order[b.operation]);
     for (const sub of subPayloads) {
       await executePayload(sub as unknown as UndoPayload, queryClient);
     }
