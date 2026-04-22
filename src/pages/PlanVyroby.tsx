@@ -434,11 +434,11 @@ export default function PlanVyroby() {
   }, []);
 
   const resolveTargetWeek = useCallback((targetId: string, dragData: ActiveDragData): string | null => {
-    if (targetId.startsWith("silo-week-")) {
-      return targetId.replace("silo-week-", "");
-    }
     if (targetId.startsWith("silo-week-new-bundle-")) {
       return targetId.replace("silo-week-new-bundle-", "");
+    }
+    if (targetId.startsWith("silo-week-")) {
+      return targetId.replace("silo-week-", "");
     }
     if (targetId.startsWith("silo-bundle-drop-") || targetId.startsWith("silo-bundle-")) {
       const rawKey = targetId.replace(/^silo-bundle-drop-/, "").replace(/^silo-bundle-/, "");
@@ -777,7 +777,7 @@ export default function PlanVyroby() {
         }
       }
   }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek, moveFullBundleAsNewBundle,
-    moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
+    moveScheduleItemIntoBundle, moveScheduleItemAsNewBundle, moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
     findSpillWeek, findSiblingInWeek, mergeSplitItems, mergeFullBundleIntoBundle, resolveTargetWeek, checkAndWarnDeadline,
     forecast]);
 
