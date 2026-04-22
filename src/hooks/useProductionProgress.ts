@@ -89,7 +89,6 @@ export function useProductionProgress() {
       }
 
       const allProjectIds = new Set<string>();
-      for (const pid of tpvByProject.keys()) allProjectIds.add(pid);
       for (const pid of inboxByProject.keys()) allProjectIds.add(pid);
       for (const pid of scheduledByProject.keys()) allProjectIds.add(pid);
       for (const pid of completedByProject.keys()) allProjectIds.add(pid);
