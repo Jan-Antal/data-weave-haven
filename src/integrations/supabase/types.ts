@@ -784,6 +784,9 @@ export type Database = {
       production_inbox: {
         Row: {
           adhoc_reason: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           estimated_czk: number
           estimated_hours: number
@@ -801,6 +804,9 @@ export type Database = {
         }
         Insert: {
           adhoc_reason?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           estimated_czk: number
           estimated_hours: number
@@ -818,6 +824,9 @@ export type Database = {
         }
         Update: {
           adhoc_reason?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           estimated_czk?: number
           estimated_hours?: number
@@ -932,6 +941,8 @@ export type Database = {
         Row: {
           adhoc_reason: string | null
           cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
@@ -961,6 +972,8 @@ export type Database = {
         Insert: {
           adhoc_reason?: string | null
           cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -990,6 +1003,8 @@ export type Database = {
         Update: {
           adhoc_reason?: string | null
           cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string

@@ -3,8 +3,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { renumberSiblings } from "./SplitItemDialog";
+
+import { useAuth } from "@/hooks/useAuth";
 import { logActivity } from "@/lib/activityLog";
 
 interface CancelItemDialogProps {
@@ -34,7 +34,7 @@ export function CancelItemDialog({
   source, splitGroupId, cancelAll,
 }: CancelItemDialogProps) {
   const qc = useQueryClient();
-  const { pushUndo } = useUndoRedo();
+  const { user } = useAuth();
   const [reason, setReason] = useState("klient");
   const [submitting, setSubmitting] = useState(false);
 
@@ -49,71 +49,42 @@ export function CancelItemDialog({
     setSubmitting(true);
     try {
       const cancelReason = REASON_OPTIONS.find(r => r.value === reason)?.label || reason;
+      const cancelledAt = new Date().toISOString();
+      const cancelledBy = user?.id ?? null;
+      const updatePayload = {
+        status: "cancelled",
+        cancel_reason: cancelReason,
+        cancelled_at: cancelledAt,
+        cancelled_by: cancelledBy,
+      } as any;
 
       if (cancelAll && splitGroupId) {
-        // Cancel all parts in the split group — best-effort, don't block on individual errors
+        // Cancel all parts in the split group via UPDATE — best-effort across both tables
         try {
           await supabase.from("production_schedule")
-            .delete()
+            .update(updatePayload)
             .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
-        } catch (e) { console.warn("[Cancel] schedule split delete failed:", e); }
+        } catch (e) { console.warn("[Cancel] schedule split update failed:", e); }
         try {
           await supabase.from("production_inbox")
-            .delete()
+            .update(updatePayload)
             .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
-        } catch (e) { console.warn("[Cancel] inbox split delete failed:", e); }
+        } catch (e) { console.warn("[Cancel] inbox split update failed:", e); }
       } else {
         if (source === "schedule") {
-          // Delete from production_schedule
-          const { error } = await supabase.from("production_schedule").delete().eq("id", itemId);
+          const { error } = await supabase.from("production_schedule")
+            .update(updatePayload)
+            .eq("id", itemId);
           if (error) throw error;
-
-          // If this was a split part, best-effort renumber siblings
-          if (splitGroupId) {
-            try {
-              const { data: remaining } = await supabase
-                .from("production_schedule")
-                .select("id")
-                .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
-
-              if (remaining && remaining.length > 1) {
-                await renumberSiblings(splitGroupId);
-                const { data: allParts } = await supabase
-                  .from("production_schedule")
-                  .select("id, split_part, split_total, item_name")
-                  .or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`)
-                  .order("scheduled_week");
-                if (allParts) {
-                  const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
-                  for (const p of allParts) {
-                    await supabase.from("production_schedule").update({
-                      item_name: `${cleanName} (${p.split_part}/${p.split_total})`,
-                    }).eq("id", p.id);
-                  }
-                }
-              } else if (remaining && remaining.length === 1) {
-                const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
-                await supabase.from("production_schedule").update({
-                  split_group_id: null,
-                  split_part: null,
-                  split_total: null,
-                  item_name: cleanName,
-                }).eq("id", remaining[0].id);
-              }
-            } catch (e) {
-              // Renumber is non-critical — delete already succeeded.
-              console.warn("[Cancel] renumber siblings failed (non-critical):", e);
-            }
-          }
         } else {
-          // Delete from inbox
-          const { error } = await supabase.from("production_inbox").delete().eq("id", itemId);
+          const { error } = await supabase.from("production_inbox")
+            .update(updatePayload)
+            .eq("id", itemId);
           if (error) throw error;
         }
       }
 
       // Auto-sync: invalidate TPV virtual status (production-statuses cache).
-      // Status "Vyroba" v TPV List sa počíta z inbox+schedule, takže stačí refetch.
       qc.invalidateQueries({ queryKey: ["production-statuses", projectId] });
       qc.invalidateQueries({ queryKey: ["tpv-items", projectId] });
 
@@ -139,7 +110,7 @@ export function CancelItemDialog({
       });
     }
     setSubmitting(false);
-  }, [reason, itemId, source, splitGroupId, cancelAll, invalidateAll, onOpenChange, itemName, projectId, itemCode, qc]);
+  }, [reason, itemId, source, splitGroupId, cancelAll, invalidateAll, onOpenChange, itemName, projectId, itemCode, qc, user?.id]);
 
   const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
 

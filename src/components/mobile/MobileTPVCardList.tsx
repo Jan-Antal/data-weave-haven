@@ -124,7 +124,11 @@ export function MobileTPVCardList({
             const statusColor = statusOpt?.color;
             const isExpanded = expandedId === item.id;
             const vyrobaStatuses = productionStatusMap.get(item.item_code || item.nazev || "") || [];
-            const vyrobaLabel = vyrobaStatuses[0]?.label || "";
+            const vyrobaPrimary = vyrobaStatuses[0];
+            const vyrobaLabel = vyrobaPrimary?.label || "";
+            const vyrobaColor = vyrobaPrimary?.color;
+            const vyrobaTooltip = vyrobaPrimary?.tooltip;
+            const vyrobaIsCancelled = vyrobaLabel.startsWith("✕");
             const stage = item.stage_id ? stages.find(s => s.id === item.stage_id) : null;
             const stageLabel = stage ? (stage.display_name || stage.stage_name) : "";
 
@@ -164,7 +168,19 @@ export function MobileTPVCardList({
                       <span className="text-[10px] font-sans bg-muted px-1.5 py-0.5 rounded">{item.pocet} ks</span>
                     )}
                     {vyrobaLabel && (
-                      <Badge variant="secondary" className="text-[10px] h-5">{vyrobaLabel}</Badge>
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] h-5"
+                        title={vyrobaTooltip || undefined}
+                        style={vyrobaColor ? {
+                          backgroundColor: `${vyrobaColor}15`,
+                          color: vyrobaColor,
+                          borderColor: `${vyrobaColor}40`,
+                          textDecoration: vyrobaIsCancelled ? "line-through" : undefined,
+                        } : undefined}
+                      >
+                        {vyrobaLabel}
+                      </Badge>
                     )}
                     {stageLabel && (
                       <Badge variant="outline" className="text-[10px] h-5 border-primary/40 text-primary">{stageLabel}</Badge>
@@ -202,7 +218,19 @@ export function MobileTPVCardList({
                     {vyrobaLabel && (
                       <div>
                         <span className="text-[10px] text-muted-foreground uppercase">Výroba</span>
-                        <Badge variant="secondary" className="text-[10px] h-5 ml-1">{vyrobaLabel}</Badge>
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] h-5 ml-1"
+                          title={vyrobaTooltip || undefined}
+                          style={vyrobaColor ? {
+                            backgroundColor: `${vyrobaColor}15`,
+                            color: vyrobaColor,
+                            borderColor: `${vyrobaColor}40`,
+                            textDecoration: vyrobaIsCancelled ? "line-through" : undefined,
+                          } : undefined}
+                        >
+                          {vyrobaLabel}
+                        </Badge>
                       </div>
                     )}
                     {stageLabel && (

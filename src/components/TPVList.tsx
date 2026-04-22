@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "./ConfirmDialog";
 import {
   useTPVItems,
@@ -379,13 +380,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         const skipped: string[] = [];
 
         for (const item of itemsToSend) {
-          // Check if already in inbox (any status) or schedule (active statuses)
+          // Check if already in inbox/schedule with active (non-cancelled) statuses
           const [inboxCheck, schedCheck] = await Promise.all([
             supabase
               .from("production_inbox")
               .select("id")
               .eq("project_id", projectId)
               .eq("item_code", item.item_code)
+              .neq("status", "cancelled")
               .limit(1),
             supabase
               .from("production_schedule")
@@ -400,6 +402,21 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             skipped.push(item.item_code);
             continue;
           }
+
+          // Wipe any prior cancelled rows for this TPV item — guarantees one current production state.
+          await supabase
+            .from("production_inbox")
+            .delete()
+            .eq("project_id", projectId)
+            .eq("item_code", item.item_code)
+            .eq("status", "cancelled");
+          await supabase
+            .from("production_schedule")
+            .delete()
+            .eq("project_id", projectId)
+            .eq("item_code", item.item_code)
+            .eq("status", "cancelled");
+
 
           // Hours = (selling price × (1 - margin) × production%) / hourly rate
           const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
@@ -978,20 +995,31 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                         return (
                           <TableCell key={key} style={cellStyle}>
                             <div className="flex flex-wrap gap-0.5">
-                              {statuses.map((s, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                                  style={{
-                                    backgroundColor: `${s.color}15`,
-                                    color: s.color,
-                                    borderColor: `${s.color}40`,
-                                    textDecoration: s.label.startsWith("✕") ? "line-through" : undefined,
-                                  }}
-                                >
-                                  {s.label}
-                                </span>
-                              ))}
+                              {statuses.map((s, idx) => {
+                                const isCancelled = s.label.startsWith("✕");
+                                const badge = (
+                                  <span
+                                    className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                                    style={{
+                                      backgroundColor: `${s.color}15`,
+                                      color: s.color,
+                                      borderColor: `${s.color}40`,
+                                      textDecoration: isCancelled ? "line-through" : undefined,
+                                    }}
+                                  >
+                                    {s.label}
+                                  </span>
+                                );
+                                if (s.tooltip) {
+                                  return (
+                                    <Tooltip key={idx}>
+                                      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+                                      <TooltipContent side="top">{s.tooltip}</TooltipContent>
+                                    </Tooltip>
+                                  );
+                                }
+                                return <span key={idx}>{badge}</span>;
+                              })}
                               {pocetLabel && (
                                 <span
                                   className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
