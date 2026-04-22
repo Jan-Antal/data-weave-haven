@@ -39,6 +39,25 @@ export function CompletionDialog({
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
 
+  // QC gate: load existing quality checks for this project
+  const { data: qcChecks = [] } = useQuery({
+    queryKey: ["production-quality-checks", projectId],
+    enabled: open && !!projectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_quality_checks" as any)
+        .select("item_id")
+        .eq("project_id", projectId);
+      if (error) throw error;
+      return (data || []) as { item_id: string }[];
+    },
+  });
+  const qcSet = useMemo(() => new Set(qcChecks.map(r => r.item_id)), [qcChecks]);
+  const missingQcChecked = useMemo(
+    () => items.filter(i => checkedIds.has(i.id) && !qcSet.has(i.id)),
+    [items, checkedIds, qcSet],
+  );
+
   const getConfig = (id: string): ItemCompletionConfig => itemConfigs[id] || { mode: "full", splitPct: 50 };
 
   const setConfig = (id: string, config: Partial<ItemCompletionConfig>) => {
