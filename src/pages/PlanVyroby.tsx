@@ -887,6 +887,7 @@ export default function PlanVyroby() {
                   showCzk={showCzk}
                   onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")}
                   overDroppableId={overDroppableId}
+                  activeDrag={activeDrag}
                   onNavigateToTPV={handleNavigateToTPV}
                   onOpenProjectDetail={handleOpenProjectDetail}
                   displayMode={displayMode}
