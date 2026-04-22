@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo } from "react";
 
 export interface ProjectProgress {
   project_id: string;
@@ -66,11 +65,14 @@ export function useProductionProgress() {
           nonBlockerCountByProject.set(pid, (nonBlockerCountByProject.get(pid) || 0) + 1);
         }
         if (row.status === "completed") {
-          completedByProject.set(pid, (completedByProject.get(pid) || 0) + 1);
+          if (!completedByProject.has(pid)) completedByProject.set(pid, new Set());
+          completedByProject.get(pid)!.add(itemKey(row));
         } else if (row.status === "paused") {
-          pausedByProject.set(pid, (pausedByProject.get(pid) || 0) + 1);
+          if (!pausedByProject.has(pid)) pausedByProject.set(pid, new Set());
+          pausedByProject.get(pid)!.add(itemKey(row));
         } else {
-          scheduledByProject.set(pid, (scheduledByProject.get(pid) || 0) + 1);
+          if (!scheduledByProject.has(pid)) scheduledByProject.set(pid, new Set());
+          scheduledByProject.get(pid)!.add(itemKey(row));
         }
         
         if (!scheduledItemsByProject.has(pid)) scheduledItemsByProject.set(pid, []);
@@ -94,11 +96,11 @@ export function useProductionProgress() {
 
       const result = new Map<string, ProjectProgress>();
       for (const pid of allProjectIds) {
-        const totalTpv = tpvByProject.get(pid) || 0;
-        const inInbox = inboxByProject.get(pid) || 0;
-        const scheduled = scheduledByProject.get(pid) || 0;
-        const completed = completedByProject.get(pid) || 0;
-        const paused = pausedByProject.get(pid) || 0;
+        const totalTpv = tpvByProject.get(pid)?.size || 0;
+        const inInbox = inboxByProject.get(pid)?.size || 0;
+        const scheduled = scheduledByProject.get(pid)?.size || 0;
+        const completed = completedByProject.get(pid)?.size || 0;
+        const paused = pausedByProject.get(pid)?.size || 0;
         const accountedFor = inInbox + scheduled + completed + paused;
         const missing = Math.max(0, totalTpv - accountedFor);
         
