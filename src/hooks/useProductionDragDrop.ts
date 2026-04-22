@@ -1618,6 +1618,8 @@ export function useProductionDragDrop() {
     moveInboxProjectToWeek,
     moveScheduleItemToWeek,
     moveBundleToWeek,
+    moveScheduleItemIntoBundle,
+    moveScheduleItemAsNewBundle,
     moveItemBackToInbox,
     reorderItemsInWeek,
     completeItems,
