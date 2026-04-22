@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fallbackBundleLabel, resolveBundleType, type BundleType } from "@/lib/productionBundles";
 
 function normalizeProductionItemCode(code: string | null | undefined): string {
   if (!code) return "";
@@ -32,6 +33,8 @@ export interface ScheduleItem {
   is_blocker: boolean;
   is_midflight: boolean;
   tpv_expected_date: string | null;
+  bundle_label: string | null;
+  bundle_type: BundleType | null;
 }
 
 export interface ScheduleBundle {
@@ -106,6 +109,8 @@ export function useProductionSchedule() {
 
         const week = row.scheduled_week;
         const pid = row.project_id;
+        const bundleLabel = (row as any).bundle_label ?? fallbackBundleLabel((row as any).split_group_id ?? `${row.project_id}:${row.stage_id ?? "none"}:${row.scheduled_week}:${row.position}`);
+        const bundleType = resolveBundleType(row as any);
         if (!byWeek.has(week)) byWeek.set(week, new Map());
         const weekMap = byWeek.get(week)!;
         if (!weekMap.has(pid)) {
@@ -143,6 +148,8 @@ export function useProductionSchedule() {
           is_blocker: (row as any).is_blocker ?? false,
           is_midflight: (row as any).is_midflight ?? false,
           tpv_expected_date: (row as any).tpv_expected_date ?? null,
+          bundle_label: bundleLabel,
+          bundle_type: bundleType,
         });
         bundle.total_hours += row.scheduled_hours;
       }
