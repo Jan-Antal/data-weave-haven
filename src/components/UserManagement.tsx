@@ -59,7 +59,7 @@ interface Props {
 }
 
 export function UserManagement({ open, onOpenChange, inline = false }: Props) {
-  const { isTestUser } = useAuth();
+  const { isTestUser, isOwner: currentUserIsOwner } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -83,6 +83,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   const [editingNameValue, setEditingNameValue] = useState("");
 
   const handleCopyInviteLink = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     setCopyingLinkId(userId);
     try {
       const { data, error } = await supabase.functions.invoke("generate-invite-link", {
@@ -190,6 +195,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleUpdatePerson = async (userId: string, personId: string | null) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("profiles").update({ person_id: personId } as any).eq("id", userId);
     if (error) {
       toast({ title: "Chyba", variant: "destructive" });
@@ -200,6 +210,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleUpdateRole = async (userId: string, role: AppRole) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("update-user", {
       body: { user_id: userId, role },
     });
@@ -212,6 +227,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleToggleActive = async (userId: string, is_active: boolean) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("update-user", {
       body: { user_id: userId, is_active },
     });
@@ -224,6 +244,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleDelete = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("delete-user", {
       body: { user_id: userId },
     });
@@ -261,6 +286,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
 
   const handleChangePassword = async () => {
     if (!passwordTarget) return;
+    const target = users.find((u) => u.id === passwordTarget.id);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     setPasswordSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("update-user", {
@@ -282,6 +312,12 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleUpdateName = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      setEditingNameId(null);
+      return;
+    }
     const trimmed = editingNameValue.trim();
     if (!trimmed) return;
     const { data, error } = await supabase.functions.invoke("update-user", {
@@ -329,7 +365,9 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Žádní uživatelé</TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => (
+                  users.map((u) => {
+                    const ownerLocked = isOwner(u) && !currentUserIsOwner;
+                    return (
                     <TableRow key={u.id}>
                       <TableCell className="text-sm">
                         {editingNameId === u.id ? (
@@ -350,18 +388,26 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                         ) : (
                           <button
                             className="flex items-center gap-1 group hover:text-primary transition-colors text-left"
-                            onClick={() => { setEditingNameId(u.id); setEditingNameValue(u.full_name || ""); }}
+                            onClick={() => {
+                              if (ownerLocked) return;
+                              setEditingNameId(u.id);
+                              setEditingNameValue(u.full_name || "");
+                            }}
                             title="Upravit jméno"
+                            disabled={ownerLocked}
                           >
                             <span>{u.full_name || "—"}</span>
-                            <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+                            {!ownerLocked && <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />}
                           </button>
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                       <TableCell>
                         {isOwner(u) ? (
-                          <Badge variant="default" className="font-normal text-[10px]">Owner</Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="default" className="w-fit font-normal text-[10px]">Owner</Badge>
+                            {ownerLocked && <span className="text-[10px] text-muted-foreground">chráněný účet</span>}
+                          </div>
                         ) : (
                           <Badge variant="secondary" className="font-normal text-[10px]">
                             {u.role ? ROLE_LABELS[u.role] : "—"}
@@ -372,6 +418,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                         <Select
                           value={u.person_id ?? "__none__"}
                           onValueChange={(v) => handleUpdatePerson(u.id, v === "__none__" ? null : v)}
+                          disabled={ownerLocked}
                         >
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue />
@@ -392,22 +439,26 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                         )}
                       </TableCell>
                       <TableCell className="flex gap-1">
-                        <button
-                          onClick={() => handleCopyInviteLink(u.id)}
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          title="Kopírovat odkaz pozvánky"
-                          disabled={copyingLinkId === u.id}
-                        >
-                          <Link2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setPasswordTarget({ id: u.id, name: u.full_name || u.email }); setNewPassword(""); setShowNewPassword(false); }}
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          title="Změnit heslo"
-                        >
-                          <Lock className="h-4 w-4" />
-                        </button>
-                        {isOwner(u) ? (
+                        {!ownerLocked && (
+                          <>
+                            <button
+                              onClick={() => handleCopyInviteLink(u.id)}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              title="Kopírovat odkaz pozvánky"
+                              disabled={copyingLinkId === u.id}
+                            >
+                              <Link2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setPasswordTarget({ id: u.id, name: u.full_name || u.email }); setNewPassword(""); setShowNewPassword(false); }}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              title="Změnit heslo"
+                            >
+                              <Lock className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                        {isOwner(u) && currentUserIsOwner ? (
                           <button
                             onClick={() => { setTransferOpen(true); setTransferTarget(""); }}
                             className="text-muted-foreground hover:text-primary transition-colors"
@@ -415,17 +466,18 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                           >
                             <ArrowRightLeft className="h-4 w-4" />
                           </button>
-                        ) : (
+                        ) : !isOwner(u) ? (
                           <button
                             onClick={() => setDeleteTarget(u.id)}
                             className="text-muted-foreground hover:text-destructive transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
-                        )}
+                        ) : null}
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

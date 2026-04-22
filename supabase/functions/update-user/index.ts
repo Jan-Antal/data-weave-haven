@@ -5,7 +5,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const VALID_ROLES = ["admin", "pm", "konstrukter", "vyroba", "viewer"];
+const VALID_ROLES = [
+  "admin",
+  "vedouci_pm",
+  "pm",
+  "vedouci_konstrukter",
+  "konstrukter",
+  "vedouci_vyroby",
+  "mistr",
+  "quality",
+  "kalkulant",
+  "vyroba",
+  "viewer",
+  "tester",
+];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -98,6 +111,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: targetRole } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user_id)
+      .single();
+
+    if (targetRole?.role === "owner" && callerRoleValue !== "owner") {
+      return new Response(JSON.stringify({ error: "Only Owner can manage Owner account." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Validate role if provided
     if (role !== undefined) {
       if (!VALID_ROLES.includes(role)) {
@@ -107,11 +133,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      const { data: targetRole } = await adminClient
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user_id)
-        .single();
       if (targetRole?.role === "owner") {
         return new Response(JSON.stringify({ error: "Cannot change Owner role. Use Transfer Ownership instead." }), {
           status: 400,
