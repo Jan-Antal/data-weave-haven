@@ -1388,7 +1388,7 @@ function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: 
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode = "hours", progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode = "hours", progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "", newItemIds, newItemCount = 0 }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; displayMode?: DisplayMode;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
@@ -1404,6 +1404,8 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   onClearChecked: () => void;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   searchQuery?: string;
+  newItemIds: Set<string>;
+  newItemCount?: number;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
@@ -1430,12 +1432,12 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
 
   return (
     <div className="rounded-lg overflow-hidden" style={{
-      backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
-      borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      backgroundColor: newItemCount > 0 ? "hsl(var(--info) / 0.05)" : isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
+      borderTop: isSelected ? "2px solid #d97706" : newItemCount > 0 ? "1px solid hsl(var(--info) / 0.35)" : "1px solid #ece8e2",
+      borderRight: isSelected ? "2px solid #d97706" : newItemCount > 0 ? "1px solid hsl(var(--info) / 0.35)" : "1px solid #ece8e2",
+      borderBottom: isSelected ? "2px solid #d97706" : newItemCount > 0 ? "1px solid hsl(var(--info) / 0.35)" : "1px solid #ece8e2",
       borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
-      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : newItemCount > 0 ? "0 0 0 2px hsl(var(--info) / 0.10)" : undefined,
       transition: "border-color 150ms, box-shadow 150ms",
     }}>
       <button
@@ -1458,6 +1460,11 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
             {urgency === "urgent" && daysLabel && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
                 {daysLabel}
+              </span>
+            )}
+            {newItemCount > 0 && (
+              <span className="shrink-0 rounded-full border border-info/30 bg-info/10 px-1.5 py-[1px] text-[8px] font-bold leading-none text-info">
+                NOVÉ {newItemCount}
               </span>
             )}
           </div>
@@ -1501,6 +1508,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
               <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
                 onContextMenu={e => onItemContextMenu(e, item, project)}
                 isChecked={checkedItems.has(item.id)}
+                isNew={newItemIds.has(item.id)}
                 onToggleCheck={onToggleCheck}
                 checkedItems={checkedItems}
                 allInboxItemsMap={allInboxItemsMap}
