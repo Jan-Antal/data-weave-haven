@@ -140,7 +140,6 @@ export function validateBundleDrop(source: BundleTarget, target: BundleTarget): 
 export function canAcceptBundleDrop(source: BundleTarget | null | undefined, target: BundleTarget): boolean {
   if (!source) return false;
   if (source.bundle_key && target.bundle_key && source.bundle_key === target.bundle_key) return false;
-  if (source.weekKey && target.weekKey && source.weekKey !== target.weekKey) return false;
   if (source.project_id !== target.project_id) return false;
   if ((source.stage_id ?? null) !== (target.stage_id ?? null)) return false;
   return resolveBundleType(source) === "full" && resolveBundleType(target) === "full";
