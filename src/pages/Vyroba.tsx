@@ -4093,8 +4093,7 @@ function UnifiedItemList({
           },
           redo: async () => {
             const redoNow = new Date().toISOString();
-            for (const { id, item } of itemsToInsert) {
-              await (supabase.from("production_expedice") as any).insert({
+            await insertProductionExpediceRowsIfMissing(itemsToInsert.map(({ id, item }) => ({
                 project_id: projectId,
                 item_name: item.item_name,
                 item_code: item.item_code || null,
@@ -4103,16 +4102,14 @@ function UnifiedItemList({
                 manufactured_at: redoNow,
                 expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
                 is_midflight: false,
-              });
-            }
+            })));
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
             qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
         });
         const nowIso = new Date().toISOString();
-        for (const { id, item } of itemsToInsert) {
-          await (supabase.from("production_expedice") as any).insert({
+        await insertProductionExpediceRowsIfMissing(itemsToInsert.map(({ id, item }) => ({
             project_id: projectId,
             item_name: item.item_name,
             item_code: item.item_code || null,
@@ -4121,8 +4118,7 @@ function UnifiedItemList({
             manufactured_at: nowIso,
             expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
             is_midflight: false,
-          });
-        }
+        })));
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
         qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -4206,8 +4202,7 @@ function UnifiedItemList({
         mids.map((mid) => ({ id: mid, item: currentItems.find((ci) => ci.item.id === mid)?.item })).filter((x): x is { id: string; item: ScheduleItem } => !!x.item)
       );
       const nowIso = new Date().toISOString();
-      for (const { id, item } of itemsToInsert) {
-        await (supabase.from("production_expedice") as any).insert({
+      await insertProductionExpediceRowsIfMissing(itemsToInsert.map(({ id, item }) => ({
           project_id: projectId,
           item_name: item.item_name,
           item_code: item.item_code || null,
@@ -4216,8 +4211,7 @@ function UnifiedItemList({
           manufactured_at: nowIso,
           expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
           is_midflight: false,
-        });
-      }
+      })));
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
