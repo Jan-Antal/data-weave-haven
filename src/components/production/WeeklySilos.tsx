@@ -447,6 +447,11 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       result.push({
         project_id: b.project_id,
         project_name: b.project_name,
+        stage_id: b.stage_id,
+        bundle_label: b.bundle_label,
+        bundle_type: b.bundle_type,
+        split_part: b.split_part,
+        split_total: b.split_total,
         items: activeItems,
         total_hours: activeHours,
         __spilledFromWeekKey: prevWeekKey,
