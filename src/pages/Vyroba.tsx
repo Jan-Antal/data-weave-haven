@@ -1295,6 +1295,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
       },
       redo: async () => {
+          const redoNow = new Date().toISOString();
         for (const item of itemsToExpedice) {
           await (supabase.from("production_expedice") as any).insert({
             project_id: pid,
@@ -1302,8 +1303,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             item_code: item.item_code || null,
             source_schedule_id: item.id,
             stage_id: item.stage_id || null,
-            manufactured_at: new Date().toISOString(),
-            expediced_at: null,
+              manufactured_at: redoNow,
+              expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
             is_midflight: false,
           });
         }
@@ -1356,14 +1357,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         description: "vrácení položky",
         undo: async () => {
           if (item) {
+            const undoNow = new Date().toISOString();
             await (supabase.from("production_expedice") as any).insert({
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
               source_schedule_id: itemId,
               stage_id: item.stage_id || null,
-              manufactured_at: new Date().toISOString(),
-              expediced_at: null,
+              manufactured_at: undoNow,
+              expediced_at: getExpediceTimestampForCompletedItem(item, undoNow),
               is_midflight: false,
             });
           }
@@ -1393,14 +1395,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         },
         redo: async () => {
           if (item) {
+            const redoNow = new Date().toISOString();
             await (supabase.from("production_expedice") as any).insert({
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
               source_schedule_id: itemId,
               stage_id: item.stage_id || null,
-              manufactured_at: new Date().toISOString(),
-              expediced_at: null,
+              manufactured_at: redoNow,
+              expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
               is_midflight: false,
             });
           }
