@@ -54,6 +54,10 @@ export function CompletionDialog({
   });
   const qcSet = useMemo(() => new Set(qcChecks.map(r => r.item_id)), [qcChecks]);
   const missingQcChecked = useMemo(
+    () => items.filter(i => checkedIds.has(i.id) && i.status !== "expedice" && i.status !== "completed" && !qcSet.has(i.id)),
+    [items, checkedIds, qcSet],
+  );
+  const missingQcChecked = useMemo(
     () => items.filter(i => checkedIds.has(i.id) && !qcSet.has(i.id)),
     [items, checkedIds, qcSet],
   );
