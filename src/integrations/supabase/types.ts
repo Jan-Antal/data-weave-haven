@@ -1827,6 +1827,7 @@ export type Database = {
           default_view: string
           id: string
           notification_prefs: Json | null
+          production_inbox_seen_at: string | null
           updated_at: string
           user_id: string
         }
@@ -1837,6 +1838,7 @@ export type Database = {
           default_view?: string
           id?: string
           notification_prefs?: Json | null
+          production_inbox_seen_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1847,6 +1849,7 @@ export type Database = {
           default_view?: string
           id?: string
           notification_prefs?: Json | null
+          production_inbox_seen_at?: string | null
           updated_at?: string
           user_id?: string
         }
