@@ -8,6 +8,7 @@ export interface ProductionStatus {
   weekLabel?: string;
   splitPart?: number;
   splitTotal?: number;
+  tooltip?: string;
 }
 
 /** Format week numbers into compact ranges: [12,13,14,17] → "T12-14, T17" */
@@ -31,22 +32,58 @@ function formatWeekRanges(weeks: number[]): string {
   return ranges.join(", ");
 }
 
+function formatCancelTooltip(reason: string | null, at: string | null, byName: string | null): string {
+  const parts: string[] = ["Zrušeno"];
+  if (at) {
+    try {
+      parts.push(new Date(at).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" }));
+    } catch {/* ignore */}
+  }
+  let head = parts.join(" ");
+  if (byName) head += ` — ${byName}`;
+  if (reason) head += ` · ${reason}`;
+  return head;
+}
+
 /** For a given project, compute production status per TPV nazev (code) */
 export function useProductionStatuses(projectId: string) {
   const query = useQuery({
     queryKey: ["production-statuses", projectId],
     queryFn: async () => {
       const [inboxRes, scheduleRes, projectRes] = await Promise.all([
-        supabase.from("production_inbox").select("item_name, item_code, status").eq("project_id", projectId),
-        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total, pause_reason, pause_expected_date, cancel_reason, expediced_at").eq("project_id", projectId),
+        supabase.from("production_inbox").select("item_name, item_code, status, cancel_reason, cancelled_at, cancelled_by").eq("project_id", projectId),
+        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total, pause_reason, pause_expected_date, cancel_reason, cancelled_at, cancelled_by, expediced_at").eq("project_id", projectId),
         supabase.from("projects").select("status").eq("project_id", projectId).maybeSingle(),
       ]);
       if (inboxRes.error) throw inboxRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
+
+      // Resolve cancelled_by user IDs to names (best-effort, batched)
+      const userIds = new Set<string>();
+      for (const r of inboxRes.data || []) {
+        if ((r as any).cancelled_by) userIds.add((r as any).cancelled_by);
+      }
+      for (const r of scheduleRes.data || []) {
+        if ((r as any).cancelled_by) userIds.add((r as any).cancelled_by);
+      }
+      const userNameMap = new Map<string, string>();
+      if (userIds.size > 0) {
+        try {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, full_name, email")
+            .in("id", Array.from(userIds));
+          for (const p of profiles || []) {
+            userNameMap.set(p.id, p.full_name || p.email || "");
+          }
+        } catch {/* non-critical */}
+      }
+
       return {
         inbox: inboxRes.data || [],
         schedule: scheduleRes.data || [],
         projectStatus: projectRes.data?.status || null,
+        userNameMap,
       };
     },
     enabled: !!projectId,
@@ -55,6 +92,8 @@ export function useProductionStatuses(projectId: string) {
   const statusMap = useMemo(() => {
     const map = new Map<string, ProductionStatus[]>();
     if (!query.data) return map;
+
+    const userNameMap = query.data.userNameMap;
 
     const now = new Date();
     const monday = new Date(now);
@@ -71,6 +110,7 @@ export function useProductionStatuses(projectId: string) {
       color?: string;
       splitPart?: number;
       splitTotal?: number;
+      tooltip?: string;
     }
     const rawMap = new Map<string, RawEntry[]>();
 
@@ -79,6 +119,16 @@ export function useProductionStatuses(projectId: string) {
       if (!rawMap.has(key)) rawMap.set(key, []);
       if (row.status === "pending") {
         rawMap.get(key)!.push({ type: "pending" });
+      } else if (row.status === "cancelled") {
+        const reason = (row as any).cancel_reason || "";
+        const at = (row as any).cancelled_at || null;
+        const by = (row as any).cancelled_by ? userNameMap.get((row as any).cancelled_by) || null : null;
+        rawMap.get(key)!.push({
+          type: "cancelled",
+          label: `✕ Zrušeno${reason ? ` · ${reason}` : ""}`,
+          color: "#dc2626",
+          tooltip: formatCancelTooltip(reason || null, at, by),
+        });
       }
     }
 
@@ -103,8 +153,15 @@ export function useProductionStatuses(projectId: string) {
         }
         rawMap.get(key)!.push({ type: "paused", label, color: isOverdue ? "#dc3545" : "#d97706" });
       } else if (row.status === "cancelled") {
-        const cancelReason = (row as any).cancel_reason || "";
-        rawMap.get(key)!.push({ type: "cancelled", label: `✕ Zrušeno${cancelReason ? ` · ${cancelReason}` : ""}`, color: "#6b7280" });
+        const reason = (row as any).cancel_reason || "";
+        const at = (row as any).cancelled_at || null;
+        const by = (row as any).cancelled_by ? userNameMap.get((row as any).cancelled_by) || null : null;
+        rawMap.get(key)!.push({
+          type: "cancelled",
+          label: `✕ Zrušeno${reason ? ` · ${reason}` : ""}`,
+          color: "#dc2626",
+          tooltip: formatCancelTooltip(reason || null, at, by),
+        });
       } else {
         const weekKey = row.scheduled_week;
         const weekDate = new Date(weekKey);
@@ -160,7 +217,7 @@ export function useProductionStatuses(projectId: string) {
 
       // Paused and cancelled keep individual labels (unique reasons)
       for (const e of entries.filter(e => e.type === "paused" || e.type === "cancelled")) {
-        statuses.push({ label: e.label!, color: e.color! });
+        statuses.push({ label: e.label!, color: e.color!, tooltip: e.tooltip });
       }
 
       map.set(key, statuses);
