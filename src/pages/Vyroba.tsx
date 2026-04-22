@@ -129,6 +129,23 @@ function slugify(name: string): string {
     .slice(0, 20);
 }
 
+function stripSplitSuffix(name: string): string {
+  return name.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+}
+
+function getScheduleBusinessKey(item: Pick<ScheduleItem, "project_id" | "item_code" | "item_name" | "split_group_id">): string {
+  const identity = item.split_group_id || item.item_code || `name::${stripSplitSuffix(item.item_name).toLowerCase()}`;
+  return `${item.project_id}::${identity}`;
+}
+
+function getExpediceTimestampForCompletedItem(item: ScheduleItem, nowIso: string): string | null {
+  const isIntermediateSplit = !!item.split_group_id
+    && item.split_part != null
+    && item.split_total != null
+    && item.split_part < item.split_total;
+  return isIntermediateSplit ? nowIso : null;
+}
+
 /** Compute VyrobaProject[] for any given week from the global schedule map */
 function getProjectsForWeek(
   scheduleData: Map<string, any> | undefined,
@@ -1278,6 +1295,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         qc.invalidateQueries({ queryKey: ["vyroba-project-details"] });
       },
       redo: async () => {
+          const redoNow = new Date().toISOString();
         for (const item of itemsToExpedice) {
           await (supabase.from("production_expedice") as any).insert({
             project_id: pid,
@@ -1285,8 +1303,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             item_code: item.item_code || null,
             source_schedule_id: item.id,
             stage_id: item.stage_id || null,
-            manufactured_at: new Date().toISOString(),
-            expediced_at: null,
+              manufactured_at: redoNow,
+              expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
             is_midflight: false,
           });
         }
@@ -1299,6 +1317,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       },
     });
 
+    const nowIso = new Date().toISOString();
     // Insert into production_expedice for each active item
     for (const item of itemsToExpedice) {
       await (supabase.from("production_expedice") as any).insert({
@@ -1307,8 +1326,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         item_code: item.item_code || null,
         source_schedule_id: item.id,
         stage_id: item.stage_id || null,
-        manufactured_at: new Date().toISOString(),
-        expediced_at: null,
+        manufactured_at: nowIso,
+        expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
         is_midflight: false,
       });
     }
@@ -1338,14 +1357,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         description: "vrácení položky",
         undo: async () => {
           if (item) {
+            const undoNow = new Date().toISOString();
             await (supabase.from("production_expedice") as any).insert({
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
               source_schedule_id: itemId,
               stage_id: item.stage_id || null,
-              manufactured_at: new Date().toISOString(),
-              expediced_at: null,
+              manufactured_at: undoNow,
+              expediced_at: getExpediceTimestampForCompletedItem(item, undoNow),
               is_midflight: false,
             });
           }
@@ -1375,14 +1395,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         },
         redo: async () => {
           if (item) {
+            const redoNow = new Date().toISOString();
             await (supabase.from("production_expedice") as any).insert({
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
               source_schedule_id: itemId,
               stage_id: item.stage_id || null,
-              manufactured_at: new Date().toISOString(),
-              expediced_at: null,
+              manufactured_at: redoNow,
+              expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
               is_midflight: false,
             });
           }
@@ -1391,11 +1412,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           qc.invalidateQueries({ queryKey: ["production-expedice"] });
         },
       });
-      // Intermediate split part → virtual "completed" (expediced_at SET, won't go to Expedice panel yet).
-      // Last/non-split part → virtual "expedice" (expediced_at NULL, awaiting shipment).
-      const isIntermediateSplit = !!item?.split_group_id
-        && item.split_part != null && item.split_total != null
-        && item.split_part < item.split_total;
       const nowIsoMark = new Date().toISOString();
       await (supabase.from("production_expedice") as any).insert({
         project_id: pid,
@@ -1404,7 +1420,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         source_schedule_id: itemId,
         stage_id: item?.stage_id || null,
         manufactured_at: nowIsoMark,
-        expediced_at: isIntermediateSplit ? nowIsoMark : null,
+        expediced_at: item ? getExpediceTimestampForCompletedItem(item, nowIsoMark) : null,
         is_midflight: false,
       });
       // Log item hotovo
@@ -3448,6 +3464,32 @@ function DetailPanel({
     if (autoExpandHotove) setCompletedOpen(true);
   }, [autoExpandHotove]);
 
+  const completedGroups = useMemo(() => {
+    const groups = new Map<string, { item: ScheduleItem; itemIds: string[]; completedParts: number; splitTotal: number | null }>();
+    for (const entry of completedItems) {
+      const key = getScheduleBusinessKey(entry.item);
+      const existing = groups.get(key);
+      if (existing) {
+        existing.itemIds.push(entry.item.id);
+        existing.completedParts += 1;
+        existing.splitTotal = Math.max(existing.splitTotal ?? 0, entry.item.split_total ?? 0) || null;
+        existing.item = {
+          ...existing.item,
+          item_name: stripSplitSuffix(existing.item.item_name),
+          scheduled_hours: existing.item.scheduled_hours + entry.item.scheduled_hours,
+        };
+      } else {
+        groups.set(key, {
+          item: { ...entry.item, item_name: stripSplitSuffix(entry.item.item_name) },
+          itemIds: [entry.item.id],
+          completedParts: 1,
+          splitTotal: entry.item.split_total,
+        });
+      }
+    }
+    return Array.from(groups.values());
+  }, [completedItems]);
+
   const totalActiveItems = currentItems.length + futureItems.length + completedItems.length;
 
   // PM initials
@@ -3767,22 +3809,23 @@ function DetailPanel({
         )}
 
         {/* ── HOTOVÉ — collapsible ── */}
-        {completedItems.length > 0 && (
+        {completedGroups.length > 0 && (
           <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
             <CollapsibleTrigger
               className="flex items-center gap-1 text-xs font-semibold cursor-pointer"
               style={{ color: "#3a8a36" }}
             >
               {completedOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}✓ Hotové (
-              {completedItems.length})
+              {completedGroups.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-2 space-y-1">
-                {completedItems.map(({ item }) => {
-                  const qcCheck = hotoveCheckMap.get(item.id);
+                {completedGroups.map(({ item, itemIds, completedParts, splitTotal }) => {
+                  const qcCheck = itemIds.map((id) => hotoveCheckMap.get(id)).find(Boolean);
+                  const isSplit = completedParts > 1 || (splitTotal ?? 0) > 1;
                   return (
                     <div
-                      key={item.id}
+                      key={itemIds.join("-")}
                       className="px-2.5 py-2 rounded-md"
                       style={{ border: "1px solid #ece8e2", background: "#ffffff" }}
                     >
@@ -3796,6 +3839,14 @@ function DetailPanel({
                         <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>
                           {item.item_name}
                         </span>
+                        {isSplit && (
+                          <span
+                            className="text-[9px] font-medium px-1.5 py-[1px] rounded shrink-0"
+                            style={{ background: "rgba(58,138,54,0.1)", color: "#3a8a36" }}
+                          >
+                            {completedParts}/{splitTotal || completedParts} částí hotovo
+                          </span>
+                        )}
                         {qcCheck && <QualityCheckFullDisplay check={qcCheck} />}
                         <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
                           {formatHours(item.scheduled_hours)}h
@@ -4015,8 +4066,8 @@ function UnifiedItemList({
     if (missingQC.length === 0) {
       // All have QC — mark as hotovo via production_expedice
       (async () => {
-        const itemsToInsert = targetItems.flatMap(({ mergedIds: mids, item }) =>
-          mids.map((mid) => ({ id: mid, item }))
+        const itemsToInsert = targetItems.flatMap(({ mergedIds: mids }) =>
+          mids.map((mid) => ({ id: mid, item: currentItems.find((ci) => ci.item.id === mid)?.item })).filter((x): x is { id: string; item: ScheduleItem } => !!x.item)
         );
         pushUndo({
           page: "vyroba",
@@ -4031,6 +4082,7 @@ function UnifiedItemList({
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
           redo: async () => {
+            const redoNow = new Date().toISOString();
             for (const { id, item } of itemsToInsert) {
               await (supabase.from("production_expedice") as any).insert({
                 project_id: projectId,
@@ -4038,8 +4090,8 @@ function UnifiedItemList({
                 item_code: item.item_code || null,
                 source_schedule_id: id,
                 stage_id: item.stage_id || null,
-                manufactured_at: new Date().toISOString(),
-                expediced_at: null,
+                manufactured_at: redoNow,
+                expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
                 is_midflight: false,
               });
             }
@@ -4048,6 +4100,7 @@ function UnifiedItemList({
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
         });
+        const nowIso = new Date().toISOString();
         for (const { id, item } of itemsToInsert) {
           await (supabase.from("production_expedice") as any).insert({
             project_id: projectId,
@@ -4055,8 +4108,8 @@ function UnifiedItemList({
             item_code: item.item_code || null,
             source_schedule_id: id,
             stage_id: item.stage_id || null,
-            manufactured_at: new Date().toISOString(),
-            expediced_at: null,
+            manufactured_at: nowIso,
+            expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
             is_midflight: false,
           });
         }
@@ -4139,9 +4192,10 @@ function UnifiedItemList({
         selectedItems.size > 0
           ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && !isItemDoneLocal(d.item))
           : dedupedItems.filter((d) => !isItemDoneLocal(d.item));
-      const itemsToInsert = targetItems2.flatMap(({ mergedIds: mids, item }) =>
-        mids.map((mid) => ({ id: mid, item }))
+      const itemsToInsert = targetItems2.flatMap(({ mergedIds: mids }) =>
+        mids.map((mid) => ({ id: mid, item: currentItems.find((ci) => ci.item.id === mid)?.item })).filter((x): x is { id: string; item: ScheduleItem } => !!x.item)
       );
+      const nowIso = new Date().toISOString();
       for (const { id, item } of itemsToInsert) {
         await (supabase.from("production_expedice") as any).insert({
           project_id: projectId,
@@ -4149,8 +4203,8 @@ function UnifiedItemList({
           item_code: item.item_code || null,
           source_schedule_id: id,
           stage_id: item.stage_id || null,
-          manufactured_at: new Date().toISOString(),
-          expediced_at: null,
+          manufactured_at: nowIso,
+          expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
           is_midflight: false,
         });
       }

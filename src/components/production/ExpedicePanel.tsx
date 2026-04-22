@@ -39,6 +39,28 @@ function parseDate(dateStr: string | null | undefined): Date | null {
   } catch { return null; }
 }
 
+function stripSplitSuffix(name: string): string {
+  return name.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+}
+
+function aggregateExpediceItems(items: ExpediceItem[]): ExpediceItem[] {
+  const grouped = new Map<string, ExpediceItem>();
+  for (const item of items) {
+    const key = `${item.project_id}::${item.item_code || stripSplitSuffix(item.item_name).toLowerCase()}`;
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...item, item_name: stripSplitSuffix(item.item_name) });
+      continue;
+    }
+    const existingManufactured = parseDate(existing.manufactured_at)?.getTime() ?? 0;
+    const itemManufactured = parseDate(item.manufactured_at)?.getTime() ?? 0;
+    if (itemManufactured > existingManufactured) {
+      grouped.set(key, { ...item, item_name: stripSplitSuffix(item.item_name) });
+    }
+  }
+  return Array.from(grouped.values());
+}
+
 interface ContextMenuState {
   x: number;
   y: number;
@@ -96,7 +118,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     for (const group of projects) {
-      const activeItems = group.items.filter(i => !i.expediced_at);
+      const activeItems = aggregateExpediceItems(group.items.filter(i => !i.expediced_at));
       // FIX 3: Archive shows only items expediced in last 30 days
       const archivedItems = group.items.filter(i => {
         if (!i.expediced_at) return false;
