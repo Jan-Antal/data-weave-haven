@@ -6,7 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { renumberChain, renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
-import { buildNewBundleAssignment, getNextBundleLabel, normalizeFullBundlesForWeek, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
+import { buildNewBundleAssignment, getAvailableBundleLabel, getNextBundleLabel, normalizeFullBundlesForWeek, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -760,6 +760,7 @@ export function useProductionDragDrop() {
       const snapshots = sourceItems.map((item: any) => ({ ...item }));
       const updatePayload = {
         scheduled_week: target.scheduled_week,
+        stage_id: target.stage_id ?? null,
         bundle_label: target.bundle_label ?? null,
         bundle_type: "full",
         split_group_id: null,
@@ -784,6 +785,7 @@ export function useProductionDragDrop() {
         undo: async () => {
           await Promise.all(snapshots.map((item: any) => supabase.from("production_schedule").update({
             scheduled_week: item.scheduled_week,
+            stage_id: item.stage_id ?? null,
             bundle_label: item.bundle_label ?? null,
             bundle_type: item.bundle_type ?? null,
             split_group_id: item.split_group_id ?? null,
