@@ -5277,7 +5277,7 @@ function VykresynSection({ projectId, cachedDocCount }: { projectId: string; cac
           📄 Výkresy ({open ? files.length : (cachedDocCount ?? 0)})
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="mt-2 space-y-1">
+          <div className="mt-2 space-y-1 max-h-[50vh] overflow-y-auto pr-1">
             {files.length === 0 ? (
               <div className="text-xs py-3 text-center" style={{ color: "#99a5a3" }}>
                 Žádné výkresy
