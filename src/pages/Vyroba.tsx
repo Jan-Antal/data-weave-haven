@@ -4066,8 +4066,8 @@ function UnifiedItemList({
     if (missingQC.length === 0) {
       // All have QC — mark as hotovo via production_expedice
       (async () => {
-        const itemsToInsert = targetItems.flatMap(({ mergedIds: mids, item }) =>
-          mids.map((mid) => ({ id: mid, item }))
+        const itemsToInsert = targetItems.flatMap(({ mergedIds: mids }) =>
+          mids.map((mid) => ({ id: mid, item: currentItems.find((ci) => ci.item.id === mid)?.item })).filter((x): x is { id: string; item: ScheduleItem } => !!x.item)
         );
         pushUndo({
           page: "vyroba",
@@ -4082,6 +4082,7 @@ function UnifiedItemList({
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
           redo: async () => {
+            const redoNow = new Date().toISOString();
             for (const { id, item } of itemsToInsert) {
               await (supabase.from("production_expedice") as any).insert({
                 project_id: projectId,
@@ -4089,8 +4090,8 @@ function UnifiedItemList({
                 item_code: item.item_code || null,
                 source_schedule_id: id,
                 stage_id: item.stage_id || null,
-                manufactured_at: new Date().toISOString(),
-                expediced_at: null,
+                manufactured_at: redoNow,
+                expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
                 is_midflight: false,
               });
             }
@@ -4099,6 +4100,7 @@ function UnifiedItemList({
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
           },
         });
+        const nowIso = new Date().toISOString();
         for (const { id, item } of itemsToInsert) {
           await (supabase.from("production_expedice") as any).insert({
             project_id: projectId,
@@ -4106,8 +4108,8 @@ function UnifiedItemList({
             item_code: item.item_code || null,
             source_schedule_id: id,
             stage_id: item.stage_id || null,
-            manufactured_at: new Date().toISOString(),
-            expediced_at: null,
+            manufactured_at: nowIso,
+            expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
             is_midflight: false,
           });
         }
