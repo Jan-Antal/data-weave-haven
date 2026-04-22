@@ -30,6 +30,7 @@ import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ForecastWeekContent, ForecastSplitDialog } from "./ForecastOverlay";
 import { type SafetyNetProject } from "./ForecastSafetyNet";
+import { buildBundleKey, formatBundleDisplayLabel } from "@/lib/productionBundles";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -1402,8 +1403,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           </div>
         )}
 
-        {realBundles.map(bundle => (
-          <CollapsibleBundleCard key={bundle.project_id} bundle={bundle} weekKey={weekKey}
+        {realBundles.map(bundle => {
+          const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
+          return <CollapsibleBundleCard key={bundleKey} bundle={bundle} weekKey={weekKey}
             showCzk={showCzk} hourlyRate={hourlyRate} weeklyCapacity={weeklyCapacity} displayMode={displayMode}
             onBundleContextMenu={onBundleContextMenu}
             onItemContextMenu={onItemContextMenu}
@@ -1413,11 +1415,11 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             isSelected={selectedProjectId === bundle.project_id}
             onSelectProject={onSelectProject} searchQuery={searchQuery}
             forecastDarkMode={forecastDarkMode}
-            isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
+            isFocusedMatch={focusedMatchKey === bundleKey}
             searchMatchedProjectIds={searchMatchedProjectIds}
             searchActive={searchActive}
-            isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />
-        ))}
+            isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />;
+        })}
 
         {/* Rezerva kapacit section — blocker bundles separated */}
         {blockerBundles.length > 0 && (
@@ -1427,8 +1429,9 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               <span className="text-[9px] font-semibold tracking-wider shrink-0" style={{ color: forecastDarkMode ? "#4a5a58" : "#99a5a3" }}>REZERVA KAPACIT</span>
               <div className="flex-1" style={{ borderTop: forecastDarkMode ? "1px solid #2a3d3a" : "1px solid #e2ddd6" }} />
             </div>
-            {blockerBundles.map(bundle => (
-              <CollapsibleBundleCard key={`blocker-${bundle.project_id}`} bundle={bundle} weekKey={weekKey}
+            {blockerBundles.map(bundle => {
+              const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
+              return <CollapsibleBundleCard key={`blocker-${bundleKey}`} bundle={bundle} weekKey={weekKey}
                 showCzk={showCzk} hourlyRate={hourlyRate} weeklyCapacity={weeklyCapacity} displayMode={displayMode}
                 onBundleContextMenu={onBundleContextMenu}
                 onItemContextMenu={onItemContextMenu}
@@ -1438,11 +1441,11 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 isSelected={selectedProjectId === bundle.project_id}
                 onSelectProject={onSelectProject} searchQuery={searchQuery}
                 forecastDarkMode={forecastDarkMode}
-                isFocusedMatch={focusedMatchKey === `${weekKey}::${bundle.project_id}`}
+                isFocusedMatch={focusedMatchKey === bundleKey}
                 searchMatchedProjectIds={searchMatchedProjectIds}
                 searchActive={searchActive}
-                isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />
-            ))}
+                isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />;
+            })}
           </>
         )}
 
