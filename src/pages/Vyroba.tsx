@@ -146,6 +146,20 @@ function getExpediceTimestampForCompletedItem(item: ScheduleItem, nowIso: string
   return isIntermediateSplit ? nowIso : null;
 }
 
+async function insertProductionExpediceRowsIfMissing(rows: any[]) {
+  const sourceIds = rows.map((row) => row.source_schedule_id).filter(Boolean);
+  if (sourceIds.length === 0) return;
+  const { data: existing, error: existingError } = await (supabase.from("production_expedice" as any) as any)
+    .select("source_schedule_id")
+    .in("source_schedule_id", sourceIds);
+  if (existingError) throw existingError;
+  const existingIds = new Set((existing || []).map((row: any) => row.source_schedule_id));
+  const rowsToInsert = rows.filter((row) => row.source_schedule_id && !existingIds.has(row.source_schedule_id));
+  if (rowsToInsert.length === 0) return;
+  const { error } = await (supabase.from("production_expedice") as any).insert(rowsToInsert);
+  if (error) throw error;
+}
+
 /** Compute VyrobaProject[] for any given week from the global schedule map */
 function getProjectsForWeek(
   scheduleData: Map<string, any> | undefined,
