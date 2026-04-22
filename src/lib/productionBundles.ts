@@ -70,13 +70,16 @@ export function deriveBundleSplitMeta<T extends {
     return { isSplit: false, splitPart: null, splitTotal: null };
   }
 
-  const partCandidate = splitRows.find((row) => typeof row.split_part === "number" && row.split_part > 0)?.split_part ?? null;
-  const totalCandidate = splitRows.find((row) => typeof row.split_total === "number" && row.split_total > 0)?.split_total ?? null;
+  const partCandidate = Math.max(0, ...splitRows.map((row) => typeof row.split_part === "number" ? row.split_part : 0));
+  const totalCandidate = Math.max(
+    partCandidate,
+    ...splitRows.map((row) => typeof row.split_total === "number" ? row.split_total : 0)
+  );
 
   return {
     isSplit: true,
-    splitPart: partCandidate,
-    splitTotal: totalCandidate,
+    splitPart: partCandidate > 0 ? partCandidate : null,
+    splitTotal: totalCandidate > 0 ? totalCandidate : null,
   };
 }
 

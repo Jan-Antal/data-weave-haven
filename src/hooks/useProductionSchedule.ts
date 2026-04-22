@@ -98,6 +98,20 @@ export function useProductionSchedule() {
         if (sid) expediceMap.set(sid, (row as any).expediced_at);
       }
 
+      const splitMetaByGroup = new Map<string, { splitPart: number | null; splitTotal: number | null }>();
+      for (const row of data || []) {
+        const bundleType = resolveBundleType(row as any);
+        const splitGroupId = (row as any).split_group_id ?? null;
+        if (bundleType !== "split" || !splitGroupId) continue;
+        const current = splitMetaByGroup.get(splitGroupId) ?? { splitPart: null, splitTotal: null };
+        const splitPart = typeof (row as any).split_part === "number" ? (row as any).split_part : 0;
+        const splitTotal = typeof (row as any).split_total === "number" ? (row as any).split_total : 0;
+        splitMetaByGroup.set(splitGroupId, {
+          splitPart: Math.max(current.splitPart ?? 0, splitPart) || null,
+          splitTotal: Math.max(current.splitTotal ?? 0, splitTotal, splitPart) || null,
+        });
+      }
+
       const byWeek = new Map<string, Map<string, ScheduleBundle>>();
 
       for (const row of data || []) {
@@ -116,7 +130,11 @@ export function useProductionSchedule() {
         const pid = row.project_id;
         const bundleLabel = (row as any).bundle_label ?? fallbackBundleLabel((row as any).split_group_id ?? `${row.project_id}:${row.stage_id ?? "none"}:${row.scheduled_week}:${row.position}`);
         const bundleType = resolveBundleType(row as any);
-        const bundleKey = `${pid}::${row.stage_id ?? "none"}::${bundleLabel}::${(row as any).split_part ?? "full"}`;
+        const splitGroupId = (row as any).split_group_id ?? null;
+        const seriesMeta = splitGroupId ? splitMetaByGroup.get(splitGroupId) : null;
+        const resolvedSplitPart = (row as any).split_part ?? (bundleType === "split" ? seriesMeta?.splitPart ?? null : null);
+        const resolvedSplitTotal = (row as any).split_total ?? (bundleType === "split" ? seriesMeta?.splitTotal ?? null : null);
+        const bundleKey = `${pid}::${row.stage_id ?? "none"}::${bundleLabel}::${resolvedSplitPart ?? "full"}`;
         if (!byWeek.has(week)) byWeek.set(week, new Map());
         const weekMap = byWeek.get(week)!;
         if (!weekMap.has(bundleKey)) {
@@ -126,8 +144,8 @@ export function useProductionSchedule() {
             stage_id: row.stage_id,
             bundle_label: bundleLabel,
             bundle_type: bundleType,
-            split_part: (row as any).split_part ?? null,
-            split_total: (row as any).split_total ?? null,
+            split_part: resolvedSplitPart,
+            split_total: resolvedSplitTotal,
             items: [],
             total_hours: 0,
           });
@@ -149,9 +167,9 @@ export function useProductionSchedule() {
           completed_at: virtualCompletedAt,
           completed_by: row.completed_by,
           expediced_at: virtualExpedicedAt,
-          split_group_id: (row as any).split_group_id ?? null,
-          split_part: (row as any).split_part ?? null,
-          split_total: (row as any).split_total ?? null,
+          split_group_id: splitGroupId,
+          split_part: resolvedSplitPart,
+          split_total: resolvedSplitTotal,
           pause_reason: (row as any).pause_reason ?? null,
           pause_expected_date: (row as any).pause_expected_date ?? null,
           adhoc_reason: (row as any).adhoc_reason ?? null,
