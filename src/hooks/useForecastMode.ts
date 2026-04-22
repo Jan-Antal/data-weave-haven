@@ -262,7 +262,7 @@ export function useForecastMode(): UseForecastModeReturn {
 
       if (error) throw error;
       if (data?.error) {
-        toast({ title: "Chyba", description: data.error, variant: "destructive" });
+        toast({ title: "Chyba", description: data.message || data.error, variant: "destructive" });
         return;
       }
 
@@ -315,7 +315,7 @@ export function useForecastMode(): UseForecastModeReturn {
 
           if (aiError || aiData?.error) {
             console.warn("AI optimizer failed, keeping baseline:", aiError || aiData?.error);
-            toast({ title: "AI nedostupná", description: "Zobrazujem základní plán." });
+            toast({ title: "AI nedostupná", description: aiData?.message || "Zobrazujem základní plán." });
           } else if (Array.isArray(aiData?.blocks) && aiData.blocks.length > 0) {
             blocks = aiData.blocks.map((b: any) => ({ ...b }));
             setForecastBlocks(blocks);
