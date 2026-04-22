@@ -3295,13 +3295,16 @@ function ProjectRow({
                 </span>
               )}
             </div>
-            <span className="font-sans text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
-              {pct}%
+            <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>
+              {bundleDisplayLabel}
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="font-sans" style={{ fontSize: 11, color: "#6b7280" }}>
               {project.projectId}
+            </span>
+            <span className="font-sans font-semibold shrink-0" style={{ fontSize: 11, color: statusColors[status] }}>
+              · {pct}%
             </span>
             {project.deadline && (
               <span style={{ fontSize: 11, color: "#6b7280" }}>· {fmtDateFull(project.deadline)}</span>
