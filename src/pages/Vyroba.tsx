@@ -9,6 +9,7 @@ import { useCompletedScheduleIds } from "@/hooks/useProductionExpedice";
 import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/useProductionDailyLogs";
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
+import { deriveBundleSplitMeta, formatBundleDisplayLabel } from "@/lib/productionBundles";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -3234,6 +3235,13 @@ function ProjectRow({
   const { bundleProgress: pct } = getBP();
   const phase = getLatestPhase(project.projectId);
   const borderColor = project.color;
+  const splitMeta = deriveBundleSplitMeta(project.scheduleItems);
+  const firstItem = project.scheduleItems[0];
+  const bundleDisplayLabel = formatBundleDisplayLabel({
+    bundle_label: firstItem?.bundle_label ?? null,
+    split_part: splitMeta.splitPart ?? firstItem?.split_part ?? null,
+    bundle_type: splitMeta.isSplit ? "split" : firstItem?.bundle_type ?? null,
+  });
 
   // Progress bar color — aligned with expanded project card (status-based traffic light)
   const progressColor = statusColors[status];
@@ -3287,13 +3295,16 @@ function ProjectRow({
                 </span>
               )}
             </div>
-            <span className="font-sans text-xs font-bold shrink-0" style={{ color: statusColors[status] }}>
-              {pct}%
+            <span className="font-sans shrink-0" style={{ fontSize: 11, color: "#6b7280" }}>
+              {bundleDisplayLabel}
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="font-sans" style={{ fontSize: 11, color: "#6b7280" }}>
               {project.projectId}
+            </span>
+            <span className="font-sans font-semibold shrink-0" style={{ fontSize: 11, color: statusColors[status] }}>
+              · {pct}%
             </span>
             {project.deadline && (
               <span style={{ fontSize: 11, color: "#6b7280" }}>· {fmtDateFull(project.deadline)}</span>
