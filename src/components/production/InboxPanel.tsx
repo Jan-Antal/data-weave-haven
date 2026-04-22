@@ -1556,9 +1556,9 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550, projectItemIds }: {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, isNew = false, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550, projectItemIds }: {
   item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
-  isChecked: boolean; onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
+  isChecked: boolean; isNew?: boolean; onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
   checkedItems: Set<string>;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   displayMode?: DisplayMode;
@@ -1608,8 +1608,8 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
     <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
       style={{
-        backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : "#ffffff",
-        border: isChecked ? "1px solid rgba(58,138,54,0.25)" : "1px solid #ece8e2",
+        backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : isNew ? "hsl(var(--info) / 0.05)" : "#ffffff",
+        border: isChecked ? "1px solid rgba(58,138,54,0.25)" : isNew ? "1px solid hsl(var(--info) / 0.30)" : "1px solid #ece8e2",
         borderLeft: isSplit ? "3px dashed #99a5a3" : undefined,
         opacity: isDragging ? 0.3 : 1,
       }}
@@ -1652,6 +1652,9 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
         <span className="font-sans shrink-0 px-1 rounded" style={{ fontSize: 9, color: "#3a8a36", backgroundColor: "rgba(58,138,54,0.08)", border: "1px solid rgba(58,138,54,0.2)", fontWeight: 600 }} title={`Počet kusů: ${item.pocet}`}>×{item.pocet}</span>
       )}
       <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
+      {isNew && (
+        <span className="shrink-0 rounded-full border border-info/30 bg-info/10 px-1.5 py-[1px] text-[8px] font-bold leading-none text-info">NOVÉ</span>
+      )}
       {(item as any).adhoc_reason && String((item as any).adhoc_reason).startsWith("midflight") && (
         <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
       )}
