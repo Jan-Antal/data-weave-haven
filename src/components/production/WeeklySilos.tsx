@@ -1433,6 +1433,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                   isWeekLocked={isWeekLocked} activeDrag={activeDrag} exchangeRates={exchangeRates} />;
         })}
 
+        <NewBundleDropSpacer weekKey={weekKey} disabled={!!isWeekLocked || !!forecastDarkMode} activeDrag={activeDrag} />
+
         {/* Rezerva kapacit section — blocker bundles separated */}
         {blockerBundles.length > 0 && (
           <>
@@ -1505,6 +1507,25 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           ⚡ Přetíženo — zobrazit návrhy
         </button>
       )}
+    </div>
+  );
+}
+
+function NewBundleDropSpacer({ weekKey, disabled, activeDrag }: { weekKey: string; disabled?: boolean; activeDrag?: Props["activeDrag"] }) {
+  const canDrop = !disabled && (activeDrag?.type === "silo-item" || activeDrag?.type === "silo-bundle" || activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project");
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-new-bundle-${weekKey}`, data: { type: "new-bundle-target", weekKey }, disabled: !canDrop });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="mt-1 flex min-h-[92px] shrink-0 items-center justify-center rounded-[6px] border border-dashed transition-all"
+      style={{
+        borderColor: isOver ? "hsl(var(--primary))" : "hsl(var(--border))",
+        backgroundColor: isOver ? "hsl(var(--primary) / 0.08)" : "hsl(var(--muted) / 0.22)",
+        color: isOver ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+      }}
+    >
+      <span className="text-[9px] font-semibold">Nový bundle</span>
     </div>
   );
 }
