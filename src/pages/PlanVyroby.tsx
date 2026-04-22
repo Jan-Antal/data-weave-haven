@@ -561,7 +561,6 @@ export default function PlanVyroby() {
       if (
         dragData.bundleKey !== targetData?.bundleKey &&
         dragData.projectId === targetData?.projectId &&
-        (dragData.stageId ?? null) === (targetData?.stageId ?? null) &&
         dragData.bundleType === "full" &&
         targetData?.bundleType === "full" &&
         dragData.itemId &&
@@ -577,7 +576,6 @@ export default function PlanVyroby() {
       if (
         dragData.bundleKey !== targetData?.bundleKey &&
         dragData.projectId === targetData?.projectId &&
-        (dragData.stageId ?? null) === (targetData?.stageId ?? null) &&
         dragData.bundleType === "full" &&
         targetData?.bundleType === "full" &&
         dragData.itemIds?.length &&
