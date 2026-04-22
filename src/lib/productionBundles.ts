@@ -84,13 +84,18 @@ export function deriveBundleSplitMeta<T extends {
 }
 
 export async function getNextBundleLabel(projectId: string, stageId: string | null): Promise<string> {
+  return getAvailableBundleLabel(projectId, stageId);
+}
+
+export async function getAvailableBundleLabel(projectId: string, _stageId: string | null, excludeIds: string[] = []): Promise<string> {
   let query = supabase
     .from("production_schedule")
-    .select("project_id, stage_id, scheduled_week, position, bundle_label, bundle_type, split_group_id, split_part, split_total")
+    .select("id, project_id, stage_id, scheduled_week, position, status, bundle_label, bundle_type, split_group_id, split_part, split_total")
     .eq("project_id", projectId)
+    .in("status", ["scheduled", "in_progress", "paused"])
     .not("bundle_label", "is", null);
 
-  query = stageId ? query.eq("stage_id", stageId) : query.is("stage_id", null);
+  if (excludeIds.length > 0) query = query.not("id", "in", `(${excludeIds.join(",")})`);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -109,13 +114,18 @@ export async function buildNewBundleAssignment(projectId: string, stageId: strin
 export function validateBundleDrop(source: BundleTarget, target: BundleTarget): boolean {
   const sourceStage = source.stage_id ?? null;
   const targetStage = target.stage_id ?? null;
+  const sourceType = resolveBundleType(source);
+  const targetType = resolveBundleType(target);
+
+  if (sourceType === "full" && targetType === "full") {
+    return source.project_id === target.project_id;
+  }
+
   if (sourceStage !== targetStage) {
     toast({ title: "Položky rôznych etáp nie je možné spájať", variant: "destructive" });
     return false;
   }
 
-  const sourceType = resolveBundleType(source);
-  const targetType = resolveBundleType(target);
   if (sourceType === "full" && targetType === "split") {
     toast({ title: "Celé položky nie je možné pridať do split bundlu", variant: "destructive" });
     return false;
@@ -141,8 +151,11 @@ export function canAcceptBundleDrop(source: BundleTarget | null | undefined, tar
   if (!source) return false;
   if (source.bundle_key && target.bundle_key && source.bundle_key === target.bundle_key) return false;
   if (source.project_id !== target.project_id) return false;
+  const sourceType = resolveBundleType(source);
+  const targetType = resolveBundleType(target);
+  if (sourceType === "full" && targetType === "full") return true;
   if ((source.stage_id ?? null) !== (target.stage_id ?? null)) return false;
-  return resolveBundleType(source) === "full" && resolveBundleType(target) === "full";
+  return false;
 }
 
 export async function normalizeFullBundlesForWeek(projectId: string, stageId: string | null, weekKey: string): Promise<string | null> {
