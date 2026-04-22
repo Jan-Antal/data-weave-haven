@@ -994,20 +994,31 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                         return (
                           <TableCell key={key} style={cellStyle}>
                             <div className="flex flex-wrap gap-0.5">
-                              {statuses.map((s, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
-                                  style={{
-                                    backgroundColor: `${s.color}15`,
-                                    color: s.color,
-                                    borderColor: `${s.color}40`,
-                                    textDecoration: s.label.startsWith("✕") ? "line-through" : undefined,
-                                  }}
-                                >
-                                  {s.label}
-                                </span>
-                              ))}
+                              {statuses.map((s, idx) => {
+                                const isCancelled = s.label.startsWith("✕");
+                                const badge = (
+                                  <span
+                                    className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
+                                    style={{
+                                      backgroundColor: `${s.color}15`,
+                                      color: s.color,
+                                      borderColor: `${s.color}40`,
+                                      textDecoration: isCancelled ? "line-through" : undefined,
+                                    }}
+                                  >
+                                    {s.label}
+                                  </span>
+                                );
+                                if (s.tooltip) {
+                                  return (
+                                    <Tooltip key={idx}>
+                                      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+                                      <TooltipContent side="top">{s.tooltip}</TooltipContent>
+                                    </Tooltip>
+                                  );
+                                }
+                                return <span key={idx}>{badge}</span>;
+                              })}
                               {pocetLabel && (
                                 <span
                                   className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium"
