@@ -211,7 +211,7 @@ export function CompletionDialog({
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate]);
+  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate, missingQcChecked.length]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
