@@ -554,7 +554,6 @@ export default function PlanVyroby() {
     if (dragData.type === "silo-bundle" && targetId.startsWith("silo-bundle-drop-")) {
       const targetData = over.data.current as any;
       if (
-        dragData.weekDate === targetData?.weekDate &&
         dragData.bundleKey !== targetData?.bundleKey &&
         dragData.projectId === targetData?.projectId &&
         (dragData.stageId ?? null) === (targetData?.stageId ?? null) &&
@@ -563,7 +562,25 @@ export default function PlanVyroby() {
         dragData.itemIds?.length &&
         targetData?.itemIds?.length
       ) {
-        await mergeFullBundleIntoBundle(dragData.itemIds, targetData.itemIds);
+        if (dragData.weekDate === targetData.weekDate) {
+          await mergeFullBundleIntoBundle(dragData.itemIds, targetData.itemIds);
+        } else {
+          setMergeState({
+            itemName: targetData.projectName || dragData.projectName || "Bundle",
+            splitGroupIds: [],
+            mergeItemCount: dragData.itemIds.length,
+            draggedItemId: dragData.itemIds[0] || "",
+            targetWeekKey: targetData.weekDate,
+            variant: "full-bundle",
+            targetBundleLabel: targetData.bundleLabel ?? "A",
+            onMergeExisting: async () => {
+              await mergeFullBundleIntoBundle(dragData.itemIds, targetData.itemIds);
+            },
+            onKeepSeparate: async () => {
+              await moveFullBundleAsNewBundle(dragData.itemIds, targetData.weekDate);
+            },
+          });
+        }
       }
       return;
     }
@@ -734,7 +751,7 @@ export default function PlanVyroby() {
           await action();
         }
       }
-  }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
+  }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek, moveFullBundleAsNewBundle,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
     findSpillWeek, findSiblingInWeek, mergeSplitItems, mergeFullBundleIntoBundle, resolveTargetWeek, checkAndWarnDeadline,
     forecast]);
