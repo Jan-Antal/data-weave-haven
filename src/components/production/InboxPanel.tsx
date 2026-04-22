@@ -336,7 +336,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       if (!scheduleData) return true;
       for (const [weekKey, silo] of scheduleData) {
         if (weekKey >= currentMondayISO) {
-          if (silo.bundles.some(b => b.project_id === p.project_id && b.status !== "completed")) return true;
+          if (silo.bundles.some(b => b.project_id === p.project_id && b.items.some(i => i.status === "scheduled" || i.status === "in_progress" || i.status === "paused"))) return true;
         }
       }
       return false;
