@@ -32,6 +32,31 @@ export function fallbackBundleLabel(seed: string | null | undefined): string {
   return LETTERS[hash] || "A";
 }
 
+export function buildBundleKey(target: {
+  weekKey: string;
+  project_id: string;
+  stage_id: string | null;
+  bundle_label: string | null;
+  split_part?: number | null;
+}): string {
+  return [
+    target.weekKey,
+    target.project_id,
+    target.stage_id ?? "none",
+    target.bundle_label ?? "none",
+    target.split_part ?? "full",
+  ].map((part) => encodeURIComponent(String(part))).join("::");
+}
+
+export function formatBundleDisplayLabel(target: {
+  bundle_label: string | null;
+  split_part?: number | null;
+  bundle_type?: BundleType | null;
+}): string {
+  const label = target.bundle_label || "A";
+  return target.bundle_type === "split" && target.split_part ? `${label}-${target.split_part}` : label;
+}
+
 export async function getNextBundleLabel(projectId: string, stageId: string | null): Promise<string> {
   let query = supabase
     .from("production_schedule")

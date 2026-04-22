@@ -71,6 +71,11 @@ interface ActiveDragData {
   scheduledCzk?: number;
   inboxItemId?: string;
   splitGroupId?: string | null;
+  bundleKey?: string;
+  bundleLabel?: string | null;
+  bundleType?: "full" | "split" | null;
+  splitPart?: number | null;
+  itemIds?: string[];
   /** For inbox-items: array of item IDs to schedule as a batch */
   batchItemIds?: string[];
 }
@@ -303,6 +308,7 @@ export default function PlanVyroby() {
     returnBundleToInbox,
     mergeSplitItems,
     mergeBundleSplitGroups,
+    mergeFullBundleIntoBundle,
     mergeBundleAcrossWeeks,
   } = useProductionDragDrop();
 
@@ -506,7 +512,9 @@ export default function PlanVyroby() {
       if (weekKey && weekKey !== dragData.weekDate) {
         // Calculate hours from the source silo
         const sourceSilo = scheduleData?.get(dragData.weekDate);
-        const sourceBundle = sourceSilo?.bundles.find(b => b.project_id === dragData.projectId);
+        const sourceBundle = sourceSilo?.bundles.find(b => dragData.bundleKey
+          ? b.items.some((item) => dragData.itemIds?.includes(item.id))
+          : b.project_id === dragData.projectId);
         const hours = sourceBundle?.total_hours ?? 0;
         const itemCount = sourceBundle?.items.length ?? 0;
         const projectName = sourceBundle?.project_name ?? dragData.projectName ?? dragData.projectId;
@@ -537,11 +545,28 @@ export default function PlanVyroby() {
 
     const targetId = over.id.toString();
 
+    if (dragData.type === "silo-bundle" && targetId.startsWith("silo-bundle-drop-")) {
+      const targetData = over.data.current as any;
+      if (
+        dragData.weekDate === targetData?.weekDate &&
+        dragData.bundleKey !== targetData?.bundleKey &&
+        dragData.projectId === targetData?.projectId &&
+        (dragData.stageId ?? null) === (targetData?.stageId ?? null) &&
+        dragData.bundleType === "full" &&
+        targetData?.bundleType === "full" &&
+        dragData.itemIds?.length &&
+        targetData?.itemIds?.length
+      ) {
+        await mergeFullBundleIntoBundle(dragData.itemIds, targetData.itemIds);
+      }
+      return;
+    }
+
     if (targetId === "inbox-drop-zone") {
       if (dragData.type === "silo-item" && dragData.itemId) {
         await moveItemBackToInbox(dragData.itemId);
       } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
-        await returnBundleToInbox(dragData.projectId, dragData.weekDate);
+        await returnBundleToInbox(dragData.projectId, dragData.weekDate, dragData.itemIds);
       }
       return;
     }
@@ -655,7 +680,9 @@ export default function PlanVyroby() {
     } else if (dragData.type === "silo-bundle" && dragData.projectId && dragData.weekDate) {
         if (dragData.weekDate !== weekDate) {
           const sourceSilo = scheduleData?.get(dragData.weekDate);
-          const sourceBundle = sourceSilo?.bundles.find(b => b.project_id === dragData.projectId);
+          const sourceBundle = sourceSilo?.bundles.find(b => dragData.bundleKey
+            ? b.items.some((item) => dragData.itemIds?.includes(item.id))
+            : b.project_id === dragData.projectId);
           if (sourceBundle) {
             const splitItems = sourceBundle.items.filter(item =>
               item.split_group_id && findSiblingInWeek(item.split_group_id, weekDate, item.id)
@@ -671,14 +698,14 @@ export default function PlanVyroby() {
                 sourceProjectId: dragData.projectId,
                 sourceWeekKey: dragData.weekDate,
                 onKeepSeparate: async () => {
-                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
+                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate', dragData.itemIds);
                 },
               });
               return;
             }
           }
           const action = async () => {
-            const result = await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate);
+            const result = await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, undefined, dragData.itemIds);
             if (result && 'conflict' in result) {
               setMergeState({
                 itemName: sourceBundle?.project_name || dragData.projectName || "Bundle",
@@ -689,7 +716,7 @@ export default function PlanVyroby() {
                 sourceProjectId: dragData.projectId,
                 sourceWeekKey: dragData.weekDate,
                 onKeepSeparate: async () => {
-                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate');
+                  await moveBundleToWeek(dragData.projectId!, dragData.weekDate!, weekDate, 'separate', dragData.itemIds);
                 },
               });
               return;
@@ -701,7 +728,7 @@ export default function PlanVyroby() {
       }
   }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
-    findSpillWeek, findSiblingInWeek, mergeSplitItems, resolveTargetWeek, checkAndWarnDeadline,
+    findSpillWeek, findSiblingInWeek, mergeSplitItems, mergeFullBundleIntoBundle, resolveTargetWeek, checkAndWarnDeadline,
     forecast]);
 
   if (loading) {

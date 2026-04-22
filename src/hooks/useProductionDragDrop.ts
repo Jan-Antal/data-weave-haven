@@ -452,15 +452,18 @@ export function useProductionDragDrop() {
     sourceWeekDate: string,
     targetWeekDate: string,
     onConflict?: 'merge' | 'separate',
+    sourceItemIds?: string[],
   ): Promise<{ conflict: true; targetWeek: string; splitGroupIds: string[] } | void> => {
     try {
       // Capture items being moved
-      const { data: movedItems } = await supabase
+      let movedQuery = supabase
         .from("production_schedule")
         .select("*")
         .eq("project_id", projectId)
         .eq("scheduled_week", sourceWeekDate)
         .in("status", ["scheduled", "in_progress"]);
+      if (sourceItemIds?.length) movedQuery = movedQuery.in("id", sourceItemIds);
+      const { data: movedItems } = await movedQuery;
       if (!movedItems || movedItems.length === 0) return;
       const movedIds = movedItems.map(i => i.id);
 
@@ -650,6 +653,82 @@ export function useProductionDragDrop() {
               .update({ scheduled_week: targetWeekDate })
               .in("id", uniqueSeparateIds);
           }
+          invalidateAll();
+        },
+      });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [invalidateAll, pushUndo]);
+
+  const mergeFullBundleIntoBundle = useCallback(async (sourceIds: string[], targetIds: string[]) => {
+    try {
+      const sourceItemIds = [...new Set(sourceIds)].filter(Boolean);
+      const targetItemIds = [...new Set(targetIds)].filter(Boolean);
+      if (sourceItemIds.length === 0 || targetItemIds.length === 0) return;
+
+      const [{ data: sourceItems, error: sourceErr }, { data: targetItems, error: targetErr }] = await Promise.all([
+        supabase.from("production_schedule").select("*").in("id", sourceItemIds),
+        supabase.from("production_schedule").select("*").in("id", targetItemIds),
+      ]);
+      if (sourceErr) throw sourceErr;
+      if (targetErr) throw targetErr;
+      if (!sourceItems?.length || !targetItems?.length) return;
+
+      const source = sourceItems[0] as any;
+      const target = targetItems[0] as any;
+      if (source.scheduled_week !== target.scheduled_week) return;
+      if (source.project_id !== target.project_id) return;
+
+      const sourceTarget: BundleTarget = {
+        project_id: source.project_id,
+        stage_id: source.stage_id ?? null,
+        bundle_label: source.bundle_label ?? null,
+        bundle_type: resolveBundleType(source),
+      };
+      const targetTarget: BundleTarget = {
+        project_id: target.project_id,
+        stage_id: target.stage_id ?? null,
+        bundle_label: target.bundle_label ?? null,
+        bundle_type: resolveBundleType(target),
+      };
+      if (!validateBundleDrop(sourceTarget, targetTarget)) return;
+      if (resolveBundleType(source) !== "full" || resolveBundleType(target) !== "full") return;
+
+      const snapshots = sourceItems.map((item: any) => ({ ...item }));
+      const updatePayload = {
+        bundle_label: target.bundle_label ?? null,
+        bundle_type: "full",
+        split_group_id: null,
+        split_part: null,
+        split_total: null,
+      };
+      const { error: updateErr } = await supabase
+        .from("production_schedule")
+        .update(updatePayload as any)
+        .in("id", sourceItemIds);
+      if (updateErr) throw updateErr;
+
+      invalidateAll();
+      toast({ title: `Bundle zlúčený do ${target.bundle_label || "A"}` });
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "merge_bundle_labels",
+        description: `Sloučení bundle ${source.bundle_label || "?"} do ${target.bundle_label || "?"}`,
+        undo: async () => {
+          await Promise.all(snapshots.map((item: any) => supabase.from("production_schedule").update({
+            bundle_label: item.bundle_label ?? null,
+            bundle_type: item.bundle_type ?? null,
+            split_group_id: item.split_group_id ?? null,
+            split_part: item.split_part ?? null,
+            split_total: item.split_total ?? null,
+          } as any).eq("id", item.id)));
+          invalidateAll();
+        },
+        redo: async () => {
+          await supabase.from("production_schedule").update(updatePayload as any).in("id", sourceItemIds);
           invalidateAll();
         },
       });
@@ -948,17 +1027,19 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string) => {
+  const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string, sourceItemIds?: string[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data: items, error: fetchErr } = await supabase
+      let itemsQuery = supabase
         .from("production_schedule")
         .select("*")
         .eq("project_id", projectId)
         .eq("scheduled_week", weekDate)
         .in("status", ["scheduled", "in_progress"]);
+      if (sourceItemIds?.length) itemsQuery = itemsQuery.in("id", sourceItemIds);
+      const { data: items, error: fetchErr } = await itemsQuery;
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
 
@@ -1397,6 +1478,7 @@ export function useProductionDragDrop() {
     returnBundleToInbox,
     mergeSplitItems,
     mergeBundleSplitGroups,
+    mergeFullBundleIntoBundle,
     mergeBundleAcrossWeeks,
   };
 }
