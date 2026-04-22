@@ -1,151 +1,127 @@
 
-## Viditeľný modrý badge „NOVÉ“ v Inboxe
+## Sjednocení dokončení prvku přes QC před Expedicí
 
 ### Cíl
-V Inboxe Plánu výroby bude jasně vidět, že do projektu / bundlu přibyly nové prvky, i když jsou schované uvnitř sbaleného bundlu a uživatel je nechce hned plánovat.
+V **Plánu výroby** nesmí akce **„Dokončit → Expedice“** odeslat prvek do Expedice, pokud ještě nemá potvrzenou **QC kontrolu**.
 
-Badge bude **modrý**, ne oranžový.
+Chování bude stejné jako v modulu **Výroba**:
+
+```text
+1. Pokud QC existuje → prvek se může dokončit a objeví se v Expedici.
+2. Pokud QC chybí → nejdřív se musí potvrdit QC.
+3. Až po potvrzení QC se prvek pošle do Expedice.
+```
+
+Současně zkontroluji a sjednotím provázanost opačného směru:
+
+```text
+Dokončení ve Výrobě → zápis do production_expedice → automatické zobrazení v Plánu výroby jako Expedice.
+```
 
 ---
 
-## Pravidlo, jak dlouho se badge drží
+## Co upravím
 
-Badge **NOVÉ** zůstane viditelný, dokud nenastane jedna z těchto akcí:
+### 1. Plán výroby: místo blokace otevřít QC krok
+V `CompletionDialog.tsx` už existuje kontrola QC, ale aktuálně jen zablokuje dokončení hláškou **„chybí QC“**.
 
-```text
-1. Uživatel klikne na „Označit jako přečtené“
-nebo
-2. Položka se naplánuje a tím zmizí z Inboxu
-```
+Upravím ji tak, aby uživatel mohl pokračovat řízeně:
 
-To znamená:
-
-- pokud novou položku jen uvidíš, ale nechceš ji hned plánovat, badge tam zůstane,
-- nezmizí automaticky po otevření Inboxu,
-- nezmizí automaticky po rozbalení bundlu,
-- nezmizí po refreshi stránky,
-- nezmizí ani na jiném zařízení stejného uživatele,
-- zmizí až vědomou akcí „Označit jako přečtené“ nebo tím, že položka už v Inboxu není.
-
-Každý uživatel bude mít vlastní stav přečtení.
-
----
-
-## Implementace
-
-### 1. Ukládání posledního přečtení
-Do uživatelských preferencí přidám timestamp:
+- pokud vybrané položky nemají QC,
+- dialog zobrazí jasný QC krok,
+- tlačítko nebude jen neaktivní / blokované,
+- bude dostupná akce typu:
 
 ```text
-production_inbox_seen_at
+Potvrdit QC a dokončit → Expedice
 ```
 
-Ten určuje, od kdy se položky v Inboxu už nepovažují za nové.
+Po kliknutí:
 
-Nová položka je:
+1. vloží se záznam do `production_quality_checks`,
+2. zapíše se aktivita `item_qc_confirmed`,
+3. následně se provede dokončení,
+4. vloží se řádek do `production_expedice`,
+5. položka se zobrazí v Expedici.
+
+### 2. Zachovat možnost dokončit jen položky, které už QC mají
+Pokud má vybraná položka QC potvrzené, workflow zůstane rychlé:
 
 ```text
-production_inbox.sent_at > user_preferences.production_inbox_seen_at
+Dokončit → Expedice
 ```
 
-Pokud preference ještě neexistuje, nastaví se bezpečný výchozí stav tak, aby staré historické položky nezačaly všechny svítit jako nové navždy.
+Bez dalšího potvrzování.
 
-### 2. Modrý badge v hlavičce Inboxu
-V hlavičce Inboxu bude badge například:
+### 3. Sjednotit logiku s modulem Výroba
+V modulu **Výroba** už workflow funguje tak, že:
+
+- `production_quality_checks` je zdroj QC potvrzení,
+- `production_expedice` je zdroj toho, že prvek je hotový / čeká na expedici,
+- `useProductionSchedule` podle `production_expedice.source_schedule_id` přepne prvek v Plánu výroby na virtuální stav `expedice` / `completed`.
+
+Tuto logiku ponechám jako společný zdroj pravdy a upravím Plán výroby, aby používal stejný princip.
+
+### 4. Oprava dokončení v Plánu výroby
+V `CompletionDialog.tsx` sjednotím dokončovací zápis:
+
+- před insertem do `production_expedice` vždy ověřím QC,
+- pokud QC chybí a uživatel zvolí potvrzení, vytvořím QC řádky,
+- zabráním duplicitnímu vložení QC pro položky, které už kontrolu mají,
+- po dokončení invaliduji cache:
+  - `production-schedule`,
+  - `production-expedice`,
+  - `production-expedice-schedule-ids`,
+  - `production-quality-checks`,
+  - `quality-checks`.
+
+### 5. Ověření provázanosti modulu Výroba
+Zkontroluji a případně dorovnám:
+
+- že dokončení ve Výrobě zapisuje do `production_expedice`,
+- že se po zápisu invaliduje `production-schedule`,
+- že Plán výroby po načtení vidí expedované položky přes `useProductionSchedule`,
+- že nedochází k duplicitnímu odeslání stejného `source_schedule_id` do Expedice.
+
+Pokud najdu riziko duplicit, doplním ochranu v kódu před insertem.
+
+### 6. UI text a stav tlačítek
+V dialogu bude jasně vidět, co se stane:
 
 ```text
-NOVÉ 7
+Chybí QC kontrola
+Nejprve potvrďte QC. Poté budou položky přesunuty do Expedice.
 ```
 
-Styl:
-- modré pozadí / modrý border,
-- výrazný, ale ne alarmující vzhled,
-- nebude používat oranžovou, aby se nepletl s urgentními nebo varovnými stavy.
-
-Vedle badge bude akce:
+Tlačítka:
 
 ```text
-Označit jako přečtené
+Zrušit
+Potvrdit QC a dokončit
 ```
 
-Po kliknutí se `production_inbox_seen_at` nastaví na aktuální čas a všechny aktuálně nové pending položky přestanou být označené jako nové.
-
-### 3. Modrý badge na projektovém bundlu
-Každý projektový bundle s novými položkami dostane badge:
+Pokud QC nechybí:
 
 ```text
-NOVÉ 3
+Dokončit → Expedice
 ```
 
-Bude viditelný i když je bundle sbalený.
+### 7. Soubory
 
-Projektová karta dostane jemné modré zvýraznění, aby bylo jasné, že uvnitř je něco nového.
+Upravím:
 
-### 4. Modrý badge na konkrétní položce
-Uvnitř rozbaleného bundlu dostane každá nová položka malý badge:
-
-```text
-NOVÉ
-```
-
-Příklad:
-
-```text
-TK.04  ×2  Nízká skříň  NOVÉ  24h
-```
-
-### 5. Řazení projektů s novými položkami výš
-Projekty s novými položkami se posunou výš v Inboxu, aby nezapadly.
-
-Zachovám ale logiku urgence:
-
-```text
-1. urgentní / po termínu + nové
-2. ostatní nové
-3. zbytek podle současné urgency logiky
-```
-
-### 6. Zachování workflow
-Nemění se:
-- plánování,
-- drag & drop,
-- split položky,
-- forecast,
-- stav položek v `production_inbox`.
-
-Badge je pouze viditelná vrstva nad existujícími pending položkami.
-
----
-
-## Soubory / změny
-
-### Databáze
-- nová migrace:
-  - rozšíření `user_preferences` o `production_inbox_seen_at`
-
-### Frontend
-- `src/hooks/useUserPreferences.ts`
-  - rozšířit typ preferencí,
-  - umožnit uložit `production_inbox_seen_at`
-
-- `src/components/production/InboxPanel.tsx`
-  - výpočet nových položek,
-  - modrý badge v hlavičce,
-  - tlačítko „Označit jako přečtené“,
-  - badge na projektovém bundlu,
-  - badge na konkrétní položce,
-  - zvýhodnění nových položek v řazení
-
-### Paměť projektu
-- `mem://features/production-planning/inbox-panel-config`
-  - doplnit pravidlo, že nové inbox položky se značí modrým `NOVÉ` badge a zůstávají viditelné do ručního označení jako přečtené nebo naplánování.
+- `src/components/production/CompletionDialog.tsx`
+- případně `src/hooks/useProductionDragDrop.ts`, pokud bude potřeba sjednotit duplicitní ochranu
+- případně `src/pages/Vyroba.tsx`, pokud kontrola ukáže chybějící invalidaci nebo riziko duplicit
+- paměť workflow:
+  - `mem://features/production-planning/expedice-shipping-workflow`
 
 ---
 
 ## Výsledek
 
-- Nové prvky v Inboxu se už neztratí uvnitř bundlů.
-- Badge bude modrý a jednoznačně odlišený od urgentních / varovných stavů.
-- Badge nezmizí jen proto, že uživatel Inbox otevřel.
-- Uživatel může nové položky nechat označené, dokud je nechce řešit.
-- Zmizí až po „Označit jako přečtené“ nebo po naplánování položky.
+- Z Plánu výroby už nepůjde poslat prvek do Expedice bez QC.
+- Pokud QC chybí, uživatel ji může potvrdit přímo v dokončovacím workflow.
+- Po potvrzení QC se prvek automaticky dokončí a objeví v Expedici.
+- Dokončení z modulu Výroba zůstane provázané s Plánem výroby.
+- Plán výroby a Výroba budou používat stejný zdroj pravdy: `production_quality_checks` + `production_expedice`.
