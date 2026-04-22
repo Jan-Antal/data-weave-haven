@@ -397,11 +397,11 @@ export function CompletionDialog({
           </button>
           <button
             onClick={handleComplete}
-            disabled={checkedIds.size === 0 || submitting}
+            disabled={checkedIds.size === 0 || submitting || missingQcChecked.length > 0}
             className="px-3 py-1.5 text-[11px] font-semibold rounded-md text-white transition-colors"
             style={{
-              backgroundColor: checkedIds.size === 0 ? "#99a5a3" : "#3a8a36",
-              cursor: checkedIds.size === 0 ? "not-allowed" : "pointer",
+              backgroundColor: (checkedIds.size === 0 || missingQcChecked.length > 0) ? "#99a5a3" : "#3a8a36",
+              cursor: (checkedIds.size === 0 || missingQcChecked.length > 0) ? "not-allowed" : "pointer",
               opacity: submitting ? 0.7 : 1,
             }}
           >
