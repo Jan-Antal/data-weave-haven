@@ -1822,7 +1822,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             )}
           </div>
           <div className="flex flex-col items-end gap-[1px] shrink-0">
-            <span className="truncate leading-tight shrink-0" style={{ fontSize: 14, color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 500 }}>
+            <span className="font-sans shrink-0" style={{ fontSize: 11, color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#6b7280") : (allCompleted ? "#b0b7c3" : "#6b7280") }}>
               {bundleDisplayLabel}
             </span>
             <div className="flex items-center gap-1">
