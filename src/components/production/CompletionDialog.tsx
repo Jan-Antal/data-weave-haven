@@ -75,6 +75,7 @@ export function CompletionDialog({
 
   const handleComplete = useCallback(async () => {
     if (checkedIds.size === 0) return;
+    if (missingQcChecked.length > 0) return; // QC gate
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
