@@ -37,7 +37,7 @@ export function useProductionInbox() {
       const { data, error } = await supabase
         .from("production_inbox")
         .select("*, projects!production_inbox_project_id_fkey(project_name)")
-        .in("status", ["pending", "returned"])
+        .eq("status", "pending")
         .order("sent_at", { ascending: true });
       if (error) throw error;
 
