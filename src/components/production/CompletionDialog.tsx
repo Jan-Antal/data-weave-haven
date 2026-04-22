@@ -308,7 +308,7 @@ export function CompletionDialog({
                     {item.item_name}
                   </span>
                   <span className="font-sans text-[10px] shrink-0" style={{ color: "#6b7a78" }}>
-                    {item.scheduled_hours}h
+                    {formatHours(item.scheduled_hours)}h
                   </span>
                   {isCompleted ? (
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>
