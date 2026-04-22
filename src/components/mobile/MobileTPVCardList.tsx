@@ -168,7 +168,19 @@ export function MobileTPVCardList({
                       <span className="text-[10px] font-sans bg-muted px-1.5 py-0.5 rounded">{item.pocet} ks</span>
                     )}
                     {vyrobaLabel && (
-                      <Badge variant="secondary" className="text-[10px] h-5">{vyrobaLabel}</Badge>
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] h-5"
+                        title={vyrobaTooltip || undefined}
+                        style={vyrobaColor ? {
+                          backgroundColor: `${vyrobaColor}15`,
+                          color: vyrobaColor,
+                          borderColor: `${vyrobaColor}40`,
+                          textDecoration: vyrobaIsCancelled ? "line-through" : undefined,
+                        } : undefined}
+                      >
+                        {vyrobaLabel}
+                      </Badge>
                     )}
                     {stageLabel && (
                       <Badge variant="outline" className="text-[10px] h-5 border-primary/40 text-primary">{stageLabel}</Badge>
