@@ -147,7 +147,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const getWeekCapacity = useWeekCapacityLookup(bruttoPerDay || undefined);
   const { moveInboxItemToWeek } = useProductionDragDrop();
   const { data: userPreferences, isFetched: preferencesFetched } = useUserPreferences();
-  const upsertPreferences = useUpsertPreferences();
+  const { mutate: upsertPreferences, isPending: isUpsertingPreferences } = useUpsertPreferences();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
@@ -210,12 +210,12 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const totalNewItemCount = newItemIds.size;
 
   useEffect(() => {
-    if (!preferencesFetched || userPreferences?.production_inbox_seen_at || upsertPreferences.isPending) return;
-    upsertPreferences.mutate({ production_inbox_seen_at: initialInboxSeenAt.current });
-  }, [preferencesFetched, userPreferences?.production_inbox_seen_at, upsertPreferences]);
+    if (!preferencesFetched || userPreferences?.production_inbox_seen_at || isUpsertingPreferences) return;
+    upsertPreferences({ production_inbox_seen_at: initialInboxSeenAt.current });
+  }, [preferencesFetched, userPreferences?.production_inbox_seen_at, isUpsertingPreferences, upsertPreferences]);
 
   const handleMarkInboxRead = useCallback(() => {
-    upsertPreferences.mutate({ production_inbox_seen_at: new Date().toISOString() });
+    upsertPreferences({ production_inbox_seen_at: new Date().toISOString() });
   }, [upsertPreferences]);
 
   // Build next 12 weeks with remaining capacity
@@ -834,7 +834,7 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           {totalNewItemCount > 0 && (
             <button
               onClick={handleMarkInboxRead}
-              disabled={upsertPreferences.isPending}
+              disabled={isUpsertingPreferences}
               className="rounded border border-info/25 bg-info/5 px-1.5 py-0.5 text-[9px] font-semibold text-info transition-colors hover:bg-info/10 disabled:opacity-50"
             >
               Označit jako přečtené
