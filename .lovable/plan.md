@@ -1,203 +1,224 @@
 
-## Úprava plánu: slučování full bundlů + čitelné nebarevné označení
+## Upravený plán opravy bundle správania
 
-### Cíl
-Opravit dvě věci v **Plánu výroby / Kanban Týdny**:
+### Cieľ
+Opravím bundle logiku v **Plán Výroby / Kanban týždne** tak, aby:
 
-1. Dva samostatné **full bundle** balíky stejného projektu/etapy ve stejném týdnu půjdou sloučit přetažením jednoho zavřeného projektového bundlu na druhý.
-2. Označení bundlu bude jasné, ale bez barevného kódování:
-   - full: `A`, `B`, `C`
-   - split: `A-1`, `A-2`, `A-3`
-   - split informace u počtu položek zůstane zachovaná.
-
----
-
-## 1. Stabilní identita bundlu
-
-Aktuálně se v některých místech bundle identifikuje jen podle:
-
-```text
-project_id + weekKey
-```
-
-To způsobuje, že dva bundle stejného projektu v jednom týdnu se chovají jako jeden celek.
-
-Upravím identitu na:
-
-```text
-weekKey + project_id + stage_id + bundle_label + split_part
-```
-
-Použiju ji pro:
-
-- React `key`
-- `data-bundle-key`
-- drag id
-- drop id
-- hledání source/target bundlu při drag & drop
-
-Tím se budou dva full bundly v T9 rozlišovat správně.
+1. Split séria `A-1`, `A-2` blokovala label `A` pre nové full bundle.
+2. Full položky rovnakého projektu/etapy v jednom týždni sa automaticky zlúčili do jedného full bundlu.
+3. Manuálne pretiahnutie full bundle na iný full bundle zostalo podporované.
+4. Drop split položky späť do rovnakého týždňa nerobil nič a neotváral merge popup.
+5. Drop animácia sa zobrazovala iba tam, kde je drop naozaj povolený.
 
 ---
 
-## 2. Drag full bundle do full bundle
+## 1. Label `A` je obsadený aj split sériou
 
-Přidám podporu pro sloučení:
+Upravím `src/lib/productionBundles.ts`.
+
+Pravidlo:
 
 ```text
-Bundle B → Bundle A
+ak existuje split A-1 / A-2 / A-3
+=> label A je obsadený
+=> nový full bundle musí dostať B alebo ďalší voľný label
 ```
 
-Povoleno pouze když:
+`getNextBundleLabel(projectId, stageId)` bude brať ako obsadené všetky existujúce `bundle_label`, bez ohľadu na to, či ide o `full` alebo `split`.
 
-- stejný `project_id`
-- stejný `stage_id`
-- stejný týden
-- source i target mají `bundle_type = full`
-- nejde o dokončený / legacy / locked týden
+---
 
-Výsledek:
+## 2. Automatické zlučovanie full položiek v jednom týždni
+
+Doplním automatickú normalizáciu full bundlov.
+
+Ak v jednom týždni existuje viac full bundlov pre rovnaké:
 
 ```text
-source položky dostanou bundle_label cílového bundlu
+project_id + stage_id + scheduled_week
+```
+
+a nejde o split položky, tak sa automaticky zlúčia do jedného bundlu.
+
+Výsledok:
+
+```text
+všetky full položky dostanú rovnaký bundle_label
 bundle_type = 'full'
 split_group_id = NULL
 split_part = NULL
 split_total = NULL
 ```
 
-Toast pouze při úspěšném sloučení:
+Použije sa stabilný cieľový label:
+
+- ak už existuje full bundle label, ponechá sa najstarší / prvý podľa pozície
+- ak label koliduje so split labelom, full bundle dostane ďalší voľný label
+- split série sa nemenia
+
+Toto sa použije po akciách, ktoré môžu vytvoriť viac samostatných full bundlov v jednom týždni:
+
+- presun položky do týždňa
+- presun bundlu do týždňa
+- plánovanie z inboxu
+- ponechanie ako samostatné položky, ak sú stále full a v rovnakom týždni
+- re-send / revive z TPV listu, ak sa následne plánuje do týždňa
+
+---
+
+## 3. Manuálne zlúčenie full bundle do full bundle zostane
+
+Zachovám manuálne pretiahnutie:
+
+```text
+Bundle B → Bundle A
+```
+
+Povolené iba keď:
+
+- rovnaký `project_id`
+- rovnaký `stage_id`
+- rovnaký týždeň
+- source aj target sú `bundle_type = full`
+- nejde o rovnaký bundle
+- nejde o completed / locked / legacy cieľ
+
+Pri dropnutí sa source položky prepíšu na target bundle:
+
+```text
+bundle_label = target.bundle_label
+bundle_type = 'full'
+split_group_id = NULL
+split_part = NULL
+split_total = NULL
+```
+
+Toast iba pri skutočnom zlúčení:
 
 ```text
 Bundle zlúčený do A
 ```
 
-Zakázané kombinace zůstanou:
-
-- full → split
-- split → full
-- jiná etapa
-- split A → split B
-
 ---
 
-## 3. Žádná nová drop zóna
+## 4. Drop split položky späť do rovnakého týždňa bude no-op
 
-Nebudu vytvářet samostatnou zónu nebo extra tlačítko pro drop.
+V `src/pages/PlanVyroby.tsx` upravím `handleDragEnd`.
 
-Chování bude:
+Ak používateľ vezme split položku v týždni a pustí ju späť do rovnakého týždňa, neurobí sa nič:
 
 ```text
-drop na prázdné místo týdne = přesun do týdne / nový bundle
-drop přímo na zavřenou kartu bundlu = vložit/sloučit do tohoto bundlu
+split položka T17 → drop späť do T17 = bez akcie
 ```
 
-Projekt nemusí být otevřený. Drop target bude samotná zavřená projektová karta.
-
----
-
-## 4. Vizuální feedback při možném dropu
-
-Když je možné dropnout bundle na bundle, karta se vizuálně zvýrazní bez nové zóny:
-
-- karta se jemně zvětší směrem dolů
-- přidá se decentní outline/stín
-- zvýšení výšky bude krátké a přechodové, aby bylo jasné „sem můžeš pustit“
-
-Nebudu používat barevné značení podle bundle labelu.
-
----
-
-## 5. Nebarevný bundle label napravo nad hodinami
-
-V pravé části zavřené karty, nad hodinami, doplním výrazný ale neutrální label:
+Nebude sa otvárať popup:
 
 ```text
-A
-53h
+Spojit / Ponechat odděleně
 ```
 
-Split:
-
-```text
-A-1
-53h
-```
-
-Pravidla:
-
-- full bundle: `A`
-- split bundle: `A-1`, `A-2`, podle `split_part`
-- neutrální vzhled: žádné modrá/zelená/amber/fialová podle písmen
-- styl bude čitelný: tmavý text, jemný šedý podklad nebo tenký border
-- hodiny zůstanou pod labelem napravo
+Ten popup zostane iba pre reálne presuny medzi týždňami, kde má zmysel riešiť merge/split.
 
 ---
 
-## 6. Zachovat split označení u počtu položek
+## 5. Drop animácia iba pre povolené ciele
 
-Současné označení u počtu položek zůstane:
+V `src/components/production/WeeklySilos.tsx` upravím validáciu hover/drop stavu.
+
+Karta sa zvýrazní iba keď drop môže reálne prebehnúť:
 
 ```text
-3 položek  Split 2/3
+full → full rovnaký projekt/etapa/týždeň = áno
+full → split = nie
+split → full = nie
+split A → split B = nie
+bundle → iný projekt = nie
+bundle → iná etapa = nie
+bundle → rovnaký bundle = nie
 ```
 
-Nebudu ho odstraňovat. Nový label `A-2` vpravo bude sloužit jako rychlá abecední identifikace bundlu, zatímco `Split 2/3` u počtu položek zůstane vysvětlující informace.
+Tým zmizne falošný vizuálny signál, že sa dá dropnúť do cudzieho projektu alebo nepovoleného bundlu.
 
 ---
 
-## 7. `ks` badge pravidlo
+## 6. Presné rozpoznanie cieľového bundlu
 
-Zachovám pravidlo:
+Upravím identifikáciu bundle targetov tak, aby sa nepoužívalo nepresné `includes`.
+
+Použije sa stabilný bundle key:
 
 ```text
-1 ks = bez badge
-2+ ks = zelený badge "2 ks", "18 ks"...
+weekKey + project_id + stage_id + bundle_label + split_part
 ```
 
-Zkontroluji aktivní, pozastavené i dokončené položky, aby se `1 ks` nikde znovu nezobrazovalo.
+Pre:
+
+- React `key`
+- drag id
+- drop id
+- `data-bundle-key`
+- hľadanie source/target bundlu pri dropnutí
+
+Tým sa dva bundle rovnakého projektu v tom istom týždni nebudú zamieňať.
 
 ---
 
-## 8. Technické úpravy
+## 7. Oprava aktuálneho stavu Z-2617-001 / T17
 
-Upravím hlavně:
+Po implementácii opravím aj existujúce dáta projektu `Z-2617-001` v T17.
 
-- `src/components/production/WeeklySilos.tsx`
-  - stabilní bundle key
-  - droppable přímo na zavřenou kartu bundlu
-  - hover/drop feedback zvětšením karty dolů
-  - nebarevný label `A`, `A-1` napravo nad hodinami
-  - zachování `Split x/y` u počtu položek
-  - sjednocení `ks > 1`
+Cieľ:
 
-- `src/pages/PlanVyroby.tsx`
-  - rozpoznání dropu na konkrétní bundle
-  - odlišení dropu na týden vs dropu na kartu bundlu
-  - předání source/target bundle identity do akce sloučení
+```text
+split A-N zostane zachovaný
+full bundle nesmie používať A, ak A patrí split sérii
+samostatné full položky rovnakého projektu/etapy v T17 sa zlúčia do jedného full bundlu
+```
 
-- `src/hooks/useProductionDragDrop.ts`
-  - nová akce pro sloučení bundle do bundle ve stejném týdnu
-  - validace full/split/stage pravidel
-  - update `bundle_label` source položek na target label
-  - undo/redo pro sloučení
+Ak sa ukáže, že niektoré položky majú nekonzistentné `stage_id`, opravím iba tie, ktoré jednoznačne patria k tej istej etape. Skutočne rozdielne etapy sa zlučovať nebudú.
+
+---
+
+## 8. Súbory na úpravu
+
+Upravím hlavne:
 
 - `src/lib/productionBundles.ts`
-  - případné doplnění helperu pro vytvoření stabilního bundle key a nebarevného display labelu
+  - obsadenosť labelu pri split sériách
+  - helper na automatické full-bundle zlučovanie
+  - helper na validáciu drop targetu
+
+- `src/hooks/useProductionDragDrop.ts`
+  - zavolanie normalizácie po presunoch/plánovaní
+  - manuálne full→full merge
+  - undo/redo pre manuálne merge
+  - bezpečné čistenie split metadát pri full merge
+
+- `src/pages/PlanVyroby.tsx`
+  - no-op pre drop späť do rovnakého týždňa
+  - presné rozlíšenie drop na týždeň vs drop na bundle
+  - predanie active drag metadát do Kanbanu
+
+- `src/components/production/WeeklySilos.tsx`
+  - drop highlight iba pri validnom cieli
+  - stabilný bundle key v drag/drop identite
+  - žiadne zvýraznenie pri cudzom projekte alebo nepovolenej kombinácii
 
 ---
 
-## 9. Ověření
+## 9. Otestovanie
 
-Po implementaci ověřím:
+Overím:
 
-- v T9 lze mít dva full bundly stejného projektu
-- přetažením jednoho zavřeného bundlu na druhý se sloučí
-- sloučení nemění `production_inbox`, `production_expedice`, analytics ani modul Výroba
-- split/full blokace zůstávají funkční
-- jiná etapa nejde sloučit
-- labely jsou čitelné jako `A`, `B`, `A-1`, `A-2`
-- nejsou použité barvy podle písmen
-- `Split x/y` u počtu položek zůstává
-- `1 ks` se nezobrazuje, `2+ ks` ano
-- build projde bez TypeScript chyb
+- split `A-1`, `A-2` blokuje nový full `A`
+- nový full bundle po split `A` dostane `B`
+- full položky rovnakého projektu/etapy v jednom týždni sa automaticky zlúčia
+- manuálne full bundle → full bundle zlúčenie stále funguje
+- split drop späť do rovnakého týždňa nič neurobí
+- popup merge/keep split sa nezobrazí pri no-op dropnutí
+- full → split zostane zakázané
+- split → full zostane zakázané
+- iný projekt sa nezvýrazní ako drop target
+- iná etapa sa nezvýrazní ako drop target
+- `Z-2617-001` v T17 bude mať split sériu oddelenú a full položky zlúčené správne
+- build prejde bez TypeScript chýb
