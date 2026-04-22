@@ -1801,9 +1801,6 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             )}
           </div>
           <div className="flex flex-col items-end gap-[1px] shrink-0">
-            <span className="font-sans text-[10px] leading-none px-1.5 py-[2px] rounded border" style={{ color: forecastDarkMode ? "#c8d0e0" : "#223937", backgroundColor: forecastDarkMode ? "rgba(200,208,224,0.08)" : "#f8f7f4", borderColor: forecastDarkMode ? "#3d4558" : "#d9d4ce", fontWeight: 700 }}>
-              {bundleDisplayLabel}
-            </span>
             <div className="flex items-center gap-1">
               {!isMidflightBundle && expSeverity && !allCompleted && deadlineInfo?.parsed && (() => {
                 const warnColor = expSeverity === "overdue" ? "#dc3545" : "#d97706";
