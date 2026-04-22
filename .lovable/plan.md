@@ -1,138 +1,124 @@
 
-## Úprava notifikace „Chybějící daylog“
+## Oprava zobrazení hotových split položek ve Výrobě
 
-### Cíl
-Notifikace se nemá posílat podle toho, jestli má log každý projekt zvlášť.
-
-Nové pravidlo bude:
+### Problém
+V sekci **✓ Hotové** se splitnutý prvek zobrazuje jako několik samostatných řádků:
 
 ```text
-Pokud je za dnešní den zapsaný aspoň jeden daylog na jakýkoliv projekt, notifikace se neposílá.
-Notifikace se pošle jen tehdy, když za celý dnešní pracovní den není zapsaný žádný daylog.
+Nízká skříň s policí (1/5)
+Nízká skříň s policí (2/5)
+Nízká skříň s policí (3/5)
+Nízká skříň s policí (4/5)
 ```
 
-To platí i pro záznam typu **„Dnes nebyla výroba“**, protože ten se také ukládá do `production_daily_logs`.
+To je matoucí, protože obchodně jde pořád o **jeden prvek** a do Expedice má čekat jen jeden finální záznam, ne každý rozdělený plánovací díl zvlášť.
 
 ---
 
 ## Implementace
 
-### 1. Změnit logiku v `check-daylog`
-V `supabase/functions/check-daylog/index.ts` upravím kontrolu tak, aby už neporovnávala logy proti jednotlivým položkám ani projektům.
+### 1. Sloučit split části v sekci „Hotové“
+V `src/pages/Vyroba.tsx` upravím výpočet `completedItems`.
 
-Aktuální problémová logika:
+Místo přímého renderování každé dokončené schedule položky zvlášť vytvořím agregaci podle:
+
+- `project_id`
+- primárně `item_code`
+- pokud kód chybí, podle názvu bez suffixu `(1/5)`, `(2/5)` atd.
+- ideálně také podle `split_group_id`, pokud je dostupné
+
+Výsledek bude v UI jen jeden řádek:
+
+```text
+Z-2617-001  Nízká skříň s policí  77.8h
+```
+
+ne čtyři samostatné řádky.
+
+### 2. Správný počet v nadpisu „Hotové“
+Nadpis:
+
+```text
+✓ Hotové (4)
+```
+
+se změní tak, aby počítal sloučené obchodní prvky, tedy např.:
+
+```text
+✓ Hotové (1)
+```
+
+pokud jde o jeden prvek rozdělený na více částí.
+
+### 3. Zobrazit informaci o částech bez duplicity
+U sloučeného řádku doplním malý badge, aby bylo jasné, že prvek je rozdělený:
+
+```text
+4/5 částí hotovo
+```
+
+nebo pokud je kompletně hotovo:
+
+```text
+5/5 částí hotovo
+```
+
+Samotný název bude očištěný od suffixu `(N/5)`, aby nevypadal jako více kusů.
+
+### 4. Sečíst hodiny všech hotových částí
+U agregovaného řádku se budou hodiny sčítat ze všech dokončených částí stejného prvku.
+
+Příklad:
+
+```text
+15.1h + 24.6h + 13.6h + 24.5h = 77.8h
+```
+
+V UI se zobrazí jen:
+
+```text
+77.8h
+```
+
+### 5. Zachovat QC informaci
+Pokud mají sloučené části QC kontrolu, zobrazí se jedna společná QC informace.
+
+Technicky:
+- pokud má QC aspoň první / reprezentativní část, zobrazí se badge,
+- případně se bude preferovat nejnovější QC z dostupných částí.
+
+### 6. Opravit hromadné dokončování split částí
+V `UnifiedItemList` jsou místa, kde se při hromadném dokončení zapisuje do `production_expedice`.
+
+Doplním jednotný helper:
 
 ```ts
-bundle_id IN scheduleItems.map(s => s.id)
+getExpediceTimestampForCompletedItem(item, now)
 ```
 
-bude nahrazena jednoduchou kontrolou:
+Pravidlo:
+- mezilehlé split části (`split_part < split_total`) se zapíšou jako interně dokončené, tedy s vyplněným `expediced_at`,
+- poslední část nebo nesplitnutý prvek se zapíše s `expediced_at = null`, aby čekal v Expedici.
 
-```ts
-production_daily_logs
-  .eq("week_key", weekKey)
-  .eq("day_index", dayIndex)
-  .limit(1)
-```
+Tím se sjednotí chování s existující single-item logikou a zabrání se tomu, aby do aktivní Expedice spadlo více částí stejného prvku.
 
-Pokud existuje aspoň jeden řádek, funkce skončí:
+### 7. Zkontrolovat Expedice panel
+V `src/components/production/ExpedicePanel.tsx` ověřím, že aktivní Expedice stále zobrazuje jen položky s `expediced_at = null`.
 
-```text
-Daylog exists for today, skipping
-```
-
-### 2. Zachovat kontrolu, zda je vůbec co hlídat
-Notifikace se bude řešit jen pokud:
-
-- není víkend,
-- není český státní svátek,
-- není firemní dovolená,
-- týden nemá nulovou kapacitu,
-- v aktuálním týdnu existuje aspoň jedna aktivní položka ve výrobě/plánu.
-
-Pokud není nic naplánované, notifikace se neposílá.
-
-### 3. Použít lokální datum místo UTC
-Ve funkci nahradím:
-
-```ts
-toISOString().split("T")[0]
-```
-
-lokálním helperem:
-
-```ts
-function toLocalDateStr(d: Date): string
-```
-
-Použije se pro:
-
-- `todayStr`
-- `weekKey`
-
-Tím se zabrání posunu data o den kvůli UTC.
-
-### 4. Změnit obsah notifikace
-Protože už nepůjde o seznam konkrétních projektů, text bude obecný, například:
-
-```text
-Za dnešní pracovní den zatím není zapsaný žádný denní log ve výrobě.
-```
-
-Titulek může zůstat:
-
-```text
-Chybějící denní log
-```
-
-nebo být jasnější:
-
-```text
-Chybí denní log za celý den
-```
-
-### 5. Zabránit duplicitám za stejný den
-Při vytváření notifikace doplním `batch_key`, například:
-
-```text
-daylog_missing:{todayStr}
-```
-
-Před vložením nové notifikace se ověří, zda už uživatel pro tento den tuto notifikaci nemá. Pokud ano, další kopie se nevloží.
-
-### 6. Upravit kliknutí v notifikacích
-V `src/components/NotificationPanel.tsx` upravím zobrazení zprávy:
-
-- zpráva nebude jen `truncate` na jeden řádek,
-- systémovou notifikaci půjde rozkliknout a zobrazit celý text,
-- pro `daylog_missing` bude kliknutí navigovat do modulu:
-
-```text
-/vyroba
-```
-
-### 7. Aktualizovat pravidlo v paměti projektu
-Doplním pravidlo k daylog notifikacím:
-
-```text
-Daylog missing alert se posílá jen při úplně chybějícím daylogu za celý den. Stačí jeden záznam v production_daily_logs pro dnešní week_key + day_index.
-```
+Pokud už ve starších datech existují duplicitní split části s `expediced_at = null`, upravím zobrazení tak, aby se ve frontendu sloučily podle stejného klíče jako ve Výrobě a nepůsobily jako více kusů.
 
 ---
 
 ## Soubory
 
-- `supabase/functions/check-daylog/index.ts`
-- `src/components/NotificationPanel.tsx`
-- `mem://features/notifications/holiday-suppression`
-- případně `mem://features/production-tracking/daily-log-logic`
+- `src/pages/Vyroba.tsx`
+- případně `src/components/production/ExpedicePanel.tsx`
 
 ---
 
 ## Výsledek
 
-- Pokud někdo zapíše daylog aspoň na jeden projekt, systém už ten den nebude hlásit chybějící daylog.
-- Falešné notifikace kvůli jiným projektům zmizí.
-- Notifikace se nebude duplikovat pro stejný den.
-- Text notifikace půjde rozkliknout.
-- Kliknutí na daylog notifikaci otevře rovnou modul Výroba.
+- Ve Výrobě se splitnutý prvek v **Hotové** zobrazí jako jeden řádek.
+- Nadpis `✓ Hotové` bude počítat skutečné prvky, ne technické split části.
+- Uživatel uvidí stav částí např. `4/5 částí hotovo`, ale nebude to vypadat jako 4 samostatné skříně.
+- Do aktivní Expedice bude čekat jen finální prvek, ne každá mezilehlá část.
