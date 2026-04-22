@@ -134,7 +134,9 @@ export function useProductionSchedule() {
         const seriesMeta = splitGroupId ? splitMetaByGroup.get(splitGroupId) : null;
         const resolvedSplitPart = (row as any).split_part ?? (bundleType === "split" ? seriesMeta?.splitPart ?? null : null);
         const resolvedSplitTotal = (row as any).split_total ?? (bundleType === "split" ? seriesMeta?.splitTotal ?? null : null);
-        const bundleKey = `${pid}::${row.stage_id ?? "none"}::${bundleLabel}::${resolvedSplitPart ?? "full"}`;
+        const bundleKey = bundleType === "full"
+          ? `${pid}::full::${bundleLabel}`
+          : `${pid}::${row.stage_id ?? "none"}::${bundleLabel}::${resolvedSplitPart ?? "split"}`;
         if (!byWeek.has(week)) byWeek.set(week, new Map());
         const weekMap = byWeek.get(week)!;
         if (!weekMap.has(bundleKey)) {
