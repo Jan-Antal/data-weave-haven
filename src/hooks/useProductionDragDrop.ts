@@ -6,7 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { renumberChain, renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
-import { buildNewBundleAssignment, getNextBundleLabel, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
+import { buildNewBundleAssignment, getNextBundleLabel, normalizeFullBundlesForWeek, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -31,6 +31,11 @@ export function useProductionDragDrop() {
     invalidateAll();
     qc.invalidateQueries({ queryKey: ["production-quality-checks"] });
   }, [invalidateAll, qc]);
+
+  const normalizeFullBundles = useCallback(async (projectId?: string | null, stageId?: string | null, weekKey?: string | null) => {
+    if (!projectId || !weekKey) return;
+    try { await normalizeFullBundlesForWeek(projectId, stageId ?? null, weekKey); } catch { /* non-blocking normalization */ }
+  }, []);
 
   const moveInboxItemToWeek = useCallback(async (inboxItemId: string, weekDate: string) => {
     try {
