@@ -3461,6 +3461,32 @@ function DetailPanel({
     if (autoExpandHotove) setCompletedOpen(true);
   }, [autoExpandHotove]);
 
+  const completedGroups = useMemo(() => {
+    const groups = new Map<string, { item: ScheduleItem; itemIds: string[]; completedParts: number; splitTotal: number | null }>();
+    for (const entry of completedItems) {
+      const key = getScheduleBusinessKey(entry.item);
+      const existing = groups.get(key);
+      if (existing) {
+        existing.itemIds.push(entry.item.id);
+        existing.completedParts += 1;
+        existing.splitTotal = Math.max(existing.splitTotal ?? 0, entry.item.split_total ?? 0) || null;
+        existing.item = {
+          ...existing.item,
+          item_name: stripSplitSuffix(existing.item.item_name),
+          scheduled_hours: existing.item.scheduled_hours + entry.item.scheduled_hours,
+        };
+      } else {
+        groups.set(key, {
+          item: { ...entry.item, item_name: stripSplitSuffix(entry.item.item_name) },
+          itemIds: [entry.item.id],
+          completedParts: 1,
+          splitTotal: entry.item.split_total,
+        });
+      }
+    }
+    return Array.from(groups.values());
+  }, [completedItems]);
+
   const totalActiveItems = currentItems.length + futureItems.length + completedItems.length;
 
   // PM initials
