@@ -214,10 +214,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     upsertPreferences({ production_inbox_seen_at: initialInboxSeenAt.current });
   }, [preferencesFetched, userPreferences?.production_inbox_seen_at, isUpsertingPreferences, upsertPreferences]);
 
-  const handleMarkInboxRead = useCallback(() => {
-    upsertPreferences({ production_inbox_seen_at: new Date().toISOString() });
-  }, [upsertPreferences]);
-
   // Build next 12 weeks with remaining capacity
   const planningWeeks = useMemo<PlanningWeek[]>(() => {
     const now = new Date();
@@ -812,15 +808,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           )}
         </div>
         <div className="flex items-center gap-1.5">
-          {totalNewItemCount > 0 && (
-            <button
-              onClick={handleMarkInboxRead}
-              disabled={isUpsertingPreferences}
-              className="rounded border border-info/25 bg-info/5 px-1.5 py-0.5 text-[9px] font-semibold text-info transition-colors hover:bg-info/10 disabled:opacity-50"
-            >
-              Označit jako přečtené
-            </button>
-          )}
           {projects.length > 0 && (
             <>
               <button
