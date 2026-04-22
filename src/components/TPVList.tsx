@@ -774,9 +774,9 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   );
 
   return (
-    <div className="w-full min-w-0 h-full flex flex-col">
+    <div className="w-full min-w-0 h-full min-h-0 overflow-hidden flex flex-col">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap mb-4">
+      <div className="flex items-center gap-2 flex-wrap mb-4 shrink-0">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Zpět
         </Button>
@@ -853,12 +853,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
       <div
         className={cn(
-          "rounded-lg border bg-card flex flex-col flex-1 min-h-0",
+          "rounded-lg border bg-card flex flex-col flex-1 min-h-0 overflow-hidden",
           editMode && "rounded-t-none border-t-0",
         )}
       >
         {/* SINGLE scrollable container with sticky header */}
-        <div ref={tpvBodyScrollRef} className="flex-1 overflow-auto always-scrollbar rounded-t-lg">
+        <div ref={tpvBodyScrollRef} className="flex-1 min-h-0 overflow-auto always-scrollbar rounded-t-lg">
           <Table style={{ tableLayout: "fixed" }}>
             {renderColGroup()}
             <TableHeader className="sticky top-0 z-10 bg-card">
