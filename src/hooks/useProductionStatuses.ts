@@ -45,26 +45,40 @@ function formatCancelTooltip(reason: string | null, at: string | null, byName: s
   return head;
 }
 
+function formatReturnedTooltip(at: string | null, byName: string | null): string {
+  const parts: string[] = ["Vráceno z výroby"];
+  if (at) {
+    try {
+      parts.push(new Date(at).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" }));
+    } catch {/* ignore */}
+  }
+  let head = parts.join(" ");
+  if (byName) head += ` — ${byName}`;
+  return head;
+}
+
 /** For a given project, compute production status per TPV nazev (code) */
 export function useProductionStatuses(projectId: string) {
   const query = useQuery({
     queryKey: ["production-statuses", projectId],
     queryFn: async () => {
       const [inboxRes, scheduleRes, projectRes] = await Promise.all([
-        supabase.from("production_inbox").select("item_name, item_code, status, cancel_reason, cancelled_at, cancelled_by").eq("project_id", projectId),
-        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total, pause_reason, pause_expected_date, cancel_reason, cancelled_at, cancelled_by, expediced_at").eq("project_id", projectId),
+        supabase.from("production_inbox").select("item_name, item_code, status, cancel_reason, cancelled_at, cancelled_by, returned_at, returned_by").eq("project_id", projectId),
+        supabase.from("production_schedule").select("item_name, item_code, status, scheduled_week, split_part, split_total, pause_reason, pause_expected_date, cancel_reason, cancelled_at, cancelled_by, returned_at, returned_by, expediced_at").eq("project_id", projectId),
         supabase.from("projects").select("status").eq("project_id", projectId).maybeSingle(),
       ]);
       if (inboxRes.error) throw inboxRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
 
-      // Resolve cancelled_by user IDs to names (best-effort, batched)
+      // Resolve cancelled_by / returned_by user IDs to names (best-effort, batched)
       const userIds = new Set<string>();
       for (const r of inboxRes.data || []) {
         if ((r as any).cancelled_by) userIds.add((r as any).cancelled_by);
+        if ((r as any).returned_by) userIds.add((r as any).returned_by);
       }
       for (const r of scheduleRes.data || []) {
         if ((r as any).cancelled_by) userIds.add((r as any).cancelled_by);
+        if ((r as any).returned_by) userIds.add((r as any).returned_by);
       }
       const userNameMap = new Map<string, string>();
       if (userIds.size > 0) {
@@ -104,7 +118,7 @@ export function useProductionStatuses(projectId: string) {
 
     // Collect raw per-item data
     interface RawEntry {
-      type: "pending" | "ve_vyrobe" | "naplan" | "zpozdeni" | "expedice_wait" | "expedovano" | "paused" | "cancelled";
+      type: "pending" | "ve_vyrobe" | "naplan" | "zpozdeni" | "expedice_wait" | "expedovano" | "paused" | "cancelled" | "returned";
       weekNum?: number;
       label?: string;
       color?: string;
@@ -128,6 +142,15 @@ export function useProductionStatuses(projectId: string) {
           label: `✕ Zrušeno${reason ? ` · ${reason}` : ""}`,
           color: "#dc2626",
           tooltip: formatCancelTooltip(reason || null, at, by),
+        });
+      } else if (row.status === "returned") {
+        const at = (row as any).returned_at || null;
+        const by = (row as any).returned_by ? userNameMap.get((row as any).returned_by) || null : null;
+        rawMap.get(key)!.push({
+          type: "returned",
+          label: "↩ Vráceno z výroby",
+          color: "#ea580c",
+          tooltip: formatReturnedTooltip(at, by),
         });
       }
     }
@@ -161,6 +184,15 @@ export function useProductionStatuses(projectId: string) {
           label: `✕ Zrušeno${reason ? ` · ${reason}` : ""}`,
           color: "#dc2626",
           tooltip: formatCancelTooltip(reason || null, at, by),
+        });
+      } else if (row.status === "returned") {
+        const at = (row as any).returned_at || null;
+        const by = (row as any).returned_by ? userNameMap.get((row as any).returned_by) || null : null;
+        rawMap.get(key)!.push({
+          type: "returned",
+          label: "↩ Vráceno z výroby",
+          color: "#ea580c",
+          tooltip: formatReturnedTooltip(at, by),
         });
       } else {
         const weekKey = row.scheduled_week;
@@ -203,6 +235,13 @@ export function useProductionStatuses(projectId: string) {
       const pending = entries.filter(e => e.type === "pending");
       if (pending.length > 0) {
         statuses.push({ label: "Čeká na plánování", color: "#6b7280" });
+      }
+
+      const returned = entries.filter(e => e.type === "returned");
+      if (returned.length > 0) {
+        // Use most recent returned entry tooltip
+        const latest = returned[returned.length - 1];
+        statuses.push({ label: "↩ Vráceno z výroby", color: "#ea580c", tooltip: latest.tooltip });
       }
 
       const expediceWait = entries.filter(e => e.type === "expedice_wait");

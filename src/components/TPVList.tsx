@@ -387,7 +387,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
               .select("id")
               .eq("project_id", projectId)
               .eq("item_code", item.item_code)
-              .neq("status", "cancelled")
+              .not("status", "in", "(cancelled,returned)")
               .limit(1),
             supabase
               .from("production_schedule")
@@ -403,19 +403,19 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             continue;
           }
 
-          // Wipe any prior cancelled rows for this TPV item — guarantees one current production state.
+          // Wipe any prior cancelled/returned rows for this TPV item — guarantees one current production state.
           await supabase
             .from("production_inbox")
             .delete()
             .eq("project_id", projectId)
             .eq("item_code", item.item_code)
-            .eq("status", "cancelled");
+            .in("status", ["cancelled", "returned"]);
           await supabase
             .from("production_schedule")
             .delete()
             .eq("project_id", projectId)
             .eq("item_code", item.item_code)
-            .eq("status", "cancelled");
+            .in("status", ["cancelled", "returned"]);
 
 
           // Hours = (selling price × (1 - margin) × production%) / hourly rate

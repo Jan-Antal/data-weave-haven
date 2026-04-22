@@ -794,6 +794,8 @@ export type Database = {
           item_code: string | null
           item_name: string
           project_id: string
+          returned_at: string | null
+          returned_by: string | null
           sent_at: string
           sent_by: string
           split_group_id: string | null
@@ -814,6 +816,8 @@ export type Database = {
           item_code?: string | null
           item_name: string
           project_id: string
+          returned_at?: string | null
+          returned_by?: string | null
           sent_at?: string
           sent_by: string
           split_group_id?: string | null
@@ -834,6 +838,8 @@ export type Database = {
           item_code?: string | null
           item_name?: string
           project_id?: string
+          returned_at?: string | null
+          returned_by?: string | null
           sent_at?: string
           sent_by?: string
           split_group_id?: string | null
@@ -959,6 +965,8 @@ export type Database = {
           pause_reason: string | null
           position: number
           project_id: string
+          returned_at: string | null
+          returned_by: string | null
           scheduled_czk: number
           scheduled_hours: number
           scheduled_week: string
@@ -990,6 +998,8 @@ export type Database = {
           pause_reason?: string | null
           position?: number
           project_id: string
+          returned_at?: string | null
+          returned_by?: string | null
           scheduled_czk: number
           scheduled_hours: number
           scheduled_week: string
@@ -1021,6 +1031,8 @@ export type Database = {
           pause_reason?: string | null
           position?: number
           project_id?: string
+          returned_at?: string | null
+          returned_by?: string | null
           scheduled_czk?: number
           scheduled_hours?: number
           scheduled_week?: string

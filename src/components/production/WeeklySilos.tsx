@@ -619,6 +619,34 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       if (hasUncompleted || pausedItems.length > 0) {
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => returnBundleToInbox(bundle.project_id, weekKey) });
+        // ↩ Vrátit celý projekt do TPV (soft-delete - zostane stopa s oranžovým badgem)
+        const returnableItems = [...activeItems, ...pausedItems].filter(i => {
+          const ia = i as any;
+          return !ia.is_midflight && !ia.is_historical;
+        });
+        if (returnableItems.length > 0) {
+          actions.push({
+            label: `↩ Vrátit do TPV (${returnableItems.length})`, icon: "↩",
+            onClick: async () => {
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const { error } = await supabase
+                  .from("production_schedule")
+                  .update({ status: "returned", returned_at: new Date().toISOString(), returned_by: user?.id ?? null } as any)
+                  .in("id", returnableItems.map(i => i.id));
+                if (error) throw error;
+                qc.invalidateQueries({ queryKey: ["production-schedule"] });
+                qc.invalidateQueries({ queryKey: ["production-progress"] });
+                qc.invalidateQueries({ queryKey: ["production-statuses", bundle.project_id] });
+                qc.invalidateQueries({ queryKey: ["tpv-items", bundle.project_id] });
+                toast({ title: `↩ Vráceno ${returnableItems.length} položek do TPV` });
+              } catch (err: any) {
+                console.error("[Vrátit projekt do TPV] failed:", err);
+                toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+              }
+            },
+          });
+        }
       }
       // Merge option for bundles containing split items
       const splitGroupIds = new Set<string>();
@@ -706,6 +734,30 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       } else if (isPaused) {
         actions.push({ label: "Uvolnit položku", icon: "▶", onClick: () => handleReleaseItem(item.id) });
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
+        const itemAnyP = item as any;
+        if (!itemAnyP.is_midflight && !itemAnyP.is_historical) {
+          actions.push({
+            label: "↩ Vrátit do TPV", icon: "↩",
+            onClick: async () => {
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const { error } = await supabase
+                  .from("production_schedule")
+                  .update({ status: "returned", returned_at: new Date().toISOString(), returned_by: user?.id ?? null } as any)
+                  .eq("id", item.id);
+                if (error) throw error;
+                qc.invalidateQueries({ queryKey: ["production-schedule"] });
+                qc.invalidateQueries({ queryKey: ["production-progress"] });
+                qc.invalidateQueries({ queryKey: ["production-statuses", item.project_id] });
+                qc.invalidateQueries({ queryKey: ["tpv-items", item.project_id] });
+                toast({ title: "↩ Vráceno do TPV" });
+              } catch (err: any) {
+                console.error("[Vrátit do TPV] failed:", err);
+                toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+              }
+            },
+          });
+        }
       } else {
         // Normal active item
         actions.push({
@@ -738,6 +790,32 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         }
 
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
+
+        // ↩ Vrátit do TPV — soft-delete (zostane stopa s oranžovým badgem v TPV Liste)
+        const itemAnyA = item as any;
+        if (!itemAnyA.is_midflight && !itemAnyA.is_historical) {
+          actions.push({
+            label: "↩ Vrátit do TPV", icon: "↩",
+            onClick: async () => {
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const { error } = await supabase
+                  .from("production_schedule")
+                  .update({ status: "returned", returned_at: new Date().toISOString(), returned_by: user?.id ?? null } as any)
+                  .eq("id", item.id);
+                if (error) throw error;
+                qc.invalidateQueries({ queryKey: ["production-schedule"] });
+                qc.invalidateQueries({ queryKey: ["production-progress"] });
+                qc.invalidateQueries({ queryKey: ["production-statuses", item.project_id] });
+                qc.invalidateQueries({ queryKey: ["tpv-items", item.project_id] });
+                toast({ title: "↩ Vráceno do TPV" });
+              } catch (err: any) {
+                console.error("[Vrátit do TPV] failed:", err);
+                toast({ title: "Chyba", description: err?.message, variant: "destructive" });
+              }
+            },
+          });
+        }
 
         actions.push({
           label: "Pozastavit", icon: "⏸",
