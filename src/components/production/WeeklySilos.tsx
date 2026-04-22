@@ -1763,7 +1763,18 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
                 })()}
               </div>
             ) : (
-              <div style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>{bundle.items.length} položek</div>
+              <div className="flex items-center gap-1" style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>
+                <span>{bundle.items.length} položek</span>
+                {isSplitBundle && (() => {
+                  const splitItem = bundle.items.find(i => i.split_part && i.split_total);
+                  return (
+                    <>
+                      <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Split</span>
+                      {splitItem && <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{splitItem.split_part}/{splitItem.split_total}</span>}
+                    </>
+                  );
+                })()}
+              </div>
             )}
           </div>
           <div className="flex flex-col items-end gap-[1px] shrink-0">
