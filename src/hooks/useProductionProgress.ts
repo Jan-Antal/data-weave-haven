@@ -19,15 +19,17 @@ export function useProductionProgress() {
   return useQuery({
     queryKey: ["production-progress"],
     queryFn: async () => {
-      const [tpvRes, inboxRes, scheduleRes] = await Promise.all([
+      const [tpvRes, inboxRes, scheduleRes, expediceRes] = await Promise.all([
         supabase.from("tpv_items").select("project_id, id, item_code, nazev").is("deleted_at", null),
         supabase.from("production_inbox").select("project_id, id, item_name, item_code, status"),
-        supabase.from("production_schedule").select("project_id, id, inbox_item_id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)").in("status", ["scheduled", "in_progress", "paused", "completed"]),
+        supabase.from("production_schedule").select("project_id, id, inbox_item_id, item_name, item_code, status, scheduled_week, is_blocker, is_midflight, is_historical, completed_at, expediced_at, projects!production_schedule_project_id_fkey(project_name)").in("status", ["scheduled", "in_progress", "paused", "completed"]),
+        supabase.from("production_expedice").select("project_id, id, source_schedule_id, item_name, item_code, is_midflight, projects!production_expedice_project_id_fkey(project_name)"),
       ]);
 
       if (tpvRes.error) throw tpvRes.error;
       if (inboxRes.error) throw inboxRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
+      if (expediceRes.error) throw expediceRes.error;
 
       const itemKey = (row: { id: string; item_code: string | null; item_name?: string | null; inbox_item_id?: string | null }) =>
         row.item_code ? `code:${row.item_code}` : row.inbox_item_id ? `inbox:${row.inbox_item_id}` : `id:${row.id}`;
@@ -53,8 +55,21 @@ export function useProductionProgress() {
       const nonBlockerCountByProject = new Map<string, number>();
       const scheduledItemsByProject = new Map<string, ProjectProgress["scheduled_items"]>();
       const projectNames = new Map<string, string>();
+      const expediceScheduleIds = new Set<string>();
+
+      for (const row of expediceRes.data || []) {
+        if ((row as any).is_midflight) continue;
+        const pid = row.project_id;
+        const pName = (row as any).projects?.project_name;
+        if (pName && !projectNames.has(pid)) projectNames.set(pid, pName);
+        if (row.source_schedule_id) expediceScheduleIds.add(row.source_schedule_id);
+        if (!row.item_code) continue;
+        if (!completedByProject.has(pid)) completedByProject.set(pid, new Set());
+        completedByProject.get(pid)!.add(itemKey(row));
+      }
 
       for (const row of scheduleRes.data || []) {
+        if ((row as any).is_midflight || (row as any).is_historical) continue;
         const pid = row.project_id;
         const pName = (row as any).projects?.project_name;
         if (pName && !projectNames.has(pid)) projectNames.set(pid, pName);
@@ -64,15 +79,17 @@ export function useProductionProgress() {
         } else {
           nonBlockerCountByProject.set(pid, (nonBlockerCountByProject.get(pid) || 0) + 1);
         }
-        if (row.status === "completed") {
+        const key = itemKey(row);
+        const isAlreadyManufactured = expediceScheduleIds.has(row.id) || completedByProject.get(pid)?.has(key);
+        if (row.status === "completed" || isAlreadyManufactured) {
           if (!completedByProject.has(pid)) completedByProject.set(pid, new Set());
-          completedByProject.get(pid)!.add(itemKey(row));
+          completedByProject.get(pid)!.add(key);
         } else if (row.status === "paused") {
           if (!pausedByProject.has(pid)) pausedByProject.set(pid, new Set());
-          pausedByProject.get(pid)!.add(itemKey(row));
+          pausedByProject.get(pid)!.add(key);
         } else {
           if (!scheduledByProject.has(pid)) scheduledByProject.set(pid, new Set());
-          scheduledByProject.get(pid)!.add(itemKey(row));
+          scheduledByProject.get(pid)!.add(key);
         }
         
         if (!scheduledItemsByProject.has(pid)) scheduledItemsByProject.set(pid, []);
