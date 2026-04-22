@@ -367,7 +367,7 @@ export function CompletionDialog({
                         onClick={e => e.stopPropagation()}
                         className="w-14 text-center text-[11px] font-sans border border-border rounded px-1 py-0.5 bg-background"
                       />
-                      <span className="text-[10px] font-sans text-muted-foreground shrink-0">= {item.scheduled_hours}h</span>
+                      <span className="text-[10px] font-sans text-muted-foreground shrink-0">= {formatHours(item.scheduled_hours)}h</span>
                     </div>
                     <button
                       className="text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
