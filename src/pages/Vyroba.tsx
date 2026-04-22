@@ -3806,22 +3806,23 @@ function DetailPanel({
         )}
 
         {/* ── HOTOVÉ — collapsible ── */}
-        {completedItems.length > 0 && (
+        {completedGroups.length > 0 && (
           <Collapsible open={completedOpen} onOpenChange={setCompletedOpen}>
             <CollapsibleTrigger
               className="flex items-center gap-1 text-xs font-semibold cursor-pointer"
               style={{ color: "#3a8a36" }}
             >
               {completedOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}✓ Hotové (
-              {completedItems.length})
+              {completedGroups.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-2 space-y-1">
-                {completedItems.map(({ item }) => {
-                  const qcCheck = hotoveCheckMap.get(item.id);
+                {completedGroups.map(({ item, itemIds, completedParts, splitTotal }) => {
+                  const qcCheck = itemIds.map((id) => hotoveCheckMap.get(id)).find(Boolean);
+                  const isSplit = completedParts > 1 || (splitTotal ?? 0) > 1;
                   return (
                     <div
-                      key={item.id}
+                      key={itemIds.join("-")}
                       className="px-2.5 py-2 rounded-md"
                       style={{ border: "1px solid #ece8e2", background: "#ffffff" }}
                     >
@@ -3835,6 +3836,14 @@ function DetailPanel({
                         <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>
                           {item.item_name}
                         </span>
+                        {isSplit && (
+                          <span
+                            className="text-[9px] font-medium px-1.5 py-[1px] rounded shrink-0"
+                            style={{ background: "rgba(58,138,54,0.1)", color: "#3a8a36" }}
+                          >
+                            {completedParts}/{splitTotal || completedParts} částí hotovo
+                          </span>
+                        )}
                         {qcCheck && <QualityCheckFullDisplay check={qcCheck} />}
                         <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
                           {formatHours(item.scheduled_hours)}h
