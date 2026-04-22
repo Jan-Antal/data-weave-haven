@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+function normalizeProductionItemCode(code: string | null | undefined): string {
+  if (!code) return "";
+  return code.replace(/_[a-z0-9]{1,8}$/i, "");
+}
+
 export interface ScheduleItem {
   id: string;
   project_id: string;
