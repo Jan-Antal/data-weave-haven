@@ -1042,6 +1042,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
                   searchActive={searchActive}
                   isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
                   onToggleLock={() => toggleWeekLock(week.key)}
+                  activeDrag={activeDrag}
                   spilledBundles={week.key === currentWeekKey ? spilledBundlesForCurrent : undefined}
                 />
               </div>
@@ -1518,7 +1519,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked, exchangeRates, isSpilled, spilledFromWeekNum }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked, activeDrag, exchangeRates, isSpilled, spilledFromWeekNum }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -1534,6 +1535,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   searchMatchedProjectIds?: Set<string>;
   searchActive?: boolean;
   isWeekLocked?: boolean;
+  activeDrag?: Props["activeDrag"];
   exchangeRates?: Array<{ year: number; eur_czk: number }>;
   isSpilled?: boolean;
   spilledFromWeekNum?: number;
