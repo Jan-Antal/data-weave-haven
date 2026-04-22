@@ -70,6 +70,9 @@ export function useProductionDragDrop() {
         bundle_type: bundleAssignment.bundle_type,
       } as any).select().single();
       if (insertErr) throw insertErr;
+      if (bundleAssignment.bundle_type === "full") {
+        await normalizeFullBundles(item.project_id, item.stage_id, weekDate);
+      }
 
       const { error: updateErr } = await supabase
         .from("production_inbox")
@@ -127,7 +130,7 @@ export function useProductionDragDrop() {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll, pushUndo]);
+  }, [invalidateAll, normalizeFullBundles, pushUndo]);
 
   const moveInboxProjectToWeek = useCallback(async (projectId: string, weekDate: string) => {
     try {
@@ -198,6 +201,11 @@ export function useProductionDragDrop() {
         .update({ status: "scheduled" })
         .in("id", ids);
       if (updateErr) throw updateErr;
+      const fullTargets = new Set(items.filter((item: any) => !item.split_group_id && !item.split_part && !item.split_total).map((item: any) => `${item.project_id}::${item.stage_id ?? ""}`));
+      for (const key of fullTargets) {
+        const [pid, sid] = key.split("::");
+        await normalizeFullBundles(pid, sid || null, weekDate);
+      }
 
       // Log activity for each item
       for (const item of items) {
@@ -249,7 +257,7 @@ export function useProductionDragDrop() {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll, pushUndo]);
+  }, [invalidateAll, normalizeFullBundles, pushUndo]);
 
   const moveScheduleItemToWeek = useCallback(async (
     scheduleItemId: string,
