@@ -1,118 +1,91 @@
 
-## Plán opravy drag/drop full bundle v Pláne Výroby
+Cieľ: opravím dve konkrétne chyby v Pláne Výroby:
+1. v sile bude vždy existovať reálny spodný drop priestor aspoň na výšku jedného bundlu, aby sa dala položka vytiahnuť z existujúceho bundlu a pustiť „mimo“ na vytvorenie nového bundlu v tom istom týždni,
+2. pôjde vložiť aj jednu celú položku priamo do existujúceho bundlu (nie len celý bundle), vrátane scenára Z-2617-001 → T.23-A → bundle D v T19.
 
-### Cieľ
-Upravím správanie pri pretiahnutí celej položky alebo full bundlu medzi týždňami tak, aby bolo jasné a funkčné:
+Čo je teraz zle
+- V `WeeklySilos.tsx` dnes na konci zoznamu bundlov chýba trvalý spacer/drop slot, takže keď je týždeň plný, scroll už nedovolí dostať sa na „voľné miesto“ pre nový bundle.
+- Bundle drop target dnes reaguje iba na `activeDrag.type === "silo-bundle"`. Jednotlivá položka (`silo-item`) sa preto nedá zvýrazniť ani vložiť do existujúceho bundlu.
+- V `PlanVyroby.tsx` je logika pre `silo-bundle-drop-*` iba pre celý bundle. Jednotlivá položka tam nemá vlastnú vetvu.
+- Pri `silo-item` je navyše same-week drop prakticky zablokovaný podmienkou `if (dragData.type === "silo-item" && dragData.weekDate === weekDate) return;`, takže položku nemožno v tom istom týždni ani vyňať do nového bundlu.
 
-1. Keď pretiahneš full položku/bundle z T17 do T19 na rovnaký projekt a rovnakú etapu, kde už existuje full bundle, systém ponúkne voľbu:
-   - vložiť do existujúceho bundlu a prevziať jeho označenie,
-   - alebo presunúť ako nový samostatný bundle.
-2. Drop priamo na existujúci full bundle bude skutočne fungovať aj medzi rôznymi týždňami.
-3. Pri dragovaní sa bude zvýrazňovať konkrétny bundle, do ktorého je možné položku/bundle vložiť, nielen celý týždeň.
-4. Keď vraciaš položku späť z T19 do pôvodného bundlu v T17, cieľový bundle sa vizuálne otvorí/zvýrazní ako platný drop target.
+Implementácia
 
-### Čo je teraz zle
-Aktuálne je drop na konkrétny bundle povolený len pre full → full v tom istom týždni. Preto:
+1. Spodný „nový bundle“ priestor v sile
+- Do `src/components/production/WeeklySilos.tsx` doplním na koniec obsahu každého týždňa samostatný spacer/drop slot.
+- Tento slot bude:
+  - súčasť layoutu stále, nie len pri hoveri,
+  - mať minimálnu výšku približne jedného bundlu,
+  - byť započítaný do scroll výšky,
+  - pri dragovaní sa jemne zvýrazní textom typu „Nový bundle“.
+- Tým vznikne reálny priestor na drop aj keď je týždeň vizuálne úplne plný.
 
-- pri presune T17 → T19 sa zvýrazní iba týždeň, nie konkrétny bundle,
-- drop na bundle v inom týždni je zakázaný na úrovni UI,
-- existujúca logika `mergeFullBundleIntoBundle` odmietne merge, ak zdroj a cieľ nie sú v rovnakom týždni,
-- pri dropnutí na týždeň sa položka presunie bez toho, aby sa používateľ vedome rozhodol, či ju chce pridať do existujúceho bundlu alebo ponechať ako nový bundle.
+2. Povoliť drop celej položky do existujúceho bundlu
+- V `src/components/production/WeeklySilos.tsx` rozšírim bundle target validáciu tak, aby vedela pracovať aj s `silo-item`, nie iba `silo-bundle`.
+- `DraggableSiloItem` doplním o bundle metadata v drag dátach:
+  - `bundleKey`
+  - `bundleLabel`
+  - `bundleType`
+  - prípadne informáciu, či ide o full/split kontext
+- Bundle karta potom správne zvýrazní cieľ aj pri ťahaní jednej položky.
 
-### Implementácia
+3. Rozlíšiť 3 typy dropu pre jednu položku
+V `src/pages/PlanVyroby.tsx` upravím `handleDragEnd`, aby pre `silo-item` rozlišoval:
+- drop na existujúci bundle:
+  - položka sa vloží do cieľového bundlu,
+  - prevezme jeho `bundle_label`,
+  - pri cross-week sa zároveň zmení `scheduled_week`,
+- drop na spodný week spacer:
+  - ak je to ten istý týždeň, položka sa vyjme z pôvodného bundlu a vytvorí nový full bundle s novým labelom,
+  - ak je to iný týždeň, presunie sa ako nový bundle do cieľového týždňa,
+- drop späť na obyčajný week target bez konkrétneho bundlu:
+  - zachová sa existujúce správanie pre klasický presun.
 
-#### 1. Rozšíriť validáciu drop targetov
-V `src/lib/productionBundles.ts` upravím `canAcceptBundleDrop`, aby podporovala aj cross-week full → full drop:
+4. Doplniť item-level mutácie v drag/drop hooku
+V `src/hooks/useProductionDragDrop.ts` doplním samostatné operácie pre jednu položku:
+- `moveScheduleItemIntoBundle(itemId, targetBundleItemIds)`
+- `moveScheduleItemAsNewBundle(itemId, targetWeekDate)`
+Tieto mutácie:
+- nastavia správny `scheduled_week`,
+- prepíšu `bundle_label` na cieľový alebo nový label,
+- ponechajú `bundle_type = full`,
+- vyčistia split meta pri full presune,
+- zavolajú normalizáciu pre zdrojový aj cieľový týždeň,
+- zachovajú undo/redo.
 
-- rovnaký `project_id`,
-- rovnaká `stage_id`,
-- zdroj aj cieľ musia byť `bundle_type = full`,
-- cieľ nesmie byť rovnaký bundle,
-- split → full a full → split zostane zakázané.
+5. Zachovať ochrany
+Nezmením existujúce pravidlá:
+- split položka sa nesmie vložiť do full bundlu,
+- full položka sa nesmie vložiť do split bundlu,
+- iný projekt alebo iná etapa sa nesmie spojiť,
+- locked/past týždne a legacy/dokončené karty ostanú chránené.
 
-Doplním parameter/variant, aby UI vedelo rozlíšiť:
-- interné preskupenie v rovnakom týždni,
-- vloženie do existujúceho bundlu v inom týždni.
+6. Drobné stabilizačné opravy pri dnd
+- Popri tom opravím ref warningy z konzoly v `WeeklySilos.tsx` a `DragOverlayContent.tsx`, aby drag targety a overlay fungovali čistejšie bez React warningov.
+- Toto nie je hlavná funkčná chyba, ale je to dobré spraviť spolu, lebo sa to týka rovnakého dnd render stromu.
 
-#### 2. Povoliť drop na full bundle v inom týždni
-V `src/components/production/WeeklySilos.tsx` upravím droppable logiku v `CollapsibleBundleCard`:
+Technické detaily
+- `src/components/production/WeeklySilos.tsx`
+  - pridať permanentný end spacer do scroll oblasti,
+  - rozšíriť `canDropActiveBundle` aj pre `silo-item`,
+  - posielať bundle kontext z `DraggableSiloItem`.
+- `src/pages/PlanVyroby.tsx`
+  - pridať vetvu pre `dragData.type === "silo-item"` + `targetId.startsWith("silo-bundle-drop-")`,
+  - odstrániť slepý early return pre same-week item drop tam, kde má vzniknúť nový bundle.
+- `src/hooks/useProductionDragDrop.ts`
+  - pridať item-level bundle assignment mutácie,
+  - normalizovať source/target týždne po presune.
+- `src/lib/productionBundles.ts`
+  - ak bude treba, doplním helper pre validáciu item→bundle dropu, aby sa používala rovnaká full/split/stage/project logika ako pri bundle→bundle.
 
-- full bundle bude droppable aj keď je v inom týždni,
-- validné cieľové bundly dostanú jasný hover/highlight stav,
-- pri `isBundleOver` sa karta vizuálne odlíši od obyčajného zvýraznenia týždňa,
-- zvýraznenie sa nebude zobrazovať pre iný projekt, inú etapu, split bundle, dokončený/legacy/locked bundle.
-
-Pridám jemný vizuálny signál typu:
-- zeleno-oranžový outline,
-- krátky text/indikátor „vložit do bundle A“ alebo podobný nenápadný hint,
-- iba počas dragovania nad platným bundlom.
-
-#### 3. Upraviť drop handling v `PlanVyroby`
-V `src/pages/PlanVyroby.tsx` upravím `handleDragEnd` pre `targetId.startsWith("silo-bundle-drop-")`:
-
-- nebude vyžadovať rovnaký týždeň,
-- načíta cieľové dáta z `over.data.current`,
-- pri full → full rovnaký projekt/etapa otvorí rozhodovací popover:
-  - „Vložit do existujícího bundle A“
-  - „Přesunout jako nový bundle“
-- pri potvrdení merge zavolá presun + zmenu `bundle_label` na cieľový label,
-- pri keep separate presunie položku/bundle do týždňa a pridelí/normalizuje samostatný full bundle label.
-
-Tým sa vyrieši T17 → T19 aj T19 → T17 návrat do pôvodného bundlu.
-
-#### 4. Rozšíriť `MergePopover`
-V `src/components/production/MergePopover.tsx` doplním variant pre full bundle voľbu, aby texty nehovorili o split konflikte.
-
-Nové texty budú napríklad:
-
-- Nadpis: `Vložit do existujícího bundle A?`
-- Primárna akcia: `Vložit do bundle A`
-- Popis: `Položky převezmou označení tohoto bundlu`
-- Sekundárna akcia: `Přesunout jako nový bundle`
-- Popis: `Ponechá vlastní označení v cílovém týdnu`
-
-Split merge popover zostane nezmenený.
-
-#### 5. Upraviť backend mutácie v hooku
-V `src/hooks/useProductionDragDrop.ts` upravím/pridám funkciu pre cross-week vloženie full bundlu:
-
-- zdrojové `sourceIds` sa najprv presunú na cieľový týždeň,
-- následne sa im nastaví `bundle_label` cieľového bundlu,
-- `bundle_type` zostane `full`,
-- `split_group_id`, `split_part`, `split_total` sa vyčistia,
-- po zmene sa normalizujú full bundly v zdrojovom aj cieľovom týždni,
-- undo/redo vráti pôvodný týždeň aj pôvodné bundle labely.
-
-Pri voľbe „nový bundle“ sa použije samostatný label, nie label existujúceho cieľového bundlu.
-
-#### 6. Zachovať existujúce pravidlá
-Nezmením tieto ochrany:
-
-- split položky sa nedajú vložiť do full bundlu,
-- full položky sa nedajú vložiť do split bundlu,
-- iný projekt sa nedá vložiť do bundlu,
-- iná etapa sa nedá vložiť do bundlu,
-- locked/past týždne a legacy/dokončené bundly ostanú chránené podľa súčasnej logiky,
-- automatické zlučovanie full položiek v rovnakom týždni zostane zachované.
-
-### Testovací scenár po úprave
-
-Overím tieto prípady:
-
-1. T17 full bundle → T19 existujúci full bundle rovnakého projektu:
-   - cieľový bundle sa zvýrazní,
-   - zobrazí sa popover,
-   - „vložiť do existujúceho“ preberie label cieľa.
-2. T17 full bundle → T19 rovnaký týždeň/projekt, ale voľba „nový bundle“:
-   - položka sa presunie,
-   - zostane samostatný full bundle label.
-3. T19 full položka → pôvodný full bundle v T17:
-   - pôvodný bundle sa zvýrazní ako drop target,
-   - po potvrdení sa položka zaradí späť do neho.
-4. full → split:
-   - ostane zakázané.
-5. split → full:
-   - ostane zakázané.
-6. iný projekt alebo iná etapa:
-   - cieľový bundle sa nezvýrazní a drop sa nevykoná.
-7. Build prejde bez TypeScript chýb.
+Overenie po implementácii
+1. V plnom týždni bude možné doscrollovať na spodný drop priestor.
+2. Pretiahnutie jednej položky mimo existujúci bundle v tom istom týždni vytvorí nový bundle.
+3. Pretiahnutie jednej full položky do existujúceho full bundlu ju reálne vloží do jeho označenia.
+4. Otestujem konkrétne:
+   - projekt `Z-2617-001`
+   - položka `T.23-A`
+   - drop do bundlu `D` v `T19`
+   - cieľový bundle sa zvýrazní a položka sa po dropnutí zaradí do `D`.
+5. Split/full ochrany ostanú zachované.
+6. Build prejde bez TypeScript chýb a bez aktuálnych ref warningov pre dotknuté dnd komponenty.
