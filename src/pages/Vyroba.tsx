@@ -72,6 +72,7 @@ import { useSharePointDocs, type SPFile } from "@/hooks/useSharePointDocs";
 import { PhotoLightbox, isImageFile } from "@/components/PhotoLightbox";
 import { ProductionContextMenu, type ContextMenuAction } from "@/components/production/ProductionContextMenu";
 import { ProjectDetailDialog } from "@/components/ProjectDetailDialog";
+import { TPVList } from "@/components/TPVList";
 import { DocumentPreviewModal } from "@/components/DocumentPreviewModal";
 import { PauseItemDialog } from "@/components/production/PauseItemDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -701,6 +702,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   // Project detail dialog
   const [detailProject, setDetailProject] = useState<any | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [tpvProjectId, setTpvProjectId] = useState<string | null>(null);
   const [recalcDetailProjectId, setRecalcDetailProjectId] = useState<string | null>(null);
   // Mobile project detail sheet
   const [mobileDetailProjectId, setMobileDetailProjectId] = useState<string | null>(null);
@@ -712,6 +714,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       setMobileVyrobaProjektOpen(false);
       setDetailDialogOpen(false);
       setDetailProject(null);
+      setTpvProjectId(null);
       setMobileDetailProjectId(null);
     };
     window.addEventListener("mobile-nav-change", handler);
@@ -1629,10 +1632,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const actions: ContextMenuAction[] = [
       { label: "Zobrazit detail projektu", icon: "📋", onClick: () => openProjectDetail(pid) },
       {
-        label: "Zobrazit položky",
+        label: "Zobrazit TPV List",
         icon: "📦",
         onClick: () => {
           setSelectedProjectId(pid);
+          setTpvProjectId(pid);
         },
       },
     ];
@@ -3106,6 +3110,18 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               </button>
             ) : undefined}
           />
+        )}
+        {!!tpvProjectId && (
+          <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
+            <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-hidden p-5 gap-0 flex flex-col">
+              <TPVList
+                projectId={tpvProjectId}
+                projectName={projectDetails?.get(tpvProjectId)?.project_name || tpvProjectId}
+                currency={(projectDetails?.get(tpvProjectId) as any)?.currency || "CZK"}
+                onBack={() => setTpvProjectId(null)}
+              />
+            </DialogContent>
+          </Dialog>
         )}
         <RecalculateDialog
           open={!!recalcDetailProjectId}
