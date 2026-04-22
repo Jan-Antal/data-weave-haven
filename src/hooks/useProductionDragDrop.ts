@@ -885,7 +885,7 @@ export function useProductionDragDrop() {
       if (resolveBundleType(source) !== "full" || resolveBundleType(target) !== "full") return;
 
       const snapshot = { ...source } as any;
-      const updatePayload = { scheduled_week: target.scheduled_week, bundle_label: target.bundle_label ?? null, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
+      const updatePayload = { scheduled_week: target.scheduled_week, stage_id: target.stage_id ?? null, bundle_label: target.bundle_label ?? null, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
       const { error } = await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId);
       if (error) throw error;
       invalidateAll();
@@ -893,7 +893,7 @@ export function useProductionDragDrop() {
         page: "plan-vyroby",
         actionType: "move_item_into_bundle",
         description: `Vložení ${source.item_name || "položky"} do bundle ${target.bundle_label || "A"}`,
-        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
+        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, stage_id: snapshot.stage_id ?? null, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
         redo: async () => { await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId); invalidateAll(); },
       });
     } catch (err: any) {
