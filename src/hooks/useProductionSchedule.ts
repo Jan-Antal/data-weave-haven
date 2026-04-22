@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fallbackBundleLabel, resolveBundleType, type BundleType } from "@/lib/productionBundles";
+import { deriveBundleSplitMeta, fallbackBundleLabel, resolveBundleType, type BundleType } from "@/lib/productionBundles";
 
 function normalizeProductionItemCode(code: string | null | undefined): string {
   if (!code) return "";
@@ -162,6 +162,10 @@ export function useProductionSchedule() {
           bundle_label: bundleLabel,
           bundle_type: bundleType,
         });
+        const splitMeta = deriveBundleSplitMeta(bundle.items);
+        bundle.bundle_type = splitMeta.isSplit ? "split" : bundle.bundle_type;
+        bundle.split_part = splitMeta.splitPart;
+        bundle.split_total = splitMeta.splitTotal;
         bundle.total_hours += row.scheduled_hours;
       }
 

@@ -30,7 +30,7 @@ import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ForecastWeekContent, ForecastSplitDialog } from "./ForecastOverlay";
 import { type SafetyNetProject } from "./ForecastSafetyNet";
-import { buildBundleKey, canAcceptBundleDrop, formatBundleDisplayLabel } from "@/lib/productionBundles";
+import { buildBundleKey, canAcceptBundleDrop, deriveBundleSplitMeta, formatBundleDisplayLabel } from "@/lib/productionBundles";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -1546,7 +1546,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const color = getProjectColor(bundle.project_id);
   const project = projectLookup.get(bundle.project_id);
   const isMidflightBundle = bundle.items.length > 0 && bundle.items.every(i => i.is_midflight);
-  const isSplitBundle = bundle.items.some(i => (i.split_part && i.split_total) || i.split_group_id);
+  const splitMeta = useMemo(() => deriveBundleSplitMeta(bundle.items), [bundle.items]);
+  const isSplitBundle = splitMeta.isSplit;
   const isProjectDone = terminalStatuses.has(project?.status ?? "");
   const completedCount = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").length;
   const totalCount = bundle.items.length;
@@ -1639,7 +1640,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const bundleDragDisabled = allCompleted || !!forecastDarkMode || isMidflightBundle || !!isWeekLocked;
   const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
   const bundleItemIds = bundle.items.map((item) => item.id);
-  const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: bundle.split_part, bundle_type: bundle.bundle_type });
+  const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: splitMeta.splitPart ?? bundle.split_part, bundle_type: isSplitBundle ? "split" : bundle.bundle_type });
   const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" ? {
     project_id: activeDrag.projectId || "",
     weekKey: activeDrag.weekDate ?? null,
@@ -1806,24 +1807,17 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             {isMidflightBundle ? (
               <div className="flex items-center gap-1" style={{ fontSize: 10, marginTop: 1 }}>
                 <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Legacy</span>
-                {(() => {
-                  const splitItem = bundle.items.find(i => i.split_part && i.split_total);
-                  if (!splitItem) return null;
-                  return <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{splitItem.split_part}/{splitItem.split_total}</span>;
-                })()}
+                  {splitMeta.splitPart && splitMeta.splitTotal ? <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{splitMeta.splitPart}/{splitMeta.splitTotal}</span> : null}
               </div>
             ) : (
               <div className="flex items-center gap-1" style={{ fontSize: 11, color: "#5c706f", marginTop: 1 }}>
                 <span>{bundle.items.length} položek</span>
-                {isSplitBundle && (() => {
-                  const splitItem = bundle.items.find(i => i.split_part && i.split_total);
-                  return (
-                    <>
-                      <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Split</span>
-                      {splitItem && <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{splitItem.split_part}/{splitItem.split_total}</span>}
-                    </>
-                  );
-                })()}
+                {isSplitBundle && (
+                  <>
+                    <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 font-medium tracking-wide">Split</span>
+                    {splitMeta.splitPart && splitMeta.splitTotal ? <span className="text-[9px] font-sans" style={{ color: "#99a5a3" }}>{splitMeta.splitPart}/{splitMeta.splitTotal}</span> : null}
+                  </>
+                )}
               </div>
             )}
           </div>
