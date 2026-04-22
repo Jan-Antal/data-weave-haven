@@ -1,127 +1,313 @@
 
-## Sjednocení dokončení prvku přes QC před Expedicí
+## Plán implementace: Bundle labeling systém pro Plán výroby
 
 ### Cíl
-V **Plánu výroby** nesmí akce **„Dokončit → Expedice“** odeslat prvek do Expedice, pokud ještě nemá potvrzenou **QC kontrolu**.
-
-Chování bude stejné jako v modulu **Výroba**:
+Doplnit do **Plánu výroby** stabilní označování bundlů přes `Bundle A`, `Bundle B`, atd., oddělené podle:
 
 ```text
-1. Pokud QC existuje → prvek se může dokončit a objeví se v Expedici.
-2. Pokud QC chybí → nejdřív se musí potvrdit QC.
-3. Až po potvrzení QC se prvek pošle do Expedice.
+project_id + stage_id + bundle_label
 ```
 
-Současně zkontroluji a sjednotím provázanost opačného směru:
+Splitované části zůstanou napojené na stávající mechanismus:
 
 ```text
-Dokončení ve Výrobě → zápis do production_expedice → automatické zobrazení v Plánu výroby jako Expedice.
+split_group_id + split_part + split_total
+```
+
+Nově se ale budou zobrazovat jako:
+
+```text
+Etapa 1 · Bundle A
+Etapa 1 · Bundle A 1/3
+Etapa 2 · Bundle A
 ```
 
 ---
 
-## Co upravím
+## 1. Databázová migrace
 
-### 1. Plán výroby: místo blokace otevřít QC krok
-V `CompletionDialog.tsx` už existuje kontrola QC, ale aktuálně jen zablokuje dokončení hláškou **„chybí QC“**.
+Upravím tabulku `production_schedule`:
 
-Upravím ji tak, aby uživatel mohl pokračovat řízeně:
+```sql
+ALTER TABLE public.production_schedule
+ADD COLUMN bundle_label text,
+ADD COLUMN bundle_type text;
 
-- pokud vybrané položky nemají QC,
-- dialog zobrazí jasný QC krok,
-- tlačítko nebude jen neaktivní / blokované,
-- bude dostupná akce typu:
-
-```text
-Potvrdit QC a dokončit → Expedice
+ALTER TABLE public.production_schedule
+ADD CONSTRAINT production_schedule_bundle_type_check
+CHECK (bundle_type IS NULL OR bundle_type IN ('full', 'split'));
 ```
 
-Po kliknutí:
+### Backfill existujících dat
+Aby se neztratilo aktuální plánování, doplním hodnoty pro existující řádky:
 
-1. vloží se záznam do `production_quality_checks`,
-2. zapíše se aktivita `item_qc_confirmed`,
-3. následně se provede dokončení,
-4. vloží se řádek do `production_expedice`,
-5. položka se zobrazí v Expedici.
+- řádky se `split_group_id` nebo `split_part/split_total` dostanou `bundle_type = 'split'`
+- ostatní aktivní řádky dostanou `bundle_type = 'full'`
+- `bundle_label` se doplní po skupinách `project_id + stage_id`
+- historické split chainy zůstanou zachované přes `split_group_id`
 
-### 2. Zachovat možnost dokončit jen položky, které už QC mají
-Pokud má vybraná položka QC potvrzené, workflow zůstane rychlé:
+Backfill bude navržen tak, aby:
+- neměnil `production_inbox`
+- neměnil `production_expedice`
+- neměnil analytics ani modul Výroba
+- nemazal ani nepřepisoval existující split chainy
 
-```text
-Dokončit → Expedice
-```
+---
 
-Bez dalšího potvrzování.
+## 2. Sdílené helpery pro bundle labely
 
-### 3. Sjednotit logiku s modulem Výroba
-V modulu **Výroba** už workflow funguje tak, že:
-
-- `production_quality_checks` je zdroj QC potvrzení,
-- `production_expedice` je zdroj toho, že prvek je hotový / čeká na expedici,
-- `useProductionSchedule` podle `production_expedice.source_schedule_id` přepne prvek v Plánu výroby na virtuální stav `expedice` / `completed`.
-
-Tuto logiku ponechám jako společný zdroj pravdy a upravím Plán výroby, aby používal stejný princip.
-
-### 4. Oprava dokončení v Plánu výroby
-V `CompletionDialog.tsx` sjednotím dokončovací zápis:
-
-- před insertem do `production_expedice` vždy ověřím QC,
-- pokud QC chybí a uživatel zvolí potvrzení, vytvořím QC řádky,
-- zabráním duplicitnímu vložení QC pro položky, které už kontrolu mají,
-- po dokončení invaliduji cache:
-  - `production-schedule`,
-  - `production-expedice`,
-  - `production-expedice-schedule-ids`,
-  - `production-quality-checks`,
-  - `quality-checks`.
-
-### 5. Ověření provázanosti modulu Výroba
-Zkontroluji a případně dorovnám:
-
-- že dokončení ve Výrobě zapisuje do `production_expedice`,
-- že se po zápisu invaliduje `production-schedule`,
-- že Plán výroby po načtení vidí expedované položky přes `useProductionSchedule`,
-- že nedochází k duplicitnímu odeslání stejného `source_schedule_id` do Expedice.
-
-Pokud najdu riziko duplicit, doplním ochranu v kódu před insertem.
-
-### 6. UI text a stav tlačítek
-V dialogu bude jasně vidět, co se stane:
+Přidám helper logiku, pravděpodobně do nového nebo existujícího produkčního helper souboru:
 
 ```text
-Chybí QC kontrola
-Nejprve potvrďte QC. Poté budou položky přesunuty do Expedice.
+getNextBundleLabel(projectId, stageId)
+resolveBundleType(row)
+validateBundleDrop(source, target)
 ```
 
-Tlačítka:
+Pravidlo pro další písmeno:
 
 ```text
-Zrušit
-Potvrdit QC a dokončit
+A → B → C → ... → Z
 ```
 
-Pokud QC nechybí:
+Kontrola bude hledat použité `bundle_label` napříč všemi týdny pro stejné:
 
 ```text
-Dokončit → Expedice
+project_id + stage_id
 ```
 
-### 7. Soubory
+---
+
+## 3. Načítání dat v useProductionSchedule
+
+V `src/hooks/useProductionSchedule.ts` rozšířím `ScheduleItem`:
+
+```ts
+bundle_label: string | null;
+bundle_type: "full" | "split" | null;
+```
+
+A při mapování dat doplním fallback:
+
+```text
+pokud bundle_label chybí → dočasně použít legacy fallback podle split_group_id / project_id
+pokud bundle_type chybí → odvodit z split_part/split_total
+```
+
+Tím bude UI bezpečné i pro starší řádky nebo případné nekompletní importy.
+
+---
+
+## 4. Drag & drop pravidla
+
+Upravím `src/hooks/useProductionDragDrop.ts` a navazující volání z `src/pages/PlanVyroby.tsx`.
+
+### Inbox → týden
+Při přesunu z Inboxu do týdne:
+
+#### Prázdný týden pro projekt + etapu
+Vytvoří se nový bundle:
+
+```text
+bundle_label = A / další volné písmeno
+bundle_type = full
+split_part = NULL
+split_total = NULL
+```
+
+#### Drop vedle existujícího bundlu
+Vytvoří se nový bundle s dalším písmenem:
+
+```text
+Bundle B, Bundle C...
+```
+
+#### Drop do existujícího bundlu
+Položka zdědí:
+
+```text
+bundle_label cílového bundlu
+bundle_type cílového bundlu
+```
+
+### Stage isolation
+Přidám validaci:
+
+```text
+Položky rôznych etáp nie je možné spájať
+```
+
+Drop mezi různými `stage_id` se zablokuje.
+
+---
+
+## 5. Split pravidla
 
 Upravím:
 
-- `src/components/production/CompletionDialog.tsx`
-- případně `src/hooks/useProductionDragDrop.ts`, pokud bude potřeba sjednotit duplicitní ochranu
-- případně `src/pages/Vyroba.tsx`, pokud kontrola ukáže chybějící invalidaci nebo riziko duplicit
-- paměť workflow:
-  - `mem://features/production-planning/expedice-shipping-workflow`
+- `src/components/production/SplitBundleDialog.tsx`
+- `src/components/production/SplitItemDialog.tsx`
+- `src/components/production/AutoSplitPopover.tsx`
+
+Při splitu:
+
+```text
+Bundle A v T17
+→ Bundle A 1/2 v T17
+→ Bundle A 2/2 v T18
+```
+
+Změny při splitu:
+
+```text
+bundle_label zůstává stejné
+bundle_type = split
+split_group_id zůstává / vzniká stávajícím mechanismem
+split_part/split_total se dál počítá stávající renumber logikou
+```
 
 ---
 
-## Výsledek
+## 6. Validace při spojování a přesunech
 
-- Z Plánu výroby už nepůjde poslat prvek do Expedice bez QC.
-- Pokud QC chybí, uživatel ji může potvrdit přímo v dokončovacím workflow.
-- Po potvrzení QC se prvek automaticky dokončí a objeví v Expedici.
-- Dokončení z modulu Výroba zůstane provázané s Plánem výroby.
-- Plán výroby a Výroba budou používat stejný zdroj pravdy: `production_quality_checks` + `production_expedice`.
+Doplním pravidla:
+
+### Nelze míchat full a split
+```text
+Celé položky nie je možné pridať do split bundlu
+Split položky nie je možné pridať do celého bundlu
+```
+
+### Split lze spojit jen v rámci stejné série
+Povoleno:
+
+```text
+Bundle A 1/2 → Bundle A 2/2
+```
+
+Zakázáno:
+
+```text
+Bundle A 1/2 → Bundle B 1/2
+```
+
+Toast:
+
+```text
+Rôzne split série nie je možné spájať
+```
+
+### Sloučení posledních dvou částí
+Pokud se spojí poslední dvě části jedné split série:
+
+```text
+bundle_type = full
+split_group_id = NULL
+split_part = NULL
+split_total = NULL
+```
+
+A vznikne nový bundle s dalším volným písmenem:
+
+```text
+Položka zlúčená — vytvorený nový Bundle B
+```
+
+---
+
+## 7. UI v Kanban týdenních silech
+
+Upravím `src/components/production/WeeklySilos.tsx`.
+
+Aktuální karta projektu seskupuje vše podle projektu. Nově uvnitř projektu seskupím položky podle:
+
+```text
+stage_id + bundle_label + split_part
+```
+
+Zobrazení:
+
+```text
+Z-2515-001 · RD Cigánkovi Zlín
+
+Etapa 1 · Bundle A ───── 84h
+  T01 Kuchyň      76h
+  T02 Ostrůvek     8h
+
+Etapa 1 · Bundle A 1/3 ─ 30h
+  T08 Skříň       30h
+
+Etapa 2 · Bundle A ───── 45h
+  K01 Pracovní deska 45h
+```
+
+### Vizuální pravidla
+Bundle header bude obsahovat:
+
+- název etapy, pokud má projekt více etap
+- `Bundle A`
+- split badge `1/3`, pokud jde o split
+- celkové hodiny této části bundlu
+- barevný levý akcent podle písmena:
+  - A = modrá
+  - B = zelená
+  - C = amber
+  - D = fialová
+  - další písmena cyklicky
+
+Split badge:
+
+```text
+amber = není poslední část
+green = poslední část
+```
+
+Zelený `ks` badge zůstane u jednotlivých položek a nebude se míchat se split označením.
+
+---
+
+## 8. Table view / plánovací dialog
+
+Upravím také místa, kde se vkládá do `production_schedule` mimo Kanban:
+
+- `src/components/production/PlanVyrobyTableView.tsx`
+- `src/components/production/InboxPlanningDialog.tsx`
+
+Aby plánování přes tabulku i dialog používalo stejná pravidla:
+
+```text
+nový bundle → další písmeno
+splitované plánování → bundle_type = split
+jedna položka bez splitu → bundle_type = full
+```
+
+---
+
+## 9. Co zůstane beze změny
+
+Nebudu měnit:
+
+- `production_inbox`
+- `production_expedice`
+- analytics logiku
+- modul Výroba
+- stávající `split_group_id / split_part / split_total` mechanismus
+
+Tyto části pouze načtou nové údaje, pokud je už poskytuje `production_schedule`, ale jejich workflow zůstane stejné.
+
+---
+
+## 10. Ověření
+
+Po implementaci ověřím:
+
+- nový drag z Inboxu vytvoří `Bundle A`
+- další samostatný drop vytvoří `Bundle B`
+- drop do existujícího bundlu zdědí `bundle_label`
+- split `Bundle A` zobrazí `Bundle A 1/2`, `Bundle A 2/2`
+- nejde spojit rozdílné etapy
+- nejde míchat full a split bundle
+- split série A nejde spojit se sérií B
+- poslední dvě části splitu se umí vrátit na nový full bundle
+- Kanban UI zobrazuje bundle hlavičky a `ks` badge zůstává zelený u položek
+- build projde bez TypeScript chyb
