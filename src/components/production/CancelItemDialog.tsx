@@ -4,7 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { renumberSiblings } from "./SplitItemDialog";
+import { useAuth } from "@/hooks/useAuth";
 import { logActivity } from "@/lib/activityLog";
 
 interface CancelItemDialogProps {
