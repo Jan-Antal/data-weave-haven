@@ -59,7 +59,7 @@ interface Props {
 }
 
 export function UserManagement({ open, onOpenChange, inline = false }: Props) {
-  const { isTestUser } = useAuth();
+  const { isTestUser, isOwner: currentUserIsOwner } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [people, setPeople] = useState<PersonOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -83,6 +83,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   const [editingNameValue, setEditingNameValue] = useState("");
 
   const handleCopyInviteLink = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     setCopyingLinkId(userId);
     try {
       const { data, error } = await supabase.functions.invoke("generate-invite-link", {
@@ -190,6 +195,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleUpdatePerson = async (userId: string, personId: string | null) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("profiles").update({ person_id: personId } as any).eq("id", userId);
     if (error) {
       toast({ title: "Chyba", variant: "destructive" });
@@ -200,6 +210,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleUpdateRole = async (userId: string, role: AppRole) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("update-user", {
       body: { user_id: userId, role },
     });
@@ -212,6 +227,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleToggleActive = async (userId: string, is_active: boolean) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("update-user", {
       body: { user_id: userId, is_active },
     });
@@ -224,6 +244,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleDelete = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("delete-user", {
       body: { user_id: userId },
     });
@@ -261,6 +286,11 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
 
   const handleChangePassword = async () => {
     if (!passwordTarget) return;
+    const target = users.find((u) => u.id === passwordTarget.id);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      return;
+    }
     setPasswordSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("update-user", {
@@ -282,6 +312,12 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
   };
 
   const handleUpdateName = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target?.role === "owner" && !currentUserIsOwner) {
+      toast({ title: "Owner účet může spravovat pouze Owner.", variant: "destructive" });
+      setEditingNameId(null);
+      return;
+    }
     const trimmed = editingNameValue.trim();
     if (!trimmed) return;
     const { data, error } = await supabase.functions.invoke("update-user", {
