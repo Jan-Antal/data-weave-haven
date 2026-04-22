@@ -329,20 +329,19 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       const info = projectInfoMap.get(p.project_id);
       return p.missing > 0 && !p.is_blocker_only && !p.is_complete && !isDoneProjectStatus(info?.status);
     });
-    const allCompleted = allFromProgress.filter(p => (p.is_complete || p.is_blocker_only));
-    // Filter: only show projects that have at least one scheduled item in future weeks
-    const regular = allCompleted.filter(p => {
-      if (p.is_blocker_only) return false;
-      // Check if project has any schedule items in current or future weeks
+    const regular = allFromProgress.filter(p => {
+      if (p.is_blocker_only || p.is_complete || p.missing > 0 || p.in_inbox > 0) return false;
+      if ((p.scheduled + p.paused) <= 0) return false;
+      // Check if project has any active schedule items in current or future weeks
       if (!scheduleData) return true;
       for (const [weekKey, silo] of scheduleData) {
         if (weekKey >= currentMondayISO) {
-          if (silo.bundles.some(b => b.project_id === p.project_id)) return true;
+          if (silo.bundles.some(b => b.project_id === p.project_id && b.status !== "completed")) return true;
         }
       }
       return false;
     });
-    const reserve = allCompleted.filter(p => p.is_blocker_only);
+    const reserve = allFromProgress.filter(p => p.is_blocker_only);
     return { completedProjects: regular, reserveProjects: reserve, missingItemProjects: missing };
   }, [progressData, projects, scheduleData, currentMondayISO, projectInfoMap]);
 
