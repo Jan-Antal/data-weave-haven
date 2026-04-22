@@ -164,7 +164,7 @@ export function MobileTPVCardList({
                     {item.konstrukter && (
                       <span className="text-[10px] text-muted-foreground">{item.konstrukter}</span>
                     )}
-                    {item.pocet != null && item.pocet > 0 && (
+                    {item.pocet != null && item.pocet > 1 && (
                       <span className="text-[10px] font-sans bg-muted px-1.5 py-0.5 rounded">{item.pocet} ks</span>
                     )}
                     {vyrobaLabel && (
