@@ -1040,8 +1040,12 @@ export default function PlanVyroby() {
           onOpenChange={open => !open && setMergeState(null)}
           itemName={mergeState.itemName}
           mergeItemCount={mergeState.mergeItemCount}
+          variant={mergeState.variant}
+          targetBundleLabel={mergeState.targetBundleLabel}
           onMerge={async () => {
-            if (mergeState.splitGroupIds.length === 1 && mergeState.draggedItemId && mergeState.mergeItemCount === 1) {
+            if (mergeState.variant === "full-bundle" && mergeState.onMergeExisting) {
+              await mergeState.onMergeExisting();
+            } else if (mergeState.splitGroupIds.length === 1 && mergeState.draggedItemId && mergeState.mergeItemCount === 1) {
               // Single item merge — hook handles it directly
               await moveScheduleItemToWeek(mergeState.draggedItemId, mergeState.targetWeekKey, 'merge');
             } else if (mergeState.sourceProjectId && mergeState.sourceWeekKey) {
