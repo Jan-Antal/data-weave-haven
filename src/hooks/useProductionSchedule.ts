@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+function normalizeProductionItemCode(code: string | null | undefined): string {
+  if (!code) return "";
+  return code.replace(/_[a-z0-9]{1,8}$/i, "");
+}
+
 export interface ScheduleItem {
   id: string;
   project_id: string;
@@ -8,6 +13,7 @@ export interface ScheduleItem {
   stage_id: string | null;
   item_name: string;
   item_code: string | null;
+  item_quantity: number | null;
   scheduled_week: string;
   scheduled_hours: number;
   scheduled_czk: number;
@@ -56,6 +62,24 @@ export function useProductionSchedule() {
         .order("position", { ascending: true });
       if (error) throw error;
 
+      const itemCodes = Array.from(
+        new Set((data || []).map((row) => normalizeProductionItemCode(row.item_code)).filter(Boolean))
+      );
+      const projectIds = Array.from(new Set((data || []).map((row) => row.project_id).filter(Boolean)));
+      const { data: tpvRows } = itemCodes.length > 0 && projectIds.length > 0
+        ? await supabase
+            .from("tpv_items")
+            .select("project_id, item_code, pocet")
+            .in("project_id", projectIds)
+            .in("item_code", itemCodes)
+            .is("deleted_at", null)
+        : { data: [] };
+
+      const quantityByProjectAndCode = new Map<string, number | null>();
+      for (const tpv of tpvRows || []) {
+        quantityByProjectAndCode.set(`${tpv.project_id}::${tpv.item_code}`, tpv.pocet ?? null);
+      }
+
       // Fetch completed schedule IDs from production_expedice
       const { data: expediceData } = await supabase
         .from("production_expedice" as any)
@@ -100,6 +124,7 @@ export function useProductionSchedule() {
           stage_id: row.stage_id,
           item_name: row.item_name,
           item_code: row.item_code ?? null,
+          item_quantity: quantityByProjectAndCode.get(`${row.project_id}::${normalizeProductionItemCode(row.item_code)}`) ?? null,
           scheduled_week: row.scheduled_week,
           scheduled_hours: row.scheduled_hours,
           scheduled_czk: row.scheduled_czk,
