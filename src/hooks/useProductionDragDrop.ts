@@ -659,6 +659,82 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
+  const mergeFullBundleIntoBundle = useCallback(async (sourceIds: string[], targetIds: string[]) => {
+    try {
+      const sourceItemIds = [...new Set(sourceIds)].filter(Boolean);
+      const targetItemIds = [...new Set(targetIds)].filter(Boolean);
+      if (sourceItemIds.length === 0 || targetItemIds.length === 0) return;
+
+      const [{ data: sourceItems, error: sourceErr }, { data: targetItems, error: targetErr }] = await Promise.all([
+        supabase.from("production_schedule").select("*").in("id", sourceItemIds),
+        supabase.from("production_schedule").select("*").in("id", targetItemIds),
+      ]);
+      if (sourceErr) throw sourceErr;
+      if (targetErr) throw targetErr;
+      if (!sourceItems?.length || !targetItems?.length) return;
+
+      const source = sourceItems[0] as any;
+      const target = targetItems[0] as any;
+      if (source.scheduled_week !== target.scheduled_week) return;
+      if (source.project_id !== target.project_id) return;
+
+      const sourceTarget: BundleTarget = {
+        project_id: source.project_id,
+        stage_id: source.stage_id ?? null,
+        bundle_label: source.bundle_label ?? null,
+        bundle_type: resolveBundleType(source),
+      };
+      const targetTarget: BundleTarget = {
+        project_id: target.project_id,
+        stage_id: target.stage_id ?? null,
+        bundle_label: target.bundle_label ?? null,
+        bundle_type: resolveBundleType(target),
+      };
+      if (!validateBundleDrop(sourceTarget, targetTarget)) return;
+      if (resolveBundleType(source) !== "full" || resolveBundleType(target) !== "full") return;
+
+      const snapshots = sourceItems.map((item: any) => ({ ...item }));
+      const updatePayload = {
+        bundle_label: target.bundle_label ?? null,
+        bundle_type: "full",
+        split_group_id: null,
+        split_part: null,
+        split_total: null,
+      };
+      const { error: updateErr } = await supabase
+        .from("production_schedule")
+        .update(updatePayload as any)
+        .in("id", sourceItemIds);
+      if (updateErr) throw updateErr;
+
+      invalidateAll();
+      toast({ title: `Bundle zlúčený do ${target.bundle_label || "A"}` });
+
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "merge_bundle_labels",
+        description: `Sloučení bundle ${source.bundle_label || "?"} do ${target.bundle_label || "?"}`,
+        undo: async () => {
+          await Promise.all(snapshots.map((item: any) => supabase.from("production_schedule").update({
+            bundle_label: item.bundle_label ?? null,
+            bundle_type: item.bundle_type ?? null,
+            split_group_id: item.split_group_id ?? null,
+            split_part: item.split_part ?? null,
+            split_total: item.split_total ?? null,
+          } as any).eq("id", item.id)));
+          invalidateAll();
+        },
+        redo: async () => {
+          await supabase.from("production_schedule").update(updatePayload as any).in("id", sourceItemIds);
+          invalidateAll();
+        },
+      });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [invalidateAll, pushUndo]);
+
   const moveItemBackToInbox = useCallback(async (scheduleItemId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
