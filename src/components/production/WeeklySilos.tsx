@@ -1715,8 +1715,13 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         </div>
       </div>
       {expanded && (() => {
-        const activeItems = bundle.items.filter(i => i.status !== "expedice" && i.status !== "completed");
-        const completedItems = bundle.items.filter(i => i.status === "expedice" || i.status === "completed");
+        const sortByCode = (a: ScheduleItem, b: ScheduleItem) => {
+          const ac = (a.item_code || a.item_name || "").toString();
+          const bc = (b.item_code || b.item_name || "").toString();
+          return ac.localeCompare(bc, undefined, { numeric: true, sensitivity: "base" });
+        };
+        const activeItems = bundle.items.filter(i => i.status !== "expedice" && i.status !== "completed").slice().sort(sortByCode);
+        const completedItems = bundle.items.filter(i => i.status === "expedice" || i.status === "completed").slice().sort(sortByCode);
         return (
           <div className="px-[3px] py-[2px]" onContextMenu={e => e.stopPropagation()}>
             {activeItems.map(item =>
