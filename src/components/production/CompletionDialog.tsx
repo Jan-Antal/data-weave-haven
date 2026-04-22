@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { renumberSiblings } from "./SplitItemDialog";
 import type { ScheduleItem } from "@/hooks/useProductionSchedule";
+import { roundHours, formatHours } from "@/lib/utils";
 
 interface CompletionDialogProps {
   open: boolean;
