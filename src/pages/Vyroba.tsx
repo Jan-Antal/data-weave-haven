@@ -3111,6 +3111,18 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             ) : undefined}
           />
         )}
+        {!!tpvProjectId && (
+          <Dialog open={!!tpvProjectId} onOpenChange={(open) => { if (!open) setTpvProjectId(null); }}>
+            <DialogContent className="max-w-[95vw] w-[95vw] max-h-[90vh] overflow-hidden p-5 gap-0 flex flex-col">
+              <TPVList
+                projectId={tpvProjectId}
+                projectName={projectDetails?.get(tpvProjectId)?.project_name || tpvProjectId}
+                currency={projectDetails?.get(tpvProjectId)?.currency || "CZK"}
+                onBack={() => setTpvProjectId(null)}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
         <RecalculateDialog
           open={!!recalcDetailProjectId}
           onClose={() => setRecalcDetailProjectId(null)}
