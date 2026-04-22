@@ -821,7 +821,7 @@ export function useProductionDragDrop() {
 
       const source = sourceItems[0] as any;
       if (resolveBundleType(source) !== "full") return;
-      const targetLabel = await getNextBundleLabel(source.project_id, source.stage_id ?? null);
+      const targetLabel = await getAvailableBundleLabel(source.project_id, source.stage_id ?? null, sourceItemIds);
       const snapshots = sourceItems.map((item: any) => ({ ...item }));
       const updatePayload = {
         scheduled_week: targetWeekDate,
@@ -847,6 +847,7 @@ export function useProductionDragDrop() {
         undo: async () => {
           await Promise.all(snapshots.map((item: any) => supabase.from("production_schedule").update({
             scheduled_week: item.scheduled_week,
+            stage_id: item.stage_id ?? null,
             bundle_label: item.bundle_label ?? null,
             bundle_type: item.bundle_type ?? null,
             split_group_id: item.split_group_id ?? null,
@@ -906,7 +907,7 @@ export function useProductionDragDrop() {
       const { data: source, error: sourceErr } = await supabase.from("production_schedule").select("*").eq("id", scheduleItemId).single();
       if (sourceErr) throw sourceErr;
       if (!source || resolveBundleType(source) !== "full") return;
-      const targetLabel = await getNextBundleLabel(source.project_id, source.stage_id ?? null);
+      const targetLabel = await getAvailableBundleLabel(source.project_id, source.stage_id ?? null, [scheduleItemId]);
       const snapshot = { ...source } as any;
       const updatePayload = { scheduled_week: targetWeekDate, bundle_label: targetLabel, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
       const { error } = await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId);
