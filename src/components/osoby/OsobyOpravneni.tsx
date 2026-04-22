@@ -28,6 +28,7 @@ import {
   type PermissionFlag,
 } from "@/lib/permissionPresets";
 import type { AppRole } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 interface ProfileLite {
@@ -219,6 +220,7 @@ function permsEqual(a: Permissions, b: Partial<Permissions> | null | undefined) 
 }
 
 export function OsobyOpravneni() {
+  const { isOwner } = useAuth();
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [roles, setRoles] = useState<UserRoleRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -255,9 +257,29 @@ export function OsobyOpravneni() {
     fetchAll();
   }, []);
 
+  const visibleRoles = useMemo(
+    () => ROLE_ORDER.filter((role) => isOwner || role !== "owner"),
+    [isOwner],
+  );
+
+  const guardOwnerRole = () => {
+    if (selectedRole !== "owner" || isOwner) return false;
+    toast({
+      title: "Roli Owner může spravovat pouze Owner.",
+      variant: "destructive",
+    });
+    return true;
+  };
+
+  useEffect(() => {
+    if (!visibleRoles.includes(selectedRole)) {
+      setSelectedRole(visibleRoles[0] ?? "admin");
+    }
+  }, [selectedRole, visibleRoles]);
+
   // Reset draft when switching role
   useEffect(() => {
-    setDraftPerms({ ...ROLE_PRESETS[selectedRole] });
+    setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
   }, [selectedRole]);
 
   const profileById = useMemo(() => {
@@ -340,6 +362,7 @@ export function OsobyOpravneni() {
   };
 
   const handleSave = async () => {
+    if (guardOwnerRole()) return;
     const targets = roles.filter((r) => r.role === selectedRole);
     if (targets.length === 0) {
       toast({ title: "Žiadni používatelia v tejto roli" });
@@ -359,6 +382,7 @@ export function OsobyOpravneni() {
   };
 
   const persistSave = async () => {
+    if (guardOwnerRole()) return;
     setSaving(true);
     setConfirmOverwrite(null);
     const { error } = await supabase
@@ -387,6 +411,7 @@ export function OsobyOpravneni() {
   };
 
   const handleAddUser = async (p: ProfileLite) => {
+    if (guardOwnerRole()) return;
     const existing = roles.find((r) => r.user_id === p.id);
     const { error } = existing
       ? await supabase
@@ -412,6 +437,7 @@ export function OsobyOpravneni() {
 
   const handleRemoveUser = async () => {
     if (!confirmRemove) return;
+    if (guardOwnerRole()) return;
     const { error } = await supabase
       .from("user_roles")
       .update({ role: "viewer" as any })
@@ -445,7 +471,7 @@ export function OsobyOpravneni() {
           Roly
         </div>
         <div className="flex-1 overflow-y-auto px-2 pb-2">
-          {ROLE_ORDER.map((r) => {
+          {visibleRoles.map((r) => {
             const active = r === selectedRole;
             const count = roleCounts[r] ?? 0;
             return (
