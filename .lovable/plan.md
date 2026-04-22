@@ -1,46 +1,40 @@
 
 
-## Záznam zrušených položiek + zobrazenie v TPV Liste
+## Oprava chyby dokončení + QC check workflow v Pláne Výroby
 
-### Cieľ
-Pri zrušení položky v Pláne Výroby sa **nezmaže**, ale označí ako `cancelled` s uloženým dôvodom, dátumom a autorom. V TPV Liste v stĺpci **Výroba** sa zobrazí **červený** badge `✕ Zrušeno · {dôvod}` s tooltipom (dôvod + dátum + kto). Pri opätovnom poslaní do výroby cez TPV List sa zrušený záznam **prepíše/odstráni** a vznikne nový inbox záznam → bez duplicít, jedna TPV položka = jeden aktuálny stav výroby.
+### Problémy
+1. **Chyba pri dokončení** (`Invalid status: expedice. Must be scheduled, in_progress, paused, cancelled, or completed`) — `CompletionDialog.tsx` nastavuje status `'expedice'` v `production_schedule`, ale DB trigger `validate_production_schedule_status` túto hodnotu nepovoľuje. Mne (vlastník DB session?) to môže prejsť rôzne podľa cache, ale Michalovi trigger spadne.
+2. **Chýba QC gate** — pri dokončení položky v Pláne Výroby sa neoveruje, či má daná položka v module Výroba potvrdený QC check (`production_quality_checks`). Má to byť tvrdá závislosť: bez QC nedá sa „Dokončit → Expedice".
+
+### Diagnostika (pred opravou)
+- Pozrieť aktuálne povolené statusy v triggeri `validate_production_schedule_status` (`supabase--read_query` na `pg_proc`).
+- Overiť `CompletionDialog.tsx` riadky ~80–160 kde sa volá `.update({ status: "expedice", ... })` pre split aj full mode.
+- `useQualityDefects.ts` + tabuľka `production_quality_checks` — odkiaľ čítať QC stav.
 
 ### Zmeny
 
-**1. DB migrácia (schéma)**
-- `production_schedule`: pridať `cancelled_at timestamptz`, `cancelled_by uuid` (`cancel_reason` už existuje).
-- `production_inbox`: pridať `cancel_reason text`, `cancelled_at timestamptz`, `cancelled_by uuid`.
-- Aktualizovať trigger `validate_production_inbox_status` aby povolil status `'cancelled'` (schedule trigger už `cancelled` povoľuje).
+**1. `CompletionDialog.tsx`** — oprava statusu
+- Nahradiť `status: "expedice"` za `status: "completed"` v oboch vetvách (full + split intermediate row). Záznam v `production_expedice` (ktorý sa už insertuje) je jediný správny zdroj „je v expedici". Schedule riadok zostáva `completed`.
+- Pre split „intermediate completed" časť: rovnako `status: "completed"`, `completed_at = now()`, `completed_by = user.id`. Riadok pôjde priamo do expedice cez existujúci `production_expedice` insert.
 
-**2. `CancelItemDialog.tsx`** (`src/components/production/CancelItemDialog.tsx`)
-- Namiesto `.delete()` použiť `.update({ status: 'cancelled', cancel_reason, cancelled_at, cancelled_by })` pre obe tabuľky (`production_schedule` aj `production_inbox`).
-- Pri `cancelAll` aktualizovať všetky riadky split-group rovnakým spôsobom.
-- Po zrušení **netreba renumberovať siblings** (riadky zostávajú, len `cancelled`).
-- Toast a `data_log` zápis ostávajú.
+**2. QC gate pred dokončením** — nový blok v `CompletionDialog.handleComplete`
+- Pred update-om sa pre každý zaškrtnutý item spýtam `production_quality_checks` (`select id, passed where item_id in (...) and project_id = ...`).
+- Položka prejde, len ak existuje QC záznam s `passed = true`.
+- Ak chýba alebo `passed = false`, zobraziť **inline varovanie** v dialógu (nie toast) so zoznamom položiek bez QC: *„Tieto položky nemajú potvrdený QC check vo Výrobe: T04, T21. Dokončenie nie je možné."* Tlačidlo „Dokončit" disabled, kým sa zoznam nezmení.
+- Refresh QC stavu pri otvorení dialógu (React Query `["production-quality-checks", projectId]`).
 
-**3. „Pošli do výroby" workflow v `TPVList.tsx`** (`executeSendToProduction`, riadky ~440)
-- Pred `INSERT` do `production_inbox` najprv **delete-nutie** všetkých `cancelled` riadkov pre dané `(project_id, item_code)` z `production_inbox` aj `production_schedule` — tým sa stará zrušená stopa vyčistí a vznikne čistý nový záznam.
-- Tým je zaručené pravidlo: jedna TPV položka = jeden aktuálny stav výroby.
+**3. Drobné UX**
+- Pri otváraní `CompletionDialog` načítať QC mapu raz; pri každom toggle checkboxu prepočítať „missing QC" zoznam.
+- Pri pokuse zaškrtnúť položku bez QC zobraziť pri riadku malý červený badge `⚠ chýba QC` namiesto blokovania zaškrtnutia (užívateľ vidí dôvod). Submit ostane disabled.
 
-**4. `useProductionStatuses.ts`** (`src/hooks/useProductionStatuses.ts`)
-- Rozšíriť SELECT o `cancel_reason, cancelled_at, cancelled_by` (schedule aj inbox).
-- Načítať `cancelled` aj z **inbox** vetvy (teraz inbox číta len `pending`).
-- Pridať do `ProductionStatus` voliteľné pole `tooltip?: string` so znením `Zrušeno {datum} — {meno} · {dôvod}` (meno z `profiles` cez batched lookup, alebo email z `data_log`).
-- Zmeniť farbu pre `cancelled` zo súčasnej šedej `#6b7280` na **červenú `#dc2626`**.
+**4. Memory**
+- Aktualizovať `mem://features/production-tracking/quality-and-defect-tracking` o pravidlo: **dokončenie položky v Pláne Výroby vyžaduje existujúci `production_quality_checks.passed = true` záznam**.
 
-**5. `TPVList.tsx` — stĺpec „vyroba_status"** (riadky ~961–1005)
-- Zachovať existujúce prečiarknutie + nové červené pozadie/border.
-- Obaliť badge do `Tooltip` (`@/components/ui/tooltip`) zobrazujúceho `s.tooltip`.
-- Excel export (`getCellValue` ~670) ostáva nezmenený — `s.label` už dôvod obsahuje.
+### Súbory
+- `src/components/production/CompletionDialog.tsx` — oprava statusu + QC gate
+- `mem://features/production-tracking/quality-and-defect-tracking` — doplniť QC gate pravidlo
 
-**6. `MobileTPVCardList.tsx`**
-- Rovnaká červená farba; tooltip nahradiť `title` atribútom (mobile fallback).
-
-**7. Memory**
-- Pridať `mem://features/production-planning/cancellation-workflow` s pravidlom: cancel = soft, červený badge v TPV, re-send → wipe cancelled rows.
-
-### Výsledok pre používateľa
-1. **Zruším položku** v Pláne Výroby (pravý klik → Zrušit, vyberiem dôvod) → zmizne zo sila/inboxu, ostane v DB ako `cancelled`.
-2. **V TPV Liste** sa v stĺpci Výroba objaví červený prečiarknutý badge `✕ Zrušeno · Zrušeno klientem`. Hover ukáže `Zrušeno 22. 4. 2026 — Marek Novák · Zrušeno klientem`.
-3. **Opätovné poslanie do výroby** z TPV Listu → cancelled riadky sa vyčistia, vznikne nový inbox záznam → badge sa zmení na `Čeká na plánování`. Žiadne duplicity.
+### Výsledok
+- Michal (a každý iný) môže dokončiť položku bez chyby triggera.
+- Ak položka nemá QC potvrdený v module Výroba, dialóg jasne ukáže ktorá položka chýba a `Dokončit → Expedice` ostane neaktívne, kým sa QC nedoplní.
 
