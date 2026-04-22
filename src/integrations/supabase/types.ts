@@ -946,6 +946,8 @@ export type Database = {
       production_schedule: {
         Row: {
           adhoc_reason: string | null
+          bundle_label: string | null
+          bundle_type: string | null
           cancel_reason: string | null
           cancelled_at: string | null
           cancelled_by: string | null
@@ -979,6 +981,8 @@ export type Database = {
         }
         Insert: {
           adhoc_reason?: string | null
+          bundle_label?: string | null
+          bundle_type?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null
@@ -1012,6 +1016,8 @@ export type Database = {
         }
         Update: {
           adhoc_reason?: string | null
+          bundle_label?: string | null
+          bundle_type?: string | null
           cancel_reason?: string | null
           cancelled_at?: string | null
           cancelled_by?: string | null

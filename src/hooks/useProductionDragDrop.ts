@@ -6,6 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { renumberChain, renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
+import { buildNewBundleAssignment, getNextBundleLabel, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -26,6 +27,11 @@ export function useProductionDragDrop() {
     qc.invalidateQueries({ queryKey: ["production-progress"] });
   }, [qc]);
 
+  const invalidateBundleQueries = useCallback(() => {
+    invalidateAll();
+    qc.invalidateQueries({ queryKey: ["production-quality-checks"] });
+  }, [invalidateAll, qc]);
+
   const moveInboxItemToWeek = useCallback(async (inboxItemId: string, weekDate: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -37,6 +43,8 @@ export function useProductionDragDrop() {
         .eq("id", inboxItemId)
         .single();
       if (fetchErr || !item) throw fetchErr || new Error("Item not found");
+
+      const bundleAssignment = await buildNewBundleAssignment(item.project_id, item.stage_id, item.split_group_id ? "split" : "full");
 
       const { data: inserted, error: insertErr } = await supabase.from("production_schedule").insert({
         project_id: item.project_id,
@@ -53,7 +61,9 @@ export function useProductionDragDrop() {
         split_group_id: item.split_group_id ?? null,
         split_part: item.split_part ?? null,
         split_total: item.split_total ?? null,
-      }).select().single();
+        bundle_label: bundleAssignment.bundle_label,
+        bundle_type: bundleAssignment.bundle_type,
+      } as any).select().single();
       if (insertErr) throw insertErr;
 
       const { error: updateErr } = await supabase
@@ -100,7 +110,9 @@ export function useProductionDragDrop() {
               split_group_id: item.split_group_id ?? null,
               split_part: item.split_part ?? null,
               split_total: item.split_total ?? null,
-            });
+              bundle_label: bundleAssignment.bundle_label,
+              bundle_type: bundleAssignment.bundle_type,
+            } as any);
             await supabase.from("production_inbox").update({ status: "scheduled" }).eq("id", inboxItemId);
             invalidateAll();
           },
