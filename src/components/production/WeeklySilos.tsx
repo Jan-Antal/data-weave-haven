@@ -1641,7 +1641,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
   const bundleItemIds = bundle.items.map((item) => item.id);
   const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: splitMeta.splitPart ?? bundle.split_part, bundle_type: isSplitBundle ? "split" : bundle.bundle_type });
-  const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" ? {
+  const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" || activeDrag?.type === "silo-item" ? {
     project_id: activeDrag.projectId || "",
     weekKey: activeDrag.weekDate ?? null,
     stage_id: activeDrag.stageId ?? null,
@@ -1871,7 +1871,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               item.status === "paused" ? (
                 <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               ) : (
-                <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode || isMidflightBundle || !!isWeekLocked} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
+                <DraggableSiloItem key={item.id} item={item} bundle={bundle} bundleKey={bundleKey} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode || isMidflightBundle || !!isWeekLocked} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               )
             )}
             {completedItems.length > 0 && (
