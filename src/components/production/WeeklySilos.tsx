@@ -1433,6 +1433,8 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                   isWeekLocked={isWeekLocked} activeDrag={activeDrag} exchangeRates={exchangeRates} />;
         })}
 
+        <NewBundleDropSpacer weekKey={weekKey} disabled={!!isWeekLocked || !!forecastDarkMode} activeDrag={activeDrag} />
+
         {/* Rezerva kapacit section — blocker bundles separated */}
         {blockerBundles.length > 0 && (
           <>
@@ -1505,6 +1507,25 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
           ⚡ Přetíženo — zobrazit návrhy
         </button>
       )}
+    </div>
+  );
+}
+
+function NewBundleDropSpacer({ weekKey, disabled, activeDrag }: { weekKey: string; disabled?: boolean; activeDrag?: Props["activeDrag"] }) {
+  const canDrop = !disabled && (activeDrag?.type === "silo-item" || activeDrag?.type === "silo-bundle" || activeDrag?.type === "inbox-item" || activeDrag?.type === "inbox-items" || activeDrag?.type === "inbox-project");
+  const { setNodeRef, isOver } = useDroppable({ id: `silo-week-new-bundle-${weekKey}`, data: { type: "new-bundle-target", weekKey }, disabled: !canDrop });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="mt-1 flex min-h-[92px] shrink-0 items-center justify-center rounded-[6px] border border-dashed transition-all"
+      style={{
+        borderColor: isOver ? "hsl(var(--primary))" : "hsl(var(--border))",
+        backgroundColor: isOver ? "hsl(var(--primary) / 0.08)" : "hsl(var(--muted) / 0.22)",
+        color: isOver ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+      }}
+    >
+      <span className="text-[9px] font-semibold">Nový bundle</span>
     </div>
   );
 }
@@ -1641,7 +1662,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
   const bundleItemIds = bundle.items.map((item) => item.id);
   const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: splitMeta.splitPart ?? bundle.split_part, bundle_type: isSplitBundle ? "split" : bundle.bundle_type });
-  const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" ? {
+  const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" || activeDrag?.type === "silo-item" ? {
     project_id: activeDrag.projectId || "",
     weekKey: activeDrag.weekDate ?? null,
     stage_id: activeDrag.stageId ?? null,
@@ -1871,7 +1892,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
               item.status === "paused" ? (
                 <PausedSiloItem key={item.id} item={item} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               ) : (
-                <DraggableSiloItem key={item.id} item={item} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode || isMidflightBundle || !!isWeekLocked} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
+                <DraggableSiloItem key={item.id} item={item} bundle={bundle} bundleKey={bundleKey} weekKey={weekKey} showCzk={showCzk} disabled={!!forecastDarkMode || isMidflightBundle || !!isWeekLocked} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onItemContextMenu(e, item, bundle); }} />
               )
             )}
             {completedItems.length > 0 && (
@@ -1979,18 +2000,21 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
   );
 }
 
-function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = false }: {
-  item: ScheduleItem; weekKey: string; showCzk: boolean; onContextMenu: (e: React.MouseEvent) => void; disabled?: boolean;
+function DraggableSiloItem({ item, bundle, bundleKey, weekKey, showCzk, onContextMenu, disabled = false }: {
+  item: ScheduleItem; bundle: ScheduleBundle; bundleKey: string; weekKey: string; showCzk: boolean; onContextMenu: (e: React.MouseEvent) => void; disabled?: boolean;
 }) {
   const isSplit = !!item.split_group_id || (!!item.split_part && !!item.split_total);
   const adhocReason = (item as any).adhoc_reason;
+  const bundleSplitMeta = deriveBundleSplitMeta(bundle.items);
+  const bundleType = bundleSplitMeta.isSplit ? "split" : (bundle.bundle_type ?? "full");
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `silo-item-${item.id}`,
     data: {
       type: "silo-item", itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
       projectId: item.project_id, projectName: item.project_name, weekDate: weekKey,
       hours: item.scheduled_hours, stageId: item.stage_id, scheduledCzk: item.scheduled_czk,
-      splitGroupId: item.split_group_id,
+      splitGroupId: item.split_group_id, bundleKey, bundleLabel: bundle.bundle_label ?? null,
+      bundleType, splitPart: bundleSplitMeta.splitPart ?? bundle.split_part ?? null,
     },
     disabled,
   });

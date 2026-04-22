@@ -827,6 +827,64 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, normalizeFullBundles, pushUndo]);
 
+  const moveScheduleItemIntoBundle = useCallback(async (scheduleItemId: string, targetItemIds: string[]) => {
+    try {
+      const cleanTargetIds = [...new Set(targetItemIds)].filter(Boolean);
+      if (!scheduleItemId || cleanTargetIds.length === 0) return;
+      const [{ data: source, error: sourceErr }, { data: targets, error: targetErr }] = await Promise.all([
+        supabase.from("production_schedule").select("*").eq("id", scheduleItemId).single(),
+        supabase.from("production_schedule").select("*").in("id", cleanTargetIds),
+      ]);
+      if (sourceErr) throw sourceErr;
+      if (targetErr) throw targetErr;
+      if (!source || !targets?.length) return;
+      const target = targets[0] as any;
+      if (source.id === target.id) return;
+      if (!validateBundleDrop({ project_id: source.project_id, stage_id: source.stage_id ?? null, bundle_label: source.bundle_label ?? null, bundle_type: resolveBundleType(source) }, { project_id: target.project_id, stage_id: target.stage_id ?? null, bundle_label: target.bundle_label ?? null, bundle_type: resolveBundleType(target) })) return;
+      if (resolveBundleType(source) !== "full" || resolveBundleType(target) !== "full") return;
+
+      const snapshot = { ...source } as any;
+      const updatePayload = { scheduled_week: target.scheduled_week, bundle_label: target.bundle_label ?? null, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
+      const { error } = await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId);
+      if (error) throw error;
+      invalidateAll();
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "move_item_into_bundle",
+        description: `Vložení ${source.item_name || "položky"} do bundle ${target.bundle_label || "A"}`,
+        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
+        redo: async () => { await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId); invalidateAll(); },
+      });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [invalidateAll, pushUndo]);
+
+  const moveScheduleItemAsNewBundle = useCallback(async (scheduleItemId: string, targetWeekDate: string) => {
+    try {
+      const { data: source, error: sourceErr } = await supabase.from("production_schedule").select("*").eq("id", scheduleItemId).single();
+      if (sourceErr) throw sourceErr;
+      if (!source || resolveBundleType(source) !== "full") return;
+      const targetLabel = await getNextBundleLabel(source.project_id, source.stage_id ?? null);
+      const snapshot = { ...source } as any;
+      const updatePayload = { scheduled_week: targetWeekDate, bundle_label: targetLabel, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
+      const { error } = await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId);
+      if (error) throw error;
+      invalidateAll();
+      pushUndo({
+        page: "plan-vyroby",
+        actionType: "move_item_new_bundle",
+        description: `Nový bundle ${targetLabel} pro ${source.item_name || "položku"}`,
+        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
+        redo: async () => { await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId); invalidateAll(); },
+      });
+    } catch (err: any) {
+      toast({ title: "Chyba", description: err.message, variant: "destructive" });
+      throw err;
+    }
+  }, [invalidateAll, pushUndo]);
+
   const moveItemBackToInbox = useCallback(async (scheduleItemId: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1560,6 +1618,8 @@ export function useProductionDragDrop() {
     moveInboxProjectToWeek,
     moveScheduleItemToWeek,
     moveBundleToWeek,
+    moveScheduleItemIntoBundle,
+    moveScheduleItemAsNewBundle,
     moveItemBackToInbox,
     reorderItemsInWeek,
     completeItems,
