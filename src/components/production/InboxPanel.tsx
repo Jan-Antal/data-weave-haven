@@ -284,14 +284,17 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       const infoB = projectInfoMap.get(b.project_id);
       const uA = getUrgency(infoA);
       const uB = getUrgency(infoB);
+      const aHasNew = newCountByProject.has(a.project_id);
+      const bHasNew = newCountByProject.has(b.project_id);
       if (URGENCY_ORDER[uA] !== URGENCY_ORDER[uB]) return URGENCY_ORDER[uA] - URGENCY_ORDER[uB];
+      if (aHasNew !== bHasNew) return aHasNew ? -1 : 1;
       const dlA = getEarliestDeadline(infoA || {});
       const dlB = getEarliestDeadline(infoB || {});
       const dA = dlA ? dlA.getTime() : Infinity;
       const dB = dlB ? dlB.getTime() : Infinity;
       return dA - dB;
     });
-  }, [regularProjects, projectInfoMap]);
+  }, [regularProjects, projectInfoMap, newCountByProject]);
 
   // Count overdue + urgent items
   const urgentItemCount = useMemo(() => {
@@ -813,6 +816,11 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
         <div className="flex items-center gap-2">
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
+          {totalNewItemCount > 0 && (
+            <span className="rounded-full border border-info/30 bg-info/10 px-1.5 py-0.5 text-[9px] font-bold leading-none text-info">
+              NOVÉ {totalNewItemCount}
+            </span>
+          )}
           {projects.length > 0 && (
             <span className="text-[9px] font-medium" style={{ color: "#6b7a78" }}>
               {projects.length} projektů, {totalItemCount} prvků
@@ -823,6 +831,15 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {totalNewItemCount > 0 && (
+            <button
+              onClick={handleMarkInboxRead}
+              disabled={upsertPreferences.isPending}
+              className="rounded border border-info/25 bg-info/5 px-1.5 py-0.5 text-[9px] font-semibold text-info transition-colors hover:bg-info/10 disabled:opacity-50"
+            >
+              Označit jako přečtené
+            </button>
+          )}
           {projects.length > 0 && (
             <>
               <button
@@ -866,6 +883,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               onClearChecked={clearCheckedItems}
               allInboxItemsMap={allInboxItemsMap}
               searchQuery={searchQuery}
+              newItemIds={newItemIds}
+              newItemCount={newCountByProject.get(project.project_id) ?? 0}
             />
           );
         })}
