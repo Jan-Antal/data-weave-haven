@@ -3596,7 +3596,7 @@ function DetailPanel({
         </div>
 
         {/* ── Výkresy inline ── */}
-        <VykresynSection projectId={project.projectId} cachedDocCount={cachedDocCount} />
+        <VykresynSection key={project.projectId} projectId={project.projectId} cachedDocCount={cachedDocCount} />
       </div>
 
       {/* ── Scrollable body ── */}
@@ -5240,16 +5240,15 @@ function VykresynSection({ projectId, cachedDocCount }: { projectId: string; cac
     loading: boolean;
   } | null>(null);
 
-  // Background fetch on mount so the count badge reflects the real SharePoint state
-  // even when the cache table only has total_count (no per-category breakdown).
+  // Force-fetch for the current project so drawings never leak between project contexts.
   useEffect(() => {
-    if (projectId) listFiles("vykresy");
+    if (projectId) listFiles("vykresy", true);
   }, [projectId, listFiles]);
 
   const files = filesByCategory["vykresy"] || [];
   const hasFetchedFiles = "vykresy" in filesByCategory;
-  // Prefer live/SharePoint count once we have it; fall back to cached aggregate count.
-  const displayCount = hasFetchedFiles ? files.length : (cachedDocCount ?? 0);
+  // Prefer optimized DB cache for counts, fall back to live list only when cache is missing.
+  const displayCount = cachedDocCount ?? (hasFetchedFiles ? files.length : 0);
 
   const handleFileClick = async (file: SPFile) => {
     setPreviewFile({

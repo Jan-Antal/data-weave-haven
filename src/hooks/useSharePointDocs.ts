@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface SPFile {
@@ -49,6 +49,15 @@ export function useSharePointDocs(projectId: string) {
   const [cacheTimestamp, setCacheTimestamp] = useState<string | null>(null);
   const fetchedRef = useRef<Set<string>>(new Set());
 
+  useEffect(() => {
+    setFilesByCategory(globalFileCache[projectId] ?? {});
+    fetchedRef.current.clear();
+    setLoadingCategory(null);
+    setInitialLoading(false);
+    setRefreshing(false);
+    setCacheTimestamp(lastRefreshTime[projectId] ? new Date(lastRefreshTime[projectId]).toISOString() : null);
+  }, [projectId]);
+
   const invoke = useCallback(async (body: Record<string, unknown>) => {
     // Add timeout via AbortController
     const controller = new AbortController();
@@ -79,6 +88,40 @@ export function useSharePointDocs(projectId: string) {
           project_id: pid,
           category_counts: categoryCounts,
           file_list: filesMap,
+          total_count: total,
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "project_id" });
+    } catch { /* ignore cache persist errors */ }
+  }, []);
+
+  const persistCategoryToCache = useCallback(async (pid: string, categoryKey: string, files: SPFile[]) => {
+    try {
+      const { data } = await supabase
+        .from("sharepoint_document_cache")
+        .select("category_counts, file_list")
+        .eq("project_id", pid)
+        .maybeSingle();
+
+      const existingCounts = data?.category_counts && typeof data.category_counts === "object" && !Array.isArray(data.category_counts)
+        ? data.category_counts as Record<string, number>
+        : {};
+      const existingFiles = data?.file_list && typeof data.file_list === "object" && !Array.isArray(data.file_list)
+        ? data.file_list as unknown as Record<string, SPFile[]>
+        : {};
+
+      const fileList = { ...existingFiles, [categoryKey]: files };
+      const categoryCounts = { ...existingCounts, [categoryKey]: files.length };
+      const total = Object.keys(fileList).reduce((sum, key) => {
+        const count = categoryCounts[key];
+        return sum + (typeof count === "number" ? count : (fileList[key]?.length ?? 0));
+      }, 0);
+
+      await supabase
+        .from("sharepoint_document_cache")
+        .upsert({
+          project_id: pid,
+          category_counts: categoryCounts,
+          file_list: fileList,
           total_count: total,
           updated_at: new Date().toISOString(),
         } as any, { onConflict: "project_id" });
@@ -218,6 +261,7 @@ export function useSharePointDocs(projectId: string) {
         globalFileCache[projectId][categoryKey] = fileList;
         return updated;
       });
+      persistCategoryToCache(projectId, categoryKey, fileList);
       fetchedRef.current.add(categoryKey);
     } catch (err: any) {
       console.warn("SP list error (using cached data):", err);
@@ -228,7 +272,7 @@ export function useSharePointDocs(projectId: string) {
     } finally {
       setLoadingCategory(null);
     }
-  }, [projectId, invoke]);
+  }, [projectId, invoke, persistCategoryToCache]);
 
   const uploadFile = useCallback(async (categoryKey: string, file: File) => {
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
