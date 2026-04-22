@@ -168,29 +168,41 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create notifications
-    const projectNames = missingProjectIds
-      .map((pid: string) => projectMap.get(pid) || pid)
-      .slice(0, 3)
-      .join(", ");
+    const batchKey = `daylog_missing:${todayStr}`;
 
-    const suffix = missingProjectIds.length > 3 ? ` a ${missingProjectIds.length - 3} dalších` : "";
+    const { data: existingNotifications } = await supabase
+      .from("notifications")
+      .select("user_id")
+      .eq("batch_key", batchKey)
+      .eq("type", "daylog_missing")
+      .in("user_id", enabledUsers);
 
-    const rows = enabledUsers.map((userId: string) => ({
+    const alreadyNotified = new Set((existingNotifications || []).map((n: any) => n.user_id));
+    const usersToNotify = enabledUsers.filter((userId: string) => !alreadyNotified.has(userId));
+
+    if (usersToNotify.length === 0) {
+      return new Response(JSON.stringify({ message: "Daylog notification already sent for today" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const rows = usersToNotify.map((userId: string) => ({
       user_id: userId,
       type: "daylog_missing",
-      title: "Chybějící denní log",
-      body: `Projekty bez záznamu: ${projectNames}${suffix}`,
+      title: "Chybí denní log za celý den",
+      body: "Za dnešní pracovní den zatím není zapsaný žádný denní log ve výrobě.",
       actor_name: "Systém",
       actor_initials: "SY",
       read: false,
+      batch_key: batchKey,
+      link_context: { route: "/vyroba" },
     }));
 
     await supabase.from("notifications").insert(rows);
 
     return new Response(
       JSON.stringify({
-        message: `Sent ${rows.length} notifications for ${missingProjectIds.length} projects`,
+        message: `Sent ${rows.length} daylog notifications`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
