@@ -297,27 +297,10 @@ export function useRealtimeSync() {
       // ━━━ PRODUCTION INBOX ━━━
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "production_inbox" },
-        (payload) => {
-          const newRow = payload.new as any;
-          queryClient.getQueriesData({ queryKey: ["production-inbox"] }).forEach(([key]) => {
-            queryClient.setQueryData(key, (old: any[] | undefined) =>
-              old ? [...old, newRow] : [newRow]
-            );
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "production_inbox" },
-        (payload) => {
-          const deletedId = (payload.old as any)?.id;
-          if (!deletedId) return;
-          queryClient.getQueriesData({ queryKey: ["production-inbox"] }).forEach(([key]) => {
-            queryClient.setQueryData(key, (old: any[] | undefined) =>
-              old?.filter((item) => item.id !== deletedId) ?? old
-            );
-          });
+        { event: "*", schema: "public", table: "production_inbox" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["production-inbox"] });
+          queryClient.invalidateQueries({ queryKey: ["production-progress"] });
         }
       )
 
