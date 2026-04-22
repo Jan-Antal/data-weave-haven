@@ -4192,9 +4192,10 @@ function UnifiedItemList({
         selectedItems.size > 0
           ? dedupedItems.filter((d) => d.mergedIds.some((id) => selectedItems.has(id)) && !isItemDoneLocal(d.item))
           : dedupedItems.filter((d) => !isItemDoneLocal(d.item));
-      const itemsToInsert = targetItems2.flatMap(({ mergedIds: mids, item }) =>
-        mids.map((mid) => ({ id: mid, item }))
+      const itemsToInsert = targetItems2.flatMap(({ mergedIds: mids }) =>
+        mids.map((mid) => ({ id: mid, item: currentItems.find((ci) => ci.item.id === mid)?.item })).filter((x): x is { id: string; item: ScheduleItem } => !!x.item)
       );
+      const nowIso = new Date().toISOString();
       for (const { id, item } of itemsToInsert) {
         await (supabase.from("production_expedice") as any).insert({
           project_id: projectId,
@@ -4202,8 +4203,8 @@ function UnifiedItemList({
           item_code: item.item_code || null,
           source_schedule_id: id,
           stage_id: item.stage_id || null,
-          manufactured_at: new Date().toISOString(),
-          expediced_at: null,
+          manufactured_at: nowIso,
+          expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
           is_midflight: false,
         });
       }
