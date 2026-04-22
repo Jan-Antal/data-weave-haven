@@ -207,8 +207,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     return counts;
   }, [projects, newItemIds]);
-  const totalNewItemCount = newItemIds.size;
-
   useEffect(() => {
     if (!preferencesFetched || userPreferences?.production_inbox_seen_at || isUpsertingPreferences) return;
     upsertPreferences({ production_inbox_seen_at: initialInboxSeenAt.current });
@@ -291,17 +289,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       return dA - dB;
     });
   }, [regularProjects, projectInfoMap, newCountByProject]);
-
-  // Count overdue + urgent items
-  const urgentItemCount = useMemo(() => {
-    let count = 0;
-    for (const p of projects) {
-      const info = projectInfoMap.get(p.project_id);
-      const u = getUrgency(info);
-      if (u === "overdue" || u === "urgent") count += p.items.length;
-    }
-    return count;
-  }, [projects, projectInfoMap]);
 
   const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
 
@@ -790,20 +777,14 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       style={{ width, minWidth: 180, maxWidth: 500, borderRight: "1px solid #ece8e2", backgroundColor: isHighlighted ? "rgba(59,130,246,0.04)" : "#ffffff", boxShadow: isHighlighted ? "inset 0 0 0 2px #3b82f6" : undefined }}>
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between" style={{ borderBottom: "1px solid #ece8e2" }}>
-        <div className="flex items-center gap-2">
-          <span className="text-sm">📥</span>
-          <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
-          {totalNewItemCount > 0 && (
-            <span className="rounded-full border border-info/30 bg-info/10 px-1.5 py-0.5 text-[9px] font-bold leading-none text-info">
-              NOVÉ {totalNewItemCount}
-            </span>
-          )}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📥</span>
+            <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
+          </div>
           {projects.length > 0 && (
-            <span className="text-[9px] font-medium" style={{ color: "#6b7a78" }}>
-              {projects.length} projektů, {totalItemCount} prvků
-              {urgentItemCount > 0 && (
-                <span className="ml-1 font-bold" style={{ color: "#d97706" }}>{urgentItemCount} rizikové</span>
-              )}
+            <span className="truncate pl-6 text-[10px] font-medium" style={{ color: "#6b7a78" }}>
+              {projects.length} projektů · {totalItemCount} k naplánování
             </span>
           )}
         </div>
