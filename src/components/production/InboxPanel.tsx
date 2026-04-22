@@ -207,8 +207,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
     }
     return counts;
   }, [projects, newItemIds]);
-  const totalNewItemCount = newItemIds.size;
-
   useEffect(() => {
     if (!preferencesFetched || userPreferences?.production_inbox_seen_at || isUpsertingPreferences) return;
     upsertPreferences({ production_inbox_seen_at: initialInboxSeenAt.current });
@@ -291,17 +289,6 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       return dA - dB;
     });
   }, [regularProjects, projectInfoMap, newCountByProject]);
-
-  // Count overdue + urgent items
-  const urgentItemCount = useMemo(() => {
-    let count = 0;
-    for (const p of projects) {
-      const info = projectInfoMap.get(p.project_id);
-      const u = getUrgency(info);
-      if (u === "overdue" || u === "urgent") count += p.items.length;
-    }
-    return count;
-  }, [projects, projectInfoMap]);
 
   const totalItemCount = projects.reduce((s, p) => s + p.items.length, 0);
 
