@@ -312,11 +312,11 @@ export function CompletionDialog({
         {missingQcChecked.length > 0 && (
           <div
             className="mx-5 mb-2 px-3 py-2 rounded-md text-[11px]"
-            style={{ backgroundColor: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c" }}
+            style={{ backgroundColor: "hsl(var(--accent) / 0.08)", border: "1px solid hsl(var(--accent) / 0.35)", color: "hsl(var(--accent-foreground))" }}
           >
-            <div className="font-semibold mb-0.5">⚠ Chybí QC kontrola ve Výrobě</div>
-            <div style={{ color: "#991b1b" }}>
-              Bez QC nelze položku dokončit:{" "}
+            <div className="font-semibold mb-0.5">Chybí QC kontrola</div>
+            <div>
+              Nejprve potvrďte QC. Poté budou položky přesunuty do Expedice:{" "}
               {missingQcChecked.map(i => i.item_code || i.item_name).join(", ")}
             </div>
           </div>
@@ -470,15 +470,15 @@ export function CompletionDialog({
           </button>
           <button
             onClick={handleComplete}
-            disabled={checkedIds.size === 0 || submitting || missingQcChecked.length > 0}
-            className="px-3 py-1.5 text-[11px] font-semibold rounded-md text-white transition-colors"
+            disabled={checkedIds.size === 0 || submitting}
+            className="px-3 py-1.5 text-[11px] font-semibold rounded-md text-primary-foreground transition-colors"
             style={{
-              backgroundColor: (checkedIds.size === 0 || missingQcChecked.length > 0) ? "#99a5a3" : "#3a8a36",
-              cursor: (checkedIds.size === 0 || missingQcChecked.length > 0) ? "not-allowed" : "pointer",
+              backgroundColor: checkedIds.size === 0 ? "hsl(var(--muted-foreground))" : "hsl(var(--primary))",
+              cursor: checkedIds.size === 0 ? "not-allowed" : "pointer",
               opacity: submitting ? 0.7 : 1,
             }}
           >
-            {submitting ? "Ukládám..." : `Dokončit vybrané`}
+            {submitting ? "Ukládám..." : needsQcConfirmation ? "Potvrdit QC a dokončit" : "Dokončit → Expedice"}
           </button>
         </div>
       </DialogContent>
