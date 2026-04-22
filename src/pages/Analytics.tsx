@@ -301,7 +301,7 @@ export default function Analytics() {
   ];
 
   return (
-    <PageTabsShell tabs={tabs} defaultTab="projekty" paramName="tab">
+    <PageTabsShell tabs={tabs} defaultTab="dilna" paramName="tab">
       {() => (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Per-tab toolbar */}
