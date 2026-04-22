@@ -350,6 +350,8 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         id: crypto.randomUUID(),
         timestamp: new Date(),
         groupId: groupId ?? entry.groupId,
+        undo: entry.undoPayload ? reconstructFromPayload(entry.undoPayload, queryClient) : entry.undo,
+        redo: entry.redoPayload ? reconstructFromPayload(entry.redoPayload, queryClient) : entry.redo,
       };
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       const newStack = [...undoStackRef.current, full];
@@ -413,7 +415,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    [bump]
+    [bump, queryClient]
   );
 
   const popLastUndo = useCallback(
