@@ -59,6 +59,27 @@ export function formatBundleDisplayLabel(target: {
   return target.bundle_type === "split" && target.split_part ? `${label}-${target.split_part}` : label;
 }
 
+export function deriveBundleSplitMeta<T extends {
+  bundle_type?: string | null;
+  split_group_id?: string | null;
+  split_part?: number | null;
+  split_total?: number | null;
+}>(rows: T[]): { isSplit: boolean; splitPart: number | null; splitTotal: number | null } {
+  const splitRows = rows.filter((row) => resolveBundleType(row) === "split");
+  if (splitRows.length === 0) {
+    return { isSplit: false, splitPart: null, splitTotal: null };
+  }
+
+  const partCandidate = splitRows.find((row) => typeof row.split_part === "number" && row.split_part > 0)?.split_part ?? null;
+  const totalCandidate = splitRows.find((row) => typeof row.split_total === "number" && row.split_total > 0)?.split_total ?? null;
+
+  return {
+    isSplit: true,
+    splitPart: partCandidate,
+    splitTotal: totalCandidate,
+  };
+}
+
 export async function getNextBundleLabel(projectId: string, stageId: string | null): Promise<string> {
   let query = supabase
     .from("production_schedule")
