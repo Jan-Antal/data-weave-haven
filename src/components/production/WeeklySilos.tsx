@@ -2000,18 +2000,21 @@ function PausedSiloItem({ item, onContextMenu }: { item: ScheduleItem; onContext
   );
 }
 
-function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = false }: {
-  item: ScheduleItem; weekKey: string; showCzk: boolean; onContextMenu: (e: React.MouseEvent) => void; disabled?: boolean;
+function DraggableSiloItem({ item, bundle, bundleKey, weekKey, showCzk, onContextMenu, disabled = false }: {
+  item: ScheduleItem; bundle: ScheduleBundle; bundleKey: string; weekKey: string; showCzk: boolean; onContextMenu: (e: React.MouseEvent) => void; disabled?: boolean;
 }) {
   const isSplit = !!item.split_group_id || (!!item.split_part && !!item.split_total);
   const adhocReason = (item as any).adhoc_reason;
+  const bundleSplitMeta = deriveBundleSplitMeta(bundle.items);
+  const bundleType = bundleSplitMeta.isSplit ? "split" : (bundle.bundle_type ?? "full");
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `silo-item-${item.id}`,
     data: {
       type: "silo-item", itemId: item.id, itemName: item.item_name, itemCode: item.item_code,
       projectId: item.project_id, projectName: item.project_name, weekDate: weekKey,
       hours: item.scheduled_hours, stageId: item.stage_id, scheduledCzk: item.scheduled_czk,
-      splitGroupId: item.split_group_id,
+      splitGroupId: item.split_group_id, bundleKey, bundleLabel: bundle.bundle_label ?? null,
+      bundleType, splitPart: bundleSplitMeta.splitPart ?? bundle.split_part ?? null,
     },
     disabled,
   });
