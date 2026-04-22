@@ -313,6 +313,10 @@ export function CompletionDialog({
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>
                       ✓ Hotovo
                     </span>
+                  ) : isChecked && !qcSet.has(item.id) ? (
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }}>
+                      ⚠ chybí QC
+                    </span>
                   ) : isChecked && config.mode === "split" ? (
                     <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
                       ✂ {doneH}h+{remainH}h
