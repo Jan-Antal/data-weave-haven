@@ -44,12 +44,12 @@ export function CompletionDialog({
     queryKey: ["production-quality-checks", projectId],
     enabled: open && !!projectId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("production_quality_checks" as any)
+      const { data, error } = await (supabase
+        .from("production_quality_checks" as any) as any)
         .select("item_id")
         .eq("project_id", projectId);
       if (error) throw error;
-      return (data || []) as { item_id: string }[];
+      return ((data || []) as any[]).map(r => ({ item_id: r.item_id as string }));
     },
   });
   const qcSet = useMemo(() => new Set(qcChecks.map(r => r.item_id)), [qcChecks]);
