@@ -1310,8 +1310,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       },
       redo: async () => {
           const redoNow = new Date().toISOString();
-        for (const item of itemsToExpedice) {
-          await (supabase.from("production_expedice") as any).insert({
+        await insertProductionExpediceRowsIfMissing(itemsToExpedice.map((item) => ({
             project_id: pid,
             item_name: item.item_name,
             item_code: item.item_code || null,
@@ -1320,8 +1319,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               manufactured_at: redoNow,
               expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
             is_midflight: false,
-          });
-        }
+        })));
         await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1333,8 +1331,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
     const nowIso = new Date().toISOString();
     // Insert into production_expedice for each active item
-    for (const item of itemsToExpedice) {
-      await (supabase.from("production_expedice") as any).insert({
+    await insertProductionExpediceRowsIfMissing(itemsToExpedice.map((item) => ({
         project_id: pid,
         item_name: item.item_name,
         item_code: item.item_code || null,
@@ -1343,8 +1340,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         manufactured_at: nowIso,
         expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
         is_midflight: false,
-      });
-    }
+    })));
     await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1372,7 +1368,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         undo: async () => {
           if (item) {
             const undoNow = new Date().toISOString();
-            await (supabase.from("production_expedice") as any).insert({
+            await insertProductionExpediceRowsIfMissing([{
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
@@ -1381,7 +1377,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               manufactured_at: undoNow,
               expediced_at: getExpediceTimestampForCompletedItem(item, undoNow),
               is_midflight: false,
-            });
+            }]);
           }
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1410,7 +1406,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         redo: async () => {
           if (item) {
             const redoNow = new Date().toISOString();
-            await (supabase.from("production_expedice") as any).insert({
+            await insertProductionExpediceRowsIfMissing([{
               project_id: pid,
               item_name: item.item_name,
               item_code: item.item_code || null,
@@ -1419,7 +1415,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               manufactured_at: redoNow,
               expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
               is_midflight: false,
-            });
+            }]);
           }
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1427,7 +1423,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         },
       });
       const nowIsoMark = new Date().toISOString();
-      await (supabase.from("production_expedice") as any).insert({
+      await insertProductionExpediceRowsIfMissing([{
         project_id: pid,
         item_name: item?.item_name || "",
         item_code: item?.item_code || null,
@@ -1436,7 +1432,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         manufactured_at: nowIsoMark,
         expediced_at: item ? getExpediceTimestampForCompletedItem(item, nowIsoMark) : null,
         is_midflight: false,
-      });
+      }]);
       // Log item hotovo
       if (selectedProject) {
         logActivity({
