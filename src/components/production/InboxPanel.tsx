@@ -25,6 +25,7 @@ import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
 import { DeadlineWarningDialog } from "./DeadlineWarningDialog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { logActivity } from "@/lib/activityLog";
+import { useUserPreferences, useUpsertPreferences } from "@/hooks/useUserPreferences";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -145,6 +146,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const bruttoPerDay = vyrobniEmps.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
   const getWeekCapacity = useWeekCapacityLookup(bruttoPerDay || undefined);
   const { moveInboxItemToWeek } = useProductionDragDrop();
+  const { data: userPreferences, isFetched: preferencesFetched } = useUserPreferences();
+  const { mutate: upsertPreferences, isPending: isUpsertingPreferences } = useUpsertPreferences();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
@@ -190,6 +193,30 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const hourlyRate = settings?.hourly_rate ?? 550;
   const weeklyCapacity = settings?.weekly_capacity_hours ?? 875;
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
+  const initialInboxSeenAt = useRef(new Date().toISOString());
+  const inboxSeenAt = userPreferences?.production_inbox_seen_at ?? initialInboxSeenAt.current;
+  const newItemIds = useMemo(() => {
+    const seenAt = new Date(inboxSeenAt).getTime();
+    return new Set(projects.flatMap((p) => p.items.filter((i) => new Date(i.sent_at).getTime() > seenAt).map((i) => i.id)));
+  }, [projects, inboxSeenAt]);
+  const newCountByProject = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const project of projects) {
+      const count = project.items.reduce((sum, item) => sum + (newItemIds.has(item.id) ? 1 : 0), 0);
+      if (count > 0) counts.set(project.project_id, count);
+    }
+    return counts;
+  }, [projects, newItemIds]);
+  const totalNewItemCount = newItemIds.size;
+
+  useEffect(() => {
+    if (!preferencesFetched || userPreferences?.production_inbox_seen_at || isUpsertingPreferences) return;
+    upsertPreferences({ production_inbox_seen_at: initialInboxSeenAt.current });
+  }, [preferencesFetched, userPreferences?.production_inbox_seen_at, isUpsertingPreferences, upsertPreferences]);
+
+  const handleMarkInboxRead = useCallback(() => {
+    upsertPreferences({ production_inbox_seen_at: new Date().toISOString() });
+  }, [upsertPreferences]);
 
   // Build next 12 weeks with remaining capacity
   const planningWeeks = useMemo<PlanningWeek[]>(() => {
@@ -257,14 +284,17 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       const infoB = projectInfoMap.get(b.project_id);
       const uA = getUrgency(infoA);
       const uB = getUrgency(infoB);
+      const aHasNew = newCountByProject.has(a.project_id);
+      const bHasNew = newCountByProject.has(b.project_id);
       if (URGENCY_ORDER[uA] !== URGENCY_ORDER[uB]) return URGENCY_ORDER[uA] - URGENCY_ORDER[uB];
+      if (aHasNew !== bHasNew) return aHasNew ? -1 : 1;
       const dlA = getEarliestDeadline(infoA || {});
       const dlB = getEarliestDeadline(infoB || {});
       const dA = dlA ? dlA.getTime() : Infinity;
       const dB = dlB ? dlB.getTime() : Infinity;
       return dA - dB;
     });
-  }, [regularProjects, projectInfoMap]);
+  }, [regularProjects, projectInfoMap, newCountByProject]);
 
   // Count overdue + urgent items
   const urgentItemCount = useMemo(() => {
@@ -786,6 +816,11 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
         <div className="flex items-center gap-2">
           <span className="text-sm">📥</span>
           <span className="text-[13px] font-semibold" style={{ color: "#223937" }}>Inbox</span>
+          {totalNewItemCount > 0 && (
+            <span className="rounded-full border border-info/30 bg-info/10 px-1.5 py-0.5 text-[9px] font-bold leading-none text-info">
+              NOVÉ {totalNewItemCount}
+            </span>
+          )}
           {projects.length > 0 && (
             <span className="text-[9px] font-medium" style={{ color: "#6b7a78" }}>
               {projects.length} projektů, {totalItemCount} prvků
@@ -796,6 +831,15 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {totalNewItemCount > 0 && (
+            <button
+              onClick={handleMarkInboxRead}
+              disabled={isUpsertingPreferences}
+              className="rounded border border-info/25 bg-info/5 px-1.5 py-0.5 text-[9px] font-semibold text-info transition-colors hover:bg-info/10 disabled:opacity-50"
+            >
+              Označit jako přečtené
+            </button>
+          )}
           {projects.length > 0 && (
             <>
               <button
@@ -839,6 +883,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
               onClearChecked={clearCheckedItems}
               allInboxItemsMap={allInboxItemsMap}
               searchQuery={searchQuery}
+              newItemIds={newItemIds}
+              newItemCount={newCountByProject.get(project.project_id) ?? 0}
             />
           );
         })}
@@ -1342,7 +1388,7 @@ function InboxResizeHandle({ onWidthChange, containerWidth }: { onWidthChange?: 
   );
 }
 
-function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode = "hours", progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "" }: {
+function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode = "hours", progress, onNavigateToTPV, onOpenProjectDetail, onProjectContextMenu, onItemContextMenu, urgency, daysLabel, isSelected, onSelectProject, projectInfo, checkedItems, onToggleCheck, onClearChecked, allInboxItemsMap, searchQuery = "", newItemIds, newItemCount = 0 }: {
   project: InboxProject; hourlyRate: number; defaultExpanded: boolean; displayMode?: DisplayMode;
   progress?: ProjectProgress; onNavigateToTPV?: (projectId: string) => void;
   onOpenProjectDetail?: (projectId: string) => void;
@@ -1358,6 +1404,8 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   onClearChecked: () => void;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   searchQuery?: string;
+  newItemIds: Set<string>;
+  newItemCount?: number;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const color = getProjectColor(project.project_id);
@@ -1384,12 +1432,12 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
 
   return (
     <div className="rounded-lg overflow-hidden" style={{
-      backgroundColor: isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
-      borderTop: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderRight: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
-      borderBottom: isSelected ? "2px solid #d97706" : "1px solid #ece8e2",
+      backgroundColor: newItemCount > 0 ? "hsl(var(--info) / 0.05)" : isSelected ? "rgba(217,119,6,0.04)" : "#ffffff",
+      borderTop: isSelected ? "2px solid #d97706" : newItemCount > 0 ? "1px solid hsl(var(--info) / 0.35)" : "1px solid #ece8e2",
+      borderRight: isSelected ? "2px solid #d97706" : newItemCount > 0 ? "1px solid hsl(var(--info) / 0.35)" : "1px solid #ece8e2",
+      borderBottom: isSelected ? "2px solid #d97706" : newItemCount > 0 ? "1px solid hsl(var(--info) / 0.35)" : "1px solid #ece8e2",
       borderLeft: `${leftBorderWidth}px solid ${leftBorderColor}`,
-      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined,
+      boxShadow: isSelected ? "0 0 0 2px rgba(217,119,6,0.15)" : newItemCount > 0 ? "0 0 0 2px hsl(var(--info) / 0.10)" : undefined,
       transition: "border-color 150ms, box-shadow 150ms",
     }}>
       <button
@@ -1412,6 +1460,11 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
             {urgency === "urgent" && daysLabel && (
               <span className="text-[8px] font-bold px-1 py-[1px] rounded shrink-0" style={{ backgroundColor: "rgba(217,119,6,0.1)", color: "#D97706" }}>
                 {daysLabel}
+              </span>
+            )}
+            {newItemCount > 0 && (
+              <span className="shrink-0 rounded-full border border-info/30 bg-info/10 px-1.5 py-[1px] text-[8px] font-bold leading-none text-info">
+                NOVÉ {newItemCount}
               </span>
             )}
           </div>
@@ -1455,6 +1508,7 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
               <DraggableInboxItem key={item.id} item={item} projectName={project.project_name}
                 onContextMenu={e => onItemContextMenu(e, item, project)}
                 isChecked={checkedItems.has(item.id)}
+                isNew={newItemIds.has(item.id)}
                 onToggleCheck={onToggleCheck}
                 checkedItems={checkedItems}
                 allInboxItemsMap={allInboxItemsMap}
@@ -1502,9 +1556,9 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
   );
 }
 
-function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550, projectItemIds }: {
+function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, isNew = false, onToggleCheck, checkedItems, allInboxItemsMap, displayMode = "hours", hourlyRate = 550, projectItemIds }: {
   item: InboxItem; projectName: string; onContextMenu: (e: React.MouseEvent) => void;
-  isChecked: boolean; onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
+  isChecked: boolean; isNew?: boolean; onToggleCheck: (itemId: string, opts?: { shiftKey?: boolean; projectId?: string; projectItemIds?: string[] }) => void;
   checkedItems: Set<string>;
   allInboxItemsMap: Map<string, InboxItem & { projectName: string }>;
   displayMode?: DisplayMode;
@@ -1554,8 +1608,8 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
     <div ref={setNodeRef} {...attributes} {...listeners}
       className="flex items-center gap-1.5 px-2 py-[5px] rounded-[5px] cursor-grab transition-all"
       style={{
-        backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : "#ffffff",
-        border: isChecked ? "1px solid rgba(58,138,54,0.25)" : "1px solid #ece8e2",
+        backgroundColor: isChecked ? "rgba(58,138,54,0.06)" : isNew ? "hsl(var(--info) / 0.05)" : "#ffffff",
+        border: isChecked ? "1px solid rgba(58,138,54,0.25)" : isNew ? "1px solid hsl(var(--info) / 0.30)" : "1px solid #ece8e2",
         borderLeft: isSplit ? "3px dashed #99a5a3" : undefined,
         opacity: isDragging ? 0.3 : 1,
       }}
@@ -1598,6 +1652,9 @@ function DraggableInboxItem({ item, projectName, onContextMenu, isChecked, onTog
         <span className="font-sans shrink-0 px-1 rounded" style={{ fontSize: 9, color: "#3a8a36", backgroundColor: "rgba(58,138,54,0.08)", border: "1px solid rgba(58,138,54,0.2)", fontWeight: 600 }} title={`Počet kusů: ${item.pocet}`}>×{item.pocet}</span>
       )}
       <span className="flex-1 truncate" style={{ fontSize: 12, color: "#4b5563" }}>{item.item_name}</span>
+      {isNew && (
+        <span className="shrink-0 rounded-full border border-info/30 bg-info/10 px-1.5 py-[1px] text-[8px] font-bold leading-none text-info">NOVÉ</span>
+      )}
       {(item as any).adhoc_reason && String((item as any).adhoc_reason).startsWith("midflight") && (
         <span className="text-[9px] bg-slate-100 text-slate-500 border border-slate-300 rounded px-1 ml-1 font-medium tracking-wide shrink-0">Legacy</span>
       )}

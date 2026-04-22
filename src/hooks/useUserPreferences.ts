@@ -7,6 +7,7 @@ export interface UserPreferences {
   user_id: string;
   default_person_filter: string | null;
   default_view: string;
+  production_inbox_seen_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +33,7 @@ export function useUpsertPreferences() {
   const { user } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (prefs: { default_person_filter?: string | null; default_view?: string }) => {
+    mutationFn: async (prefs: { default_person_filter?: string | null; default_view?: string; production_inbox_seen_at?: string | null }) => {
       if (!user) throw new Error("Not authenticated");
       const { data, error } = await (supabase as any)
         .from("user_preferences")
