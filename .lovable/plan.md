@@ -1,57 +1,94 @@
 
+## Oprava Výkresů v modulu Výroba
 
-## "Vrátit do TPV" z Week Sila + badge "Vráceno z výroby"
+### Cíl
+V sekci **Dokumentace → Výkresy** v modulu **Výroba** se musí vždy zobrazovat soubory jen pro aktuální `project_id` ze složky:
 
-### Cieľ
-Aktuálne "Vrátit do TPV" existuje len v Inboxe a v tabuľkovom view — vykonáva **hard delete** bez stopy. Rozšírime ho aj na pravý klik vo **Week Silo** (kanban) a zmeníme správanie na **soft delete**: položka ostane v DB so statusom `returned` a v TPV Liste sa zobrazí oranžový badge `↩ Vráceno z Výroby` s tooltipom (kto, kedy). Pri opätovnom odoslaní do výroby z TPV Listu sa returned záznamy vyčistia (rovnako ako cancelled).
+```text
+/{ProjectID}/Vykresy/
+```
 
-### Zmeny
+Počet v tlačítku `📄 Výkresy (x)` se má brát z optimalizační cache `sharepoint_document_cache.category_counts.vykresy`, stejně jako v detailu projektu.
 
-**1. DB migrácia (schéma + trigger)**
-- `production_schedule`: pridať `returned_at timestamptz`, `returned_by uuid`.
-- `production_inbox`: pridať `returned_at timestamptz`, `returned_by uuid`.
-- Aktualizovať `validate_production_schedule_status` aj `validate_production_inbox_status` — povoliť nový status `'returned'`.
+### Pravděpodobná příčina chyby
+Hook `useSharePointDocs(projectId)` si drží vnitřní stav `filesByCategory` a `fetchedRef`. Když uživatel ve Výrobě přepne projekt, komponenta může zůstat stejná, ale změní se `projectId`.
 
-**2. `WeeklySilos.tsx` — `handleItemContextMenu`** (riadky ~709-755, vetva normal active item)
-- Pridať akciu `↩ Vrátit do TPV` (za `Vrátit do Inboxu`).
-- Skryť pre paused, completed/expedice, cancelled — len pre normálne aktívne položky a tiež pre paused (user musí vrátiť aj pozastavené).
-- Akcia: `update production_schedule set status='returned', returned_at=now(), returned_by=auth.uid()` namiesto delete.
-- Invalidate: `["production-schedule"]`, `["production-progress"]`, `["production-statuses", projectId]`, `["tpv-items", projectId]`. Toast `↩ Vráceno do TPV`.
-- Tiež pridať bundle-level akciu `↩ Vrátit celý projekt do TPV` (analogicky k existujúcej `Vrátit do Inboxu` v `handleBundleContextMenu`).
+Tím pádem:
+- seznam výkresů může zůstat z předchozího projektu,
+- `fetchedRef` může říct „vykresy už byly načtené“ a přeskočit nový fetch,
+- uživatel pak vidí stejný výkres u více projektů.
 
-**3. Existujúce "Vrátit do TPV" v `InboxPanel.tsx` a `PlanVyrobyTableView.tsx`** — zmeniť z `.delete()` na `.update({ status: 'returned', returned_at, returned_by })`. Toast a invalidácia ostávajú.
+### Implementace
 
-**4. `useProductionStatuses.ts`** — nový badge type
-- Rozšíriť SELECT o `returned_at, returned_by` (inbox aj schedule).
-- Pridať `userIds` zo `returned_by` do batched lookup.
-- Pridať `RawEntry.type = "returned"` so spracovaním z oboch tabuliek (status `'returned'`).
-- Aggregácia: badge `↩ Vráceno z výroby`, farba **oranžová `#ea580c`** (odlíšenie od šedej "pending" a červenej "cancelled"), tooltip `Vráceno z výroby {datum} — {meno}`.
-- Umiestnenie v poradí: za pending, pred cancelled.
+#### 1. Reset dokumentového stavu při změně projektu
+V `src/hooks/useSharePointDocs.ts` doplním `useEffect`, který při změně `projectId`:
 
-**5. `TPVList.tsx` — `executeSendToProduction`** (riadky ~395-418)
-- Rozšíriť `inboxCheck`/`schedCheck` filter `.in("status", [...])` aby **nezahŕňal `'returned'`** (returned položky musia ísť cez wipe + nový insert, nie skip).
-- V "wipe prior cancelled rows" bloku rozšíriť na `["cancelled", "returned"]` — vyčistí oba "soft-deleted" stopy pred novým insertom.
+- nastaví `filesByCategory` na `globalFileCache[projectId] ?? {}`,
+- vyčistí `fetchedRef`,
+- vyčistí loading stav,
+- nastaví cache timestamp pro nový projekt.
 
-**6. Tooltip v TPV Liste**
-- Existujúce wrapping cancelled badge v `Tooltip` automaticky pokryje aj returned (rovnaký rendering cez `s.tooltip`).
+Tím se zabrání tomu, aby se výkresy z předchozího projektu propsaly do dalšího projektu.
 
-**7. Mobile `MobileTPVCardList.tsx`**
-- Žiadna zmena potrebná — používa rovnaký `statusMap` a `s.label/s.color/s.tooltip` cez `title` attribute.
+#### 2. Vynutit oddělení instance Výkresů podle projektu
+V `src/pages/Vyroba.tsx` upravím render:
 
-**8. Memory**
-- Aktualizovať `mem://features/production-planning/cancellation-workflow` → premenovať alebo pridať poznámku o paralele "Vrátit do TPV" = soft delete s oranžovým badgem; re-send wipe pokrýva `cancelled` aj `returned`.
+```tsx
+<VykresynSection
+  key={project.projectId}
+  projectId={project.projectId}
+  cachedDocCount={cachedDocCount}
+/>
+```
 
-### Súbory
-- nová migrácia (DB schéma + 2 triggers)
-- `src/components/production/WeeklySilos.tsx` (item + bundle context menu)
-- `src/components/production/InboxPanel.tsx` (zmena delete → update)
-- `src/components/production/PlanVyrobyTableView.tsx` (zmena delete → update)
-- `src/hooks/useProductionStatuses.ts` (returned badge)
-- `src/components/TPVList.tsx` (wipe + executeSendToProduction)
-- memory update
+Tím React při změně projektu vytvoří novou instanci sekce Výkresů a nepřenese starý stav otevření/seznamu.
 
-### Výsledok
-1. Pravý klik na položku v Week Sile → `↩ Vrátit do TPV` zmizne zo sila.
-2. V TPV Liste sa v stĺpci **Výroba** objaví oranžový badge `↩ Vráceno z výroby` s tooltipom `Vráceno z výroby 22. 4. 2026 — Marek Novák`.
-3. Užívateľ môže položku po prepracovaní znova poslať z TPV Listu → returned záznam sa vyčistí, vznikne nový pending v Inboxe → badge sa zmení na `Čeká na plánování`. Zachovaná zásada: jedna TPV položka = jeden aktuálny stav výroby.
+#### 3. Počet zobrazovat primárně z cache úložiště
+V `VykresynSection` nastavím logiku počtu takto:
 
+- pokud máme `cachedDocCount` z `category_counts.vykresy`, použije se ten,
+- pokud cache chybí a soubory už byly načtené živě, použije se `files.length`,
+- jinak se zobrazí `0`.
+
+Tedy tlačítko bude respektovat uložený optimalizační počet, ne náhodný živý stav jiné instance.
+
+#### 4. Načítat živé Výkresy až pro správný projekt
+Upravím efekt v `VykresynSection`, aby při načítání volal výhradně:
+
+```ts
+listFiles("vykresy", true)
+```
+
+pro aktuální `projectId`.
+
+`force = true` zajistí, že se při změně projektu nepoužije starý `fetchedRef`.
+
+#### 5. Ukládat výsledek složky Výkresy zpět do cache
+V `useSharePointDocs.listFiles()` doplním po úspěšném načtení jedné kategorie uložení do `sharepoint_document_cache` tak, aby:
+
+- aktualizovalo `file_list.vykresy`,
+- aktualizovalo `category_counts.vykresy`,
+- přepočítalo `total_count` jako součet kategorií,
+- nepřepsalo ostatní kategorie prázdným objektem.
+
+Tím bude Výroba i Project detail číst stejný poslední známý stav.
+
+#### 6. Zachovat správnou složku
+Nebudu měnit mapování kategorie, protože už je správně:
+
+```ts
+vykresy: "Vykresy"
+```
+
+Pouze zajistím, že se nikdy nepoužije starý `projectId`.
+
+### Soubory
+- `src/hooks/useSharePointDocs.ts`
+- `src/pages/Vyroba.tsx`
+- případně aktualizace paměti `mem://features/production-tracking/drawing-and-document-previews`
+
+### Výsledek
+- Ve Výrobě se u každého projektu zobrazí pouze jeho vlastní výkresy.
+- Kliknutí na výkres otevře správný soubor z aktuálního projektu.
+- Počet `📄 Výkresy (x)` se bude brát z uložené cache `category_counts.vykresy`.
+- Živý fetch složky `Vykresy` po načtení aktualizuje cache, aby se Project detail i Výroba držely ve stejném stavu.
