@@ -129,6 +129,23 @@ function slugify(name: string): string {
     .slice(0, 20);
 }
 
+function stripSplitSuffix(name: string): string {
+  return name.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+}
+
+function getScheduleBusinessKey(item: Pick<ScheduleItem, "project_id" | "item_code" | "item_name" | "split_group_id">): string {
+  const identity = item.split_group_id || item.item_code || `name::${stripSplitSuffix(item.item_name).toLowerCase()}`;
+  return `${item.project_id}::${identity}`;
+}
+
+function getExpediceTimestampForCompletedItem(item: ScheduleItem, nowIso: string): string | null {
+  const isIntermediateSplit = !!item.split_group_id
+    && item.split_part != null
+    && item.split_total != null
+    && item.split_part < item.split_total;
+  return isIntermediateSplit ? nowIso : null;
+}
+
 /** Compute VyrobaProject[] for any given week from the global schedule map */
 function getProjectsForWeek(
   scheduleData: Map<string, any> | undefined,
