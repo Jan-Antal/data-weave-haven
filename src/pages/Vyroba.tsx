@@ -5240,11 +5240,16 @@ function VykresynSection({ projectId, cachedDocCount }: { projectId: string; cac
     loading: boolean;
   } | null>(null);
 
+  // Background fetch on mount so the count badge reflects the real SharePoint state
+  // even when the cache table only has total_count (no per-category breakdown).
   useEffect(() => {
-    if (open && projectId) listFiles("vykresy");
-  }, [open, projectId, listFiles]);
+    if (projectId) listFiles("vykresy");
+  }, [projectId, listFiles]);
 
   const files = filesByCategory["vykresy"] || [];
+  const hasFetchedFiles = "vykresy" in filesByCategory;
+  // Prefer live/SharePoint count once we have it; fall back to cached aggregate count.
+  const displayCount = hasFetchedFiles ? files.length : (cachedDocCount ?? 0);
 
   const handleFileClick = async (file: SPFile) => {
     setPreviewFile({
@@ -5274,7 +5279,7 @@ function VykresynSection({ projectId, cachedDocCount }: { projectId: string; cac
         >
           {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           <FileText className="h-3 w-3" />
-          📄 Výkresy ({open ? files.length : (cachedDocCount ?? 0)})
+          📄 Výkresy ({displayCount})
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="mt-2 space-y-1 max-h-[50vh] overflow-y-auto pr-1">
