@@ -1568,6 +1568,7 @@ export function useProductionDragDrop() {
     mergeSplitItems,
     mergeBundleSplitGroups,
     mergeFullBundleIntoBundle,
+    moveFullBundleAsNewBundle,
     mergeBundleAcrossWeeks,
   };
 }
