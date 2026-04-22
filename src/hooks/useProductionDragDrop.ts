@@ -428,6 +428,10 @@ export function useProductionDragDrop() {
         .update({ scheduled_week: newWeekDate })
         .eq("id", scheduleItemId);
       if (error) throw error;
+      if (resolveBundleType(oldItem as any) === "full") {
+        await normalizeFullBundles(oldItem.project_id, oldItem.stage_id, newWeekDate);
+        if (oldWeek !== newWeekDate) await normalizeFullBundles(oldItem.project_id, oldItem.stage_id, oldWeek);
+      }
 
       if (oldItem) {
         logActivity({
@@ -458,7 +462,7 @@ export function useProductionDragDrop() {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll, pushUndo]);
+  }, [invalidateAll, normalizeFullBundles, pushUndo]);
 
   const moveBundleToWeek = useCallback(async (
     projectId: string,
@@ -583,6 +587,13 @@ export function useProductionDragDrop() {
           .in("id", uniquePlainMoveIds);
         if (error) throw error;
       }
+      const fullNormalizeTargets = new Set(movedItems
+        .filter((item: any) => resolveBundleType(item) === "full")
+        .flatMap((item: any) => [`${item.project_id}::${item.stage_id ?? ""}::${sourceWeekDate}`, `${item.project_id}::${item.stage_id ?? ""}::${targetWeekDate}`]));
+      for (const key of fullNormalizeTargets) {
+        const [pid, sid, wk] = key.split("::");
+        await normalizeFullBundles(pid, sid || null, wk);
+      }
 
       // Execute separate-conflict moves — keep original item_code, rely on id + split_group_id.
       const uniqueSeparateIds = [...new Set(separateConflictIds)].filter(id => !mergedSourceIds.has(id));
@@ -673,7 +684,7 @@ export function useProductionDragDrop() {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
       throw err;
     }
-  }, [invalidateAll, pushUndo]);
+  }, [invalidateAll, normalizeFullBundles, pushUndo]);
 
   const mergeFullBundleIntoBundle = useCallback(async (sourceIds: string[], targetIds: string[]) => {
     try {
