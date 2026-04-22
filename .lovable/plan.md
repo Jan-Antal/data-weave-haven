@@ -1,40 +1,57 @@
 
 
-## Oprava chyby dokončení + QC check workflow v Pláne Výroby
+## "Vrátit do TPV" z Week Sila + badge "Vráceno z výroby"
 
-### Problémy
-1. **Chyba pri dokončení** (`Invalid status: expedice. Must be scheduled, in_progress, paused, cancelled, or completed`) — `CompletionDialog.tsx` nastavuje status `'expedice'` v `production_schedule`, ale DB trigger `validate_production_schedule_status` túto hodnotu nepovoľuje. Mne (vlastník DB session?) to môže prejsť rôzne podľa cache, ale Michalovi trigger spadne.
-2. **Chýba QC gate** — pri dokončení položky v Pláne Výroby sa neoveruje, či má daná položka v module Výroba potvrdený QC check (`production_quality_checks`). Má to byť tvrdá závislosť: bez QC nedá sa „Dokončit → Expedice".
-
-### Diagnostika (pred opravou)
-- Pozrieť aktuálne povolené statusy v triggeri `validate_production_schedule_status` (`supabase--read_query` na `pg_proc`).
-- Overiť `CompletionDialog.tsx` riadky ~80–160 kde sa volá `.update({ status: "expedice", ... })` pre split aj full mode.
-- `useQualityDefects.ts` + tabuľka `production_quality_checks` — odkiaľ čítať QC stav.
+### Cieľ
+Aktuálne "Vrátit do TPV" existuje len v Inboxe a v tabuľkovom view — vykonáva **hard delete** bez stopy. Rozšírime ho aj na pravý klik vo **Week Silo** (kanban) a zmeníme správanie na **soft delete**: položka ostane v DB so statusom `returned` a v TPV Liste sa zobrazí oranžový badge `↩ Vráceno z Výroby` s tooltipom (kto, kedy). Pri opätovnom odoslaní do výroby z TPV Listu sa returned záznamy vyčistia (rovnako ako cancelled).
 
 ### Zmeny
 
-**1. `CompletionDialog.tsx`** — oprava statusu
-- Nahradiť `status: "expedice"` za `status: "completed"` v oboch vetvách (full + split intermediate row). Záznam v `production_expedice` (ktorý sa už insertuje) je jediný správny zdroj „je v expedici". Schedule riadok zostáva `completed`.
-- Pre split „intermediate completed" časť: rovnako `status: "completed"`, `completed_at = now()`, `completed_by = user.id`. Riadok pôjde priamo do expedice cez existujúci `production_expedice` insert.
+**1. DB migrácia (schéma + trigger)**
+- `production_schedule`: pridať `returned_at timestamptz`, `returned_by uuid`.
+- `production_inbox`: pridať `returned_at timestamptz`, `returned_by uuid`.
+- Aktualizovať `validate_production_schedule_status` aj `validate_production_inbox_status` — povoliť nový status `'returned'`.
 
-**2. QC gate pred dokončením** — nový blok v `CompletionDialog.handleComplete`
-- Pred update-om sa pre každý zaškrtnutý item spýtam `production_quality_checks` (`select id, passed where item_id in (...) and project_id = ...`).
-- Položka prejde, len ak existuje QC záznam s `passed = true`.
-- Ak chýba alebo `passed = false`, zobraziť **inline varovanie** v dialógu (nie toast) so zoznamom položiek bez QC: *„Tieto položky nemajú potvrdený QC check vo Výrobe: T04, T21. Dokončenie nie je možné."* Tlačidlo „Dokončit" disabled, kým sa zoznam nezmení.
-- Refresh QC stavu pri otvorení dialógu (React Query `["production-quality-checks", projectId]`).
+**2. `WeeklySilos.tsx` — `handleItemContextMenu`** (riadky ~709-755, vetva normal active item)
+- Pridať akciu `↩ Vrátit do TPV` (za `Vrátit do Inboxu`).
+- Skryť pre paused, completed/expedice, cancelled — len pre normálne aktívne položky a tiež pre paused (user musí vrátiť aj pozastavené).
+- Akcia: `update production_schedule set status='returned', returned_at=now(), returned_by=auth.uid()` namiesto delete.
+- Invalidate: `["production-schedule"]`, `["production-progress"]`, `["production-statuses", projectId]`, `["tpv-items", projectId]`. Toast `↩ Vráceno do TPV`.
+- Tiež pridať bundle-level akciu `↩ Vrátit celý projekt do TPV` (analogicky k existujúcej `Vrátit do Inboxu` v `handleBundleContextMenu`).
 
-**3. Drobné UX**
-- Pri otváraní `CompletionDialog` načítať QC mapu raz; pri každom toggle checkboxu prepočítať „missing QC" zoznam.
-- Pri pokuse zaškrtnúť položku bez QC zobraziť pri riadku malý červený badge `⚠ chýba QC` namiesto blokovania zaškrtnutia (užívateľ vidí dôvod). Submit ostane disabled.
+**3. Existujúce "Vrátit do TPV" v `InboxPanel.tsx` a `PlanVyrobyTableView.tsx`** — zmeniť z `.delete()` na `.update({ status: 'returned', returned_at, returned_by })`. Toast a invalidácia ostávajú.
 
-**4. Memory**
-- Aktualizovať `mem://features/production-tracking/quality-and-defect-tracking` o pravidlo: **dokončenie položky v Pláne Výroby vyžaduje existujúci `production_quality_checks.passed = true` záznam**.
+**4. `useProductionStatuses.ts`** — nový badge type
+- Rozšíriť SELECT o `returned_at, returned_by` (inbox aj schedule).
+- Pridať `userIds` zo `returned_by` do batched lookup.
+- Pridať `RawEntry.type = "returned"` so spracovaním z oboch tabuliek (status `'returned'`).
+- Aggregácia: badge `↩ Vráceno z výroby`, farba **oranžová `#ea580c`** (odlíšenie od šedej "pending" a červenej "cancelled"), tooltip `Vráceno z výroby {datum} — {meno}`.
+- Umiestnenie v poradí: za pending, pred cancelled.
+
+**5. `TPVList.tsx` — `executeSendToProduction`** (riadky ~395-418)
+- Rozšíriť `inboxCheck`/`schedCheck` filter `.in("status", [...])` aby **nezahŕňal `'returned'`** (returned položky musia ísť cez wipe + nový insert, nie skip).
+- V "wipe prior cancelled rows" bloku rozšíriť na `["cancelled", "returned"]` — vyčistí oba "soft-deleted" stopy pred novým insertom.
+
+**6. Tooltip v TPV Liste**
+- Existujúce wrapping cancelled badge v `Tooltip` automaticky pokryje aj returned (rovnaký rendering cez `s.tooltip`).
+
+**7. Mobile `MobileTPVCardList.tsx`**
+- Žiadna zmena potrebná — používa rovnaký `statusMap` a `s.label/s.color/s.tooltip` cez `title` attribute.
+
+**8. Memory**
+- Aktualizovať `mem://features/production-planning/cancellation-workflow` → premenovať alebo pridať poznámku o paralele "Vrátit do TPV" = soft delete s oranžovým badgem; re-send wipe pokrýva `cancelled` aj `returned`.
 
 ### Súbory
-- `src/components/production/CompletionDialog.tsx` — oprava statusu + QC gate
-- `mem://features/production-tracking/quality-and-defect-tracking` — doplniť QC gate pravidlo
+- nová migrácia (DB schéma + 2 triggers)
+- `src/components/production/WeeklySilos.tsx` (item + bundle context menu)
+- `src/components/production/InboxPanel.tsx` (zmena delete → update)
+- `src/components/production/PlanVyrobyTableView.tsx` (zmena delete → update)
+- `src/hooks/useProductionStatuses.ts` (returned badge)
+- `src/components/TPVList.tsx` (wipe + executeSendToProduction)
+- memory update
 
 ### Výsledok
-- Michal (a každý iný) môže dokončiť položku bez chyby triggera.
-- Ak položka nemá QC potvrdený v module Výroba, dialóg jasne ukáže ktorá položka chýba a `Dokončit → Expedice` ostane neaktívne, kým sa QC nedoplní.
+1. Pravý klik na položku v Week Sile → `↩ Vrátit do TPV` zmizne zo sila.
+2. V TPV Liste sa v stĺpci **Výroba** objaví oranžový badge `↩ Vráceno z výroby` s tooltipom `Vráceno z výroby 22. 4. 2026 — Marek Novák`.
+3. Užívateľ môže položku po prepracovaní znova poslať z TPV Listu → returned záznam sa vyčistí, vznikne nový pending v Inboxe → badge sa zmení na `Čeká na plánování`. Zachovaná zásada: jedna TPV položka = jeden aktuálny stav výroby.
 
