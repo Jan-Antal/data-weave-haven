@@ -261,6 +261,7 @@ export function useSharePointDocs(projectId: string) {
         globalFileCache[projectId][categoryKey] = fileList;
         return updated;
       });
+      persistCategoryToCache(projectId, categoryKey, fileList);
       fetchedRef.current.add(categoryKey);
     } catch (err: any) {
       console.warn("SP list error (using cached data):", err);
@@ -271,7 +272,7 @@ export function useSharePointDocs(projectId: string) {
     } finally {
       setLoadingCategory(null);
     }
-  }, [projectId, invoke]);
+  }, [projectId, invoke, persistCategoryToCache]);
 
   const uploadFile = useCallback(async (categoryKey: string, file: File) => {
     const folder = CATEGORY_FOLDER_MAP[categoryKey];
