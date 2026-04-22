@@ -1077,7 +1077,7 @@ export default function PlanVyroby() {
 }
 
 
-function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, isOwner, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport }: {
+function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplayModeChange, searchQuery, onSearchChange, forecastActive, onForecastToggle, forecastPlanMode, onForecastPlanModeChange, canUseForecast, isGenerating, onResetForecast, forecastBlockCounts, searchNavActive = false, searchNavTotalCount = 0, searchNavCurrentIndex = 0, searchNavGoNext, searchNavGoPrev, overbookedWeekCount = 0, onOverbookBadgeClick, isAdmin, recalculating, onRecalculateHours, midflightRunning, onMidflightImport }: {
   visibleMonth: { month: number; year: number };
   viewTab: "kanban" | "table";
   setViewTab: (v: "kanban" | "table") => void;
@@ -1089,7 +1089,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
   onForecastToggle: (v: boolean) => void;
   forecastPlanMode: "respect_plan" | "from_scratch";
   onForecastPlanModeChange: (m: "respect_plan" | "from_scratch") => void;
-  isOwner: boolean;
+  canUseForecast: boolean;
   isGenerating: boolean;
   onResetForecast?: () => void;
   forecastBlockCounts?: { real: number; inbox: number; ai: number };
@@ -1471,8 +1471,8 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
           )}
         </div>
 
-        {/* Forecast toggle — owner only */}
-        {isOwner && (
+        {/* Forecast toggle — restricted roles only */}
+        {canUseForecast && (
           <div className="flex items-center gap-1.5 ml-2 pl-2" style={{ borderLeft: forecastActive ? "1px solid #2a2f3d" : "1px solid hsl(var(--border))" }}>
             <Sparkles className="h-3.5 w-3.5" style={{ color: forecastActive ? "#f59e0b" : "#9ca3af" }} />
             <span className="text-[12px] font-medium" style={{ color: forecastActive ? "#f59e0b" : "#6b7280" }}>Forecast</span>
