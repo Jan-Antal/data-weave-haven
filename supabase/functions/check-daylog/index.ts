@@ -46,6 +46,13 @@ async function isZeroCapacityDay(supabase: any, weekKey: string, dayOfWeek: numb
   return false;
 }
 
+function toLocalDateStr(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -66,7 +73,7 @@ Deno.serve(async (req) => {
     }
 
     const year = now.getFullYear();
-    const todayStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const todayStr = toLocalDateStr(now);
 
     // Check Czech public holidays and company holidays in parallel
     const [publicHoliday, companyHoliday] = await Promise.all([
@@ -92,7 +99,7 @@ Deno.serve(async (req) => {
     const d = new Date(now);
     const day = d.getDay() || 7;
     d.setDate(d.getDate() - day + 1);
-    const weekKey = d.toISOString().split("T")[0];
+    const weekKey = toLocalDateStr(d);
 
     // Check if the week has zero capacity (fully blocked)
     const zeroCapacity = await isZeroCapacityDay(supabase, weekKey, dayOfWeek);
