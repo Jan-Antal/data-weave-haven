@@ -1989,7 +1989,7 @@ function DraggableSiloItem({ item, weekKey, showCzk, onContextMenu, disabled = f
       )}
       {item.item_code && <span className="font-sans text-[9px] shrink-0" style={{ color: "#223937" }}>{item.item_code}</span>}
       <span className="text-[10px] flex-1 truncate" style={{ color: "#6b7a78" }}>{item.item_name}</span>
-      {item.item_quantity != null && item.item_quantity > 0 && (
+      {item.item_quantity != null && item.item_quantity > 1 && (
         <span className="text-[8px] font-semibold shrink-0 px-1 py-px rounded" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36", border: "1px solid rgba(58,138,54,0.24)" }}>
           {item.item_quantity} ks
         </span>
