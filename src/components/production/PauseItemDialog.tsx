@@ -34,6 +34,7 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
   const [customReason, setCustomReason] = useState("");
   const [expectedDate, setExpectedDate] = useState<Date | undefined>();
   const [submitting, setSubmitting] = useState(false);
+  const cleanName = itemName.replace(/\s*\((\d+\/\d+)\)$/, "");
 
   const handlePause = useCallback(async () => {
     setSubmitting(true);
@@ -104,9 +105,7 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [reason, customReason, expectedDate, itemId, itemName, source, qc, onOpenChange, pushUndo]);
-
-  const cleanName = itemName.replace(/\s*\((\d+\/\d+)\)$/, "");
+  }, [reason, customReason, expectedDate, itemId, itemName, itemCode, source, qc, onOpenChange, pushUndo, cleanName]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
