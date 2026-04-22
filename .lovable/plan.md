@@ -1,313 +1,203 @@
 
-## Plán implementace: Bundle labeling systém pro Plán výroby
+## Úprava plánu: slučování full bundlů + čitelné nebarevné označení
 
 ### Cíl
-Doplnit do **Plánu výroby** stabilní označování bundlů přes `Bundle A`, `Bundle B`, atd., oddělené podle:
+Opravit dvě věci v **Plánu výroby / Kanban Týdny**:
 
-```text
-project_id + stage_id + bundle_label
-```
-
-Splitované části zůstanou napojené na stávající mechanismus:
-
-```text
-split_group_id + split_part + split_total
-```
-
-Nově se ale budou zobrazovat jako:
-
-```text
-Etapa 1 · Bundle A
-Etapa 1 · Bundle A 1/3
-Etapa 2 · Bundle A
-```
+1. Dva samostatné **full bundle** balíky stejného projektu/etapy ve stejném týdnu půjdou sloučit přetažením jednoho zavřeného projektového bundlu na druhý.
+2. Označení bundlu bude jasné, ale bez barevného kódování:
+   - full: `A`, `B`, `C`
+   - split: `A-1`, `A-2`, `A-3`
+   - split informace u počtu položek zůstane zachovaná.
 
 ---
 
-## 1. Databázová migrace
+## 1. Stabilní identita bundlu
 
-Upravím tabulku `production_schedule`:
+Aktuálně se v některých místech bundle identifikuje jen podle:
 
-```sql
-ALTER TABLE public.production_schedule
-ADD COLUMN bundle_label text,
-ADD COLUMN bundle_type text;
-
-ALTER TABLE public.production_schedule
-ADD CONSTRAINT production_schedule_bundle_type_check
-CHECK (bundle_type IS NULL OR bundle_type IN ('full', 'split'));
+```text
+project_id + weekKey
 ```
 
-### Backfill existujících dat
-Aby se neztratilo aktuální plánování, doplním hodnoty pro existující řádky:
+To způsobuje, že dva bundle stejného projektu v jednom týdnu se chovají jako jeden celek.
 
-- řádky se `split_group_id` nebo `split_part/split_total` dostanou `bundle_type = 'split'`
-- ostatní aktivní řádky dostanou `bundle_type = 'full'`
-- `bundle_label` se doplní po skupinách `project_id + stage_id`
-- historické split chainy zůstanou zachované přes `split_group_id`
+Upravím identitu na:
 
-Backfill bude navržen tak, aby:
-- neměnil `production_inbox`
-- neměnil `production_expedice`
-- neměnil analytics ani modul Výroba
-- nemazal ani nepřepisoval existující split chainy
+```text
+weekKey + project_id + stage_id + bundle_label + split_part
+```
+
+Použiju ji pro:
+
+- React `key`
+- `data-bundle-key`
+- drag id
+- drop id
+- hledání source/target bundlu při drag & drop
+
+Tím se budou dva full bundly v T9 rozlišovat správně.
 
 ---
 
-## 2. Sdílené helpery pro bundle labely
+## 2. Drag full bundle do full bundle
 
-Přidám helper logiku, pravděpodobně do nového nebo existujícího produkčního helper souboru:
-
-```text
-getNextBundleLabel(projectId, stageId)
-resolveBundleType(row)
-validateBundleDrop(source, target)
-```
-
-Pravidlo pro další písmeno:
+Přidám podporu pro sloučení:
 
 ```text
-A → B → C → ... → Z
+Bundle B → Bundle A
 ```
 
-Kontrola bude hledat použité `bundle_label` napříč všemi týdny pro stejné:
+Povoleno pouze když:
+
+- stejný `project_id`
+- stejný `stage_id`
+- stejný týden
+- source i target mají `bundle_type = full`
+- nejde o dokončený / legacy / locked týden
+
+Výsledek:
 
 ```text
-project_id + stage_id
-```
-
----
-
-## 3. Načítání dat v useProductionSchedule
-
-V `src/hooks/useProductionSchedule.ts` rozšířím `ScheduleItem`:
-
-```ts
-bundle_label: string | null;
-bundle_type: "full" | "split" | null;
-```
-
-A při mapování dat doplním fallback:
-
-```text
-pokud bundle_label chybí → dočasně použít legacy fallback podle split_group_id / project_id
-pokud bundle_type chybí → odvodit z split_part/split_total
-```
-
-Tím bude UI bezpečné i pro starší řádky nebo případné nekompletní importy.
-
----
-
-## 4. Drag & drop pravidla
-
-Upravím `src/hooks/useProductionDragDrop.ts` a navazující volání z `src/pages/PlanVyroby.tsx`.
-
-### Inbox → týden
-Při přesunu z Inboxu do týdne:
-
-#### Prázdný týden pro projekt + etapu
-Vytvoří se nový bundle:
-
-```text
-bundle_label = A / další volné písmeno
-bundle_type = full
-split_part = NULL
-split_total = NULL
-```
-
-#### Drop vedle existujícího bundlu
-Vytvoří se nový bundle s dalším písmenem:
-
-```text
-Bundle B, Bundle C...
-```
-
-#### Drop do existujícího bundlu
-Položka zdědí:
-
-```text
-bundle_label cílového bundlu
-bundle_type cílového bundlu
-```
-
-### Stage isolation
-Přidám validaci:
-
-```text
-Položky rôznych etáp nie je možné spájať
-```
-
-Drop mezi různými `stage_id` se zablokuje.
-
----
-
-## 5. Split pravidla
-
-Upravím:
-
-- `src/components/production/SplitBundleDialog.tsx`
-- `src/components/production/SplitItemDialog.tsx`
-- `src/components/production/AutoSplitPopover.tsx`
-
-Při splitu:
-
-```text
-Bundle A v T17
-→ Bundle A 1/2 v T17
-→ Bundle A 2/2 v T18
-```
-
-Změny při splitu:
-
-```text
-bundle_label zůstává stejné
-bundle_type = split
-split_group_id zůstává / vzniká stávajícím mechanismem
-split_part/split_total se dál počítá stávající renumber logikou
-```
-
----
-
-## 6. Validace při spojování a přesunech
-
-Doplním pravidla:
-
-### Nelze míchat full a split
-```text
-Celé položky nie je možné pridať do split bundlu
-Split položky nie je možné pridať do celého bundlu
-```
-
-### Split lze spojit jen v rámci stejné série
-Povoleno:
-
-```text
-Bundle A 1/2 → Bundle A 2/2
-```
-
-Zakázáno:
-
-```text
-Bundle A 1/2 → Bundle B 1/2
-```
-
-Toast:
-
-```text
-Rôzne split série nie je možné spájať
-```
-
-### Sloučení posledních dvou částí
-Pokud se spojí poslední dvě části jedné split série:
-
-```text
-bundle_type = full
+source položky dostanou bundle_label cílového bundlu
+bundle_type = 'full'
 split_group_id = NULL
 split_part = NULL
 split_total = NULL
 ```
 
-A vznikne nový bundle s dalším volným písmenem:
+Toast pouze při úspěšném sloučení:
 
 ```text
-Položka zlúčená — vytvorený nový Bundle B
+Bundle zlúčený do A
 ```
+
+Zakázané kombinace zůstanou:
+
+- full → split
+- split → full
+- jiná etapa
+- split A → split B
 
 ---
 
-## 7. UI v Kanban týdenních silech
+## 3. Žádná nová drop zóna
 
-Upravím `src/components/production/WeeklySilos.tsx`.
+Nebudu vytvářet samostatnou zónu nebo extra tlačítko pro drop.
 
-Aktuální karta projektu seskupuje vše podle projektu. Nově uvnitř projektu seskupím položky podle:
-
-```text
-stage_id + bundle_label + split_part
-```
-
-Zobrazení:
+Chování bude:
 
 ```text
-Z-2515-001 · RD Cigánkovi Zlín
-
-Etapa 1 · Bundle A ───── 84h
-  T01 Kuchyň      76h
-  T02 Ostrůvek     8h
-
-Etapa 1 · Bundle A 1/3 ─ 30h
-  T08 Skříň       30h
-
-Etapa 2 · Bundle A ───── 45h
-  K01 Pracovní deska 45h
+drop na prázdné místo týdne = přesun do týdne / nový bundle
+drop přímo na zavřenou kartu bundlu = vložit/sloučit do tohoto bundlu
 ```
 
-### Vizuální pravidla
-Bundle header bude obsahovat:
-
-- název etapy, pokud má projekt více etap
-- `Bundle A`
-- split badge `1/3`, pokud jde o split
-- celkové hodiny této části bundlu
-- barevný levý akcent podle písmena:
-  - A = modrá
-  - B = zelená
-  - C = amber
-  - D = fialová
-  - další písmena cyklicky
-
-Split badge:
-
-```text
-amber = není poslední část
-green = poslední část
-```
-
-Zelený `ks` badge zůstane u jednotlivých položek a nebude se míchat se split označením.
+Projekt nemusí být otevřený. Drop target bude samotná zavřená projektová karta.
 
 ---
 
-## 8. Table view / plánovací dialog
+## 4. Vizuální feedback při možném dropu
 
-Upravím také místa, kde se vkládá do `production_schedule` mimo Kanban:
+Když je možné dropnout bundle na bundle, karta se vizuálně zvýrazní bez nové zóny:
 
-- `src/components/production/PlanVyrobyTableView.tsx`
-- `src/components/production/InboxPlanningDialog.tsx`
+- karta se jemně zvětší směrem dolů
+- přidá se decentní outline/stín
+- zvýšení výšky bude krátké a přechodové, aby bylo jasné „sem můžeš pustit“
 
-Aby plánování přes tabulku i dialog používalo stejná pravidla:
+Nebudu používat barevné značení podle bundle labelu.
+
+---
+
+## 5. Nebarevný bundle label napravo nad hodinami
+
+V pravé části zavřené karty, nad hodinami, doplním výrazný ale neutrální label:
 
 ```text
-nový bundle → další písmeno
-splitované plánování → bundle_type = split
-jedna položka bez splitu → bundle_type = full
+A
+53h
 ```
 
+Split:
+
+```text
+A-1
+53h
+```
+
+Pravidla:
+
+- full bundle: `A`
+- split bundle: `A-1`, `A-2`, podle `split_part`
+- neutrální vzhled: žádné modrá/zelená/amber/fialová podle písmen
+- styl bude čitelný: tmavý text, jemný šedý podklad nebo tenký border
+- hodiny zůstanou pod labelem napravo
+
 ---
 
-## 9. Co zůstane beze změny
+## 6. Zachovat split označení u počtu položek
 
-Nebudu měnit:
+Současné označení u počtu položek zůstane:
 
-- `production_inbox`
-- `production_expedice`
-- analytics logiku
-- modul Výroba
-- stávající `split_group_id / split_part / split_total` mechanismus
+```text
+3 položek  Split 2/3
+```
 
-Tyto části pouze načtou nové údaje, pokud je už poskytuje `production_schedule`, ale jejich workflow zůstane stejné.
+Nebudu ho odstraňovat. Nový label `A-2` vpravo bude sloužit jako rychlá abecední identifikace bundlu, zatímco `Split 2/3` u počtu položek zůstane vysvětlující informace.
 
 ---
 
-## 10. Ověření
+## 7. `ks` badge pravidlo
+
+Zachovám pravidlo:
+
+```text
+1 ks = bez badge
+2+ ks = zelený badge "2 ks", "18 ks"...
+```
+
+Zkontroluji aktivní, pozastavené i dokončené položky, aby se `1 ks` nikde znovu nezobrazovalo.
+
+---
+
+## 8. Technické úpravy
+
+Upravím hlavně:
+
+- `src/components/production/WeeklySilos.tsx`
+  - stabilní bundle key
+  - droppable přímo na zavřenou kartu bundlu
+  - hover/drop feedback zvětšením karty dolů
+  - nebarevný label `A`, `A-1` napravo nad hodinami
+  - zachování `Split x/y` u počtu položek
+  - sjednocení `ks > 1`
+
+- `src/pages/PlanVyroby.tsx`
+  - rozpoznání dropu na konkrétní bundle
+  - odlišení dropu na týden vs dropu na kartu bundlu
+  - předání source/target bundle identity do akce sloučení
+
+- `src/hooks/useProductionDragDrop.ts`
+  - nová akce pro sloučení bundle do bundle ve stejném týdnu
+  - validace full/split/stage pravidel
+  - update `bundle_label` source položek na target label
+  - undo/redo pro sloučení
+
+- `src/lib/productionBundles.ts`
+  - případné doplnění helperu pro vytvoření stabilního bundle key a nebarevného display labelu
+
+---
+
+## 9. Ověření
 
 Po implementaci ověřím:
 
-- nový drag z Inboxu vytvoří `Bundle A`
-- další samostatný drop vytvoří `Bundle B`
-- drop do existujícího bundlu zdědí `bundle_label`
-- split `Bundle A` zobrazí `Bundle A 1/2`, `Bundle A 2/2`
-- nejde spojit rozdílné etapy
-- nejde míchat full a split bundle
-- split série A nejde spojit se sérií B
-- poslední dvě části splitu se umí vrátit na nový full bundle
-- Kanban UI zobrazuje bundle hlavičky a `ks` badge zůstává zelený u položek
+- v T9 lze mít dva full bundly stejného projektu
+- přetažením jednoho zavřeného bundlu na druhý se sloučí
+- sloučení nemění `production_inbox`, `production_expedice`, analytics ani modul Výroba
+- split/full blokace zůstávají funkční
+- jiná etapa nejde sloučit
+- labely jsou čitelné jako `A`, `B`, `A-1`, `A-2`
+- nejsou použité barvy podle písmen
+- `Split x/y` u počtu položek zůstává
+- `1 ks` se nezobrazuje, `2+ ks` ano
 - build projde bez TypeScript chyb
