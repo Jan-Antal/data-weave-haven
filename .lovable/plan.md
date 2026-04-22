@@ -1,124 +1,153 @@
 
-## Oprava zobrazení hotových split položek ve Výrobě
+## Zpřístupnění Forecastu pro Admina a Vedoucího výroby
 
-### Problém
-V sekci **✓ Hotové** se splitnutý prvek zobrazuje jako několik samostatných řádků:
+### Cíl
+Forecast v **Plánu výroby** nebude dostupný jen pro Ownera, ale pro:
 
 ```text
-Nízká skříň s policí (1/5)
-Nízká skříň s policí (2/5)
-Nízká skříň s policí (3/5)
-Nízká skříň s policí (4/5)
+Admin
+Vedoucí výroby
+Owner
 ```
 
-To je matoucí, protože obchodně jde pořád o **jeden prvek** a do Expedice má čekat jen jeden finální záznam, ne každý rozdělený plánovací díl zvlášť.
+Současně se přidá backendové/RLS omezení, aby forecast a jeho zápis nemohl používat jiný uživatel jen tím, že si ručně zavolá funkci nebo obejde UI.
 
 ---
 
-## Implementace
+## Co upravím
 
-### 1. Sloučit split části v sekci „Hotové“
-V `src/pages/Vyroba.tsx` upravím výpočet `completedItems`.
-
-Místo přímého renderování každé dokončené schedule položky zvlášť vytvořím agregaci podle:
-
-- `project_id`
-- primárně `item_code`
-- pokud kód chybí, podle názvu bez suffixu `(1/5)`, `(2/5)` atd.
-- ideálně také podle `split_group_id`, pokud je dostupné
-
-Výsledek bude v UI jen jeden řádek:
-
-```text
-Z-2617-001  Nízká skříň s policí  77.8h
-```
-
-ne čtyři samostatné řádky.
-
-### 2. Správný počet v nadpisu „Hotové“
-Nadpis:
-
-```text
-✓ Hotové (4)
-```
-
-se změní tak, aby počítal sloučené obchodní prvky, tedy např.:
-
-```text
-✓ Hotové (1)
-```
-
-pokud jde o jeden prvek rozdělený na více částí.
-
-### 3. Zobrazit informaci o částech bez duplicity
-U sloučeného řádku doplním malý badge, aby bylo jasné, že prvek je rozdělený:
-
-```text
-4/5 částí hotovo
-```
-
-nebo pokud je kompletně hotovo:
-
-```text
-5/5 částí hotovo
-```
-
-Samotný název bude očištěný od suffixu `(N/5)`, aby nevypadal jako více kusů.
-
-### 4. Sečíst hodiny všech hotových částí
-U agregovaného řádku se budou hodiny sčítat ze všech dokončených částí stejného prvku.
-
-Příklad:
-
-```text
-15.1h + 24.6h + 13.6h + 24.5h = 77.8h
-```
-
-V UI se zobrazí jen:
-
-```text
-77.8h
-```
-
-### 5. Zachovat QC informaci
-Pokud mají sloučené části QC kontrolu, zobrazí se jedna společná QC informace.
-
-Technicky:
-- pokud má QC aspoň první / reprezentativní část, zobrazí se badge,
-- případně se bude preferovat nejnovější QC z dostupných částí.
-
-### 6. Opravit hromadné dokončování split částí
-V `UnifiedItemList` jsou místa, kde se při hromadném dokončení zapisuje do `production_expedice`.
-
-Doplním jednotný helper:
+### 1. UI: zobrazit Forecast přepínač pro správné role
+V `src/pages/PlanVyroby.tsx` je Forecast přepínač teď navázaný na:
 
 ```ts
-getExpediceTimestampForCompletedItem(item, now)
+isOwner
 ```
 
-Pravidlo:
-- mezilehlé split části (`split_part < split_total`) se zapíšou jako interně dokončené, tedy s vyplněným `expediced_at`,
-- poslední část nebo nesplitnutý prvek se zapíše s `expediced_at = null`, aby čekal v Expedici.
+Změním to na nové oprávnění, například:
 
-Tím se sjednotí chování s existující single-item logikou a zabrání se tomu, aby do aktivní Expedice spadlo více částí stejného prvku.
+```ts
+canUseForecast = isOwner || isAdmin || role === "vedouci_vyroby"
+```
 
-### 7. Zkontrolovat Expedice panel
-V `src/components/production/ExpedicePanel.tsx` ověřím, že aktivní Expedice stále zobrazuje jen položky s `expediced_at = null`.
+A tím se Forecast zobrazí i pro:
 
-Pokud už ve starších datech existují duplicitní split části s `expediced_at = null`, upravím zobrazení tak, aby se ve frontendu sloučily podle stejného klíče jako ve Výrobě a nepůsobily jako více kusů.
+- Admin
+- Vedoucí výroby
+
+Nezobrazí se pro běžné role typu PM, Mistr, Konstruktér, Viewer, Quality.
+
+### 2. Předat oprávnění do toolbaru
+`ToolbarRow2` teď dostává `isOwner`.
+
+Upravím props tak, aby toolbar nepoužíval owner-only logiku, ale jasný příznak:
+
+```ts
+canUseForecast
+```
+
+Forecast toggle se bude renderovat podle něj.
+
+### 3. Backend ochrana forecast funkcí
+Forecast aktuálně běží přes backend funkce:
+
+```text
+forecast-schedule
+forecast-ai-optimize
+```
+
+Doplním kontrolu přihlášeného uživatele z `Authorization` headeru.
+
+Povolené role budou:
+
+```text
+owner
+admin
+vedouci_vyroby
+```
+
+Pokud uživatel nemá jednu z těchto rolí, funkce vrátí `403 Forbidden`.
+
+Tím se zabrání tomu, aby někdo mimo povolené role spustil forecast mimo UI.
+
+### 4. RLS / databázové politiky pro zápis forecastu
+Forecast při potvrzení zapisuje do výrobních tabulek, hlavně:
+
+```text
+production_schedule
+production_inbox
+```
+
+Zkontroluji a upravím RLS politiky tak, aby zápis potřebný pro forecast uměli:
+
+```text
+owner
+admin
+vedouci_vyroby
+```
+
+Konkrétně:
+
+- `production_schedule`: INSERT/UPDATE pro Admin + Vedoucí výroby
+- `production_inbox`: UPDATE pro změnu stavu položek po commitnutí forecastu
+
+Použiju existující bezpečný pattern:
+
+```sql
+public.has_role(auth.uid(), 'admin'::app_role)
+OR public.has_role(auth.uid(), 'owner'::app_role)
+OR public.has_role(auth.uid(), 'vedouci_vyroby'::app_role)
+```
+
+Role zůstanou uložené v samostatné tabulce `user_roles`, ne v profilu.
+
+### 5. Zachovat čtení pro ostatní role podle současných pravidel
+Nezměním běžné čtení plánu výroby.
+
+To znamená:
+
+- kdo dnes vidí Plán výroby, bude ho vidět dál,
+- Forecast spouštění a commit bude omezené jen na Admin / Owner / Vedoucí výroby.
+
+### 6. Ošetřit hlášky při zákazu
+Pokud někdo bez oprávnění zkusí spustit forecast, UI/backend vrátí jasnou hlášku:
+
+```text
+Nemáte oprávnění spustit Forecast.
+```
+
+### 7. Aktualizovat paměť projektu
+Doplním pravidlo k Forecast modulu:
+
+```text
+Forecast v Plánu výroby smí spouštět a commitovat pouze Owner, Admin a Vedoucí výroby. Backend funkce i RLS musí používat stejné omezení.
+```
 
 ---
 
-## Soubory
+## Soubory / změny
 
-- `src/pages/Vyroba.tsx`
-- případně `src/components/production/ExpedicePanel.tsx`
+### Frontend
+- `src/pages/PlanVyroby.tsx`
+
+### Backend funkce
+- `supabase/functions/forecast-schedule/index.ts`
+- `supabase/functions/forecast-ai-optimize/index.ts`
+
+### Databáze
+- nová migrace pro RLS politiky:
+  - `production_schedule`
+  - `production_inbox`
+
+### Paměť
+- `mem://features/production-planning/forecast/overview`
 
 ---
 
 ## Výsledek
 
-- Ve Výrobě se splitnutý prvek v **Hotové** zobrazí jako jeden řádek.
-- Nadpis `✓ Hotové` bude počítat skutečné prvky, ne technické split části.
-- Uživatel uvidí stav částí např. `4/5 částí hotovo`, ale nebude to vypadat jako 4 samostatné skříně.
-- Do aktivní Expedice bude čekat jen finální prvek, ne každá mezilehlá část.
+- Admin uvidí a může používat Forecast.
+- Vedoucí výroby uvidí a může používat Forecast.
+- Ostatní role Forecast neuvidí.
+- Backend funkce nepůjdou spustit bez oprávnění.
+- Commit forecastu projde přes RLS jen pro povolené role.
+- UI oprávnění, backend ochrana i databázové politiky budou sladěné.
