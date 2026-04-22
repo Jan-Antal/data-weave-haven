@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { renumberSiblings } from "./SplitItemDialog";
 import type { ScheduleItem } from "@/hooks/useProductionSchedule";
+import { roundHours, formatHours } from "@/lib/utils";
 
 interface CompletionDialogProps {
   open: boolean;
@@ -274,8 +275,8 @@ export function CompletionDialog({
             const isChecked = checkedIds.has(item.id);
             const config = getConfig(item.id);
             const isSplitOpen = splitOpenId === item.id && isChecked && !isCompleted;
-            const doneH = Math.round(item.scheduled_hours * config.splitPct / 100);
-            const remainH = item.scheduled_hours - doneH;
+            const doneH = roundHours(item.scheduled_hours * config.splitPct / 100);
+            const remainH = roundHours(item.scheduled_hours - doneH);
 
             return (
               <div key={item.id}>
@@ -307,7 +308,7 @@ export function CompletionDialog({
                     {item.item_name}
                   </span>
                   <span className="font-sans text-[10px] shrink-0" style={{ color: "#6b7a78" }}>
-                    {item.scheduled_hours}h
+                    {formatHours(item.scheduled_hours)}h
                   </span>
                   {isCompleted ? (
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(58,138,54,0.12)", color: "#3a8a36" }}>
@@ -319,7 +320,7 @@ export function CompletionDialog({
                     </span>
                   ) : isChecked && config.mode === "split" ? (
                     <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
-                      ✂ {doneH}h+{remainH}h
+                      ✂ {formatHours(doneH)}h+{formatHours(remainH)}h
                     </span>
                   ) : isChecked ? (
                     <>
@@ -366,7 +367,7 @@ export function CompletionDialog({
                         onClick={e => e.stopPropagation()}
                         className="w-14 text-center text-[11px] font-sans border border-border rounded px-1 py-0.5 bg-background"
                       />
-                      <span className="text-[10px] font-sans text-muted-foreground shrink-0">= {item.scheduled_hours}h</span>
+                      <span className="text-[10px] font-sans text-muted-foreground shrink-0">= {formatHours(item.scheduled_hours)}h</span>
                     </div>
                     <button
                       className="text-[10px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
