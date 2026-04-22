@@ -118,7 +118,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     for (const group of projects) {
-      const activeItems = group.items.filter(i => !i.expediced_at);
+      const activeItems = aggregateExpediceItems(group.items.filter(i => !i.expediced_at));
       // FIX 3: Archive shows only items expediced in last 30 days
       const archivedItems = group.items.filter(i => {
         if (!i.expediced_at) return false;
