@@ -619,14 +619,14 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
       }
       if (hasUncompleted || pausedItems.length > 0) {
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => returnBundleToInbox(bundle.project_id, weekKey) });
-        // ↩ Vrátit celý projekt do TPV (soft-delete - zostane stopa s oranžovým badgem)
+        // Vrátit celý projekt do TPV (soft-delete - zostane stopa s oranžovým badgem)
         const returnableItems = [...activeItems, ...pausedItems].filter(i => {
           const ia = i as any;
           return !ia.is_midflight && !ia.is_historical;
         });
         if (returnableItems.length > 0) {
           actions.push({
-            label: `↩ Vrátit do TPV (${returnableItems.length})`, icon: "↩",
+            label: `Vrátit do TPV (${returnableItems.length})`, icon: "↩",
             onClick: async () => {
               try {
                 const { data: { user } } = await supabase.auth.getUser();
@@ -737,7 +737,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
         const itemAnyP = item as any;
         if (!itemAnyP.is_midflight && !itemAnyP.is_historical) {
           actions.push({
-            label: "↩ Vrátit do TPV", icon: "↩",
+            label: "Vrátit do TPV", icon: "↩",
             onClick: async () => {
               try {
                 const { data: { user } } = await supabase.auth.getUser();
@@ -791,11 +791,11 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
 
         actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => moveItemBackToInbox(item.id) });
 
-        // ↩ Vrátit do TPV — soft-delete (zostane stopa s oranžovým badgem v TPV Liste)
+        // Vrátit do TPV — soft-delete (zostane stopa s oranžovým badgem v TPV Liste)
         const itemAnyA = item as any;
         if (!itemAnyA.is_midflight && !itemAnyA.is_historical) {
           actions.push({
-            label: "↩ Vrátit do TPV", icon: "↩",
+            label: "Vrátit do TPV", icon: "↩",
             onClick: async () => {
               try {
                 const { data: { user } } = await supabase.auth.getUser();
