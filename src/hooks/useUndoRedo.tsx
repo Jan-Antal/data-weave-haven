@@ -125,8 +125,8 @@ async function persistToDb(entry: UndoEntry, userId: string): Promise<string | n
     page: entry.page,
     action_type: entry.actionType,
     description: entry.description,
-    undo_payload: entry.undoPayload,
-    redo_payload: entry.redoPayload,
+    undo_payload: { ...entry.undoPayload, description: entry.undoDescription ?? entry.description },
+    redo_payload: { ...entry.redoPayload, description: entry.redoDescription ?? entry.description },
     expires_at: expiresAt,
     group_id: entry.groupId ?? null,
   } as any).select("id").single();
@@ -203,6 +203,8 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         page: row.page as UndoPage,
         actionType: row.action_type,
         description: row.description,
+        undoDescription: (row.undo_payload as any)?.description ?? row.description,
+        redoDescription: (row.redo_payload as any)?.description ?? row.description,
         undoPayload: row.undo_payload as UndoPayload,
         redoPayload: row.redo_payload as UndoPayload,
         dbId: row.id,
@@ -458,7 +460,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       const targetPage = page ?? currentPageRef.current;
       for (let i = undoStackRef.current.length - 1; i >= 0; i--) {
         if (!targetPage || undoStackRef.current[i].page === targetPage) {
-          return undoStackRef.current[i].description;
+          return undoStackRef.current[i].undoDescription ?? undoStackRef.current[i].description;
         }
       }
       return null;
@@ -472,7 +474,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       const targetPage = page ?? currentPageRef.current;
       for (let i = redoStackRef.current.length - 1; i >= 0; i--) {
         if (!targetPage || redoStackRef.current[i].page === targetPage) {
-          return redoStackRef.current[i].description;
+          return redoStackRef.current[i].redoDescription ?? redoStackRef.current[i].description;
         }
       }
       return null;
