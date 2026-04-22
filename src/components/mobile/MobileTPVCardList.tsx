@@ -124,7 +124,11 @@ export function MobileTPVCardList({
             const statusColor = statusOpt?.color;
             const isExpanded = expandedId === item.id;
             const vyrobaStatuses = productionStatusMap.get(item.item_code || item.nazev || "") || [];
-            const vyrobaLabel = vyrobaStatuses[0]?.label || "";
+            const vyrobaPrimary = vyrobaStatuses[0];
+            const vyrobaLabel = vyrobaPrimary?.label || "";
+            const vyrobaColor = vyrobaPrimary?.color;
+            const vyrobaTooltip = vyrobaPrimary?.tooltip;
+            const vyrobaIsCancelled = vyrobaLabel.startsWith("✕");
             const stage = item.stage_id ? stages.find(s => s.id === item.stage_id) : null;
             const stageLabel = stage ? (stage.display_name || stage.stage_name) : "";
 
