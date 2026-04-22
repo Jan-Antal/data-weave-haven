@@ -1,256 +1,347 @@
 
-## Plán opravy oprávnění pro roli Owner
+## Doplněný plán revize „Step back“ / Undo systému
 
 ### Cíl
-Zajistím, že roli **Owner** může spravovat pouze aktuální **Owner**.
+Rozšířím revizi Step back tak, aby výrobní workflow bylo spolehlivě vratné i po refreshi stránky a aby jedna reálná akce byla vždy jeden krok zpět/dopředu.
 
-Admin nebude moct:
-- vidět roli **Owner** v záložce **Oprávnění**,
-- přidávat uživatele do role **Owner**,
-- odebrat uživatele z role **Owner**,
-- měnit oprávnění role **Owner**,
-- změnit Ownerovi roli, deaktivovat ho, změnit mu heslo nebo jinak spravovat jeho účet.
-
-Owner bude dál moct:
-- vidět roli **Owner**,
-- upravovat oprávnění Owner role,
-- spravovat uživatele v Owner roli,
-- předat vlastnictví jinému uživateli.
+Platnost Step back prodloužím z **15 minut na 30 minut**.
 
 ---
 
-## 1. Úprava UI v `OsobyOpravneni`
+## 1. Centrální Undo/Redo systém
 
 ### Soubor
-`src/components/osoby/OsobyOpravneni.tsx`
+`src/hooks/useUndoRedo.tsx`
 
-Doplním použití `useAuth()` a podle `isOwner` upravím seznam rolí.
+Upravím:
 
-### Chování
+1. Expiraci z 15 na 30 minut.
+2. Bezpečné vykonávání payloadů:
+   - insert restore bude používat původní `id`,
+   - před insertem ověří, jestli řádek už neexistuje,
+   - pokud existuje, použije update místo duplicity,
+   - delete přes neexistující `id` nebude padat,
+   - multi operace poběží v bezpečném pořadí:
+     1. delete nově vzniklých řádků,
+     2. update existujících řádků,
+     3. insert obnovených řádků.
+3. Doplním podporu pro detailnější popis akce v tooltipu:
+   - `undoDescription`
+   - `redoDescription`
+   - případně ponechám `description` jako fallback.
 
-#### Pokud je přihlášený Owner
-Uvidí vše jako dnes:
-
-```text
-Owner
-Admin
-Vedoucí PM
-PM
-...
-```
-
-#### Pokud je přihlášený Admin
-Role **Owner** se v levém seznamu vůbec nezobrazí:
-
-```text
-Admin
-Vedoucí PM
-PM
-...
-```
-
-Admin se tedy nedostane na detail Owner role a neuvidí ani její přiřazené uživatele.
-
-### Ochrana akcí
-Přidám i ochranu v samotných handlerech:
-
-- `handleSave`
-- `persistSave`
-- `handleAddUser`
-- `handleRemoveUser`
-
-Pokud by se admin nějak dostal k `selectedRole === "owner"`, akce se zastaví a zobrazí se chyba:
+### Hover na šipkách
+V horní liště upravím hover text pro Step back / Step forward tak, aby jasně říkal, co se stane:
 
 ```text
-Roli Owner může spravovat pouze Owner.
+Zpět: Vrátí 4 položky projektu Z-2512-001 z T18 do Inboxu
+Dopředu: Znovu naplánuje 4 položky projektu Z-2512-001 do T18
 ```
 
-Tím nebude ochrana závislá jen na skrytém UI.
+Soubor:
+`src/components/production/ProductionHeader.tsx`
 
 ---
 
-## 2. Úprava defaultní vybrané role
-
-Aktuálně komponenta začíná na:
-
-```ts
-selectedRole = "pm"
-```
-
-Upravím to tak, aby:
-
-- Owner mohl začínat klidně na Owner/Admin podle stávající logiky,
-- Admin nikdy nezačínal ani nepřepnul na `owner`.
-
-Pokud se role seznam změní, komponenta automaticky přepne na první dostupnou roli.
-
----
-
-## 3. Backend ochrana přes databázové policies
-
-### Důvod
-Teď existuje policy, která dovoluje adminům spravovat `user_roles`. To je příliš široké, protože UI sice můžeme skrýt, ale bezpečnost musí být i na úrovni backendu.
-
-### Změna
-Připravím migraci pro `user_roles`, která rozdělí práva takto:
-
-#### Owner
-Může:
-- číst všechny role,
-- vkládat všechny role,
-- měnit všechny role,
-- mazat všechny role.
-
-#### Admin
-Může:
-- číst a spravovat pouze ne-Owner role,
-- nemůže vložit `role = 'owner'`,
-- nemůže upravit existující Owner řádek,
-- nemůže změnit libovolného uživatele na Ownera,
-- nemůže smazat Owner roli.
-
-Princip policies:
-
-```sql
--- Admin smí spravovat jen role, kde role <> 'owner'
-USING (
-  has_role(auth.uid(), 'admin')
-  AND role <> 'owner'
-)
-
-WITH CHECK (
-  has_role(auth.uid(), 'admin')
-  AND role <> 'owner'
-)
-```
-
-Owner bude mít samostatnou policy bez tohoto omezení.
-
----
-
-## 4. Zabezpečení backend funkcí
+## 2. Plán výroby: doplněné akce pro Step back
 
 ### Soubor
-`supabase/functions/update-user/index.ts`
+`src/hooks/useProductionDragDrop.ts`
 
-Doplním kontrolu cílového uživatele hned po načtení `user_id`.
+Doplním persistentní undo/redo payloady pro:
 
-Pokud cílový uživatel má roli `owner` a volající není `owner`, funkce vrátí chybu:
+1. **Přesun z Inboxu do týdne**
+   - jedna položka,
+   - celý projekt,
+   - bundle jako jedna operace.
 
-```text
-Only Owner can manage Owner account.
-```
+2. **Přesun mezi týdny**
+   - jedna položka,
+   - celý bundle,
+   - merge/separate konflikty.
 
-Tím admin nebude moct přes funkci:
-- změnit Ownerovi jméno,
-- změnit Ownerovi heslo,
-- deaktivovat Ownera,
-- změnit Ownerovi roli,
-- odebrat mu oprávnění přes změnu role.
+3. **Vrácení do Inboxu / TPV**
+   - `moveItemBackToInbox`
+   - `returnBundleToInbox`
+   - doplním jako jednu undo operaci pro všechny dotčené položky.
+   - Undo vrátí schedule řádky přesně zpět.
+   - Redo znovu vrátí položky do Inboxu bez duplicit.
 
-Ponechám stávající pravidlo, že převod vlastnictví (`transfer_ownership_to`) smí spustit pouze Owner.
+4. **Dokončení položky**
+   - `completeItems`
+   - dokončení bude jedna undo operace.
+   - Undo:
+     - odstraní odpovídající `production_expedice` záznamy,
+     - vrátí `production_schedule` na původní `status`, `completed_at`, `completed_by`,
+     - pokud dokončení vytvořilo QC záznam, odstraní i tento QC záznam.
+   - Redo:
+     - znovu nastaví dokončení,
+     - obnoví přesné `production_expedice` záznamy,
+     - obnoví přesné QC záznamy, pokud byly součástí původní akce.
 
-### Soubor
-`supabase/functions/generate-invite-link/index.ts`
-
-Doplním kontrolu, že pokud cílový uživatel je Owner, link může vygenerovat pouze Owner.
-
-### Soubor
-`supabase/functions/delete-user/index.ts`
-
-Už teď blokuje smazání Ownera. Nechám zachované, případně zpřesním chybovou hlášku.
-
-### Soubor
-`supabase/functions/create-user/index.ts`
-
-Owner se přes běžné vytvoření uživatele dál nebude dát vytvořit. Owner vznikne pouze přes řízený převod vlastnictví.
-
-Zároveň sjednotím seznam validních rolí ve funkcích s aktuálními rolemi aplikace, ale `owner` zůstane z běžného přiřazování vyloučený.
-
----
-
-## 5. Úprava `UserManagement`
-
-### Soubor
-`src/components/UserManagement.tsx`
-
-Doplním rozlišení mezi Ownerem a Adminem.
-
-#### Pro Admina
-Owner účet bude chráněný:
-
-- nebude možné měnit jméno Ownera,
-- nebude možné měnit heslo Ownera,
-- nebude možné generovat invite/reset link Ownerovi,
-- nebude možné deaktivovat Ownera,
-- nebude možné odstranit Ownera,
-- nebude vidět akce pro předání vlastnictví.
-
-Owner se může zobrazit jen jako uzamčený řádek, například:
-
-```text
-Owner    chráněný účet
-```
-
-nebo ho pro admina úplně skryji ze seznamu uživatelů podle toho, co bude v aktuálním UI čistší.
-
-#### Pro Ownera
-Zůstane možnost:
-- spravovat ostatní uživatele,
-- předat vlastnictví,
-- vidět Owner účet.
+5. **Vrácení z Expedice do výroby**
+   - `returnToProduction`
+   - undo znovu vrátí položku do Expedice v původním stavu.
 
 ---
 
-## 6. Očekávané chování po opravě
+## 3. Dialogy v Plánu výroby
 
-### Admin v záložce Oprávnění
-Uvidí:
+### `src/components/production/CompletionDialog.tsx`
 
-```text
-Admin
-Vedoucí PM
-PM
-Konstruktér
-...
-```
+Doplním Step back pro dokončení přes dialog.
 
-Neuvidí:
+Dnes dialog umí při dokončení automaticky vložit i QC záznam, pokud chybí. To musí být jedna atomická operace.
+
+Jedna akce:
 
 ```text
-Owner
+Dokončení 3 položek + QC potvrzení
 ```
 
-Nemůže tedy přidat nikoho do Owner role ani upravit Owner oprávnění.
+Undo udělá společně:
+- vrátí položky jako nedokončené,
+- odstraní nově vložené `production_expedice`,
+- odstraní nově vložené `production_quality_checks`,
+- u split-at-completion smaže nově vytvořenou zbývající část,
+- obnoví původní hodiny, CZK, split metadata a názvy.
 
-### Owner v záložce Oprávnění
-Uvidí:
+Redo udělá společně:
+- znovu dokončí položky,
+- znovu vloží expedice záznamy,
+- znovu vloží QC záznamy,
+- znovu vytvoří split část, pokud vznikla.
+
+### `src/components/production/CancelItemDialog.tsx`
+
+Doplním Step back pro **Zrušení položky**.
+
+Undo:
+- vrátí původní `status`,
+- vrátí původní `cancel_reason`,
+- vrátí původní `cancelled_at`,
+- vrátí původní `cancelled_by`.
+
+Pokud se ruší všechny části splitu, bude to pořád jeden krok:
 
 ```text
-Owner
-Admin
-Vedoucí PM
-PM
-...
+Zrušení 4 částí položky AT.02
 ```
 
-Může Owner roli spravovat.
+### `src/components/production/PauseItemDialog.tsx`
 
-### Přímý pokus přes API / klienta
-Pokud by admin obešel UI a pokusil se změnit `user_roles` přímo, databázová pravidla změnu odmítnou.
+Doplním Step back pro **Pauzu položky**.
+
+Undo:
+- obnoví původní `status`,
+- obnoví původní `pause_reason`,
+- obnoví původní `pause_expected_date`.
+
+Pokud pauza zasáhne celý bundle nebo split skupinu, bude to jedna operace.
 
 ---
 
-## 7. Ověření
+## 4. Expedice panel
+
+### Soubor
+`src/components/production/ExpedicePanel.tsx`
+
+Doplním persistentní Step back pro tyto akce:
+
+1. **Expedovat jednu položku**
+   - `markAsExpediced`
+   - Undo vrátí `expediced_at` na původní hodnotu.
+
+2. **Expedovat celý projekt**
+   - `markAllAsExpediced`
+   - jedna operace pro všechny položky.
+   - Undo vrátí každému řádku jeho původní `expediced_at`.
+
+3. **Vrátit z Archivu do Expedice**
+   - `unExpedice`
+   - `unExpediceAll`
+   - Undo obnoví původní expedovaný stav.
+
+4. **Vrátit do Výroby**
+   - `returnToProduction`
+   - `returnAllToProduction`
+   - Undo znovu vloží přesné `production_expedice` záznamy.
+   - Nebude hádat podle názvu položky.
+
+5. **Vrátit do Inboxu / TPV**
+   - `returnAllToInbox`
+   - jedna operace, která zaznamená:
+     - odstraněné `production_expedice`,
+     - odstraněné `production_schedule`,
+     - změněné nebo nově vložené `production_inbox`.
+   - Undo obnoví celý stav před vrácením.
+   - Redo znovu provede vrácení bez duplicit.
+
+---
+
+## 5. Modul Výroba
+
+### Soubor
+`src/pages/Vyroba.tsx`
+
+Doplním persistentní payloady pro existující Step back akce:
+
+1. **Denní log**
+   - změna fáze / procent / poznámky,
+   - Bez výroby.
+
+2. **Přelití do dalšího týdne**
+   - více položek jako jeden krok.
+
+3. **Poslat do Expedice**
+   - `handleConfirmExpedice`
+   - Undo:
+     - vrátí projekt na původní status,
+     - odstraní vložené expedice záznamy,
+     - obnoví původní data.
+   - Redo:
+     - znovu pošle projekt do Expedice pomocí uložených záznamů.
+
+4. **Označit jako Hotovo**
+   - jedna nebo více položek.
+   - Undo odstraní odpovídající expedice záznamy.
+   - Redo je znovu vloží přes původní uložený snapshot.
+
+5. **QC potvrzení**
+   - pokud QC vzniká samostatně, bude mít vlastní Step back.
+   - pokud QC vzniká jako součást dokončení, nebude samostatný druhý krok, ale bude součástí dokončení.
+
+---
+
+## 6. Bundle = jedna operace
+
+U všech bundle akcí sjednotím chování:
+
+```text
+Přesun bundlu Z-2512-001 → T18
+```
+
+nebude:
+
+```text
+Přesun AT.01
+Přesun AT.02
+Přesun AT.03
+```
+
+Technicky budu používat snapshoty:
+
+```text
+beforeRows
+afterRows
+```
+
+Undo obnoví `beforeRows`.
+Redo obnoví `afterRows`.
+
+To zabrání tomu, aby redo znovu spouštělo drag/drop logiku, merge dialogy nebo konfliktové větve.
+
+---
+
+## 7. Ochrana proti duplicitám a loop chybám
+
+Zavedu pravidlo:
+
+- undo/redo nikdy nevolá `pushUndo`,
+- redo nepřepočítává akci znovu podle aktuálního stavu,
+- redo používá uložený snapshot,
+- insert používá původní `id`,
+- pokud řádek existuje, aktualizuje se,
+- pokud řádek neexistuje při delete, akce pokračuje,
+- pokud řádek chybí při kritickém update, zobrazí se čitelná chyba.
+
+Tím se sníží riziko:
+- duplicit v `production_schedule`,
+- duplicit v `production_inbox`,
+- duplicit v `production_expedice`,
+- duplicit QC záznamů,
+- nekonečného undo/redo loopu.
+
+---
+
+## 8. Audit ostatních modulů
+
+Zreviduji i současný stav mimo výrobu:
+
+### Projekty
+- inline edit projektu,
+- status,
+- termíny,
+- PM,
+- konstruktér,
+- cena.
+
+### TPV
+- inline edit položky,
+- mazání položek,
+- bulk status,
+- změna počtu kusů s dopadem na výrobu.
+
+### Nastavení
+Prověřím, kde Step back dává smysl:
+- kapacity,
+- statusy,
+- kurzy,
+- formule,
+- nákladové presety.
+
+Výstupem bude krátká tabulka:
+
+```text
+Modul              Dnes                 Po opravě
+Plán výroby        část session-only    persistent 30 min
+Výroba             část session-only    persistent 30 min
+Expedice           bez Step back        persistent 30 min
+TPV                částečně             audit + doplnění
+Projekty           částečně             ověřeno/doplněno
+Nastavení          různé                rozhodnuto podle akce
+```
+
+---
+
+## 9. Ověření
 
 Po implementaci ověřím:
 
-1. Admin nevidí roli Owner v `Osoby → Oprávnění`.
-2. Admin nemůže přidat uživatele do Owner role.
-3. Admin nemůže odebrat aktuálního Ownera z Owner role.
-4. Admin nemůže změnit oprávnění Owner role.
-5. Admin nemůže přes správu uživatelů změnit Ownerovi heslo, aktivitu ani účet.
-6. Owner stále vidí Owner roli.
-7. Owner stále může předat vlastnictví.
-8. Přímá databázová ochrana blokuje admin změny na `role = 'owner'`.
-9. Build projde bez TypeScript chyb.
+1. Step back po refreshi funguje do 30 minut.
+2. Přesun jedné položky v Plánu výroby jde vrátit po refreshi.
+3. Přesun bundlu je jedna undo operace.
+4. Undo bundlu nevyrobí duplicity.
+5. Redo bundlu nevyvolá merge/conflict dialogy.
+6. Vrácení do Inboxu / TPV jde vrátit i zopakovat.
+7. Zrušení položky jde vrátit.
+8. Pauza položky jde vrátit.
+9. Dokončení položky jde vrátit včetně expedice záznamu.
+10. Pokud dokončení vytvoří QC, Step back odstraní i QC ve stejném kroku.
+11. Step forward QC znovu obnoví jen pokud QC vzniklo danou akcí.
+12. Poslat do Expedice jde vrátit jako jedna operace.
+13. Expedovat jde vrátit jako jedna operace.
+14. Vrácení z Expedice do výroby jde vrátit.
+15. Vrácení z Expedice do Inboxu jde vrátit bez duplicit.
+16. Hover na Step back / Step forward jasně popisuje, co tlačítko udělá.
+17. Build projde bez TypeScript chyb.
+
+---
+
+## Soubory k úpravě
+
+```text
+src/hooks/useUndoRedo.tsx
+src/components/production/ProductionHeader.tsx
+src/hooks/useProductionDragDrop.ts
+src/components/production/CompletionDialog.tsx
+src/components/production/CancelItemDialog.tsx
+src/components/production/PauseItemDialog.tsx
+src/components/production/ExpedicePanel.tsx
+src/pages/Vyroba.tsx
+src/hooks/useTPVItems.tsx
+src/hooks/useProjectMutations.tsx
+src/hooks/useCustomColumns.tsx
+```
+
+Databázové schéma `undo_sessions` už existuje. Novou tabulku nepředpokládám.
