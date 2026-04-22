@@ -25,6 +25,7 @@ import { resolveDeadline, checkDeadlineWarning } from "@/lib/deadlineWarning";
 import { DeadlineWarningDialog } from "./DeadlineWarningDialog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { logActivity } from "@/lib/activityLog";
+import { useUserPreferences, useUpsertPreferences } from "@/hooks/useUserPreferences";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -145,6 +146,8 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const bruttoPerDay = vyrobniEmps.reduce((s, e) => s + (e.uvazok_hodiny ?? 8), 0);
   const getWeekCapacity = useWeekCapacityLookup(bruttoPerDay || undefined);
   const { moveInboxItemToWeek } = useProductionDragDrop();
+  const { data: userPreferences, isFetched: preferencesFetched } = useUserPreferences();
+  const upsertPreferences = useUpsertPreferences();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
@@ -190,6 +193,30 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
   const hourlyRate = settings?.hourly_rate ?? 550;
   const weeklyCapacity = settings?.weekly_capacity_hours ?? 875;
   const isHighlighted = isOver || overDroppableId === "inbox-drop-zone";
+  const initialInboxSeenAt = useRef(new Date().toISOString());
+  const inboxSeenAt = userPreferences?.production_inbox_seen_at ?? initialInboxSeenAt.current;
+  const newItemIds = useMemo(() => {
+    const seenAt = new Date(inboxSeenAt).getTime();
+    return new Set(projects.flatMap((p) => p.items.filter((i) => new Date(i.sent_at).getTime() > seenAt).map((i) => i.id)));
+  }, [projects, inboxSeenAt]);
+  const newCountByProject = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const project of projects) {
+      const count = project.items.reduce((sum, item) => sum + (newItemIds.has(item.id) ? 1 : 0), 0);
+      if (count > 0) counts.set(project.project_id, count);
+    }
+    return counts;
+  }, [projects, newItemIds]);
+  const totalNewItemCount = newItemIds.size;
+
+  useEffect(() => {
+    if (!preferencesFetched || userPreferences?.production_inbox_seen_at || upsertPreferences.isPending) return;
+    upsertPreferences.mutate({ production_inbox_seen_at: initialInboxSeenAt.current });
+  }, [preferencesFetched, userPreferences?.production_inbox_seen_at, upsertPreferences]);
+
+  const handleMarkInboxRead = useCallback(() => {
+    upsertPreferences.mutate({ production_inbox_seen_at: new Date().toISOString() });
+  }, [upsertPreferences]);
 
   // Build next 12 weeks with remaining capacity
   const planningWeeks = useMemo<PlanningWeek[]>(() => {
