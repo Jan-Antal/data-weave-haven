@@ -31,18 +31,30 @@ export function NotificationPanel({ onClose, mobile = false }: NotificationPanel
   const navigate = useNavigate();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const handleClick = (n: Notification) => {
     if (!n.read) markAsRead(n.id);
-    onClose();
 
     const ctx = n.link_context as any;
     const projectId = ctx?.project_id || n.project_id;
     const tab = ctx?.tab || "project-info";
 
     if (projectId) {
+      onClose();
       navigate(`/?tab=${tab}&project=${projectId}`);
+      return;
     }
+
+    setExpandedId((current) => current === n.id ? null : n.id);
+  };
+
+  const openNotificationRoute = (n: Notification) => {
+    const route = (n.link_context as any)?.route;
+    if (!route) return;
+    if (!n.read) markAsRead(n.id);
+    onClose();
+    navigate(route);
   };
 
   return (
@@ -81,11 +93,23 @@ export function NotificationPanel({ onClose, mobile = false }: NotificationPanel
               <span className="text-sm">Žádné notifikace</span>
             </div>
           ) : (
-            notifications.map((n) => (
-              <button
+            notifications.map((n) => {
+              const expanded = expandedId === n.id;
+              const route = (n.link_context as any)?.route;
+
+              return (
+              <div
                 key={n.id}
                 onClick={() => handleClick(n)}
-                className="flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-muted/50 cursor-pointer transition-colors"
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleClick(n);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                className="flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-muted/50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {/* Avatar */}
                 <div
@@ -109,9 +133,24 @@ export function NotificationPanel({ onClose, mobile = false }: NotificationPanel
                     {n.title}
                   </p>
                   {n.body && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    <p className={cn(
+                      "text-xs text-muted-foreground mt-0.5",
+                      expanded ? "whitespace-pre-wrap" : "line-clamp-2"
+                    )}>
                       {n.body}
                     </p>
+                  )}
+                  {expanded && route && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openNotificationRoute(n);
+                      }}
+                      className="mt-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    >
+                      Otevřít Výrobu
+                    </button>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
                     {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: cs })}
@@ -122,8 +161,9 @@ export function NotificationPanel({ onClose, mobile = false }: NotificationPanel
                 {!n.read && (
                   <span className="shrink-0 mt-2 w-2 h-2 rounded-full bg-primary" />
                 )}
-              </button>
-            ))
+              </div>
+              );
+            })
           )}
         </div>
 
