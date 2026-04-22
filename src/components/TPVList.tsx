@@ -379,13 +379,14 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         const skipped: string[] = [];
 
         for (const item of itemsToSend) {
-          // Check if already in inbox (any status) or schedule (active statuses)
+          // Check if already in inbox/schedule with active (non-cancelled) statuses
           const [inboxCheck, schedCheck] = await Promise.all([
             supabase
               .from("production_inbox")
               .select("id")
               .eq("project_id", projectId)
               .eq("item_code", item.item_code)
+              .neq("status", "cancelled")
               .limit(1),
             supabase
               .from("production_schedule")
@@ -400,6 +401,21 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             skipped.push(item.item_code);
             continue;
           }
+
+          // Wipe any prior cancelled rows for this TPV item — guarantees one current production state.
+          await supabase
+            .from("production_inbox")
+            .delete()
+            .eq("project_id", projectId)
+            .eq("item_code", item.item_code)
+            .eq("status", "cancelled");
+          await supabase
+            .from("production_schedule")
+            .delete()
+            .eq("project_id", projectId)
+            .eq("item_code", item.item_code)
+            .eq("status", "cancelled");
+
 
           // Hours = (selling price × (1 - margin) × production%) / hourly rate
           const itemCena = (item.cena || 0) * (Number(item.pocet) || 1);
