@@ -52,7 +52,6 @@ import { DataLogPanel } from "@/components/DataLogPanel";
 import { OverbookWarningDialog, OverbookBadge } from "@/components/production/OverbookWarningDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
-import { buildBundleKey } from "@/lib/productionBundles";
 
 
 export type DisplayMode = "hours" | "czk" | "percent";
@@ -309,6 +308,7 @@ export default function PlanVyroby() {
     returnBundleToInbox,
     mergeSplitItems,
     mergeBundleSplitGroups,
+    mergeFullBundleIntoBundle,
     mergeBundleAcrossWeeks,
   } = useProductionDragDrop();
 
