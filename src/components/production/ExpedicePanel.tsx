@@ -218,6 +218,23 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     return { totalItems: total, lastCompletedStr: latest ? format(latest, "dd.MM.yyyy") : null };
   }, [activeProjects]);
 
+  const expediceTotalByProject = useMemo(() => {
+    const totals = new Map<string, Set<string>>();
+    if (!scheduleData) return new Map<string, number>();
+
+    for (const silo of scheduleData.values()) {
+      for (const bundle of silo.bundles) {
+        if (!totals.has(bundle.project_id)) totals.set(bundle.project_id, new Set());
+        const projectItems = totals.get(bundle.project_id)!;
+        for (const item of bundle.items) {
+          projectItems.add(item.item_code || stripSplitSuffix(item.item_name).toLowerCase());
+        }
+      }
+    }
+
+    return new Map(Array.from(totals, ([projectId, items]) => [projectId, items.size]));
+  }, [scheduleData]);
+
   const allGroupsExpanded = activeProjects.length > 0 && collapsedGroups.size === 0;
   const handleToggleAllGroups = () => {
     if (allGroupsExpanded) {
@@ -538,6 +555,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
             key={group.project_id}
             group={group}
             projectDeadlineMap={projectDeadlineMap}
+            expediceTotalByProject={expediceTotalByProject}
             isGroupCollapsed={collapsedGroups.has(group.project_id)}
             toggleGroup={() => setCollapsedGroups(prev => {
               const next = new Set(prev);
@@ -620,6 +638,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
                 key={group.project_id}
                 group={group}
                 projectDeadlineMap={projectDeadlineMap}
+                expediceTotalByProject={expediceTotalByProject}
                 isGroupCollapsed={collapsedGroups.has(`archive-${group.project_id}`)}
                 toggleGroup={() => setCollapsedGroups(prev => {
                   const key = `archive-${group.project_id}`;
