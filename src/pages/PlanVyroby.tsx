@@ -431,13 +431,15 @@ export default function PlanVyroby() {
     if (targetId.startsWith("silo-week-")) {
       return targetId.replace("silo-week-", "");
     }
-    if (targetId.startsWith("silo-item-") || targetId.startsWith("silo-bundle-")) {
+    if (targetId.startsWith("silo-bundle-drop-") || targetId.startsWith("silo-bundle-")) {
+      const rawKey = targetId.replace(/^silo-bundle-drop-/, "").replace(/^silo-bundle-/, "");
+      const weekKey = rawKey.split("::")[0];
+      return weekKey ? decodeURIComponent(weekKey) : null;
+    }
+    if (targetId.startsWith("silo-item-")) {
       if (scheduleData) {
         for (const [weekKey, silo] of scheduleData) {
           for (const bundle of silo.bundles) {
-            if (targetId.startsWith("silo-bundle-") && targetId.includes(bundle.project_id) && targetId.includes(weekKey)) {
-              return weekKey;
-            }
             for (const item of bundle.items) {
               if (targetId === `silo-item-${item.id}`) {
                 return weekKey;
@@ -573,6 +575,8 @@ export default function PlanVyroby() {
 
     const weekDate = resolveTargetWeek(targetId, dragData);
     if (!weekDate) return;
+
+      if (dragData.type === "silo-item" && dragData.weekDate === weekDate) return;
 
       if (dragData.type === "silo-item" && dragData.splitGroupId && dragData.itemId) {
         const sibling = findSiblingInWeek(dragData.splitGroupId, weekDate, dragData.itemId);
@@ -883,6 +887,7 @@ export default function PlanVyroby() {
                   showCzk={showCzk}
                   onToggleCzk={(v) => setDisplayMode(v ? "czk" : "hours")}
                   overDroppableId={overDroppableId}
+                  activeDrag={activeDrag}
                   onNavigateToTPV={handleNavigateToTPV}
                   onOpenProjectDetail={handleOpenProjectDetail}
                   displayMode={displayMode}

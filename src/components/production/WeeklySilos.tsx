@@ -30,7 +30,7 @@ import { getProjectRiskSeverity } from "@/hooks/useRiskHighlight";
 import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ForecastWeekContent, ForecastSplitDialog } from "./ForecastOverlay";
 import { type SafetyNetProject } from "./ForecastSafetyNet";
-import { buildBundleKey, formatBundleDisplayLabel } from "@/lib/productionBundles";
+import { buildBundleKey, canAcceptBundleDrop, formatBundleDisplayLabel } from "@/lib/productionBundles";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -87,6 +87,16 @@ interface Props {
   showCzk: boolean;
   onToggleCzk: (v: boolean) => void;
   overDroppableId?: string | null;
+  activeDrag?: {
+    type?: string;
+    projectId?: string;
+    weekDate?: string;
+    stageId?: string | null;
+    bundleKey?: string;
+    bundleLabel?: string | null;
+    bundleType?: "full" | "split" | null;
+    splitPart?: number | null;
+  } | null;
   onNavigateToTPV?: (projectId: string, itemCode?: string | null) => void;
   onOpenProjectDetail?: (projectId: string) => void;
   displayMode?: DisplayMode;
@@ -179,7 +189,7 @@ interface CancelState {
   cancelAll?: boolean;
 }
 
-export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey, searchMatchedProjectIds, searchActive, onVisibleMonthChange }: Props) {
+export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey, searchMatchedProjectIds, searchActive, onVisibleMonthChange }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
   const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
@@ -1032,6 +1042,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, onNavigateT
                   searchActive={searchActive}
                   isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
                   onToggleLock={() => toggleWeekLock(week.key)}
+                  activeDrag={activeDrag}
                   spilledBundles={week.key === currentWeekKey ? spilledBundlesForCurrent : undefined}
                 />
               </div>
@@ -1167,11 +1178,12 @@ interface SiloProps {
   searchActive?: boolean;
   isWeekLocked?: boolean;
   onToggleLock?: () => void;
+  activeDrag?: Props["activeDrag"];
   spilledBundles?: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock, spilledBundles }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock, activeDrag, spilledBundles }: SiloProps) {
   const spilledHours = useMemo(() => (spilledBundles || []).reduce((s, b) => s + b.total_hours, 0), [spilledBundles]);
   const spilledPct = weeklyCapacity > 0 ? (spilledHours / weeklyCapacity) * 100 : 0;
   // Capacity calculation: exclude paused items
@@ -1418,7 +1430,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             isFocusedMatch={focusedMatchKey === bundleKey}
             searchMatchedProjectIds={searchMatchedProjectIds}
             searchActive={searchActive}
-            isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />;
+                  isWeekLocked={isWeekLocked} activeDrag={activeDrag} exchangeRates={exchangeRates} />;
         })}
 
         {/* Rezerva kapacit section — blocker bundles separated */}
@@ -1444,7 +1456,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 isFocusedMatch={focusedMatchKey === bundleKey}
                 searchMatchedProjectIds={searchMatchedProjectIds}
                 searchActive={searchActive}
-                isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />;
+                isWeekLocked={isWeekLocked} activeDrag={activeDrag} exchangeRates={exchangeRates} />;
             })}
           </>
         )}
@@ -1507,7 +1519,7 @@ function formatDateShortYY(dateStr: string | null | undefined): string | null {
   return `${dd}.${mm}.${yy}`;
 }
 
-function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked, exchangeRates, isSpilled, spilledFromWeekNum }: {
+function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCapacity, onBundleContextMenu, onItemContextMenu, projectLookup, planHoursMap, realHoursMap, isSelected, onSelectProject, displayMode, searchQuery = "", forecastDarkMode, isFocusedMatch, searchMatchedProjectIds, searchActive, isWeekLocked, activeDrag, exchangeRates, isSpilled, spilledFromWeekNum }: {
   bundle: ScheduleBundle; weekKey: string; showCzk: boolean; hourlyRate: number; weeklyCapacity: number;
   displayMode: DisplayMode;
   onBundleContextMenu: (e: React.MouseEvent, bundle: ScheduleBundle, toggleExpand: () => void) => void;
@@ -1523,6 +1535,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   searchMatchedProjectIds?: Set<string>;
   searchActive?: boolean;
   isWeekLocked?: boolean;
+  activeDrag?: Props["activeDrag"];
   exchangeRates?: Array<{ year: number; eur_czk: number }>;
   isSpilled?: boolean;
   spilledFromWeekNum?: number;
@@ -1627,6 +1640,23 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
   const bundleItemIds = bundle.items.map((item) => item.id);
   const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: bundle.split_part, bundle_type: bundle.bundle_type });
+  const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" ? {
+    project_id: activeDrag.projectId || "",
+    weekKey: activeDrag.weekDate ?? null,
+    stage_id: activeDrag.stageId ?? null,
+    bundle_label: activeDrag.bundleLabel ?? null,
+    bundle_type: activeDrag.bundleType ?? null,
+    bundle_key: activeDrag.bundleKey ?? null,
+    split_part: activeDrag.splitPart ?? null,
+  } : null, {
+    project_id: bundle.project_id,
+    weekKey,
+    stage_id: bundle.stage_id ?? null,
+    bundle_label: bundle.bundle_label ?? null,
+    bundle_type: bundle.bundle_type ?? null,
+    bundle_key: bundleKey,
+    split_part: bundle.split_part ?? null,
+  });
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `silo-bundle-${bundleKey}`,
     data: { type: "silo-bundle", bundleKey, itemIds: bundleItemIds, projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, hours: bundle.total_hours, itemCount: bundle.items.length, stageId: bundle.stage_id, bundleLabel: bundle.bundle_label, bundleType: bundle.bundle_type, splitPart: bundle.split_part },
@@ -1635,14 +1665,14 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const { setNodeRef: setDropRef, isOver: isBundleOver } = useDroppable({
     id: `silo-bundle-drop-${bundleKey}`,
     data: { type: "silo-bundle-target", bundleKey, itemIds: bundleItemIds, projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, stageId: bundle.stage_id, bundleLabel: bundle.bundle_label, bundleType: bundle.bundle_type, splitPart: bundle.split_part },
-    disabled: bundleDragDisabled || expanded || !!isSpilled,
+    disabled: bundleDragDisabled || expanded || !!isSpilled || !canDropActiveBundle,
   });
   const setBundleNodeRef = useCallback((node: HTMLDivElement | null) => { setDropRef(node); }, [setDropRef]);
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
   const isMatch = searchMatchedProjectIds?.has(bundle.project_id) ?? false;
   const isDimmed = !!searchActive && !isMatch;
   const isHighlighted = isSelected || isFocusedMatch;
-  const isDropHighlighted = isBundleOver && !isDragging;
+  const isDropHighlighted = isBundleOver && canDropActiveBundle && !isDragging;
 
   // Blocker card — special rendering (after all hooks)
   if (isBlockerBundle) {

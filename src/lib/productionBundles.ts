@@ -5,9 +5,11 @@ export type BundleType = "full" | "split";
 
 export interface BundleTarget {
   project_id: string;
+  weekKey?: string | null;
   stage_id: string | null;
   bundle_label: string | null;
   bundle_type: BundleType | null;
+  bundle_key?: string | null;
   split_group_id?: string | null;
   split_part?: number | null;
   split_total?: number | null;
@@ -60,7 +62,7 @@ export function formatBundleDisplayLabel(target: {
 export async function getNextBundleLabel(projectId: string, stageId: string | null): Promise<string> {
   let query = supabase
     .from("production_schedule")
-    .select("bundle_label")
+    .select("project_id, stage_id, scheduled_week, position, bundle_label, bundle_type, split_group_id, split_part, split_total")
     .eq("project_id", projectId)
     .not("bundle_label", "is", null);
 
@@ -69,7 +71,7 @@ export async function getNextBundleLabel(projectId: string, stageId: string | nu
   const { data, error } = await query;
   if (error) throw error;
 
-  const used = new Set((data || []).map((r: any) => r.bundle_label).filter(Boolean));
+  const used = new Set((data || []).map((r: any) => r.bundle_label || fallbackBundleLabel(r.split_group_id ?? `${r.project_id}:${r.stage_id ?? "none"}:${r.scheduled_week}:${r.position}`)).filter(Boolean));
   return LETTERS.find((letter) => !used.has(letter)) || LETTERS[used.size % LETTERS.length] || "A";
 }
 
@@ -109,4 +111,56 @@ export function validateBundleDrop(source: BundleTarget, target: BundleTarget): 
   }
 
   return true;
+}
+
+export function canAcceptBundleDrop(source: BundleTarget | null | undefined, target: BundleTarget): boolean {
+  if (!source) return false;
+  if (source.bundle_key && target.bundle_key && source.bundle_key === target.bundle_key) return false;
+  if (source.weekKey && target.weekKey && source.weekKey !== target.weekKey) return false;
+  if (source.project_id !== target.project_id) return false;
+  if ((source.stage_id ?? null) !== (target.stage_id ?? null)) return false;
+  return resolveBundleType(source) === "full" && resolveBundleType(target) === "full";
+}
+
+export async function normalizeFullBundlesForWeek(projectId: string, stageId: string | null, weekKey: string): Promise<string | null> {
+  let query = supabase
+    .from("production_schedule")
+    .select("id, project_id, stage_id, scheduled_week, position, bundle_label, bundle_type, split_group_id, split_part, split_total")
+    .eq("project_id", projectId)
+    .eq("scheduled_week", weekKey)
+    .in("status", ["scheduled", "in_progress", "paused"])
+    .order("position", { ascending: true });
+
+  query = stageId ? query.eq("stage_id", stageId) : query.is("stage_id", null);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = data || [];
+  const splitLabels = new Set(rows
+    .filter((row: any) => resolveBundleType(row) === "split")
+    .map((row: any) => row.bundle_label || fallbackBundleLabel(row.split_group_id ?? `${row.project_id}:${row.stage_id ?? "none"}:${row.scheduled_week}:${row.position}`))
+    .filter(Boolean));
+  const fullRows = rows.filter((row: any) => resolveBundleType(row) === "full");
+  if (fullRows.length === 0) return null;
+
+  const currentLabels = new Set(fullRows.map((row: any) => row.bundle_label).filter(Boolean));
+  const preferred = fullRows.find((row: any) => row.bundle_label && !splitLabels.has(row.bundle_label))?.bundle_label;
+  const targetLabel = preferred || LETTERS.find((letter) => !splitLabels.has(letter)) || "A";
+  const needsUpdate = fullRows.length > 1 || currentLabels.size !== 1 || !currentLabels.has(targetLabel) || splitLabels.has(targetLabel);
+  if (!needsUpdate) return targetLabel;
+
+  const { error: updateError } = await supabase
+    .from("production_schedule")
+    .update({
+      bundle_label: targetLabel,
+      bundle_type: "full",
+      split_group_id: null,
+      split_part: null,
+      split_total: null,
+    } as any)
+    .in("id", fullRows.map((row: any) => row.id));
+  if (updateError) throw updateError;
+
+  return targetLabel;
 }
