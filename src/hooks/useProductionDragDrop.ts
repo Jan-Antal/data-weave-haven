@@ -6,7 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { renumberChain, renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
-import { buildNewBundleAssignment, getNextBundleLabel, normalizeFullBundlesForWeek, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
+import { buildNewBundleAssignment, getAvailableBundleLabel, getNextBundleLabel, normalizeFullBundlesForWeek, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -760,6 +760,7 @@ export function useProductionDragDrop() {
       const snapshots = sourceItems.map((item: any) => ({ ...item }));
       const updatePayload = {
         scheduled_week: target.scheduled_week,
+        stage_id: target.stage_id ?? null,
         bundle_label: target.bundle_label ?? null,
         bundle_type: "full",
         split_group_id: null,
@@ -784,6 +785,7 @@ export function useProductionDragDrop() {
         undo: async () => {
           await Promise.all(snapshots.map((item: any) => supabase.from("production_schedule").update({
             scheduled_week: item.scheduled_week,
+            stage_id: item.stage_id ?? null,
             bundle_label: item.bundle_label ?? null,
             bundle_type: item.bundle_type ?? null,
             split_group_id: item.split_group_id ?? null,
@@ -819,7 +821,7 @@ export function useProductionDragDrop() {
 
       const source = sourceItems[0] as any;
       if (resolveBundleType(source) !== "full") return;
-      const targetLabel = await getNextBundleLabel(source.project_id, source.stage_id ?? null);
+      const targetLabel = await getAvailableBundleLabel(source.project_id, source.stage_id ?? null, sourceItemIds);
       const snapshots = sourceItems.map((item: any) => ({ ...item }));
       const updatePayload = {
         scheduled_week: targetWeekDate,
@@ -845,6 +847,7 @@ export function useProductionDragDrop() {
         undo: async () => {
           await Promise.all(snapshots.map((item: any) => supabase.from("production_schedule").update({
             scheduled_week: item.scheduled_week,
+            stage_id: item.stage_id ?? null,
             bundle_label: item.bundle_label ?? null,
             bundle_type: item.bundle_type ?? null,
             split_group_id: item.split_group_id ?? null,
@@ -882,7 +885,7 @@ export function useProductionDragDrop() {
       if (resolveBundleType(source) !== "full" || resolveBundleType(target) !== "full") return;
 
       const snapshot = { ...source } as any;
-      const updatePayload = { scheduled_week: target.scheduled_week, bundle_label: target.bundle_label ?? null, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
+      const updatePayload = { scheduled_week: target.scheduled_week, stage_id: target.stage_id ?? null, bundle_label: target.bundle_label ?? null, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
       const { error } = await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId);
       if (error) throw error;
       invalidateAll();
@@ -890,7 +893,7 @@ export function useProductionDragDrop() {
         page: "plan-vyroby",
         actionType: "move_item_into_bundle",
         description: `Vložení ${source.item_name || "položky"} do bundle ${target.bundle_label || "A"}`,
-        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
+        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, stage_id: snapshot.stage_id ?? null, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
         redo: async () => { await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId); invalidateAll(); },
       });
     } catch (err: any) {
@@ -904,7 +907,7 @@ export function useProductionDragDrop() {
       const { data: source, error: sourceErr } = await supabase.from("production_schedule").select("*").eq("id", scheduleItemId).single();
       if (sourceErr) throw sourceErr;
       if (!source || resolveBundleType(source) !== "full") return;
-      const targetLabel = await getNextBundleLabel(source.project_id, source.stage_id ?? null);
+      const targetLabel = await getAvailableBundleLabel(source.project_id, source.stage_id ?? null, [scheduleItemId]);
       const snapshot = { ...source } as any;
       const updatePayload = { scheduled_week: targetWeekDate, bundle_label: targetLabel, bundle_type: "full", split_group_id: null, split_part: null, split_total: null };
       const { error } = await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId);
@@ -914,7 +917,7 @@ export function useProductionDragDrop() {
         page: "plan-vyroby",
         actionType: "move_item_new_bundle",
         description: `Nový bundle ${targetLabel} pro ${source.item_name || "položku"}`,
-        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
+        undo: async () => { await supabase.from("production_schedule").update({ scheduled_week: snapshot.scheduled_week, stage_id: snapshot.stage_id ?? null, bundle_label: snapshot.bundle_label ?? null, bundle_type: snapshot.bundle_type ?? null, split_group_id: snapshot.split_group_id ?? null, split_part: snapshot.split_part ?? null, split_total: snapshot.split_total ?? null } as any).eq("id", scheduleItemId); invalidateAll(); },
         redo: async () => { await supabase.from("production_schedule").update(updatePayload as any).eq("id", scheduleItemId); invalidateAll(); },
       });
     } catch (err: any) {
