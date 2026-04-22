@@ -105,6 +105,9 @@ interface MergeState {
   mergeItemCount: number;
   draggedItemId: string;
   targetWeekKey: string;
+  variant?: "split" | "full-bundle";
+  targetBundleLabel?: string | null;
+  onMergeExisting?: () => Promise<void>;
   /** Set for bundle merges so we can run an atomic bundle-level merge across two weeks. */
   sourceProjectId?: string;
   sourceWeekKey?: string;
@@ -304,6 +307,7 @@ export default function PlanVyroby() {
     moveInboxProjectToWeek,
     moveScheduleItemToWeek,
     moveBundleToWeek,
+    moveFullBundleAsNewBundle,
     moveItemBackToInbox,
     returnBundleToInbox,
     mergeSplitItems,
