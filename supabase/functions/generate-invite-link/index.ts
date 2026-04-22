@@ -46,7 +46,9 @@ Deno.serve(async (req) => {
       .eq("user_id", caller.id)
       .single();
 
-    if (!roleData || (roleData.role !== "admin" && roleData.role !== "owner")) {
+    const callerRoleValue = roleData?.role;
+
+    if (!roleData || (callerRoleValue !== "admin" && callerRoleValue !== "owner")) {
       return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -60,6 +62,19 @@ Deno.serve(async (req) => {
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id is required" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: targetRole } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user_id)
+      .single();
+
+    if (targetRole?.role === "owner" && callerRoleValue !== "owner") {
+      return new Response(JSON.stringify({ error: "Only Owner can manage Owner account." }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
