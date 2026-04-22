@@ -57,10 +57,6 @@ export function CompletionDialog({
     () => items.filter(i => checkedIds.has(i.id) && i.status !== "expedice" && i.status !== "completed" && !qcSet.has(i.id)),
     [items, checkedIds, qcSet],
   );
-  const missingQcChecked = useMemo(
-    () => items.filter(i => checkedIds.has(i.id) && !qcSet.has(i.id)),
-    [items, checkedIds, qcSet],
-  );
 
   const getConfig = (id: string): ItemCompletionConfig => itemConfigs[id] || { mode: "full", splitPct: 50 };
 
