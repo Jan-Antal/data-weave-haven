@@ -6,6 +6,7 @@ import { useUndoRedo, type UndoEntry } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 import { getISOWeekNumber } from "@/hooks/useProductionSchedule";
 import { renumberChain, renumberBundleChain, renumberProjectChain } from "@/lib/splitChainHelpers";
+import { buildNewBundleAssignment, getNextBundleLabel, resolveBundleType, validateBundleDrop, type BundleTarget } from "@/lib/productionBundles";
 
 function weekLabel(weekDate: string): string {
   try {
@@ -25,6 +26,11 @@ export function useProductionDragDrop() {
     qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
     qc.invalidateQueries({ queryKey: ["production-progress"] });
   }, [qc]);
+
+  const invalidateBundleQueries = useCallback(() => {
+    invalidateAll();
+    qc.invalidateQueries({ queryKey: ["production-quality-checks"] });
+  }, [invalidateAll, qc]);
 
   const moveInboxItemToWeek = useCallback(async (inboxItemId: string, weekDate: string) => {
     try {
