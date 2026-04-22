@@ -15,6 +15,24 @@ function weekLabel(weekDate: string): string {
   } catch { return weekDate; }
 }
 
+const productionQueryKeys = [["production-inbox"], ["production-schedule"], ["production-expedice"], ["production-expedice-schedule-ids"], ["production-progress"]];
+
+function updatePayload(table: string, records: Record<string, any>[]) {
+  return { table, operation: "update" as const, records, queryKeys: productionQueryKeys };
+}
+
+function deleteRestorePayload(table: string, records: Record<string, any>[]) {
+  return { table, operation: "delete" as const, records, queryKeys: productionQueryKeys };
+}
+
+function insertedRowsPayload(table: string, records: Record<string, any>[]) {
+  return { table, operation: "insert" as const, records, queryKeys: productionQueryKeys };
+}
+
+function multiPayload(records: Record<string, any>[]) {
+  return { operation: "multi" as const, records, queryKeys: productionQueryKeys };
+}
+
 export function useProductionDragDrop() {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
@@ -102,6 +120,16 @@ export function useProductionDragDrop() {
           page: "plan-vyroby",
           actionType: "inbox_to_silo",
           description: `Přesun ${item.item_name} → T${weekDate}`,
+          undoDescription: `Vrátí ${item.item_name} z ${weekLabel(weekDate)} zpět do Inboxu`,
+          redoDescription: `Znovu naplánuje ${item.item_name} do ${weekLabel(weekDate)}`,
+          undoPayload: multiPayload([
+            insertedRowsPayload("production_schedule", [inserted as any]),
+            updatePayload("production_inbox", [item as any]),
+          ]),
+          redoPayload: multiPayload([
+            deleteRestorePayload("production_schedule", [inserted as any]),
+            updatePayload("production_inbox", [{ ...(item as any), status: "scheduled" }]),
+          ]),
           undo: async () => {
             await supabase.from("production_schedule").delete().eq("id", inserted.id);
             await supabase.from("production_inbox").update({ status: "pending" }).eq("id", inboxItemId);
@@ -231,6 +259,16 @@ export function useProductionDragDrop() {
         page: "plan-vyroby",
         actionType: "inbox_project_to_silo",
         description: `Přesun projektu ${projectId} → T${weekDate}`,
+        undoDescription: `Vrátí ${items.length} položek projektu ${projectId} z ${weekLabel(weekDate)} zpět do Inboxu`,
+        redoDescription: `Znovu naplánuje ${items.length} položek projektu ${projectId} do ${weekLabel(weekDate)}`,
+        undoPayload: multiPayload([
+          insertedRowsPayload("production_schedule", (inserted || []) as any[]),
+          updatePayload("production_inbox", items as any[]),
+        ]),
+        redoPayload: multiPayload([
+          deleteRestorePayload("production_schedule", (inserted || []) as any[]),
+          updatePayload("production_inbox", (items as any[]).map((item: any) => ({ ...item, status: "scheduled" }))),
+        ]),
         undo: async () => {
           if (insertedIds.length) await supabase.from("production_schedule").delete().in("id", insertedIds);
           await supabase.from("production_inbox").update({ status: "pending" }).in("id", ids);

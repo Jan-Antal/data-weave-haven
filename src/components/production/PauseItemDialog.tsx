@@ -34,6 +34,7 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
   const [customReason, setCustomReason] = useState("");
   const [expectedDate, setExpectedDate] = useState<Date | undefined>();
   const [submitting, setSubmitting] = useState(false);
+  const cleanName = itemName.replace(/\s*\((\d+\/\d+)\)$/, "");
 
   const handlePause = useCallback(async () => {
     setSubmitting(true);
@@ -61,9 +62,26 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
             if (siblings) siblings.forEach(s => allIds.add(s.id));
           }
         }
+        const affectedIds = Array.from(allIds);
+        const { data: beforeRows } = await supabase.from("production_schedule").select("*").in("id", affectedIds);
 
-        const { error } = await supabase.from("production_schedule").update(pauseData).in("id", Array.from(allIds));
+        const { error } = await supabase.from("production_schedule").update(pauseData).in("id", affectedIds);
         if (error) throw error;
+
+        if (beforeRows?.length) {
+          const afterRows = beforeRows.map((row: any) => ({ ...row, ...pauseData }));
+          pushUndo({
+            page: "plan-vyroby",
+            actionType: "item_paused",
+            description: beforeRows.length > 1 ? `Pauza ${beforeRows.length} částí položky ${cleanName}` : `Pauza položky ${cleanName}`,
+            undoDescription: beforeRows.length > 1 ? `Vrátí ${beforeRows.length} částí položky ${cleanName} z pauzy` : `Vrátí položku ${cleanName} z pauzy`,
+            redoDescription: beforeRows.length > 1 ? `Znovu pozastaví ${beforeRows.length} částí položky ${cleanName}` : `Znovu pozastaví položku ${cleanName}`,
+            undoPayload: { table: "production_schedule", operation: "update", records: beforeRows as any[], queryKeys: [["production-schedule"], ["production-inbox"], ["production-progress"]] },
+            redoPayload: { table: "production_schedule", operation: "update", records: afterRows, queryKeys: [["production-schedule"], ["production-inbox"], ["production-progress"]] },
+            undo: async () => {},
+            redo: async () => {},
+          });
+        }
       } else {
         throw new Error("Inbox items cannot be paused - schedule them first");
       }
@@ -87,9 +105,7 @@ export function PauseItemDialog({ open, onOpenChange, itemId, itemName, itemCode
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [reason, customReason, expectedDate, itemId, itemName, source, qc, onOpenChange]);
-
-  const cleanName = itemName.replace(/\s*\((\d+\/\d+)\)$/, "");
+  }, [reason, customReason, expectedDate, itemId, itemName, itemCode, source, qc, onOpenChange, pushUndo, cleanName]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

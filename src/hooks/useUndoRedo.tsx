@@ -11,7 +11,7 @@ export function generateUndoGroupId(): string {
 }
 
 export interface UndoPayload {
-  table: string;
+  table?: string;
   operation: "update" | "delete" | "insert" | "multi";
   records: Record<string, any>[];
   newRecords?: Record<string, any>[];
@@ -28,6 +28,8 @@ export interface UndoEntry {
   redo: () => Promise<void>;
   undoPayload?: UndoPayload;
   redoPayload?: UndoPayload;
+  undoDescription?: string;
+  redoDescription?: string;
   dbId?: string; // id in undo_sessions table
   groupId?: string; // shared group id for batch undo
 }
@@ -52,27 +54,47 @@ const PAGE_MAX_STACK: Record<string, number> = {
   "tpv-list": 20,
 };
 const DEFAULT_MAX_STACK = 20;
-const SESSION_EXPIRY_MS = 15 * 60 * 1000;
+const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
 const UndoRedoContext = createContext<UndoRedoState | null>(null);
 
 // ── Reconstructor ─────────────────────────────────────────────────────
 async function executePayload(payload: UndoPayload, queryClient: ReturnType<typeof useQueryClient>) {
+  if (payload.operation !== "multi" && !payload.table) {
+    throw new Error("Undo payload neobsahuje cílovou tabulku.");
+  }
   if (payload.operation === "update") {
     for (const record of payload.records) {
       const { id, ...rest } = record;
-      await supabase.from(payload.table as any).update(rest as any).eq("id", id);
+      const { data: exists, error: existsError } = await supabase.from(payload.table as any).select("id").eq("id", id).maybeSingle();
+      if (existsError) throw existsError;
+      if (!exists) throw new Error(`Akci nelze vrátit, řádek ${id} už neexistuje.`);
+      const { error } = await supabase.from(payload.table as any).update(rest as any).eq("id", id);
+      if (error) throw error;
     }
   } else if (payload.operation === "delete") {
-    // Undo a delete = re-insert the records
-    await supabase.from(payload.table as any).insert(payload.records as any);
+    // Restore deleted records using original ids; update instead of duplicating if row already exists.
+    for (const record of payload.records) {
+      const { id } = record;
+      const { data: exists, error: existsError } = await supabase.from(payload.table as any).select("id").eq("id", id).maybeSingle();
+      if (existsError) throw existsError;
+      const { error } = exists
+        ? await supabase.from(payload.table as any).update(record as any).eq("id", id)
+        : await supabase.from(payload.table as any).insert(record as any);
+      if (error) throw error;
+    }
   } else if (payload.operation === "insert") {
-    // Undo an insert = delete the records
+    // Remove rows that were inserted by the original action. Missing rows are OK.
     const ids = payload.records.map(r => r.id);
-    await supabase.from(payload.table as any).delete().in("id", ids);
+    if (ids.length) {
+      const { error } = await supabase.from(payload.table as any).delete().in("id", ids);
+      if (error) throw error;
+    }
   } else if (payload.operation === "multi") {
-    // Multi combines sub-operations in records array
-    for (const sub of payload.records) {
+    // Multi combines sub-operations; execute in the order prepared by the caller.
+    // Safe convention for snapshot payloads: insert op = delete new rows, update op = restore existing rows, delete op = restore deleted rows.
+    const subPayloads = [...payload.records] as unknown as UndoPayload[];
+    for (const sub of subPayloads) {
       await executePayload(sub as unknown as UndoPayload, queryClient);
     }
   }
@@ -102,8 +124,8 @@ async function persistToDb(entry: UndoEntry, userId: string): Promise<string | n
     page: entry.page,
     action_type: entry.actionType,
     description: entry.description,
-    undo_payload: entry.undoPayload,
-    redo_payload: entry.redoPayload,
+    undo_payload: { ...entry.undoPayload, description: entry.undoDescription ?? entry.description },
+    redo_payload: { ...entry.redoPayload, description: entry.redoDescription ?? entry.description },
     expires_at: expiresAt,
     group_id: entry.groupId ?? null,
   } as any).select("id").single();
@@ -180,6 +202,8 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         page: row.page as UndoPage,
         actionType: row.action_type,
         description: row.description,
+        undoDescription: (row.undo_payload as any)?.description ?? row.description,
+        redoDescription: (row.redo_payload as any)?.description ?? row.description,
         undoPayload: row.undo_payload as UndoPayload,
         redoPayload: row.redo_payload as UndoPayload,
         dbId: row.id,
@@ -326,6 +350,8 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         id: crypto.randomUUID(),
         timestamp: new Date(),
         groupId: groupId ?? entry.groupId,
+        undo: entry.undoPayload ? reconstructFromPayload(entry.undoPayload, queryClient) : entry.undo,
+        redo: entry.redoPayload ? reconstructFromPayload(entry.redoPayload, queryClient) : entry.redo,
       };
       const maxForPage = PAGE_MAX_STACK[entry.page] ?? DEFAULT_MAX_STACK;
       const newStack = [...undoStackRef.current, full];
@@ -389,7 +415,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    [bump]
+    [bump, queryClient]
   );
 
   const popLastUndo = useCallback(
@@ -435,7 +461,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       const targetPage = page ?? currentPageRef.current;
       for (let i = undoStackRef.current.length - 1; i >= 0; i--) {
         if (!targetPage || undoStackRef.current[i].page === targetPage) {
-          return undoStackRef.current[i].description;
+          return undoStackRef.current[i].undoDescription ?? undoStackRef.current[i].description;
         }
       }
       return null;
@@ -449,7 +475,7 @@ export function UndoRedoProvider({ children }: { children: React.ReactNode }) {
       const targetPage = page ?? currentPageRef.current;
       for (let i = redoStackRef.current.length - 1; i >= 0; i--) {
         if (!targetPage || redoStackRef.current[i].page === targetPage) {
-          return redoStackRef.current[i].description;
+          return redoStackRef.current[i].redoDescription ?? redoStackRef.current[i].description;
         }
       }
       return null;

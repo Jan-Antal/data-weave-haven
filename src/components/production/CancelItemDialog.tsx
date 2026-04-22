@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { logActivity } from "@/lib/activityLog";
 
 interface CancelItemDialogProps {
@@ -35,6 +36,7 @@ export function CancelItemDialog({
 }: CancelItemDialogProps) {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { pushUndo } = useUndoRedo();
   const [reason, setReason] = useState("klient");
   const [submitting, setSubmitting] = useState(false);
 
@@ -57,6 +59,13 @@ export function CancelItemDialog({
         cancelled_at: cancelledAt,
         cancelled_by: cancelledBy,
       } as any;
+      const tableName = source === "schedule" ? "production_schedule" : "production_inbox";
+      const idsForUndo = cancelAll && splitGroupId
+        ? null
+        : [itemId];
+      const { data: beforeRows } = idsForUndo
+        ? await supabase.from(tableName as any).select("*").in("id", idsForUndo)
+        : await supabase.from(tableName as any).select("*").or(`split_group_id.eq.${splitGroupId},id.eq.${splitGroupId}`);
 
       if (cancelAll && splitGroupId) {
         // Cancel all parts in the split group via UPDATE — best-effort across both tables
@@ -90,6 +99,21 @@ export function CancelItemDialog({
 
       invalidateAll();
 
+      const changedRows = (beforeRows || []).map((row: any) => ({ ...row, ...updatePayload }));
+      if (beforeRows?.length) {
+        pushUndo({
+          page: "plan-vyroby",
+          actionType: "item_cancelled",
+          description: cancelAll ? `Zrušení ${beforeRows.length} částí položky ${cleanName}` : `Zrušení položky ${cleanName}`,
+          undoDescription: cancelAll ? `Vrátí ${beforeRows.length} částí položky ${cleanName} zpět před zrušení` : `Vrátí položku ${cleanName} zpět před zrušení`,
+          redoDescription: cancelAll ? `Znovu zruší ${beforeRows.length} částí položky ${cleanName}` : `Znovu zruší položku ${cleanName}`,
+          undoPayload: { table: tableName, operation: "update", records: beforeRows as any[], queryKeys: [["production-schedule"], ["production-inbox"], ["production-progress"], ["production-statuses", projectId], ["tpv-items", projectId]] },
+          redoPayload: { table: tableName, operation: "update", records: changedRows, queryKeys: [["production-schedule"], ["production-inbox"], ["production-progress"], ["production-statuses", projectId], ["tpv-items", projectId]] },
+          undo: async () => {},
+          redo: async () => {},
+        });
+      }
+
       // Log activity
       logActivity({
         projectId: projectId || "_production_",
@@ -110,7 +134,7 @@ export function CancelItemDialog({
       });
     }
     setSubmitting(false);
-  }, [reason, itemId, source, splitGroupId, cancelAll, invalidateAll, onOpenChange, itemName, projectId, itemCode, qc, user?.id]);
+  }, [reason, itemId, source, splitGroupId, cancelAll, invalidateAll, onOpenChange, itemName, projectId, itemCode, qc, user?.id, pushUndo]);
 
   const cleanName = itemName.replace(/\s*\(\d+\/\d+\)$/, "");
 
