@@ -11,7 +11,7 @@ export function generateUndoGroupId(): string {
 }
 
 export interface UndoPayload {
-  table: string;
+  table?: string;
   operation: "update" | "delete" | "insert" | "multi";
   records: Record<string, any>[];
   newRecords?: Record<string, any>[];
@@ -28,6 +28,8 @@ export interface UndoEntry {
   redo: () => Promise<void>;
   undoPayload?: UndoPayload;
   redoPayload?: UndoPayload;
+  undoDescription?: string;
+  redoDescription?: string;
   dbId?: string; // id in undo_sessions table
   groupId?: string; // shared group id for batch undo
 }
@@ -52,27 +54,48 @@ const PAGE_MAX_STACK: Record<string, number> = {
   "tpv-list": 20,
 };
 const DEFAULT_MAX_STACK = 20;
-const SESSION_EXPIRY_MS = 15 * 60 * 1000;
+const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
 const UndoRedoContext = createContext<UndoRedoState | null>(null);
 
 // ── Reconstructor ─────────────────────────────────────────────────────
 async function executePayload(payload: UndoPayload, queryClient: ReturnType<typeof useQueryClient>) {
+  if (payload.operation !== "multi" && !payload.table) {
+    throw new Error("Undo payload neobsahuje cílovou tabulku.");
+  }
   if (payload.operation === "update") {
     for (const record of payload.records) {
       const { id, ...rest } = record;
-      await supabase.from(payload.table as any).update(rest as any).eq("id", id);
+      const { data: exists, error: existsError } = await supabase.from(payload.table as any).select("id").eq("id", id).maybeSingle();
+      if (existsError) throw existsError;
+      if (!exists) throw new Error(`Akci nelze vrátit, řádek ${id} už neexistuje.`);
+      const { error } = await supabase.from(payload.table as any).update(rest as any).eq("id", id);
+      if (error) throw error;
     }
   } else if (payload.operation === "delete") {
-    // Undo a delete = re-insert the records
-    await supabase.from(payload.table as any).insert(payload.records as any);
+    // Restore deleted records using original ids; update instead of duplicating if row already exists.
+    for (const record of payload.records) {
+      const { id } = record;
+      const { data: exists, error: existsError } = await supabase.from(payload.table as any).select("id").eq("id", id).maybeSingle();
+      if (existsError) throw existsError;
+      const { error } = exists
+        ? await supabase.from(payload.table as any).update(record as any).eq("id", id)
+        : await supabase.from(payload.table as any).insert(record as any);
+      if (error) throw error;
+    }
   } else if (payload.operation === "insert") {
-    // Undo an insert = delete the records
+    // Remove rows that were inserted by the original action. Missing rows are OK.
     const ids = payload.records.map(r => r.id);
-    await supabase.from(payload.table as any).delete().in("id", ids);
+    if (ids.length) {
+      const { error } = await supabase.from(payload.table as any).delete().in("id", ids);
+      if (error) throw error;
+    }
   } else if (payload.operation === "multi") {
-    // Multi combines sub-operations in records array
-    for (const sub of payload.records) {
+    // Multi combines sub-operations; execute in deterministic order to reduce duplicate/key conflicts.
+    const order = { insert: 0, update: 1, delete: 2, multi: 3 } as const;
+    const subPayloads = [...payload.records] as unknown as UndoPayload[];
+    subPayloads.sort((a, b) => order[a.operation] - order[b.operation]);
+    for (const sub of subPayloads) {
       await executePayload(sub as unknown as UndoPayload, queryClient);
     }
   }
