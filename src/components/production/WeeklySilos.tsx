@@ -1728,7 +1728,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
         {/* Right portion: drag handle + bundle info */}
         <div ref={setDragRef} {...attributes} {...(!bundleDragDisabled && hasUncompleted ? listeners : {})}
           data-context="bundle"
-          className={`flex items-center gap-1 flex-1 min-w-0 pr-[6px] py-[5px] ${!bundleDragDisabled && hasUncompleted ? "cursor-grab" : "cursor-default"}`}
+          className={`flex items-start gap-1 flex-1 min-w-0 pr-[6px] py-[5px] ${!bundleDragDisabled && hasUncompleted ? "cursor-grab" : "cursor-default"}`}
           onClick={e => { e.stopPropagation(); onSelectProject?.(bundle.project_id); }}
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onBundleContextMenu(e, bundle, toggleExpand); }}
         >
@@ -1798,7 +1798,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             )}
           </div>
           <div className="flex flex-col items-end gap-[1px] shrink-0">
-            <span className="font-sans text-[10px] leading-none shrink-0" style={{ color: forecastDarkMode ? "#c8d0e0" : "#223937", fontWeight: 700 }}>
+            <span className="truncate leading-tight shrink-0" style={{ fontSize: 14, color: forecastDarkMode ? (allCompleted ? "#5a6480" : "#c8d0e0") : (allCompleted ? "#9ca3af" : "#1a1a1a"), fontWeight: allCompleted ? 400 : 500 }}>
               {bundleDisplayLabel}
             </span>
             <div className="flex items-center gap-1">
