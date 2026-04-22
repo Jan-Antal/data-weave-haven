@@ -675,6 +675,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
 interface ProjectGroupProps {
   group: ExpediceProject;
   projectDeadlineMap: Map<string, { expedice?: string | null; montaz?: string | null; predani?: string | null; datum_smluvni?: string | null }>;
+  expediceTotalByProject: Map<string, number>;
   isGroupCollapsed: boolean;
   toggleGroup: () => void;
   onProjectContextMenu: (e: React.MouseEvent, projectId: string, isArchive?: boolean) => void;
@@ -693,7 +694,7 @@ const DEADLINE_SHORT_LABELS: Record<string, string> = {
 };
 
 function ProjectGroup({
-  group, projectDeadlineMap,
+  group, projectDeadlineMap, expediceTotalByProject,
   isGroupCollapsed, toggleGroup,
   onProjectContextMenu, onItemContextMenu, onNavigateToTPV,
   isArchive, isSelected, onSelectProject,
@@ -714,6 +715,8 @@ function ProjectGroup({
     : null;
 
   const projectColor = isArchive ? "#d1d5db" : getProjectColor(group.project_id);
+  const expediceTotal = Math.max(expediceTotalByProject.get(group.project_id) ?? group.count, group.count);
+  const expediceBadgeLabel = isArchive ? String(group.count) : `${group.count}/${expediceTotal}`;
 
   return (
     <div
@@ -762,7 +765,7 @@ function ProjectGroup({
                 }),
               }}
             >
-              {group.count}
+              {expediceBadgeLabel}
             </span>
           </div>
           <div className="flex items-center justify-between">
