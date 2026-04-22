@@ -1092,7 +1092,11 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
           label: "↩ Vrátit do TPV", icon: "↩",
           onClick: async () => {
             try {
-              const { error } = await supabase.from("production_schedule").delete().eq("id", item.id);
+              const { data: { user } } = await supabase.auth.getUser();
+              const { error } = await supabase
+                .from("production_schedule")
+                .update({ status: "returned", returned_at: new Date().toISOString(), returned_by: user?.id ?? null } as any)
+                .eq("id", item.id);
               if (error) throw error;
               qc.invalidateQueries({ queryKey: ["production-schedule"] });
               qc.invalidateQueries({ queryKey: ["production-progress"] });

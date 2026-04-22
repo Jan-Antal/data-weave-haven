@@ -390,7 +390,11 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
           if (!confirm(`Vrátit ${itemCount} položek projektu ${project.project_name} do TPV?`)) return;
           try {
             const ids = project.items.map(i => i.id);
-            const { error } = await supabase.from("production_inbox").delete().in("id", ids);
+            const { data: { user } } = await supabase.auth.getUser();
+            const { error } = await supabase
+              .from("production_inbox")
+              .update({ status: "returned", returned_at: new Date().toISOString(), returned_by: user?.id ?? null } as any)
+              .in("id", ids);
             if (error) throw error;
             qc.invalidateQueries({ queryKey: ["production-inbox"] });
             qc.invalidateQueries({ queryKey: ["production-progress"] });
@@ -499,7 +503,11 @@ export function InboxPanel({ overDroppableId, showCzk, displayMode: displayModeP
       onClick: async () => {
         try {
           const ids = selectedItems.map(s => s.item.id);
-          const { error } = await supabase.from("production_inbox").delete().in("id", ids);
+          const { data: { user } } = await supabase.auth.getUser();
+          const { error } = await supabase
+            .from("production_inbox")
+            .update({ status: "returned", returned_at: new Date().toISOString(), returned_by: user?.id ?? null } as any)
+            .in("id", ids);
           if (error) throw error;
           qc.invalidateQueries({ queryKey: ["production-inbox"] });
           qc.invalidateQueries({ queryKey: ["production-progress"] });
