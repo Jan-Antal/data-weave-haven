@@ -452,15 +452,18 @@ export function useProductionDragDrop() {
     sourceWeekDate: string,
     targetWeekDate: string,
     onConflict?: 'merge' | 'separate',
+    sourceItemIds?: string[],
   ): Promise<{ conflict: true; targetWeek: string; splitGroupIds: string[] } | void> => {
     try {
       // Capture items being moved
-      const { data: movedItems } = await supabase
+      let movedQuery = supabase
         .from("production_schedule")
         .select("*")
         .eq("project_id", projectId)
         .eq("scheduled_week", sourceWeekDate)
         .in("status", ["scheduled", "in_progress"]);
+      if (sourceItemIds?.length) movedQuery = movedQuery.in("id", sourceItemIds);
+      const { data: movedItems } = await movedQuery;
       if (!movedItems || movedItems.length === 0) return;
       const movedIds = movedItems.map(i => i.id);
 
@@ -1024,17 +1027,19 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string) => {
+  const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string, sourceItemIds?: string[]) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data: items, error: fetchErr } = await supabase
+      let itemsQuery = supabase
         .from("production_schedule")
         .select("*")
         .eq("project_id", projectId)
         .eq("scheduled_week", weekDate)
         .in("status", ["scheduled", "in_progress"]);
+      if (sourceItemIds?.length) itemsQuery = itemsQuery.in("id", sourceItemIds);
+      const { data: items, error: fetchErr } = await itemsQuery;
       if (fetchErr) throw fetchErr;
       if (!items || items.length === 0) return;
 
