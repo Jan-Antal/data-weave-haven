@@ -6,12 +6,14 @@ interface MergePopoverProps {
   onOpenChange: (open: boolean) => void;
   itemName: string;
   mergeItemCount?: number;
+  variant?: "split" | "full-bundle";
+  targetBundleLabel?: string | null;
   onMerge: () => Promise<void>;
   onKeepSeparate: () => Promise<void>;
 }
 
 export function MergePopover({
-  open, onOpenChange, itemName, mergeItemCount, onMerge, onKeepSeparate,
+  open, onOpenChange, itemName, mergeItemCount, variant = "split", targetBundleLabel, onMerge, onKeepSeparate,
 }: MergePopoverProps) {
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,13 +40,16 @@ export function MergePopover({
   }, [onKeepSeparate, onOpenChange]);
 
   const isBundle = (mergeItemCount ?? 1) > 1;
+  const isFullBundleChoice = variant === "full-bundle";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[320px] p-0 gap-0" style={{ borderRadius: 12 }}>
         <div className="px-5 pt-5 pb-3">
           <div className="text-[13px] font-semibold" style={{ color: "#223937" }}>
-            {isBundle
+            {isFullBundleChoice
+              ? `Vložit do existujícího bundle ${targetBundleLabel || "A"}?`
+              : isBundle
               ? `${mergeItemCount} položek má rozdělené části v cílovém týdnu`
               : "Tyto části patří ke stejné položce"}
           </div>
@@ -65,10 +70,12 @@ export function MergePopover({
             <span style={{ fontSize: 12 }}>🔗</span>
             <div>
               <div className="text-[11px] font-semibold" style={{ color: "#223937" }}>
-                {isBundle ? `Spojit ${mergeItemCount} položek` : "Spojit"}
+                {isFullBundleChoice ? `Vložit do bundle ${targetBundleLabel || "A"}` : isBundle ? `Spojit ${mergeItemCount} položek` : "Spojit"}
               </div>
               <div className="text-[10px]" style={{ color: "#6b7a78" }}>
-                {isBundle
+                {isFullBundleChoice
+                  ? "Položky převezmou označení tohoto bundlu"
+                  : isBundle
                   ? "Sloučit hodiny všech rozdělených položek"
                   : "Sloučit hodiny, ponechat v cílovém týdnu"}
               </div>
@@ -85,9 +92,9 @@ export function MergePopover({
           >
             <span style={{ fontSize: 12 }}>↔</span>
             <div>
-              <div className="text-[11px] font-semibold" style={{ color: "#223937" }}>Ponechat odděleně</div>
+              <div className="text-[11px] font-semibold" style={{ color: "#223937" }}>{isFullBundleChoice ? "Přesunout jako nový bundle" : "Ponechat odděleně"}</div>
               <div className="text-[10px]" style={{ color: "#6b7a78" }}>
-                {isBundle ? "Přesunout bundle bez slučování" : "Přesunout jako samostatnou položku"}
+                {isFullBundleChoice ? "Ponechá vlastní označení v cílovém týdnu" : isBundle ? "Přesunout bundle bez slučování" : "Přesunout jako samostatnou položku"}
               </div>
             </div>
           </button>

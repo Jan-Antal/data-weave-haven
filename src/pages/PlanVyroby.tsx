@@ -105,6 +105,9 @@ interface MergeState {
   mergeItemCount: number;
   draggedItemId: string;
   targetWeekKey: string;
+  variant?: "split" | "full-bundle";
+  targetBundleLabel?: string | null;
+  onMergeExisting?: () => Promise<void>;
   /** Set for bundle merges so we can run an atomic bundle-level merge across two weeks. */
   sourceProjectId?: string;
   sourceWeekKey?: string;
@@ -304,6 +307,7 @@ export default function PlanVyroby() {
     moveInboxProjectToWeek,
     moveScheduleItemToWeek,
     moveBundleToWeek,
+    moveFullBundleAsNewBundle,
     moveItemBackToInbox,
     returnBundleToInbox,
     mergeSplitItems,
@@ -550,7 +554,6 @@ export default function PlanVyroby() {
     if (dragData.type === "silo-bundle" && targetId.startsWith("silo-bundle-drop-")) {
       const targetData = over.data.current as any;
       if (
-        dragData.weekDate === targetData?.weekDate &&
         dragData.bundleKey !== targetData?.bundleKey &&
         dragData.projectId === targetData?.projectId &&
         (dragData.stageId ?? null) === (targetData?.stageId ?? null) &&
@@ -559,7 +562,25 @@ export default function PlanVyroby() {
         dragData.itemIds?.length &&
         targetData?.itemIds?.length
       ) {
-        await mergeFullBundleIntoBundle(dragData.itemIds, targetData.itemIds);
+        if (dragData.weekDate === targetData.weekDate) {
+          await mergeFullBundleIntoBundle(dragData.itemIds, targetData.itemIds);
+        } else {
+          setMergeState({
+            itemName: targetData.projectName || dragData.projectName || "Bundle",
+            splitGroupIds: [],
+            mergeItemCount: dragData.itemIds.length,
+            draggedItemId: dragData.itemIds[0] || "",
+            targetWeekKey: targetData.weekDate,
+            variant: "full-bundle",
+            targetBundleLabel: targetData.bundleLabel ?? "A",
+            onMergeExisting: async () => {
+              await mergeFullBundleIntoBundle(dragData.itemIds, targetData.itemIds);
+            },
+            onKeepSeparate: async () => {
+              await moveFullBundleAsNewBundle(dragData.itemIds, targetData.weekDate);
+            },
+          });
+        }
       }
       return;
     }
@@ -730,7 +751,7 @@ export default function PlanVyroby() {
           await action();
         }
       }
-  }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek,
+  }, [moveInboxItemToWeek, moveInboxProjectToWeek, moveScheduleItemToWeek, moveBundleToWeek, moveFullBundleAsNewBundle,
     moveItemBackToInbox, returnBundleToInbox, scheduleData, weeklyCapacity, hourlyRate,
     findSpillWeek, findSiblingInWeek, mergeSplitItems, mergeFullBundleIntoBundle, resolveTargetWeek, checkAndWarnDeadline,
     forecast]);
@@ -1019,8 +1040,12 @@ export default function PlanVyroby() {
           onOpenChange={open => !open && setMergeState(null)}
           itemName={mergeState.itemName}
           mergeItemCount={mergeState.mergeItemCount}
+          variant={mergeState.variant}
+          targetBundleLabel={mergeState.targetBundleLabel}
           onMerge={async () => {
-            if (mergeState.splitGroupIds.length === 1 && mergeState.draggedItemId && mergeState.mergeItemCount === 1) {
+            if (mergeState.variant === "full-bundle" && mergeState.onMergeExisting) {
+              await mergeState.onMergeExisting();
+            } else if (mergeState.splitGroupIds.length === 1 && mergeState.draggedItemId && mergeState.mergeItemCount === 1) {
               // Single item merge — hook handles it directly
               await moveScheduleItemToWeek(mergeState.draggedItemId, mergeState.targetWeekKey, 'merge');
             } else if (mergeState.sourceProjectId && mergeState.sourceWeekKey) {

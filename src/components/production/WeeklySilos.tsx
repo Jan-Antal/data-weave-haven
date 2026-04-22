@@ -1666,7 +1666,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const { setNodeRef: setDropRef, isOver: isBundleOver } = useDroppable({
     id: `silo-bundle-drop-${bundleKey}`,
     data: { type: "silo-bundle-target", bundleKey, itemIds: bundleItemIds, projectId: bundle.project_id, projectName: bundle.project_name, weekDate: weekKey, stageId: bundle.stage_id, bundleLabel: bundle.bundle_label, bundleType: bundle.bundle_type, splitPart: bundle.split_part },
-    disabled: bundleDragDisabled || expanded || !!isSpilled || !canDropActiveBundle,
+    disabled: bundleDragDisabled || !!isSpilled || !canDropActiveBundle,
   });
   const setBundleNodeRef = useCallback((node: HTMLDivElement | null) => { setDropRef(node); }, [setDropRef]);
   const toggleExpand = useCallback(() => setExpanded(v => !v), []);
@@ -1737,12 +1737,17 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
       opacity: isDragging ? 0.3 : isDimmed ? 0.5 : 1,
       outline: isFocusedMatch ? "2px solid #d97706" : undefined,
       outlineOffset: isFocusedMatch ? "2px" : undefined,
-      boxShadow: isDropHighlighted ? "0 8px 18px rgba(34,57,55,0.16), 0 0 0 2px rgba(34,57,55,0.18)" : forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isHighlighted ? "0 0 0 2px rgba(217,119,6,0.15)" : undefined),
+      boxShadow: isDropHighlighted ? "0 8px 18px hsl(var(--primary) / 0.16), 0 0 0 2px hsl(var(--primary) / 0.24)" : forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isHighlighted ? "0 0 0 2px hsl(var(--accent) / 0.15)" : undefined),
       paddingBottom: isDropHighlighted ? 10 : undefined,
       transform: isDropHighlighted ? "translateY(-1px)" : undefined,
       transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms, outline 300ms, opacity 200ms, padding-bottom 160ms, transform 160ms",
     }}>
 
+      {isDropHighlighted && (
+        <div className="px-2 py-1 text-[9px] font-semibold" style={{ backgroundColor: "hsl(var(--primary) / 0.08)", color: "hsl(var(--primary))", borderBottom: "1px solid hsl(var(--primary) / 0.16)" }}>
+          Vložit do bundle {bundleDisplayLabel}
+        </div>
+      )}
       <div className="flex" style={{ borderBottom: expanded ? (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2") : "none", backgroundColor: forecastDarkMode ? undefined : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : undefined) }}>
         {/* Left strip: expand/collapse toggle — NOT draggable */}
         <div
