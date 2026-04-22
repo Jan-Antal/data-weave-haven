@@ -8,6 +8,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { renumberSiblings } from "./SplitItemDialog";
 import type { ScheduleItem } from "@/hooks/useProductionSchedule";
 import { roundHours, formatHours } from "@/lib/utils";
+import { logActivity } from "@/lib/activityLog";
 
 interface CompletionDialogProps {
   open: boolean;
@@ -77,6 +78,7 @@ export function CompletionDialog({
     () => items.filter(i => checkedIds.has(i.id) && i.status !== "expedice" && i.status !== "completed" && !qcSet.has(i.id)),
     [items, checkedIds, qcSet],
   );
+  const needsQcConfirmation = missingQcChecked.length > 0;
 
   const getConfig = (id: string): ItemCompletionConfig => itemConfigs[id] || { mode: "full", splitPct: 50 };
 
@@ -95,7 +97,6 @@ export function CompletionDialog({
 
   const handleComplete = useCallback(async () => {
     if (checkedIds.size === 0) return;
-    if (missingQcChecked.length > 0) return; // QC gate
     setSubmitting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -123,6 +124,37 @@ export function CompletionDialog({
 
       const nowIso = new Date().toISOString();
 
+      if (missingQcChecked.length > 0) {
+        const qcRows = missingQcChecked.map(item => ({
+          item_id: item.id,
+          project_id: item.project_id,
+          checked_by: user.id,
+        }));
+        const { error: qcError } = await (supabase.from("production_quality_checks" as any) as any).insert(qcRows);
+        if (qcError) throw qcError;
+
+        logActivity({
+          projectId,
+          actionType: "item_qc_confirmed",
+          newValue: missingQcChecked.map(i => i.item_code || i.item_name).join(", "),
+          detail: "QC potvrzeno při dokončení v Plánu výroby",
+        });
+      }
+
+      const insertExpediceRows = async (rows: any[]) => {
+        const sourceIds = rows.map(row => row.source_schedule_id).filter(Boolean);
+        if (sourceIds.length === 0) return;
+        const { data: existing, error: existingError } = await (supabase.from("production_expedice" as any) as any)
+          .select("source_schedule_id")
+          .in("source_schedule_id", sourceIds);
+        if (existingError) throw existingError;
+        const existingIds = new Set((existing || []).map((row: any) => row.source_schedule_id));
+        const rowsToInsert = rows.filter(row => row.source_schedule_id && !existingIds.has(row.source_schedule_id));
+        if (rowsToInsert.length === 0) return;
+        const { error } = await (supabase.from("production_expedice") as any).insert(rowsToInsert);
+        if (error) throw error;
+      };
+
       // Complete full items → insert into production_expedice
       if (fullCompleteIds.length > 0) {
         // Mark schedule rows with completed_at/by metadata (status stays scheduled/in_progress per DB trigger)
@@ -147,8 +179,7 @@ export function CompletionDialog({
             is_midflight: false,
           };
         });
-        const { error } = await (supabase.from("production_expedice") as any).insert(expediceRows);
-        if (error) throw error;
+        await insertExpediceRows(expediceRows);
       }
 
       // Split-at-completion items
@@ -206,7 +237,7 @@ export function CompletionDialog({
         // Splitting at completion always creates ≥1 remaining sibling → original is intermediate
         const intermediate = !originalPart
           || (originalPart.split_part != null && originalPart.split_total != null && originalPart.split_part < originalPart.split_total);
-        await (supabase.from("production_expedice") as any).insert({
+        await insertExpediceRows([{
           project_id: item.project_id,
           item_name: `${cleanName}${originalPart ? ` (${originalPart.split_part}/${originalPart.split_total})` : ""}`,
           item_code: item.item_code || null,
@@ -215,12 +246,15 @@ export function CompletionDialog({
           manufactured_at: nowIso,
           expediced_at: intermediate ? nowIso : null,
           is_midflight: false,
-        });
+        }]);
       }
 
       // NOTE: production_daily_logs is manual-only — completion does not write progress %.
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
+      qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+      qc.invalidateQueries({ queryKey: ["production-quality-checks", projectId] });
+      qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-daily-logs"] });
 
@@ -231,7 +265,7 @@ export function CompletionDialog({
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate, missingQcChecked.length]);
+  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate, missingQcChecked, projectId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
