@@ -1,76 +1,46 @@
 
 
-## Oprava dvojitého škálovania „Dnešní cíl" a markeru „Očekávaný stav"
+## Záznam zrušených položiek + zobrazenie v TPV Liste
 
-### Príčina chyby
+### Cieľ
+Pri zrušení položky v Pláne Výroby sa **nezmaže**, ale označí ako `cancelled` s uloženým dôvodom, dátumom a autorom. V TPV Liste v stĺpci **Výroba** sa zobrazí **červený** badge `✕ Zrušeno · {dôvod}` s tooltipom (dôvod + dátum + kto). Pri opätovnom poslaní do výroby cez TPV List sa zrušený záznam **prepíše/odstráni** a vznikne nový inbox záznam → bez duplicít, jedna TPV položka = jeden aktuálny stav výroby.
 
-Premenná **`weeklyGoal`** (z `getWeeklyGoal()`, riadky 866-900) **už interne aplikuje `dayFraction`** — vracia kumulatívne % `hodiny_plan` zodpovedajúce dnešnej pozícii v týždni:
+### Zmeny
 
-```
-expectedHours = completedWeeksHours + currentWeekHours * dayFraction
-weeklyGoal    = expectedHours / hPlan
-```
+**1. DB migrácia (schéma)**
+- `production_schedule`: pridať `cancelled_at timestamptz`, `cancelled_by uuid` (`cancel_reason` už existuje).
+- `production_inbox`: pridať `cancel_reason text`, `cancelled_at timestamptz`, `cancelled_by uuid`.
+- Aktualizovať trigger `validate_production_inbox_status` aby povolil status `'cancelled'` (schedule trigger už `cancelled` povoľuje).
 
-Tzn. pre projekt s plánom 100h/týždeň, kde sa už spravilo 0h v predošlých týždňoch, v utorok (2/5):  
-`weeklyGoal = (0 + 100 * 0.4) / 100 = 40%` ← **toto je už dnešný cieľ**.
+**2. `CancelItemDialog.tsx`** (`src/components/production/CancelItemDialog.tsx`)
+- Namiesto `.delete()` použiť `.update({ status: 'cancelled', cancel_reason, cancelled_at, cancelled_by })` pre obe tabuľky (`production_schedule` aj `production_inbox`).
+- Pri `cancelAll` aktualizovať všetky riadky split-group rovnakým spôsobom.
+- Po zrušení **netreba renumberovať siblings** (riadky zostávajú, len `cancelled`).
+- Toast a `data_log` zápis ostávajú.
 
-Funkcia **`getExpectedPct(_, weeklyGoal, pid)`** (riadky 986-996) ale `weeklyGoal` znova škáluje dayFraction:  
-`return Math.round(weeklyGoal * fraction)` → `40 * 0.4 = 16%` ← **dvojité škálovanie, bug**.
+**3. „Pošli do výroby" workflow v `TPVList.tsx`** (`executeSendToProduction`, riadky ~440)
+- Pred `INSERT` do `production_inbox` najprv **delete-nutie** všetkých `cancelled` riadkov pre dané `(project_id, item_code)` z `production_inbox` aj `production_schedule` — tým sa stará zrušená stopa vyčistí a vznikne čistý nový záznam.
+- Tým je zaručené pravidlo: jedna TPV položka = jeden aktuálny stav výroby.
 
-Rovnaký bug je v inline výpočte vertikálneho markeru „Očekávaný stav" (riadky 3568-3593): `Math.round(weeklyGoal * fraction)`.
+**4. `useProductionStatuses.ts`** (`src/hooks/useProductionStatuses.ts`)
+- Rozšíriť SELECT o `cancel_reason, cancelled_at, cancelled_by` (schedule aj inbox).
+- Načítať `cancelled` aj z **inbox** vetvy (teraz inbox číta len `pending`).
+- Pridať do `ProductionStatus` voliteľné pole `tooltip?: string` so znením `Zrušeno {datum} — {meno} · {dôvod}` (meno z `profiles` cez batched lookup, alebo email z `data_log`).
+- Zmeniť farbu pre `cancelled` zo súčasnej šedej `#6b7280` na **červenú `#dc2626`**.
 
-**Chain-window vetva je naopak správna** — `getWeeklyGoal` pre split chain vracia surové `cw.end` (bez dayFraction), a `getExpectedPct` aplikuje `cw.start + (cw.end - cw.start) * fraction`. Tým pádom utorok pre okno 50→100 dáva 70% ✅.
+**5. `TPVList.tsx` — stĺpec „vyroba_status"** (riadky ~961–1005)
+- Zachovať existujúce prečiarknutie + nové červené pozadie/border.
+- Obaliť badge do `Tooltip` (`@/components/ui/tooltip`) zobrazujúceho `s.tooltip`.
+- Excel export (`getCellValue` ~670) ostáva nezmenený — `s.label` už dôvod obsahuje.
 
-### Oprava
+**6. `MobileTPVCardList.tsx`**
+- Rovnaká červená farba; tooltip nahradiť `title` atribútom (mobile fallback).
 
-**Súbor:** `src/pages/Vyroba.tsx`
+**7. Memory**
+- Pridať `mem://features/production-planning/cancellation-workflow` s pravidlom: cancel = soft, červený badge v TPV, re-send → wipe cancelled rows.
 
-**1. `getExpectedPct` (riadky 986-996):** odstrániť dvojité škálovanie pre non-chain vetvu — `weeklyGoal` je už dnešný cieľ, vrátiť ho priamo:
-
-```ts
-function getExpectedPct(_dayIndex: number, weeklyGoal: number = 100, pid?: string): number {
-  if (pid) {
-    const today = new Date();
-    const dow = today.getDay();
-    const wde = (dow === 0 || dow === 6) ? 5 : dow;
-    const fraction = wde / 5;
-    const cw = getChainWindow(pid);
-    if (cw) return Math.round(cw.start + (cw.end - cw.start) * fraction);
-  }
-  return Math.round(weeklyGoal); // už zahrňuje dayFraction
-}
-```
-
-**2. Inline marker „Očekávaný stav k dnes" (riadky 3568-3593):** zarovnať s opraveným `getExpectedPct`:
-
-```ts
-const exp = chainWindow
-  ? Math.round(chainWindow.start + (chainWindow.end - chainWindow.start) * fraction)
-  : Math.round(weeklyGoal); // bez * fraction
-```
-
-**3. Marker „Cíl pro tento týden" (riadky 3540-3553):** **ponechať bezo zmeny** — sémanticky je to ten istý bod ako „Očekávaný stav" pre non-chain projekty (lebo `weeklyGoal` je dnešná pozícia). V praxi obidva markery splynú — to je správne. Pre split chain projekty má marker stále zmysel (ukazuje koniec okna `cw.end` cez `weeklyGoal`).
-
-### Validácia
-
-Utorok (dayFraction = 0.4):
-
-| Scenár | Pred | Po |
-|---|---|---|
-| Plán 100h/týždeň, žiadne minulé týždne | weeklyGoal=40, expectedPct=**16%** ❌ | weeklyGoal=40, expectedPct=**40%** ✅ |
-| Chain window 50→100 | expectedPct=**70%** ✅ | expectedPct=**70%** ✅ (nezmenené) |
-| Plán s 50h v minulých týždňoch + 50h tento týždeň, projekt 100h | weeklyGoal=70 (50+50*0.4), expected=**28%** ❌ | weeklyGoal=70, expected=**70%** ✅ |
-| Pondelok (0.2) | weeklyGoal=20, exp=**4%** ❌ | weeklyGoal=20, exp=**20%** ✅ |
-| Piatok/víkend (1.0) | weeklyGoal=100, exp=**100%** ✅ | weeklyGoal=100, exp=**100%** ✅ (nezmenené) |
-
-### Vplyv na semafor (`getProjectStatus`, riadok 998-1023)
-
-`bundleProgress >= expected − 10/25` — po oprave je `expected` 2-3× vyšší, takže projekty s nízkym daylogom správne padnú do **at-risk/behind** namiesto falošne **on-track**. To je presne to čo užívateľ chcel pri unifikácii s Dílnou.
-
-### Mimo scope
-
-- `getWeeklyGoal` — **nemení sa** (jeho hodnota „dnešný kumulatívny cieľ" je správna sémantika).
-- `getChainWindow` — nemení sa.
-- DayCell `weeklyGoal` prop pre badge „🎉" — porovnáva s `cumulative` v rámci dňa, neovplyvnené.
-- DilnaDashboard — nemení sa (už používa správnu logiku cez vlastný `dayFraction`).
+### Výsledok pre používateľa
+1. **Zruším položku** v Pláne Výroby (pravý klik → Zrušit, vyberiem dôvod) → zmizne zo sila/inboxu, ostane v DB ako `cancelled`.
+2. **V TPV Liste** sa v stĺpci Výroba objaví červený prečiarknutý badge `✕ Zrušeno · Zrušeno klientem`. Hover ukáže `Zrušeno 22. 4. 2026 — Marek Novák · Zrušeno klientem`.
+3. **Opätovné poslanie do výroby** z TPV Listu → cancelled riadky sa vyčistia, vznikne nový inbox záznam → badge sa zmení na `Čeká na plánování`. Žiadne duplicity.
 
