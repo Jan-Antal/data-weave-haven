@@ -1,6 +1,7 @@
 // AI Optimizer for forecast: takes deterministic baseline blocks + capacity context,
 // asks Lovable AI to re-balance for better flow (less context-switching, deadline respect, smoothed load).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,9 +61,52 @@ const TOOL_SCHEMA = {
   },
 };
 
+const FORECAST_ROLES = ["owner", "admin", "vedouci_vyroby"];
+
+async function authorizeForecastUser(req: Request): Promise<Response | null> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "unauthorized", message: "Nemáte oprávnění spustit Forecast." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  const authClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+  if (claimsError || !claimsData?.claims?.sub) {
+    return new Response(JSON.stringify({ error: "unauthorized", message: "Nemáte oprávnění spustit Forecast." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data: roles, error: roleError } = await sb
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", claimsData.claims.sub)
+    .in("role", FORECAST_ROLES);
+
+  if (roleError || !roles || roles.length === 0) {
+    return new Response(JSON.stringify({ error: "forbidden", message: "Nemáte oprávnění spustit Forecast." }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    const authError = await authorizeForecastUser(req);
+    if (authError) return authError;
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
