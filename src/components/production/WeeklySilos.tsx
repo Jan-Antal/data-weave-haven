@@ -1177,11 +1177,12 @@ interface SiloProps {
   searchActive?: boolean;
   isWeekLocked?: boolean;
   onToggleLock?: () => void;
+  activeDrag?: Props["activeDrag"];
   spilledBundles?: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
 }
 
 function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, silo, weeklyCapacity,
-  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock, spilledBundles }: SiloProps) {
+  showCzk, hourlyRate, isOverTarget, onBundleContextMenu, onItemContextMenu, allWeeksData, weekKeys, registerRef, projectLookup, planHoursMap, realHoursMap, exchangeRates, spillDismissed, onDismissSpill, onReopenSpill, selectedProjectId, onSelectProject, displayMode, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onForecastContextMenu, forecastExpandedIds, onToggleForecastExpand, focusedMatchKey, searchMatchedProjectIds, searchActive, isWeekLocked, onToggleLock, activeDrag, spilledBundles }: SiloProps) {
   const spilledHours = useMemo(() => (spilledBundles || []).reduce((s, b) => s + b.total_hours, 0), [spilledBundles]);
   const spilledPct = weeklyCapacity > 0 ? (spilledHours / weeklyCapacity) * 100 : 0;
   // Capacity calculation: exclude paused items
@@ -1428,7 +1429,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
             isFocusedMatch={focusedMatchKey === bundleKey}
             searchMatchedProjectIds={searchMatchedProjectIds}
             searchActive={searchActive}
-            isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />;
+                  isWeekLocked={isWeekLocked} activeDrag={activeDrag} exchangeRates={exchangeRates} />;
         })}
 
         {/* Rezerva kapacit section — blocker bundles separated */}
@@ -1454,7 +1455,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
                 isFocusedMatch={focusedMatchKey === bundleKey}
                 searchMatchedProjectIds={searchMatchedProjectIds}
                 searchActive={searchActive}
-                isWeekLocked={isWeekLocked} exchangeRates={exchangeRates} />;
+                isWeekLocked={isWeekLocked} activeDrag={activeDrag} exchangeRates={exchangeRates} />;
             })}
           </>
         )}
