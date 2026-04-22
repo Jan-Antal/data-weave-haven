@@ -3117,7 +3117,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               <TPVList
                 projectId={tpvProjectId}
                 projectName={projectDetails?.get(tpvProjectId)?.project_name || tpvProjectId}
-                currency={projectDetails?.get(tpvProjectId)?.currency || "CZK"}
+                currency={(projectDetails?.get(tpvProjectId) as any)?.currency || "CZK"}
                 onBack={() => setTpvProjectId(null)}
               />
             </DialogContent>
