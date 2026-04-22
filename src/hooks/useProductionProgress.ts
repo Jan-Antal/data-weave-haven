@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo } from "react";
 
 export interface ProjectProgress {
   project_id: string;
@@ -23,28 +22,33 @@ export function useProductionProgress() {
       const [tpvRes, inboxRes, scheduleRes] = await Promise.all([
         supabase.from("tpv_items").select("project_id, id, item_code, nazev").is("deleted_at", null),
         supabase.from("production_inbox").select("project_id, id, item_name, item_code, status"),
-        supabase.from("production_schedule").select("project_id, id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)").in("status", ["scheduled", "in_progress", "paused"]),
+        supabase.from("production_schedule").select("project_id, id, inbox_item_id, item_name, item_code, status, scheduled_week, is_blocker, projects!production_schedule_project_id_fkey(project_name)").in("status", ["scheduled", "in_progress", "paused", "completed"]),
       ]);
 
       if (tpvRes.error) throw tpvRes.error;
       if (inboxRes.error) throw inboxRes.error;
       if (scheduleRes.error) throw scheduleRes.error;
 
-      const tpvByProject = new Map<string, number>();
+      const itemKey = (row: { id: string; item_code: string | null; item_name?: string | null; inbox_item_id?: string | null }) =>
+        row.item_code ? `code:${row.item_code}` : row.inbox_item_id ? `inbox:${row.inbox_item_id}` : `id:${row.id}`;
+
+      const tpvByProject = new Map<string, Set<string>>();
       for (const row of tpvRes.data || []) {
-        tpvByProject.set(row.project_id, (tpvByProject.get(row.project_id) || 0) + 1);
+        if (!tpvByProject.has(row.project_id)) tpvByProject.set(row.project_id, new Set());
+        tpvByProject.get(row.project_id)!.add(itemKey(row));
       }
 
-      const inboxByProject = new Map<string, number>();
+      const inboxByProject = new Map<string, Set<string>>();
       for (const row of inboxRes.data || []) {
-        if (row.status === "pending") {
-          inboxByProject.set(row.project_id, (inboxByProject.get(row.project_id) || 0) + 1);
+        if (row.status === "pending" || row.status === "returned") {
+          if (!inboxByProject.has(row.project_id)) inboxByProject.set(row.project_id, new Set());
+          inboxByProject.get(row.project_id)!.add(itemKey(row));
         }
       }
 
-      const scheduledByProject = new Map<string, number>();
-      const completedByProject = new Map<string, number>();
-      const pausedByProject = new Map<string, number>();
+      const scheduledByProject = new Map<string, Set<string>>();
+      const completedByProject = new Map<string, Set<string>>();
+      const pausedByProject = new Map<string, Set<string>>();
       const blockerCountByProject = new Map<string, number>();
       const nonBlockerCountByProject = new Map<string, number>();
       const scheduledItemsByProject = new Map<string, ProjectProgress["scheduled_items"]>();
@@ -61,11 +65,14 @@ export function useProductionProgress() {
           nonBlockerCountByProject.set(pid, (nonBlockerCountByProject.get(pid) || 0) + 1);
         }
         if (row.status === "completed") {
-          completedByProject.set(pid, (completedByProject.get(pid) || 0) + 1);
+          if (!completedByProject.has(pid)) completedByProject.set(pid, new Set());
+          completedByProject.get(pid)!.add(itemKey(row));
         } else if (row.status === "paused") {
-          pausedByProject.set(pid, (pausedByProject.get(pid) || 0) + 1);
+          if (!pausedByProject.has(pid)) pausedByProject.set(pid, new Set());
+          pausedByProject.get(pid)!.add(itemKey(row));
         } else {
-          scheduledByProject.set(pid, (scheduledByProject.get(pid) || 0) + 1);
+          if (!scheduledByProject.has(pid)) scheduledByProject.set(pid, new Set());
+          scheduledByProject.get(pid)!.add(itemKey(row));
         }
         
         if (!scheduledItemsByProject.has(pid)) scheduledItemsByProject.set(pid, []);
@@ -89,11 +96,11 @@ export function useProductionProgress() {
 
       const result = new Map<string, ProjectProgress>();
       for (const pid of allProjectIds) {
-        const totalTpv = tpvByProject.get(pid) || 0;
-        const inInbox = inboxByProject.get(pid) || 0;
-        const scheduled = scheduledByProject.get(pid) || 0;
-        const completed = completedByProject.get(pid) || 0;
-        const paused = pausedByProject.get(pid) || 0;
+        const totalTpv = tpvByProject.get(pid)?.size || 0;
+        const inInbox = inboxByProject.get(pid)?.size || 0;
+        const scheduled = scheduledByProject.get(pid)?.size || 0;
+        const completed = completedByProject.get(pid)?.size || 0;
+        const paused = pausedByProject.get(pid)?.size || 0;
         const accountedFor = inInbox + scheduled + completed + paused;
         const missing = Math.max(0, totalTpv - accountedFor);
         
