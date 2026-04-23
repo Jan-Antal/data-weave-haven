@@ -501,10 +501,62 @@ export function OsobyOpravneni() {
         <div className="px-4 pt-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           Roly
         </div>
+        <div className="px-2 pb-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Hľadať osobu…"
+              className="h-8 pl-8 pr-8 text-xs bg-background"
+            />
+            {userSearch && (
+              <button
+                onClick={() => setUserSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Vymazať hľadanie"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {userSearch.trim() && (
+            <div className="mt-2 rounded-md border border-border/60 bg-background shadow-sm overflow-hidden">
+              {userSearchResults.length === 0 ? (
+                <div className="px-2 py-2 text-[11px] text-muted-foreground text-center">
+                  Osoba nenájdená
+                </div>
+              ) : (
+                userSearchResults.map(({ profile, role }) => (
+                  <button
+                    key={profile.id}
+                    onClick={() => setSelectedRole(role)}
+                    className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-muted transition-colors"
+                  >
+                    <Avatar className="h-6 w-6 shrink-0">
+                      <AvatarFallback className="text-[10px] font-medium">
+                        {initials(profile.full_name, profile.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium truncate text-foreground">
+                        {profile.full_name || profile.email}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {ROLE_LABELS[role]}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         <div className="flex-1 overflow-y-auto px-2 pb-2">
           {visibleRoles.map((r) => {
             const active = r === selectedRole;
             const count = roleCounts[r] ?? 0;
+            const matched = matchedRoleSet.has(r);
             return (
               <button
                 key={r}
@@ -513,6 +565,8 @@ export function OsobyOpravneni() {
                   "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-xs transition-colors text-left",
                   active
                     ? "bg-background font-medium text-foreground border-l-2 border-[#0a2e28] pl-[10px]"
+                    : matched
+                    ? "bg-accent/15 text-foreground ring-1 ring-accent/30"
                     : "text-muted-foreground hover:bg-muted",
                 )}
               >
@@ -522,6 +576,8 @@ export function OsobyOpravneni() {
                     "text-[10px] tabular-nums px-1.5 py-0.5 rounded-full",
                     active
                       ? "bg-[#0a2e28] text-white"
+                      : matched
+                      ? "bg-accent/25 text-accent-foreground"
                       : "bg-muted-foreground/10 text-muted-foreground",
                   )}
                 >
