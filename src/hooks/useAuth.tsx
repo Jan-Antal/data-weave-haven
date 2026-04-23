@@ -60,6 +60,7 @@ interface AuthContextType {
   canUploadDocuments: boolean;
   canPermanentDelete: boolean;
   canManageExchangeRates: boolean;
+  canManageOverheadProjects: boolean;
   canManageStatuses: boolean;
   canAccessRecycleBin: boolean;
   canEditColumns: boolean;
@@ -288,6 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canUploadDocuments: permissions.canUploadDocuments,
     canPermanentDelete: permissions.canPermanentDelete,
     canManageExchangeRates: permissions.canManageExchangeRates,
+    canManageOverheadProjects: permissions.canManageOverheadProjects,
     canManageStatuses: permissions.canManageStatuses,
     canAccessRecycleBin: permissions.canAccessRecycleBin,
     canEditColumns,

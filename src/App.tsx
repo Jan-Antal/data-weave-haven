@@ -99,13 +99,33 @@ function PortraitLockOverlay() {
   );
 }
 
-/** Route guard for admin/owner-only pages and vyroba role */
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin, isOwner, isVyroba, isPM, isKonstrukter, canManagePeople, canManageExternisti, canManageUsers } = useAuth();
-  const allowed =
-    isAdmin || isOwner || isVyroba || isPM || isKonstrukter ||
-    canManagePeople || canManageExternisti || canManageUsers;
-  if (!allowed) return <Navigate to="/" replace />;
+function PlanRoute({ children }: { children: React.ReactNode }) {
+  const { canAccessPlanVyroby } = useAuth();
+  if (!canAccessPlanVyroby) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function VyrobaRoute({ children }: { children: React.ReactNode }) {
+  const { canManageProduction, canQCOnly, canAccessPlanVyroby } = useAuth();
+  if (!canManageProduction && !canQCOnly && !canAccessPlanVyroby) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AnalyticsRoute({ children }: { children: React.ReactNode }) {
+  const { canAccessAnalytics } = useAuth();
+  if (!canAccessAnalytics) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function OsobyRoute({ children }: { children: React.ReactNode }) {
+  const { canManagePeople, canManageExternisti, canManageUsers, isAdmin, isOwner } = useAuth();
+  if (!canManagePeople && !canManageExternisti && !canManageUsers && !isAdmin && !isOwner) {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -199,10 +219,10 @@ function AppRoutes() {
             <main style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               <Routes>
                 <Route path="/" element={<Index />} />
-                <Route path="/plan-vyroby" element={<AdminRoute><PlanVyroby /></AdminRoute>} />
-                <Route path="/vyroba" element={<AdminRoute><Vyroba /></AdminRoute>} />
-                <Route path="/analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
-                <Route path="/osoby" element={<AdminRoute><Osoby /></AdminRoute>} />
+                <Route path="/plan-vyroby" element={<PlanRoute><PlanVyroby /></PlanRoute>} />
+                <Route path="/vyroba" element={<VyrobaRoute><Vyroba /></VyrobaRoute>} />
+                <Route path="/analytics" element={<AnalyticsRoute><Analytics /></AnalyticsRoute>} />
+                <Route path="/osoby" element={<OsobyRoute><Osoby /></OsobyRoute>} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/set-password" element={<SetPassword />} />
                 <Route path="/login" element={<Navigate to="/" replace />} />
