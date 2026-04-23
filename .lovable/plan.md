@@ -1,184 +1,246 @@
 
-## Plán opravy bundle logiky v Plánu výroby
+## Plán opravy konzistence „Dokončeno / Vrátit do výroby“
 
-### Problém 1: položka z bundle B nejde přetáhnout do bundle D
+### Zjištěná příčina
 
-V T19 má projekt `Z-2617-001` bundle `B` a `D`, oba jsou typu `full`, ale nejsou ve stejné etapě:
+U projektu `Z-2515-001`, prvek `T02`, je aktuální stav v databázi nekonzistentní:
 
 ```text
-B: stage_id = 5dbe6c7d...
-D: stage_id = null
+production_schedule.status = scheduled
+production_schedule.completed_at = null
+production_expedice existuje pro source_schedule_id = T02
 ```
 
-Aktuální kontrola dropu nedovolí spojit položky mezi různými `stage_id`, proto přetažení `B → D` skončí jako neplatný drop.
+Aplikace tedy vidí položku jako hotovou kvůli záznamu v `production_expedice`, i když samotný řádek v `production_schedule` říká `scheduled`.
 
-### Úprava
-Upravím pravidlo pro full bundle:
+Proto:
+- klik „Vrátit do výroby“ ukáže toast, ale stav se nezmění, protože funkce mění hlavně `production_schedule`, ale nesmaže záznam v `production_expedice`,
+- Plán výroby a Výroba se mohou rozcházet, protože někde se bere stav ze `status`, jinde z existence expedice záznamu.
 
-- pokud jsou oba bundle typu `full`,
-- jsou ze stejného projektu,
-- nejsou split,
-- uživatel dropuje položku/bundle do jiného full bundlu,
+---
 
-tak sloučení povolím i tehdy, když se `stage_id` liší nebo je u jednoho `null`.
+## 1. Jednotné pravidlo stavu položky
+
+Zavedu jedno konzistentní pravidlo pro oba moduly:
+
+```text
+Výroba / Plán výroby:
+- scheduled / in_progress / paused = ve výrobě
+- completed = vyrobeno
+- production_expedice row bez expediced_at = vyrobeno a čeká v Expedici
+- production_expedice row s expediced_at = expedováno / archiv
+```
+
+Prakticky:
+- položka dokončená ve Výrobě i v Plánu výroby bude mít stejný zdroj pravdy,
+- `production_expedice` bude dál sloužit jako přechod do Expedice,
+- návrat do výroby musí vždy odstranit odpovídající `production_expedice` záznam.
+
+---
+
+## 2. Oprava „Vrátit do výroby“ v Plánu výroby
+
+### Soubor
+`src/hooks/useProductionDragDrop.ts`
+
+Upravím `returnToProduction(scheduleItemId)` tak, aby při návratu:
+
+1. načetl původní `production_schedule` řádek,
+2. načetl odpovídající `production_expedice` řádek podle `source_schedule_id`,
+3. smazal `production_expedice` řádek,
+4. nastavil `production_schedule` zpět na aktivní stav:
+   ```text
+   status = in_progress nebo scheduled
+   completed_at = null
+   completed_by = null
+   expediced_at = null
+   ```
+5. invalidoval všechny související query:
+   ```text
+   production-schedule
+   production-expedice
+   production-expedice-schedule-ids
+   production-progress
+   production-statuses
+   ```
+
+Undo/Redo pro tuto akci bude snapshotové:
+- Undo znovu obnoví původní `production_expedice` řádek a původní schedule stav.
+- Redo znovu odstraní expedice řádek a vrátí položku do výroby.
+- Nevytvoří duplicitu, protože insert použije původní `id` a bezpečný upsert mechanismus.
+
+---
+
+## 3. Oprava bundle návratu do výroby
+
+### Soubor
+`src/components/production/WeeklySilos.tsx`
+
+Aktuálně se u dokončeného bundlu volá `returnToProduction` v cyklu pro každou položku:
+
+```text
+for each completed item → returnToProduction(item.id)
+```
+
+To je špatně, protože:
+- vzniká více undo kroků,
+- může se zobrazit toast, i když část změny nezmění reálný stav,
+- je vyšší riziko nekonzistence.
+
+Upravím to na jednu bundle operaci:
+
+```text
+Vrácení bundlu A projektu Z-2515-001 do výroby
+```
+
+Technicky:
+- přidám/rozšířím funkci pro hromadný návrat položek do výroby,
+- zachytím snapshot všech dotčených `production_schedule` řádků,
+- zachytím snapshot všech dotčených `production_expedice` řádků,
+- smažu expedice řádky jedním krokem,
+- obnovím schedule řádky jedním krokem,
+- Step back / Step forward bude jedna operace.
+
+---
+
+## 4. Oprava Výroba modulu, aby správně zobrazoval dokončené položky
+
+### Soubor
+`src/hooks/useProductionSchedule.ts`
+
+Dnes hook načítá jen:
+
+```text
+scheduled, in_progress, paused
+```
+
+To může skrýt položky, které mají `status = completed`, i když mají být ve Výrobě viditelné jako dokončené.
+
+Upravím načítání tak, aby zahrnovalo i:
+
+```text
+completed
+```
+
+a potom stav sjednotím:
+- pokud existuje `production_expedice` řádek bez `expediced_at`, položka se v UI zobrazí jako dokončená / v Expedici,
+- pokud je `production_schedule.status = completed`, zobrazí se jako dokončená,
+- pokud se položka vrátí do výroby, oba moduly ji po invalidaci uvidí jako aktivní.
+
+---
+
+## 5. Oprava lokálních kontrol ve Výrobě
+
+### Soubor
+`src/pages/Vyroba.tsx`
+
+Sjednotím lokální helpery, které dnes ne vždy používají stejnou logiku:
+
+- `isItemDone`
+- `isItemDoneLocal`
+- řazení dokončených položek dolů,
+- výpočet `hasIncomplete`,
+- tlačítko „Označit jako hotovo“.
+
+Konkrétně opravím problém typu:
+
+```text
+status = expedice
+```
+
+nesmí být brán jako nedokončený jen proto, že není přesně `completed`.
 
 Výsledkem bude:
-- položka z `B` půjde přetáhnout do `D`,
-- po sloučení převezme položka týden, bundle label a stage cílového bundlu,
-- v undo/redo to zůstane jedna operace.
-
-Split bundle pravidla nechám přísnější:
-- split se nebude míchat s full,
-- různé split série se dál nebudou spojovat.
+- hotové položky budou vždy ve spodní části,
+- tlačítko „Označit jako hotovo“ nebude nabízet dokončené položky,
+- QC a dokončení budou pracovat se stejnou logikou jako Plán výroby.
 
 ---
 
-## Problém 2: stejný bundle label `B` existuje v T17 i T19
+## 6. Dokončení položky ve Výrobě
 
-Aktuální `normalizeFullBundlesForWeek` sjednocuje full bundle pouze v rámci jednoho týdne. To způsobí, že stejný projekt může mít `B` ve více týdnech, pokud se bundle přesune nebo vytvoří v jiném týdnu.
+### Soubor
+`src/pages/Vyroba.tsx`
 
-U projektu `Z-2617-001` jsem ověřil stav:
+Při označení položky jako hotovo sjednotím zápis:
+
+1. vložit/obnovit `production_expedice`,
+2. nastavit `production_schedule.status = completed`,
+3. nastavit `completed_at`,
+4. nastavit `completed_by`.
+
+Při vrácení zpět:
+
+1. smazat `production_expedice`,
+2. vrátit `production_schedule.status` na `in_progress` nebo `scheduled`,
+3. vyčistit `completed_at`,
+4. vyčistit `completed_by`.
+
+Tím budou Plan Výroby a Výroba ukazovat stejný stav ze stejných dat.
+
+---
+
+## 7. Cílená oprava aktuálních dat pro Z-2515-001 / T02
+
+Po úpravě kódu provedu cílenou opravu aktuálního rozbitého stavu:
 
 ```text
-T17: bundle B, full, T.23 -B
-T19: bundle B, full, T.23 -A
-T19: bundle D, full, T.07, T.08
+Projekt: Z-2515-001
+Prvek: T02
+Akce: odstranit stale production_expedice záznam, pokud má být T02 zpět ve výrobě
 ```
 
-To je podle nového pravidla chyba: každý samostatný full bundle projektu má mít vlastní označení globálně napříč týdny, ne jen v rámci týdne.
+Tím se aktuální položka ihned vrátí do aktivního stavu a přestane se tvářit jako dokončená.
+
+Nebudu dělat žádný hromadný přepis ostatních projektů bez kontroly.
 
 ---
 
-## Nové pravidlo pro označování full bundle
+## 8. Realtime a cache invalidace
 
-Pro jeden projekt + etapu bude platit:
+### Soubor
+`src/hooks/useRealtimeSync.ts`
+
+Doplním invalidaci pro `production_expedice`, protože změny v této tabulce přímo mění stav položek ve Výrobě i v Plánu výroby.
+
+Při INSERT / UPDATE / DELETE v `production_expedice` se invaliduje:
 
 ```text
-A, B, C, D...
+production-expedice
+production-expedice-schedule-ids
+production-schedule
+production-progress
 ```
 
-jsou globální názvy samostatných full bundlů napříč celým plánem.
-
-Tedy:
-- pokud existuje `B` v T17, nově vytvořený/samostatný bundle v T19 nesmí také dostat `B`,
-- pokud se celý bundle přesune z T17 do T19, jeho label zůstane `B`,
-- pokud se položka nebo bundle vloží do existujícího `D`, převezme `D`,
-- pokud se položka vyčlení jako nový bundle, dostane první volný label, který není použitý nikde v projektu.
+Tím se oba moduly přepočítají hned po změně.
 
 ---
 
-## Technická úprava
-
-### 1. `src/lib/productionBundles.ts`
-
-Upravím helpery:
-
-#### `getNextBundleLabel`
-Zůstane globální pro projekt + etapu, ale zpřesním, že ignoruje pouze zrušené/vrácené/dokončené historické řádky, a bere aktivní full/split labely jako obsazené.
-
-#### Nový helper
-Doplním funkci například:
-
-```ts
-getAvailableBundleLabel(projectId, stageId, excludeIds?)
-```
-
-Použije se při přesunu nebo vyčlenění, aby nevznikla duplicita labelu mimo původní bundle.
-
-#### `validateBundleDrop`
-Upravím tak, aby:
-- full → full sloučení bylo povolené i při rozdílném `stage_id`,
-- split pravidla zůstala chráněná.
-
-#### `canAcceptBundleDrop`
-Upravím stejně jako UI kontrolu:
-- drop full položky/bundlu do full bundlu stejného projektu bude povolený,
-- stage rozdíl nebude blokovat full → full,
-- split logika zůstane beze změny.
-
----
-
-### 2. `src/hooks/useProductionDragDrop.ts`
-
-Upravím akce:
-
-```text
-moveScheduleItemIntoBundle
-mergeFullBundleIntoBundle
-moveScheduleItemAsNewBundle
-moveFullBundleAsNewBundle
-moveBundleToWeek
-```
-
-Konkrétně:
-- při sloučení do cílového bundlu položka převezme i `stage_id` cílového bundlu,
-- při vytvoření nového bundlu se použije globálně volný label,
-- po přesunu se nebude automaticky normalizovat tak, že se omylem sjednotí samostatné full bundle v jednom týdnu,
-- undo/redo payloady zachovají původní `stage_id`, `bundle_label`, `bundle_type`, `scheduled_week`.
-
----
-
-### 3. `src/hooks/useProductionSchedule.ts`
-
-Zkontroluji klíč pro seskupování bundle:
-
-```ts
-project_id + stage_id + bundle_label + split_part
-```
-
-Pokud po nové logice bude potřeba, upravím ho tak, aby full bundle seskupoval podle stabilního bundle labelu a split bundle podle split metadat. Cílem je, aby UI správně ukázalo:
-- `D` jako jeden bundle po vložení položky z `B`,
-- `B` a `D` jako oddělené bundle, pokud se nesloučily.
-
----
-
-### 4. Oprava existujících dat pro `Z-2617-001`
-
-Připravím jednorázovou bezpečnou opravu aktuální duplicity:
-
-```text
-Z-2617-001
-T17: B ponechat
-T19: B přejmenovat na první volný label, pravděpodobně C nebo E
-```
-
-Ponechám existující `D`, protože už existuje jako samostatný bundle v T19.
-
-Oprava bude cílená jen na projekt `Z-2617-001`, ne globální přepis všech dat.
-
----
-
-## Očekávané chování po opravě
-
-### Ad 1
-V T19 půjde:
-```text
-položka z B → drop na D
-```
-
-Výsledek:
-```text
-D obsahuje původní položky D + položku z B
-B zmizí, pokud byl prázdný
-```
-
-### Ad 2
-Nebude možné, aby jeden projekt měl samostatný full bundle `B` v T17 a další samostatný full bundle `B` v T19.
-
-Pokud nový bundle vzniká v jiném týdnu, dostane nový volný label.
-
----
-
-## Ověření
+## 9. Ověření
 
 Po implementaci ověřím:
 
-1. `Z-2617-001` v T19: položka z `B` jde přetáhnout do `D`.
-2. Po dropu má položka label `D`.
-3. Po dropu se nezmění split bundle `A`.
-4. Full bundle se nespojí se split bundle.
-5. Nový full bundle nedostane label, který už projekt používá v jiném týdnu.
-6. Aktuální duplicita `B` u `Z-2617-001` bude opravena.
-7. Undo vrátí položku zpět do původního bundlu.
-8. Redo ji znovu vloží do cílového bundlu bez duplicit.
-9. Build projde bez TypeScript chyb.
+1. `Z-2515-001 / T02` se po opravě již netváří jako dokončený, pokud byl vrácen do výroby.
+2. Pravý klik v Plánu výroby → „Vrátit do výroby“ skutečně odstraní stav dokončeno.
+3. Po návratu do výroby zmizí odpovídající záznam z `production_expedice`.
+4. Výroba modul ukáže stejný stav jako Plán výroby.
+5. Dokončení položky ve Výrobě se propíše do Plánu výroby.
+6. Dokončení položky v Plánu výroby se propíše do Výroby.
+7. Hotové položky se ve Výrobě řadí dolů.
+8. Vrácení celého bundlu je jeden Step back krok.
+9. Undo návratu do výroby znovu obnoví dokončený / expedice stav.
+10. Redo návratu do výroby znovu vrátí položku do aktivní výroby.
+11. Nevzniknou duplicitní `production_expedice` záznamy.
+12. Build projde bez TypeScript chyb.
+
+---
+
+## Soubory k úpravě
+
+```text
+src/hooks/useProductionDragDrop.ts
+src/components/production/WeeklySilos.tsx
+src/hooks/useProductionSchedule.ts
+src/pages/Vyroba.tsx
+src/hooks/useRealtimeSync.ts
+```
