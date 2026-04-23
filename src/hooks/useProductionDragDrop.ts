@@ -15,7 +15,7 @@ function weekLabel(weekDate: string): string {
   } catch { return weekDate; }
 }
 
-const productionQueryKeys = [["production-inbox"], ["production-schedule"], ["production-expedice"], ["production-expedice-schedule-ids"], ["production-progress"]];
+const productionQueryKeys = [["production-inbox"], ["production-schedule"], ["production-expedice"], ["production-expedice-schedule-ids"], ["production-progress"], ["production-statuses"]];
 
 function updatePayload(table: string, records: Record<string, any>[]) {
   return { table, operation: "update" as const, records, queryKeys: productionQueryKeys };
@@ -43,6 +43,7 @@ export function useProductionDragDrop() {
     qc.invalidateQueries({ queryKey: ["production-expedice"] });
     qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
     qc.invalidateQueries({ queryKey: ["production-progress"] });
+    qc.invalidateQueries({ queryKey: ["production-statuses"] });
   }, [qc]);
 
   const invalidateBundleQueries = useCallback(() => {
@@ -1169,6 +1170,7 @@ export function useProductionDragDrop() {
           await supabase.from("production_schedule")
             .update({ status: "completed", completed_at: redoNow, completed_by: u?.id })
             .in("id", itemIds);
+          await (supabase.from("production_expedice") as any).delete().in("source_schedule_id", itemIds);
           await (supabase.from("production_expedice") as any).insert(expediceRows);
           invalidateAll();
         },
@@ -1180,33 +1182,59 @@ export function useProductionDragDrop() {
     }
   }, [invalidateAll, pushUndo]);
 
-  const returnToProduction = useCallback(async (scheduleItemId: string) => {
+  const returnItemsToProduction = useCallback(async (scheduleItemIds: string[], description?: string) => {
+    const ids = Array.from(new Set(scheduleItemIds.filter(Boolean)));
+    if (ids.length === 0) return;
     try {
-      const { data: oldItem } = await supabase.from("production_schedule")
-        .select("status, completed_at, completed_by, item_name")
-        .eq("id", scheduleItemId).single();
+      const { data: oldItems, error: oldItemsError } = await supabase.from("production_schedule")
+        .select("*")
+        .in("id", ids);
+      if (oldItemsError) throw oldItemsError;
+      if (!oldItems || oldItems.length === 0) throw new Error("Položky nebyly nalezeny");
 
-      const { error } = await supabase
+      const { data: oldExpediceRows, error: expediceError } = await (supabase.from("production_expedice" as any) as any)
+        .select("*")
+        .in("source_schedule_id", ids);
+      if (expediceError) throw expediceError;
+
+      const { error: deleteExpediceError } = await (supabase.from("production_expedice") as any)
+        .delete()
+        .in("source_schedule_id", ids);
+      if (deleteExpediceError) throw deleteExpediceError;
+
+      const { error: updateError } = await supabase
         .from("production_schedule")
         .update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any)
-        .eq("id", scheduleItemId);
-      if (error) throw error;
+        .in("id", ids);
+      if (updateError) throw updateError;
       invalidateAll();
 
       pushUndo({
         page: "plan-vyroby",
         actionType: "return_to_production",
-        description: `Vrácení ${oldItem?.item_name || "položky"} do výroby`,
+        description: description || `Vrácení ${oldItems.length === 1 ? oldItems[0].item_name : `${oldItems.length} položek`} do výroby`,
         undo: async () => {
-          await supabase.from("production_schedule")
-            .update({ status: oldItem?.status || "completed", completed_at: oldItem?.completed_at, completed_by: oldItem?.completed_by })
-            .eq("id", scheduleItemId);
+          for (const oldItem of oldItems) {
+            await supabase.from("production_schedule")
+              .update({
+                status: oldItem.status,
+                completed_at: oldItem.completed_at,
+                completed_by: oldItem.completed_by,
+                expediced_at: (oldItem as any).expediced_at ?? null,
+              } as any)
+              .eq("id", oldItem.id);
+          }
+          if ((oldExpediceRows || []).length > 0) {
+            await (supabase.from("production_expedice") as any).delete().in("source_schedule_id", ids);
+            await (supabase.from("production_expedice") as any).insert(oldExpediceRows as any[]);
+          }
           invalidateAll();
         },
         redo: async () => {
+          await (supabase.from("production_expedice") as any).delete().in("source_schedule_id", ids);
           await supabase.from("production_schedule")
-            .update({ status: "scheduled", completed_at: null, completed_by: null })
-            .eq("id", scheduleItemId);
+            .update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any)
+            .in("id", ids);
           invalidateAll();
         },
       });
@@ -1214,6 +1242,10 @@ export function useProductionDragDrop() {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
   }, [invalidateAll, pushUndo]);
+
+  const returnToProduction = useCallback(async (scheduleItemId: string) => {
+    await returnItemsToProduction([scheduleItemId]);
+  }, [returnItemsToProduction]);
 
   const returnBundleToInbox = useCallback(async (projectId: string, weekDate: string, sourceItemIds?: string[]) => {
     try {
@@ -1665,6 +1697,7 @@ export function useProductionDragDrop() {
     reorderItemsInWeek,
     completeItems,
     returnToProduction,
+    returnItemsToProduction,
     returnBundleToInbox,
     mergeSplitItems,
     mergeBundleSplitGroups,
