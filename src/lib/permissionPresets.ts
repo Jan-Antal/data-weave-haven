@@ -21,6 +21,7 @@ export type PermissionFlag =
   | "canUploadDocuments"
   | "canPermanentDelete"
   | "canManageExchangeRates"
+  | "canManageOverheadProjects"
   | "canManageStatuses"
   | "canAccessRecycleBin";
 
@@ -45,6 +46,7 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canUploadDocuments",
   "canPermanentDelete",
   "canManageExchangeRates",
+  "canManageOverheadProjects",
   "canManageStatuses",
   "canAccessRecycleBin",
 ];
@@ -70,6 +72,7 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canUploadDocuments: "Nahrávať dokumenty",
   canPermanentDelete: "Trvalé mazanie",
   canManageExchangeRates: "Spravovať kurzy",
+  canManageOverheadProjects: "Spravovať réžijné projekty",
   canManageStatuses: "Spravovať stavy",
   canAccessRecycleBin: "Prístup do Koša",
 };
@@ -112,6 +115,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canAccessDaylog",
     "canUploadDocuments",
     "canPermanentDelete",
+    "canManageOverheadProjects",
     "canAccessRecycleBin",
   ),
   pm: preset(
@@ -158,8 +162,12 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canUploadDocuments",
   ),
   quality: preset("canAccessDaylog", "canQCOnly"),
-  kalkulant: preset("canAccessAnalytics", "canSeePrices"),
-  viewer: { ...ALL_FALSE },
+  kalkulant: preset("canAccessAnalytics", "canSeePrices", "canManageOverheadProjects"),
+  viewer: preset(
+    "canAccessPlanVyroby",
+    "canAccessDaylog",
+    "canAccessAnalytics",
+  ),
   // Backward-compat: vyroba mirrors vedouci_vyroby
   vyroba: preset(
     "canEdit",
