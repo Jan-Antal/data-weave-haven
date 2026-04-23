@@ -1313,7 +1313,6 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", item.id);
         }
         await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any).in("id", itemsToExpedice.map((item) => item.id));
-        await supabase.from("production_schedule").update({ status: "completed", completed_at: nowIso, completed_by: null } as any).in("id", itemsToInsert.map(({ id }) => id));
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
         qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -1393,6 +1392,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               is_midflight: false,
             }]);
           }
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: null } as any).eq("id", itemId);
           await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: null } as any).eq("id", itemId);
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
