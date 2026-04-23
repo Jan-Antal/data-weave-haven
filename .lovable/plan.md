@@ -1,236 +1,229 @@
 
-## Plán opravy konzistence „Dokončeno / Vrátit do výroby“
+## Plán sjednocení QC kontroly při dokončení v Plánu Výroby
 
-### Zjištěná příčina
+### Zjištění
 
-U projektu `Z-2515-001`, prvek `T02`, je aktuální stav v databázi nekonzistentní:
+V modulu **Výroba** funguje dokončení takto:
 
 ```text
-production_schedule.status = scheduled
-production_schedule.completed_at = null
-production_expedice existuje pro source_schedule_id = T02
+Označit jako hotovo
+→ pokud chybí QC
+→ otevře se samostatný modal „Kontrola kvality“
+→ uživatel může potvrdit QC, případně zapsat vadu
+→ až potom se položka označí jako hotová / přesune do Expedice
 ```
 
-Aplikace tedy vidí položku jako hotovou kvůli záznamu v `production_expedice`, i když samotný řádek v `production_schedule` říká `scheduled`.
+V **Plánu Výroby** už QC kontrola technicky existuje v `CompletionDialog`, ale chování není stejné:
 
-Proto:
-- klik „Vrátit do výroby“ ukáže toast, ale stav se nezmění, protože funkce mění hlavně `production_schedule`, ale nesmaže záznam v `production_expedice`,
-- Plán výroby a Výroba se mohou rozcházet, protože někde se bere stav ze `status`, jinde z existence expedice záznamu.
+```text
+Pravý klik → Dokončit → Expedice
+→ otevře se dokončovací dialog
+→ chybějící QC se ukáže jen jako inline upozornění
+→ tlačítko se změní na „Potvrdit QC a dokončit“
+→ po kliknutí se QC zapíše automaticky a položka se dokončí
+```
+
+To znamená, že Plán Výroby teď QC neřeší stejným uživatelským tokem jako Výroba. Chybí samostatné QC okno a možnost řešit vady před dokončením.
 
 ---
 
-## 1. Jednotné pravidlo stavu položky
+## Cíl úpravy
 
-Zavedu jedno konzistentní pravidlo pro oba moduly:
+Sjednotit chování tak, aby při dokončení položky v **Plánu Výroby** vyskočil stejný typ QC kroku jako ve **Výrobě**.
+
+Výsledné pravidlo:
 
 ```text
-Výroba / Plán výroby:
-- scheduled / in_progress / paused = ve výrobě
-- completed = vyrobeno
-- production_expedice row bez expediced_at = vyrobeno a čeká v Expedici
-- production_expedice row s expediced_at = expedováno / archiv
+Pokud položka nemá QC:
+- Plán Výroby nesmí položku rovnou dokončit.
+- Nejdřív otevře QC dialog.
+- Po potvrzení QC dokončí položku a přesune ji do Expedice.
 ```
 
-Prakticky:
-- položka dokončená ve Výrobě i v Plánu výroby bude mít stejný zdroj pravdy,
-- `production_expedice` bude dál sloužit jako přechod do Expedice,
-- návrat do výroby musí vždy odstranit odpovídající `production_expedice` záznam.
+Pokud položka QC už má:
+
+```text
+Dokončení proběhne rovnou.
+```
 
 ---
 
-## 2. Oprava „Vrátit do výroby“ v Plánu výroby
+## 1. Rozšíření `CompletionDialog` v Plánu Výroby
 
 ### Soubor
-`src/hooks/useProductionDragDrop.ts`
+`src/components/production/CompletionDialog.tsx`
 
-Upravím `returnToProduction(scheduleItemId)` tak, aby při návratu:
+Upravím dokončovací dialog tak, aby při kliknutí na dokončení:
 
-1. načetl původní `production_schedule` řádek,
-2. načetl odpovídající `production_expedice` řádek podle `source_schedule_id`,
-3. smazal `production_expedice` řádek,
-4. nastavil `production_schedule` zpět na aktivní stav:
-   ```text
-   status = in_progress nebo scheduled
-   completed_at = null
-   completed_by = null
-   expediced_at = null
-   ```
-5. invalidoval všechny související query:
-   ```text
-   production-schedule
-   production-expedice
-   production-expedice-schedule-ids
-   production-progress
-   production-statuses
-   ```
-
-Undo/Redo pro tuto akci bude snapshotové:
-- Undo znovu obnoví původní `production_expedice` řádek a původní schedule stav.
-- Redo znovu odstraní expedice řádek a vrátí položku do výroby.
-- Nevytvoří duplicitu, protože insert použije původní `id` a bezpečný upsert mechanismus.
+1. zkontroloval vybrané položky,
+2. zjistil, které nemají záznam v `production_quality_checks`,
+3. pokud QC chybí:
+   - neprovede dokončení hned,
+   - otevře samostatný QC potvrzovací dialog,
+   - zobrazí seznam položek, kterých se QC týká,
+   - po potvrzení zapíše QC a teprve potom dokončí položky,
+4. pokud QC nechybí:
+   - dokončí položky rovnou jako dnes.
 
 ---
 
-## 3. Oprava bundle návratu do výroby
+## 2. Použití stejného UI principu jako ve Výrobě
 
-### Soubor
-`src/components/production/WeeklySilos.tsx`
-
-Aktuálně se u dokončeného bundlu volá `returnToProduction` v cyklu pro každou položku:
-
-```text
-for each completed item → returnToProduction(item.id)
-```
-
-To je špatně, protože:
-- vzniká více undo kroků,
-- může se zobrazit toast, i když část změny nezmění reálný stav,
-- je vyšší riziko nekonzistence.
-
-Upravím to na jednu bundle operaci:
-
-```text
-Vrácení bundlu A projektu Z-2515-001 do výroby
-```
-
-Technicky:
-- přidám/rozšířím funkci pro hromadný návrat položek do výroby,
-- zachytím snapshot všech dotčených `production_schedule` řádků,
-- zachytím snapshot všech dotčených `production_expedice` řádků,
-- smažu expedice řádky jedním krokem,
-- obnovím schedule řádky jedním krokem,
-- Step back / Step forward bude jedna operace.
-
----
-
-## 4. Oprava Výroba modulu, aby správně zobrazoval dokončené položky
-
-### Soubor
-`src/hooks/useProductionSchedule.ts`
-
-Dnes hook načítá jen:
-
-```text
-scheduled, in_progress, paused
-```
-
-To může skrýt položky, které mají `status = completed`, i když mají být ve Výrobě viditelné jako dokončené.
-
-Upravím načítání tak, aby zahrnovalo i:
-
-```text
-completed
-```
-
-a potom stav sjednotím:
-- pokud existuje `production_expedice` řádek bez `expediced_at`, položka se v UI zobrazí jako dokončená / v Expedici,
-- pokud je `production_schedule.status = completed`, zobrazí se jako dokončená,
-- pokud se položka vrátí do výroby, oba moduly ji po invalidaci uvidí jako aktivní.
-
----
-
-## 5. Oprava lokálních kontrol ve Výrobě
-
-### Soubor
+### Zdroj vzoru
 `src/pages/Vyroba.tsx`
 
-Sjednotím lokální helpery, které dnes ne vždy používají stejnou logiku:
-
-- `isItemDone`
-- `isItemDoneLocal`
-- řazení dokončených položek dolů,
-- výpočet `hasIncomplete`,
-- tlačítko „Označit jako hotovo“.
-
-Konkrétně opravím problém typu:
+Převezmu logiku a vizuální princip z modulu Výroba:
 
 ```text
-status = expedice
+Dialog title: Kontrola kvality — {projekt}
+Seznam položek bez QC
+Tlačítko: Potvrdit QC
+Volitelné: zápis vady / blokující vady podle existujícího komponentového vzoru
 ```
 
-nesmí být brán jako nedokončený jen proto, že není přesně `completed`.
-
-Výsledkem bude:
-- hotové položky budou vždy ve spodní části,
-- tlačítko „Označit jako hotovo“ nebude nabízet dokončené položky,
-- QC a dokončení budou pracovat se stejnou logikou jako Plán výroby.
-
----
-
-## 6. Dokončení položky ve Výrobě
-
-### Soubor
-`src/pages/Vyroba.tsx`
-
-Při označení položky jako hotovo sjednotím zápis:
-
-1. vložit/obnovit `production_expedice`,
-2. nastavit `production_schedule.status = completed`,
-3. nastavit `completed_at`,
-4. nastavit `completed_by`.
-
-Při vrácení zpět:
-
-1. smazat `production_expedice`,
-2. vrátit `production_schedule.status` na `in_progress` nebo `scheduled`,
-3. vyčistit `completed_at`,
-4. vyčistit `completed_by`.
-
-Tím budou Plan Výroby a Výroba ukazovat stejný stav ze stejných dat.
-
----
-
-## 7. Cílená oprava aktuálních dat pro Z-2515-001 / T02
-
-Po úpravě kódu provedu cílenou opravu aktuálního rozbitého stavu:
+První krok udělám tak, aby Plán Výroby minimálně zobrazil samostatný QC modal před dokončením. Pokud půjde jednoduše znovupoužít existující formulář vad z Výroby bez rizika velkého refaktoru, přidám i zápis vad. Pokud je formulář ve Výrobě příliš lokálně navázaný, udělám bezpečnější variantu:
 
 ```text
-Projekt: Z-2515-001
-Prvek: T02
-Akce: odstranit stale production_expedice záznam, pokud má být T02 zpět ve výrobě
+Plán Výroby:
+- samostatný QC modal
+- potvrzení QC
+- dokončení položky
 ```
 
-Tím se aktuální položka ihned vrátí do aktivního stavu a přestane se tvářit jako dokončená.
-
-Nebudu dělat žádný hromadný přepis ostatních projektů bez kontroly.
+a následně bude možné formulář vad extrahovat do sdílené komponenty.
 
 ---
 
-## 8. Realtime a cache invalidace
+## 3. Oprava textů v dokončovacím dialogu
 
-### Soubor
-`src/hooks/useRealtimeSync.ts`
-
-Doplním invalidaci pro `production_expedice`, protože změny v této tabulce přímo mění stav položek ve Výrobě i v Plánu výroby.
-
-Při INSERT / UPDATE / DELETE v `production_expedice` se invaliduje:
+Dnešní inline upozornění:
 
 ```text
+Chybí QC kontrola
+Nejprve potvrďte QC. Poté budou položky přesunuty do Expedice.
+```
+
+změním tak, aby dialog jasně říkal, že po kliknutí se otevře QC krok, ne že se QC potvrdí potichu.
+
+Například:
+
+```text
+Vybrané položky nemají QC kontrolu.
+Před dokončením se otevře potvrzení kvality.
+```
+
+Tlačítko:
+
+```text
+Pokračovat na QC
+```
+
+místo automatického:
+
+```text
+Potvrdit QC a dokončit
+```
+
+---
+
+## 4. Zachování konzistence dat
+
+Po potvrzení QC v Plánu Výroby se bude zapisovat stejně jako ve Výrobě:
+
+```text
+production_quality_checks:
+- item_id
+- project_id
+- checked_by
+- checked_at
+```
+
+Až potom se provede dokončení:
+
+```text
+production_schedule.status = completed
+production_schedule.completed_at = now
+production_schedule.completed_by = current user
+
+production_expedice:
+- source_schedule_id
+- project_id
+- item_code
+- item_name
+- stage_id
+- manufactured_at
+- expediced_at podle split/expedice pravidla
+```
+
+---
+
+## 5. Cache invalidace
+
+Po potvrzení QC a dokončení invaliduji:
+
+```text
+production-schedule
 production-expedice
 production-expedice-schedule-ids
-production-schedule
+production-quality-checks
+quality-checks
 production-progress
+production-statuses
 ```
 
-Tím se oba moduly přepočítají hned po změně.
+Tím se změna okamžitě projeví v:
+
+```text
+Plán Výroby
+Výroba
+Expedice
+stavové badge u TPV/projektu
+```
 
 ---
 
-## 9. Ověření
+## 6. Undo / Step back
+
+Zkontroluji, aby dokončení z Plánu Výroby zůstalo jedna vratná akce:
+
+```text
+QC potvrzení + dokončení položky = jeden Step back krok
+```
+
+Undo musí vrátit:
+
+```text
+- položku zpět jako nedokončenou,
+- odstranit nově vytvořený production_expedice záznam,
+- odstranit QC záznam vytvořený tímto krokem,
+- ponechat starší QC záznamy, pokud už existovaly před akcí.
+```
+
+Redo musí znovu:
+
+```text
+- obnovit QC vytvořené v daném kroku,
+- dokončit položku,
+- obnovit production_expedice záznam.
+```
+
+---
+
+## 7. Ověření
 
 Po implementaci ověřím:
 
-1. `Z-2515-001 / T02` se po opravě již netváří jako dokončený, pokud byl vrácen do výroby.
-2. Pravý klik v Plánu výroby → „Vrátit do výroby“ skutečně odstraní stav dokončeno.
-3. Po návratu do výroby zmizí odpovídající záznam z `production_expedice`.
-4. Výroba modul ukáže stejný stav jako Plán výroby.
-5. Dokončení položky ve Výrobě se propíše do Plánu výroby.
-6. Dokončení položky v Plánu výroby se propíše do Výroby.
-7. Hotové položky se ve Výrobě řadí dolů.
-8. Vrácení celého bundlu je jeden Step back krok.
-9. Undo návratu do výroby znovu obnoví dokončený / expedice stav.
-10. Redo návratu do výroby znovu vrátí položku do aktivní výroby.
-11. Nevzniknou duplicitní `production_expedice` záznamy.
+1. V Plánu Výroby pravý klik na aktivní položku bez QC → `Dokončit → Expedice`.
+2. Neproběhne okamžité dokončení.
+3. Otevře se QC dialog.
+4. Po zrušení QC dialogu položka zůstane ve výrobě.
+5. Po potvrzení QC se položka dokončí.
+6. Vznikne záznam v `production_quality_checks`.
+7. Vznikne / zůstane jeden odpovídající záznam v `production_expedice`.
+8. Modul Výroba ukáže položku jako hotovou.
+9. Položka s existujícím QC se dokončí rovnou bez QC dialogu.
+10. Step back vrátí dokončení i nově vytvořený QC krok najednou.
+11. Step forward znovu provede QC + dokončení.
 12. Build projde bez TypeScript chyb.
 
 ---
@@ -238,9 +231,7 @@ Po implementaci ověřím:
 ## Soubory k úpravě
 
 ```text
-src/hooks/useProductionDragDrop.ts
-src/components/production/WeeklySilos.tsx
-src/hooks/useProductionSchedule.ts
-src/pages/Vyroba.tsx
-src/hooks/useRealtimeSync.ts
+src/components/production/CompletionDialog.tsx
+src/pages/Vyroba.tsx        // jen pokud bude potřeba extrahovat sdílenou QC část
+src/hooks/useUndoRedo.tsx   // jen pokud stávající undo payload nepokrývá QC + dokončení jako jeden krok
 ```
