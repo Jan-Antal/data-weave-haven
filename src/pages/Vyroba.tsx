@@ -178,7 +178,7 @@ function getProjectsForWeek(
 ): VyrobaProject[] {
   if (!scheduleData) return [];
   const result: VyrobaProject[] = [];
-  const itemDone = (i: ScheduleItem) => i.is_midflight || i.status === "completed" || (expedicedIds?.has(i.id) ?? false);
+  const itemDone = (i: ScheduleItem) => i.is_midflight || i.status === "completed" || i.status === "expedice" || (expedicedIds?.has(i.id) ?? false);
 
   // Current week bundles
   const silo = scheduleData.get(slideWeekKey);
@@ -512,7 +512,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   /** Check if a schedule item is "done" — either via production_expedice or legacy midflight */
   const isItemDone = useCallback((item: ScheduleItem): boolean => {
     if (item.is_midflight) return true;
-    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+    return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
   // Prefetch daily logs for all 5 pager weeks to avoid blink on swipe
   const pagerWk0 = useProductionDailyLogs(weekKeyStr(addWeeks(currentMonday, -2)));
@@ -1312,6 +1312,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         for (const item of itemsToExpedice) {
           await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", item.id);
         }
+        await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any).in("id", itemsToExpedice.map((item) => item.id));
+        await supabase.from("production_schedule").update({ status: "completed", completed_at: nowIso, completed_by: null } as any).in("id", itemsToInsert.map(({ id }) => id));
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
         qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -1330,6 +1332,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
             is_midflight: false,
         })));
+        await supabase.from("production_schedule").update({ status: "completed", completed_at: redoNow, completed_by: null } as any).in("id", itemsToExpedice.map((item) => item.id));
         await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
         qc.invalidateQueries({ queryKey: ["production-schedule"] });
         qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1351,6 +1354,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
         is_midflight: false,
     })));
+    await supabase.from("production_schedule").update({ status: "completed", completed_at: nowIso, completed_by: null } as any).in("id", itemsToExpedice.map((item) => item.id));
     await supabase.from("projects").update({ status: "Expedice" }).eq("project_id", pid);
     qc.invalidateQueries({ queryKey: ["production-schedule"] });
     qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
@@ -1365,7 +1369,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   /* ── Toggle single item complete ── */
   async function toggleItemComplete(itemId: string, currentStatus: string) {
-    const wasDone = currentStatus === "completed" || expedicedScheduleIds.has(itemId);
+    const wasDone = currentStatus === "completed" || currentStatus === "expedice" || expedicedScheduleIds.has(itemId);
     const item = selectedProject?.scheduleItems.find((i) => i.id === itemId);
     const pid = item?.project_id || selectedProject?.projectId || "";
 
@@ -1389,18 +1393,22 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               is_midflight: false,
             }]);
           }
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: null } as any).eq("id", itemId);
+          await supabase.from("production_schedule").update({ status: "completed", completed_at: new Date().toISOString(), completed_by: null } as any).eq("id", itemId);
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
           qc.invalidateQueries({ queryKey: ["production-expedice"] });
         },
         redo: async () => {
           await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
+          await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any).eq("id", itemId);
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
           qc.invalidateQueries({ queryKey: ["production-expedice"] });
         },
       });
       await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
+      await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any).eq("id", itemId);
     } else {
       // Mark as done: insert into production_expedice
       pushUndo({
@@ -1409,6 +1417,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         description: "označení jako hotovo",
         undo: async () => {
           await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", itemId);
+          await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any).eq("id", itemId);
           qc.invalidateQueries({ queryKey: ["production-schedule"] });
           qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
           qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -1443,6 +1452,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         expediced_at: item ? getExpediceTimestampForCompletedItem(item, nowIsoMark) : null,
         is_midflight: false,
       }]);
+      await supabase.from("production_schedule").update({ status: "completed", completed_at: nowIsoMark, completed_by: null } as any).eq("id", itemId);
       // Log item hotovo
       if (selectedProject) {
         logActivity({
@@ -3464,7 +3474,7 @@ function DetailPanel({
   const isMobile = useIsMobile();
   const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
     if (item.is_midflight) return true;
-    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+    return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal, project.projectId) : 0;
   const isExpanded = expandedMap[bundleId] ?? true;
@@ -3968,7 +3978,7 @@ function UnifiedItemList({
 }) {
   const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
     if (item.is_midflight) return true;
-    return item.status === "completed" || expedicedScheduleIds.has(item.id);
+    return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
   const { defects, addDefect, resolveDefect } = useQualityDefects(projectId);
@@ -4123,6 +4133,7 @@ function UnifiedItemList({
             for (const { id } of itemsToInsert) {
               await (supabase.from("production_expedice") as any).delete().eq("source_schedule_id", id);
             }
+            await supabase.from("production_schedule").update({ status: "scheduled", completed_at: null, completed_by: null, expediced_at: null } as any).in("id", itemsToInsert.map(({ id }) => id));
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
             qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -4139,6 +4150,7 @@ function UnifiedItemList({
                 expediced_at: getExpediceTimestampForCompletedItem(item, redoNow),
                 is_midflight: false,
             })));
+            await supabase.from("production_schedule").update({ status: "completed", completed_at: redoNow, completed_by: null } as any).in("id", itemsToInsert.map(({ id }) => id));
             qc.invalidateQueries({ queryKey: ["production-schedule"] });
             qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
             qc.invalidateQueries({ queryKey: ["production-expedice"] });
@@ -4248,6 +4260,7 @@ function UnifiedItemList({
           expediced_at: getExpediceTimestampForCompletedItem(item, nowIso),
           is_midflight: false,
       })));
+      await supabase.from("production_schedule").update({ status: "completed", completed_at: nowIso, completed_by: null } as any).in("id", itemsToInsert.map(({ id }) => id));
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
       qc.invalidateQueries({ queryKey: ["production-expedice"] });
