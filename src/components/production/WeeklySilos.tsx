@@ -192,7 +192,7 @@ interface CancelState {
 export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag, onNavigateToTPV, onOpenProjectDetail, displayMode, onDisplayModeChange, selectedProjectId, onSelectProject, searchQuery = "", forecastBlocks, forecastSelectedIds, onToggleForecastSelect, forecastDarkMode, forecastPlanMode, onMoveForecastBlock, onRemoveForecastBlock, onSplitForecastBlock, forecastSafetyNet, onRestoreFromSafetyNet, onConvertReserveToForecast, focusedMatchKey, searchMatchWeekKey, searchMatchedProjectIds, searchActive, onVisibleMonthChange }: Props) {
   const { data: scheduleData } = useProductionSchedule();
   const { data: settings } = useProductionSettings();
-  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
+  const { moveItemBackToInbox, returnBundleToInbox, returnToProduction, returnItemsToProduction, mergeSplitItems, mergeBundleSplitGroups } = useProductionDragDrop();
   const { data: allProjects = [] } = useProjects();
   const { data: statusOpts = [] } = useProjectStatusOptions();
   const terminalStatuses = useMemo(() => getTerminalStatuses(statusOpts), [statusOpts]);
@@ -697,12 +697,10 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
         actions.push({
           label: "Vrátit do výroby", icon: "↩", dividerBefore: true,
           onClick: async () => {
-            try {
-              for (const ci of completedItems) await returnToProduction(ci.id);
-              toast({ title: `↩ ${completedItems.length} položek vráceno do výroby` });
-            } catch (err: any) {
-              toast({ title: "Chyba", description: err.message, variant: "destructive" });
-            }
+            await returnItemsToProduction(
+              completedItems.map((ci) => ci.id),
+              `Vrácení bundlu ${bundle.project_name} do výroby`,
+            );
           },
         });
         actions.push({
@@ -729,7 +727,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
       }
       setContextMenu({ x: e.clientX, y: e.clientY, actions });
     },
-    [returnBundleToInbox, returnToProduction, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems, mergeBundleSplitGroups, forecastDarkMode, onConvertReserveToForecast]
+    [returnBundleToInbox, returnToProduction, returnItemsToProduction, onNavigateToTPV, onOpenProjectDetail, handleReleaseItem, mergeSplitItems, mergeBundleSplitGroups, forecastDarkMode, onConvertReserveToForecast]
   );
 
   const handleItemContextMenu = useCallback(

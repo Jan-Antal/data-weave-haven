@@ -130,6 +130,19 @@ export function useRealtimeSync() {
         }
       )
 
+      // ━━━ PRODUCTION EXPEDICE ━━━
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "production_expedice" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["production-expedice"] });
+          queryClient.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
+          queryClient.invalidateQueries({ queryKey: ["production-schedule"] });
+          queryClient.invalidateQueries({ queryKey: ["production-progress"] });
+          queryClient.invalidateQueries({ queryKey: ["production-statuses"] });
+        }
+      )
+
       // ━━━ DAILY LOGS ━━━
       .on(
         "postgres_changes",
