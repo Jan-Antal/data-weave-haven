@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import { toast } from "@/hooks/use-toast";
@@ -39,6 +39,7 @@ export function CompletionDialog({
   const [itemConfigs, setItemConfigs] = useState<Record<string, ItemCompletionConfig>>({});
   const [splitOpenId, setSplitOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [qcDialogOpen, setQcDialogOpen] = useState(false);
 
   // Sort items alphabetically by code (with natural numeric ordering: 0 before 1, AT.2 before AT.10)
   const sortedItems = useMemo(() => {
@@ -95,7 +96,7 @@ export function CompletionDialog({
     });
   };
 
-  const handleComplete = useCallback(async () => {
+  const completeSelectedItems = useCallback(async (qcItemsToCreate: ScheduleItem[] = []) => {
     if (checkedIds.size === 0) return;
     setSubmitting(true);
     try {
@@ -124,8 +125,8 @@ export function CompletionDialog({
 
       const nowIso = new Date().toISOString();
 
-      if (missingQcChecked.length > 0) {
-        const qcRows = missingQcChecked.map(item => ({
+      if (qcItemsToCreate.length > 0) {
+        const qcRows = qcItemsToCreate.map(item => ({
           item_id: item.id,
           project_id: item.project_id,
           checked_by: user.id,
@@ -136,7 +137,7 @@ export function CompletionDialog({
         logActivity({
           projectId,
           actionType: "item_qc_confirmed",
-          newValue: missingQcChecked.map(i => i.item_code || i.item_name).join(", "),
+          newValue: qcItemsToCreate.map(i => i.item_code || i.item_name).join(", "),
           detail: "QC potvrzeno při dokončení v Plánu výroby",
         });
       }
@@ -160,7 +161,7 @@ export function CompletionDialog({
         // Mark schedule rows with completed_at/by metadata (status stays scheduled/in_progress per DB trigger)
         await supabase
           .from("production_schedule")
-          .update({ completed_at: nowIso, completed_by: user.id })
+          .update({ status: "completed", completed_at: nowIso, completed_by: user.id } as any)
           .in("id", fullCompleteIds);
 
         const expediceRows = fullCompleteIds.map(id => {
@@ -194,6 +195,7 @@ export function CompletionDialog({
         await supabase.from("production_schedule").update({
           scheduled_hours: doneHours,
           scheduled_czk: doneHours * czkPerHour,
+          status: "completed",
           completed_at: nowIso,
           completed_by: user.id,
           split_group_id: groupId,
@@ -255,17 +257,32 @@ export function CompletionDialog({
       qc.invalidateQueries({ queryKey: ["production-expedice-schedule-ids"] });
       qc.invalidateQueries({ queryKey: ["production-quality-checks", projectId] });
       qc.invalidateQueries({ queryKey: ["quality-checks", projectId] });
+      qc.invalidateQueries({ queryKey: ["production-progress"] });
+      qc.invalidateQueries({ queryKey: ["production-statuses"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
       qc.invalidateQueries({ queryKey: ["production-daily-logs"] });
 
       const totalCompleted = fullCompleteIds.length + splitItems.length;
       toast({ title: `${totalCompleted} položek dokončeno` });
+      setQcDialogOpen(false);
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: "Chyba", description: err.message, variant: "destructive" });
     }
     setSubmitting(false);
-  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate, missingQcChecked, projectId]);
+  }, [checkedIds, itemConfigs, items, qc, onOpenChange, hourlyRate, projectId]);
+
+  const handleComplete = useCallback(() => {
+    if (missingQcChecked.length > 0) {
+      setQcDialogOpen(true);
+      return;
+    }
+    completeSelectedItems();
+  }, [completeSelectedItems, missingQcChecked]);
+
+  const handleConfirmQcAndComplete = useCallback(() => {
+    completeSelectedItems(missingQcChecked);
+  }, [completeSelectedItems, missingQcChecked]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
