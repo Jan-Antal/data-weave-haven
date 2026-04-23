@@ -140,6 +140,12 @@ function getScheduleBusinessKey(item: Pick<ScheduleItem, "project_id" | "item_co
   return `${item.project_id}::${identity}`;
 }
 
+function compareScheduleItemsByCode(a: ScheduleItem, b: ScheduleItem): number {
+  const ac = (a.item_code || a.item_name || "").toString();
+  const bc = (b.item_code || b.item_name || "").toString();
+  return ac.localeCompare(bc, undefined, { numeric: true, sensitivity: "base" });
+}
+
 function getExpediceTimestampForCompletedItem(item: ScheduleItem, nowIso: string): string | null {
   const isIntermediateSplit = !!item.split_group_id
     && item.split_part != null
@@ -4066,7 +4072,7 @@ function UnifiedItemList({
       });
       if (aDone && !bDone) return 1;
       if (!aDone && bDone) return -1;
-      return 0;
+      return compareScheduleItemsByCode(a.item, b.item);
     });
     return result;
   }, [currentItems]);
