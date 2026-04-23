@@ -231,6 +231,7 @@ export function OsobyOpravneni() {
   const [saving, setSaving] = useState(false);
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addUserSearch, setAddUserSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [confirmOverwrite, setConfirmOverwrite] = useState<{
     count: number;
   } | null>(null);
@@ -295,6 +296,36 @@ export function OsobyOpravneni() {
     });
     return counts;
   }, [roles]);
+
+  const roleByUserId = useMemo(() => {
+    const m = new Map<string, AppRole>();
+    roles.forEach((r) => m.set(r.user_id, r.role));
+    return m;
+  }, [roles]);
+
+  const userSearchResults = useMemo(() => {
+    const s = userSearch.trim().toLowerCase();
+    if (!s) return [];
+    return profiles
+      .filter((p) =>
+        (p.full_name || "").toLowerCase().includes(s) ||
+        (p.email || "").toLowerCase().includes(s),
+      )
+      .map((p) => ({ profile: p, role: roleByUserId.get(p.id) ?? "viewer" as AppRole }))
+      .filter(({ role }) => visibleRoles.includes(role))
+      .sort((a, b) =>
+        (a.profile.full_name || a.profile.email).localeCompare(
+          b.profile.full_name || b.profile.email,
+          "cs",
+        ),
+      )
+      .slice(0, 8);
+  }, [profiles, roleByUserId, userSearch, visibleRoles]);
+
+  const matchedRoleSet = useMemo(
+    () => new Set(userSearchResults.map(({ role }) => role)),
+    [userSearchResults],
+  );
 
   const assignedUsers = useMemo(() => {
     return roles
