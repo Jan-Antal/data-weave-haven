@@ -793,89 +793,62 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                         )}
                       </div>
 
-                      {/* Progress bars — Hodiny (tracking) + Dokončeno (completion) */}
-                      <div className="flex flex-col gap-1.5">
-                        {/* Bar 1: HODINY — logged vs planned */}
-                        <div>
-                          <div className="relative h-[5px] rounded-full bg-muted overflow-visible">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${card.trackedPct > 100 ? 100 : barWidthPct}%`,
-                                background: card.trackedPct > 100 ? "#dc3545" : styles.bg,
-                              }}
-                            />
-                            {card.expectedPct != null && (
-                              <div
-                                className="absolute top-[-2px] bottom-[-2px] w-[1.5px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
-                                style={{ left: `${Math.min(100, Math.max(0, card.expectedPct))}%` }}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                            <span>
-                              Hodiny <span className="font-medium text-foreground">{card.trackedPct}%</span>
-                            </span>
-                            <span>
-                              <span className="font-medium text-foreground">{fmtHours(card.loggedHours)}h</span>
-                              {card.plannedHours > 0 && <> / {fmtHours(card.plannedHours)}h</>}
-                            </span>
-                          </div>
+                      {/* Bundle rows — per-bundle completion vs expected */}
+                      {card.bundles.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {card.bundles.map((b) => {
+                            const bStyles = slipBarStyles(b.slipStatus);
+                            return (
+                              <div key={b.bundleId} className="flex items-center gap-2 text-[11px]">
+                                <div className="w-14 font-medium tabular-nums truncate shrink-0" title={b.displayLabel}>
+                                  {b.displayLabel}
+                                </div>
+                                <div className="flex-1 relative h-[6px] rounded-full bg-muted overflow-visible">
+                                  {b.completionPct != null && (
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${Math.min(100, Math.max(0, b.completionPct))}%`,
+                                        background: bStyles.bg,
+                                      }}
+                                    />
+                                  )}
+                                  {b.expectedPct != null && (
+                                    <div
+                                      className="absolute top-[-2px] bottom-[-2px] w-[1.5px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
+                                      style={{ left: `${Math.min(100, Math.max(0, b.expectedPct))}%` }}
+                                    />
+                                  )}
+                                </div>
+                                <div className="w-9 text-right tabular-nums text-muted-foreground shrink-0">
+                                  {b.completionPct != null ? `${Math.round(b.completionPct)}%` : "—"}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
+                      ) : card.warning === "off_plan" || card.warning === "unmatched" ? null : (
+                        <div className="text-[11px] text-muted-foreground italic">Bez bundlu</div>
+                      )}
 
-                        {/* Bar 2: DOKONČENO — daylog completion */}
-                        <div>
-                          <div className="relative h-[5px] rounded-full bg-muted overflow-visible">
-                            {card.completionPct != null && (
-                              <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, card.completionPct))}%`,
-                                  background: "#639922",
-                                }}
-                              />
-                            )}
-                            {card.expectedPct != null && (
-                              <div
-                                className="absolute top-[-2.5px] bottom-[-2.5px] w-[1.5px] rounded-sm shadow-sm pointer-events-none"
-                                style={{
-                                  left: `${Math.min(100, Math.max(0, card.expectedPct))}%`,
-                                  background: "var(--color-border-primary)",
-                                  height: "10px",
-                                }}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                            {card.completionPct != null ? (
-                              <span>
-                                Dokončeno <span className="font-medium text-foreground">{card.completionPct}%</span>
-                              </span>
-                            ) : (
-                              <span className="italic">Bez denního logu</span>
-                            )}
-                            {card.expectedPct != null && (
-                              <span>
-                                Očekáváno <span className="font-medium text-teal-600">{card.expectedPct}%</span>
-                              </span>
-                            )}
-                            <span />
-                          </div>
+                      {/* Stats row — value (real / cíl) on the right */}
+                      <div className="flex items-end justify-between gap-2 mt-auto">
+                        <div className="text-[11px] text-muted-foreground tabular-nums">
+                          {card.bundles.length > 0 && (
+                            <span>{card.bundles.length} bundle{card.bundles.length === 1 ? "" : "s"}</span>
+                          )}
                         </div>
-                      </div>
-
-                      {/* Stats row */}
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>
-                          <span className="font-medium text-foreground tabular-nums">{fmtHours(card.loggedHours)}h</span>
-                          {card.plannedHours > 0 && <> / {fmtHours(card.plannedHours)}h</>}
-                        </span>
                         {card.valueCzk > 0 && (
-                          <span>
-                            <span className="font-medium text-foreground tabular-nums">
-                              {(card.valueCzk / 1_000_000).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M Kč
-                            </span>
-                          </span>
+                          <div className="text-right">
+                            <div className="text-base font-semibold tabular-nums text-[#2f6f2c] leading-tight">
+                              {fmtMCzk(card.valueCzk)}
+                            </div>
+                            {card.valueTargetCzk > 0 && (
+                              <div className="text-[10px] text-muted-foreground tabular-nums leading-tight">
+                                cíl {fmtMCzk(card.valueTargetCzk)}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
 
