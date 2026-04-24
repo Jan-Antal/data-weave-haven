@@ -310,7 +310,7 @@ export function ProductionHeader({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {(canAccessSettings || realRole === "owner") && (
+            {canOpenSettingsMenu && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -335,12 +335,12 @@ export function ProductionHeader({
                       Kurzovní lístek
                     </DropdownMenuItem>
                   )}
-                  {isAdmin && (
+                  {canAccessSettings && (
                     <DropdownMenuItem onClick={() => setCostPresetsOpen(true)}>
                       Rozpad ceny
                     </DropdownMenuItem>
                   )}
-                  {isAdmin && (
+                  {canManageOverheadProjects && (
                     <DropdownMenuItem onClick={() => setOverheadOpen(true)}>
                       Režijní projekty
                     </DropdownMenuItem>
