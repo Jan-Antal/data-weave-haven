@@ -112,16 +112,17 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes] = await Promise.all([
+      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
           .gte("datum_sync", weekInfo.weekKey)
           .lt("datum_sync", sundayStr)
           .not("cinnost_kod", "in", '("TPV","ENG","PRO")'),
+        // Per-bundle schedule rows for THIS week (for bundle table + planned hours)
         supabase
           .from("production_schedule")
-          .select("project_id, scheduled_hours, status, item_name")
+          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position")
           .eq("scheduled_week", weekInfo.weekKey)
           .not("status", "eq", "cancelled"),
         supabase
@@ -131,7 +132,7 @@ function useDilnaData(weekOffset: number) {
           .single(),
         supabase
           .from("projects")
-          .select("project_id, project_name, prodejni_cena, cost_production_pct, currency")
+          .select("project_id, project_name, prodejni_cena, cost_production_pct, currency, created_at")
           .is("deleted_at", null),
         supabase
           .from("production_capacity")
@@ -150,11 +151,21 @@ function useDilnaData(weekOffset: number) {
           .from("overhead_projects" as any)
           .select("project_code")
           .eq("is_active", true),
-        // All schedule rows (across weeks) for chain-window calculation
+        // All schedule rows (across weeks) for chain-window calculation (incl. split_group_id for per-bundle chain)
         supabase
           .from("production_schedule")
-          .select("project_id, scheduled_week, scheduled_hours, status")
+          .select("project_id, scheduled_week, scheduled_hours, status, split_group_id, bundle_label")
           .not("status", "eq", "cancelled"),
+        // Plan hours per project (for value calculation denominator)
+        supabase
+          .from("project_plan_hours")
+          .select("project_id, hodiny_plan"),
+        // Exchange rates for EUR → CZK conversion
+        supabase
+          .from("exchange_rates")
+          .select("year, eur_czk"),
+        // Real lifetime hours per project (RPC, mirrors WeeklySilos logic)
+        (supabase.rpc as any)("get_hours_by_project"),
       ]);
 
       const weeklyCapacity =
