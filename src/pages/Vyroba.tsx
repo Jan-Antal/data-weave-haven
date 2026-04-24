@@ -5899,7 +5899,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
             const dateLabel = `${date.getDate()}.${date.getMonth() + 1}.`;
             return (
               <div
-                key={photo.itemId || photo.name}
+                key={`${photo.itemId || "noid"}-${photo.name}-${idx}`}
                 className="relative group cursor-pointer"
                 onClick={() => {
                   setLightboxIndex(idx);
