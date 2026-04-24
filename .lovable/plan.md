@@ -1,135 +1,135 @@
-## Plán: Modul TPV — Príprava výroby
+## Plán: Modul TPV v2 — Príprava výroby (rozšírená špec)
 
-Postavím samostatný modul na `/tpv` s tromi záložkami, vlastnou ikonou v topbare a dvomi novými DB tabuľkami. Existujúca `tpv_items` zostáva nedotknutá — len z nej čítame.
+**Princíp:** READ-everywhere, WRITE-own. Modul číta z `projects`, `tpv_items`, `project_stages`, `people`, `production_*` atď., ale **zapisuje výhradne** do nových `tpv_*` tabuliek vyhradených pre tento modul. Existujúce live tabuľky zostávajú nedotknuté.
 
----
-
-### 1. Database (migrácia)
-
-Vytvorím dve nové tabuľky presne podľa špecifikácie:
-
-- **`tpv_preparation`** (1:1 k `tpv_items`)
-  - FK `tpv_item_id → tpv_items(id) ON DELETE CASCADE`, `UNIQUE(tpv_item_id)`
-  - polia: `doc_ok bool`, `hodiny_manual numeric`, `hodiny_schvalene bool`, `readiness_status text` s CHECK constraintom (`rozpracovane | ready | riziko | blokovane`), `notes`, `created_at`, `updated_at`
-- **`tpv_material`** (1:N k `tpv_items`)
-  - FK `tpv_item_id → tpv_items(id) ON DELETE CASCADE`
-  - polia: `nazov`, `mnozstvo`, `jednotka`, `dodavatel`, `objednane_dat`, `dodane_dat`, `stav` s CHECK (`nezadany | objednane | caka | dodane`), `poznamka`, timestamps
-- **RLS** pre obe podľa vzoru ostatných production tabuliek:
-  - SELECT pre `authenticated` = true
-  - INSERT/UPDATE/DELETE pre `owner | admin | pm | konstrukter` (TPV príprava je doména konstruktérov + nákupca = pm/admin)
-  - `is_test_project(project_id) = is_test_user()` izolácia, aby tester sandbox neunikol do produkcie (rovnaký vzor ako `data_log`)
-- **Trigger** `update_updated_at_column` na obe tabuľky
-- **Indexy** na `tpv_item_id` a `project_id` pre obe
-
-Po migrácii sa `src/integrations/supabase/types.ts` vygeneruje automaticky.
-
-> Readiness logika sa **nepočíta v DB** — počíta sa v UI/hooku z aktuálneho stavu `tpv_preparation` + `tpv_material`. Pole `readiness_status` zostane v tabuľke ako voliteľný manuálny override (zatiaľ ho len ukladáme, default `'rozpracovane'`).
+Stav: existujúce tabuľky `tpv_preparation` a `tpv_material` z v1 zostávajú a rozšírime ich o nové sady tabuliek pre subdodávky, dodávateľov, schvaľovanie hodín a TPV inbox/úlohy.
 
 ---
 
-### 2. Routing + topbar ikona
+### 1. Database (migrácia v2)
 
-- **`src/App.tsx`**: nová route `/tpv` chránená novým `TpvRoute` guardom (rovnaký pattern ako `PlanRoute`). Prístup: `canAccessPlanVyroby || canManageTPV || isAdmin || isOwner` (TPV pripravujú konstruktéri + admini).
-- **`PersistentDesktopHeader`**: pridať `module: "tpv"` keď `pathname === "/tpv"`.
-- **`ProductionHeader.tsx`**:
-  - rozšíriť `HeaderModule` o `"tpv"`
-  - moduleLabel: `"TPV — Príprava výroby"`
-  - **Nová ikona** medzi LayoutDashboard (Project Info) a CalendarRange (Plán výroby). Použijem `ClipboardCheck` z lucide-react. Aktívny stav rovnaký ako ostatné — `bg-primary-foreground/10`.
+#### 1.1 Nová rola
+- Pridať `'kalkulant'` do enum `public.app_role`.
+- RLS pravidlá pre TPV tabuľky budú akceptovať: `owner | admin | pm | konstrukter | kalkulant`.
 
-### 3. Stránka `src/pages/Tpv.tsx` — shell
+#### 1.2 Nové tabuľky (všetky TPV-OWNED)
 
-Použijem existujúci `PageTabsShell` (rovnako ako Analytics/Osoby) s tromi záložkami:
-- `summary` → "Prehľad pipeline"
-- `material` → "Materiál"
-- `hodiny` → "Hodinová dotácia"
+- **`tpv_project_preparation`** (1:1 k projektu, agreguje stav prípravy)
+  - `project_id text UNIQUE` (FK na `projects.project_id`)
+  - `calc_status text` CHECK (`draft | review | released`) default `draft`
+  - `readiness_overall numeric` (0–100, počíta UI, len cache)
+  - `target_release_date date`, `notes text`, timestamps
+  - trigger updated_at
 
-URL param `?tab=`. Defaultne `summary`.
+- **`tpv_subcontract`** (1:N k projektu, subdodávky)
+  - `project_id text`, `tpv_item_id uuid NULL` (voliteľne viazané na položku)
+  - `nazov text`, `popis text`, `mnozstvo numeric`, `jednotka text`
+  - `dodavatel_id uuid NULL` (FK na `tpv_supplier`)
+  - `cena_predpokladana numeric`, `cena_finalna numeric`, `mena text default 'CZK'`
+  - `stav text` CHECK (`navrh | rfq | ponuka | objednane | dodane | zruseno`) default `navrh`
+  - `objednane_dat date`, `dodane_dat date`, `poznamka text`, timestamps
 
-### 4. Hooks (nové súbory v `src/hooks/`)
+- **`tpv_supplier`** (CRM dodávateľov — **merge supplier + contact**)
+  - `nazov text NOT NULL`, `ico text`, `dic text`
+  - kontaktné polia priamo: `kontakt_meno text`, `kontakt_email text`, `kontakt_telefon text`, `kontakt_pozice text`
+  - `web text`, `adresa text`, `kategorie text[]` (napr. `['kov','sklo']`)
+  - `rating int` (1–5), `notes text`, `is_active bool default true`, timestamps
+  - **POZNÁMKA:** ak v budúcnosti bude treba viacero kontaktov per dodávateľ, doplníme samostatný `tpv_supplier_contact`. Zatiaľ jeden kontakt per riadok stačí.
 
-- **`useTpvPipelineProjects.ts`** — vracia projekty s `status IN ('Příprava','Konstrukce','TPV')` ktoré majú aspoň jednu `tpv_items` položku. Používa `useProjects` + `useAllTPVItems`, joinuje a vracia agregáty (počet items, termín výroby z `expedice/montaz/predani/datum_smluvni` cez existujúci `resolveDeadline`, sum hodín).
-- **`useTpvPreparation.ts`** — `useTpvPreparationForProject(projectId)`, `useUpsertTpvPreparation()` (upsert na `tpv_item_id` UNIQUE), `useBulkApproveHours(projectId)` (set `hodiny_schvalene=true`).
-- **`useTpvMaterial.ts`** — CRUD: `useTpvMaterialsForProject(projectId)`, `useTpvMaterialsAll()` (cez všetky projekty pre per-materiál view s konsolidáciou), `useUpsertTpvMaterial()`, `useDeleteTpvMaterial()`.
-- **`src/lib/tpvReadiness.ts`** — čistá funkcia `computeReadiness(prep, materials): 'blokovane' | 'riziko' | 'ready' | 'rozpracovane'` podľa pravidiel zo zadania.
+- **`tpv_supplier_task`** (úlohy/follow-upy s dodávateľom)
+  - `supplier_id uuid` (FK), `subcontract_id uuid NULL` (FK), `project_id text NULL`
+  - `title text`, `description text`, `due_date date`
+  - `status text` CHECK (`open | in_progress | done | cancelled`) default `open`
+  - `assigned_to uuid` (FK na `auth.users`), `created_by uuid`, timestamps
 
-### 5. Tab 1 — Summary (`src/components/tpv/TpvSummaryTab.tsx`)
+- **`tpv_subcontract_request`** (RFQ — žiadosť o cenovú ponuku)
+  - `subcontract_id uuid` (FK), `supplier_id uuid` (FK)
+  - `sent_at timestamptz`, `responded_at timestamptz`, `cena_nabidka numeric`, `mena text`
+  - `termin_dodani date`, `stav text` CHECK (`sent | received | accepted | rejected`) default `sent`
+  - `poznamka text`, timestamps
 
-- 4 metric cards: V pipeline / Ready / Rizikové / Blokované
-- Filter chips: Všetky | Blokované | Rizikové | Ready
-- **Project pipeline table** so stĺpcami zo zadania. Ľavý 3px accent border z `getProjectColor(project_id)`. Termín výroby s countdown (red <14 dní, amber <30) — využijem existujúci `resolveDeadline` z `src/lib/deadlineWarning.ts`.
-- **Rozbaľovacia inline detail karta** pri kliknutí na riadok (state `expandedProjectId`):
-  - tabuľka items: kód, názov, výkres dot (8px green/red), agreg. materiál stav, hodiny (read-only z `tpv_items.hodiny_plan` + editable override `hodiny_manual`), stav badge
-  - footer: Celkom hodín + tlačidlá `Uložiť`, `Odoslať rizikovo` (red outline), `Odoslať do výroby` (blue filled, disabled kým nie sú všetky `ready`/`riziko`)
-  - "Odoslať do výroby" volá existujúci flow z `TPVList.tsx` (`executeSendToProduction`) — vyextrahujem ho do hooku `useSendItemsToProduction` aby sa dal volať aj odtiaľto bez duplikácie.
+- **`tpv_hours_allocation`** (workflow schvaľovania hodín — bez dotyku do `tpv_items`)
+  - `project_id text`, `tpv_item_id uuid` (FK), `hodiny_navrh numeric`
+  - `stav text` CHECK (`draft | submitted | approved | returned`) default `draft`
+  - `submitted_by uuid`, `submitted_at timestamptz`
+  - `approved_by uuid`, `approved_at timestamptz`
+  - `return_reason text`, `notes text`, timestamps
 
-### 6. Tab 2 — Materiál (`src/components/tpv/TpvMaterialTab.tsx`)
+- **`tpv_inbox_task`** (TPV-vlastné úlohy/inbox — pre denné riadenie konstruktérov a kalkulantov)
+  - `project_id text NULL`, `tpv_item_id uuid NULL`
+  - `title text`, `description text`, `category text` (napr. `material | doc | rfq | hours | other`)
+  - `priority text` CHECK (`low | normal | high | urgent`) default `normal`
+  - `assigned_to uuid`, `due_date date`
+  - `status text` CHECK (`open | in_progress | done | cancelled`) default `open`
+  - `created_by uuid`, timestamps
 
-Toggle `Per projekt | Per materiál` (Tabs alebo button group).
+> **`tpv_supplier_price_list` zatiaľ nerealizujeme** — neskôr ako samostatná migrácia, ak bude potrebné.
 
-**Per projekt view:**
-- Filter: project selector (Select) + stav selector
-- Tabuľka materiálov pre vybraný projekt (alebo všetky), spojená s `tpv_items` cez `tpv_item_id` aby sme vedeli kód/názov položky
-- Inline edit pre `stav`, `objednane_dat`, `dodane_dat`, `poznamka`, `dodavatel` — využijem existujúci `InlineEditableCell`
-- Pri každom item-e tlačidlo `+` na pridanie ďalšieho materiálu (jeden item môže mať viac materiálov)
+#### 1.3 Notifikácie — bez novej tabuľky
+- Použijeme existujúcu `public.notifications` (RLS už máme: user vidí len svoje).
+- Nové hodnoty `type`:
+  - `tpv_task_assigned` — pridelená TPV úloha
+  - `tpv_task_due_soon` — úloha do 24h
+  - `tpv_supplier_response_received` — RFQ odpoveď
+  - `tpv_hours_submitted` — kalkulant odoslal návrh hodín
+  - `tpv_hours_approved` / `tpv_hours_returned`
+  - `tpv_subcontract_status_changed`
+- Notifikačný panel rozšírime v ďalšej iterácii o sekciu „Inbox / Moje úlohy" napojenú na `tpv_inbox_task` + `tpv_supplier_task`.
 
-**Per materiál view (read-only):**
-- 3 metric cards: Unikátnych materiálov | Zdieľané 2+ projektov (blue badge) | Čaká na dodanie
-- Grupovanie cez `tpv_material.nazov` (case-insensitive trim). Pre každú skupinu:
-  - hlavný riadok: názov + dodávateľ, celkom množstvo, "X proj." badge (modrý ak ≥2, šedý inak), agreg. stav
-  - rozbalené: sub-riadky per project — kód, mini horizontálny bar (proportional quantity vzhľadom k max v skupine), množstvo + jednotka, stav
+#### 1.4 Views
+- `vw_project_tpv_status` — agregát na projekt (z `tpv_project_preparation` + počty z `tpv_material`, `tpv_subcontract`, `tpv_hours_allocation`)
+- `vw_open_tpv_tasks_by_user` — otvorené `tpv_inbox_task` + `tpv_supplier_task` per `assigned_to` (pre rozšírenie notifikačného panelu)
 
-### 7. Tab 3 — Hodinová dotácia (`src/components/tpv/TpvHoursTab.tsx`)
-
-- Project selector (len projekty z TPV pipeline)
-- 4 metric cards:
-  - **Budget** = `prodejni_cena × cost_production_pct / 100` (z `projects` tabuľky; `cost_production_pct` má fallback z `cost_breakdown_presets` defaultu rovnako ako v RozpadCeny)
-  - **Auto plán** = `Σ tpv_items.hodiny_plan`
-  - **Po úprave** = `Σ COALESCE(tpv_preparation.hodiny_manual, tpv_items.hodiny_plan)`
-  - **Zostatok** = budget − po úprave (amber border + warning ak <10% budgetu)
-- Alert banner ak zostatok <10% budgetu
-- Tabuľka: Kód | Názov | Auto (gray) | Manuálny zásah (editable, modrý border po zmene) | Rozdiel (+amber/-red/0 gray) | Stav (OK / Upravené / Veľká odchýlka >50% → row bg `#FCEBEB`)
-- Footer: Celkom / Budget / Zostatok + `Uložiť` + `Schváliť hodiny` (set `hodiny_schvalene=true` pre všetky items projektu)
-
-### 8. Status badges + design tokens
-
-Vytvorím malý helper `src/components/tpv/TpvStatusBadge.tsx`:
-- Ready `#EAF3DE` / `#27500A`
-- Riziko `#FAEEDA` / `#633806`
-- Blokované `#FCEBEB` / `#791F1F`
-- Rozpracované `#F1EFE8` / `#5F5E5A`
-- pill, 10px font, uppercase letter-spacing
-
-Tabuľky používajú existujúce shadcn `Table` so štýlmi rovnakými ako Project Info / Analytics (header `bg-muted`, 10px uppercase, hover `bg-muted/50`).
-
-### 9. Notifikácie (light)
-
-Pri "Odoslať do výroby" / "Odoslať rizikovo" — využijem existujúce `createNotification` aby PM dostal notifikáciu (rovnaký vzor ako v `useTPVItems`). Žiadne nové typy notifikácií, použijem existujúce TPV-related typy + nový `tpv_sent_to_production_risky`.
-
-### 10. Memory update
-
-Pridám `mem://features/tpv-status/preparation-module.md` s popisom modulu a aktualizujem `mem://index.md`.
+#### 1.5 RLS (jednotný vzor pre všetky nové tpv_* tabuľky)
+- SELECT pre `authenticated` = true (s `is_test_project / is_test_user` izoláciou tam, kde je `project_id`)
+- INSERT/UPDATE/DELETE pre `owner | admin | pm | konstrukter | kalkulant`
+- Trigger `update_updated_at_column` na všetky tabuľky
+- Indexy: `project_id`, `tpv_item_id`, `assigned_to`, `supplier_id`, `subcontract_id`, `status`
 
 ---
 
-### Súbory ktoré vytvorím
-1. migrácia (`tpv_preparation`, `tpv_material` + RLS + trigger + indexy)
-2. `src/pages/Tpv.tsx`
-3. `src/components/tpv/TpvSummaryTab.tsx`
-4. `src/components/tpv/TpvMaterialTab.tsx`
-5. `src/components/tpv/TpvHoursTab.tsx`
-6. `src/components/tpv/TpvStatusBadge.tsx`
-7. `src/hooks/useTpvPipelineProjects.ts`
-8. `src/hooks/useTpvPreparation.ts`
-9. `src/hooks/useTpvMaterial.ts`
-10. `src/lib/tpvReadiness.ts`
+### 2. Routing + topbar
+- Existujúca route `/tpv` zostáva. Žiadny meeting mode v tejto iterácii.
+- TPV bell (mini inbox) **odložíme** spolu s prerábkou notifikačného panelu — pripravíme len dáta a hooky.
 
-### Súbory ktoré upravím
-- `src/App.tsx` — route + guard + module detection
-- `src/components/production/ProductionHeader.tsx` — `"tpv"` module + nová ikona medzi Project Info a Plán výroby
-- `src/components/TPVList.tsx` — vyextrahovať `executeSendToProduction` do reusable hooku (alebo vytvoriť shared `src/lib/sendTpvToProduction.ts`)
-- `mem://index.md`
+### 3. Stránka `src/pages/Tpv.tsx` — rozšírenie na 5 záložiek
+
+| Tab key | Label | Komponent |
+|---|---|---|
+| `summary` | Prehľad pipeline | `TpvSummaryTab` (existuje, len doplniť KPI o subdodávky a hodiny workflow) |
+| `material` | Materiál | `TpvMaterialTab` (existuje) |
+| `subcontracts` | Subdodávky | **nový** `TpvSubcontractsTab` |
+| `suppliers` | Dodávatelia | **nový** `TpvSuppliersTab` |
+| `hodiny` | Hodinová dotácia | `TpvHoursTab` (existuje, doplniť workflow Draft → Submitted → Approved/Returned cez `tpv_hours_allocation`) |
+
+### 4. Hooks (nové súbory)
+- `useTpvProjectPreparation.ts` — CRUD k `tpv_project_preparation`
+- `useTpvSubcontracts.ts` — CRUD + RFQ wizard helpers
+- `useTpvSuppliers.ts` — CRUD k `tpv_supplier` (vrátane kontaktných polí v jednom riadku)
+- `useTpvSupplierTasks.ts`
+- `useTpvHoursAllocation.ts` — submit/approve/return workflow
+- `useTpvInboxTasks.ts` — pre budúci inbox panel; už teraz vrátime `useMyOpenTpvTasks()` pre topbar badge
+- `src/lib/tpvNotifications.ts` — helpery na vytvorenie notifikácií s `type='tpv_*'`
+
+### 5. Komponenty (nové)
+- `src/components/tpv/TpvSubcontractsTab.tsx` — tabuľka subdodávok + RFQ wizard (`SendRfqDialog`)
+- `src/components/tpv/TpvSuppliersTab.tsx` — zoznam dodávateľov + `SupplierDialog` (edit/create) s kontaktnými poľami v jednom formulári
+- `src/components/tpv/SupplierDialog.tsx`
+- `src/components/tpv/SendRfqDialog.tsx`
+- `src/components/tpv/HoursWorkflowBar.tsx` — submit/approve/return tlačidlá pre `TpvHoursTab`
+
+### 6. Súbory ktoré upravím
+- `src/pages/Tpv.tsx` — pridať 2 nové taby
+- `src/components/tpv/TpvSummaryTab.tsx` — KPI rozšíriť o subdodávky a hours workflow stav
+- `src/components/tpv/TpvHoursTab.tsx` — napojiť na `tpv_hours_allocation` (read pôvodných hodín z `tpv_items.hodiny_plan`, write výhradne do allocation)
+
+### 7. Memory
+- Nový súbor `mem://features/tpv/preparation-module-v2.md` s popisom architektúry "READ-everywhere, WRITE-own", zoznamom tabuliek a workflow.
+- Update `mem://index.md`.
+
+---
 
 ### Otvorené otázky (pokračujem s defaultmi ak nepovieš inak)
-- **Mobile**: zatiaľ len desktop (`hidden md:block` shell). Mobil neriešim v prvej iterácii.
-- **Permissions**: prístup na `/tpv` pre `admin | owner | pm | konstrukter`. `vyroba` a `viewer` nemajú prístup.
-- **Per-materiál konsolidácia**: kľúč skupiny = `lower(trim(nazov))`. Ak chceš striktnejšie (vrátane `dodavatel` alebo jednotky), povedz.
+- **Kalkulant prístupy mimo `/tpv`:** zatiaľ rovnaké ako konstrukter (read-only všade, write len do `tpv_*`). OK?
+- **TPV inbox panel v topbare:** v tejto iterácii len pripravím dáta + hook `useMyOpenTpvTasks`. UI panel doriešime v ďalšej iterácii spolu s mergom do existujúceho notifikačného panelu.
+- **Subcontract ↔ tpv_item naviazanie:** voliteľné (`tpv_item_id NULL`). Subdodávka môže existovať aj na úrovni projektu bez konkrétnej položky.
