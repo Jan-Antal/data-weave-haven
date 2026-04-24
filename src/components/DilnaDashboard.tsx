@@ -713,12 +713,15 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
           </Card>
           <Card className="p-4 shadow-sm">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Hodnota výroby</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums text-[#2f6f2c]">
-              {totalValueCzk > 0
-                ? `${(totalValueCzk / 1_000_000).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M Kč`
-                : "—"}
+            <div className="flex items-baseline gap-2 mt-1">
+              <div className="text-2xl font-bold tabular-nums text-[#2f6f2c]">
+                {fmtMCzk(totalValueCzk)}
+              </div>
+              <div className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                / cíl {fmtMCzk(totalValueTargetCzk)}
+              </div>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2">Suma napříč projekty týdne</div>
+            <div className="text-[11px] text-muted-foreground mt-2">Reálne odpracované / plán týždne</div>
           </Card>
         </div>
 
