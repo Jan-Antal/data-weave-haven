@@ -114,9 +114,27 @@ export function ProductionHeader({
     canManageExchangeRates,
     canManageStatuses,
     canAccessRecycleBin,
+    canManageOverheadProjects,
+    canAccessPlanVyroby,
+    canAccessAnalytics,
+    canManageProduction,
+    canQCOnly,
     profile,
     signOut,
   } = useAuth();
+
+  const canSeeVyroba = canManageProduction || canQCOnly || isAdmin || isOwner;
+  const canSeePlanVyroby = canAccessPlanVyroby || isAdmin || isOwner;
+  const canSeeAnalytics = canAccessAnalytics || isAdmin || isOwner;
+  const canOpenSettingsMenu =
+    canAccessSettings ||
+    canManageUsers ||
+    canManagePeople ||
+    canManageExchangeRates ||
+    canManageStatuses ||
+    canAccessRecycleBin ||
+    canManageOverheadProjects ||
+    isOwner;
   const { openPeopleManagement } = usePeopleManagement();
   const { undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
@@ -190,7 +208,7 @@ export function ProductionHeader({
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-            {(isAdmin || isOwner) && (
+            {canSeeVyroba && (
               <button
                 onClick={module === "vyroba" ? undefined : () => navigate("/vyroba")}
                 className={cn(
@@ -205,7 +223,7 @@ export function ProductionHeader({
               </button>
             )}
 
-            {(isAdmin || isOwner) && (
+            {canSeePlanVyroby && (
               <button
                 onClick={module === "plan-vyroby" ? undefined : () => navigate("/plan-vyroby")}
                 className={cn(
@@ -220,7 +238,7 @@ export function ProductionHeader({
               </button>
             )}
 
-            {(isAdmin || isOwner) && (
+            {canSeeAnalytics && (
               <button
                 onClick={module === "analytics" ? undefined : () => navigate("/analytics")}
                 className={cn(
@@ -292,7 +310,7 @@ export function ProductionHeader({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {(canAccessSettings || realRole === "owner") && (
+            {canOpenSettingsMenu && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -317,12 +335,12 @@ export function ProductionHeader({
                       Kurzovní lístek
                     </DropdownMenuItem>
                   )}
-                  {isAdmin && (
+                  {canAccessSettings && (
                     <DropdownMenuItem onClick={() => setCostPresetsOpen(true)}>
                       Rozpad ceny
                     </DropdownMenuItem>
                   )}
-                  {isAdmin && (
+                  {canManageOverheadProjects && (
                     <DropdownMenuItem onClick={() => setOverheadOpen(true)}>
                       Režijní projekty
                     </DropdownMenuItem>

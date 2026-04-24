@@ -327,6 +327,16 @@ export function OsobyOpravneni() {
     return counts;
   }, [roles]);
 
+  // Count users in selected role that have custom (non-null, non-empty) overrides
+  const customOverrideCount = useMemo(() => {
+    return roles.filter(
+      (r) =>
+        r.role === selectedRole &&
+        r.permissions &&
+        Object.keys(r.permissions).length > 0,
+    ).length;
+  }, [roles, selectedRole]);
+
   const roleByUserId = useMemo(() => {
     const m = new Map<string, AppRole>();
     roles.forEach((r) => m.set(r.user_id, r.role));
@@ -460,6 +470,30 @@ export function OsobyOpravneni() {
       return;
     }
     toast({ title: `Uložené pre ${ROLE_LABELS[selectedRole]}` });
+    fetchAll();
+  };
+
+  const handleResetToPreset = async () => {
+    if (guardOwnerRole()) return;
+    if (customOverrideCount === 0) {
+      toast({ title: "Nie sú žiadne vlastné nastavenia v tejto roli" });
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("user_roles")
+      .update({ permissions: null as any })
+      .eq("role", selectedRole);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Chyba pri resete", description: error.message, variant: "destructive" });
+      return;
+    }
+    setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
+    toast({
+      title: `Predvolené obnovené pre ${ROLE_LABELS[selectedRole]}`,
+      description: "Užívatelia uvidia zmenu po obnovení stránky.",
+    });
     fetchAll();
   };
 
@@ -641,6 +675,11 @@ export function OsobyOpravneni() {
                 : assignedUsers.length >= 2 && assignedUsers.length <= 4
                 ? "používatelia"
                 : "používateľov"}
+              {customOverrideCount > 0 && (
+                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-medium">
+                  ⚠ Vlastné nastavenie ({customOverrideCount})
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -653,6 +692,18 @@ export function OsobyOpravneni() {
               <Copy className="h-3.5 w-3.5 mr-1.5" />
               Duplikovať
             </Button>
+            {customOverrideCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={handleResetToPreset}
+                disabled={saving || loading}
+                title="Vymazať vlastné nastavenia a vrátiť rolu na predvolené hodnoty z kódu"
+              >
+                Vrátiť na predvolené
+              </Button>
+            )}
             <Button
               size="sm"
               className="h-8 text-xs bg-[#0a2e28] hover:bg-[#0a2e28]/90 text-white"
