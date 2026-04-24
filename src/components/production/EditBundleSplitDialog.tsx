@@ -196,7 +196,7 @@ export function EditBundleSplitDialog({
           const bucket = weekBuckets.find(b => b.weekKey === r.scheduled_week);
           return bucket && !bucket.locked;
         });
-        const editablePctSum = editableRows.reduce((s, r) => s + (percentages[r.scheduled_week] || 0), 0);
+        const editablePctSum = editableRows.reduce((s, r) => s + (effectivePct[r.scheduled_week] || 0), 0);
 
         if (editablePctSum <= 0 || editableRows.length === 0) continue;
 
@@ -204,7 +204,7 @@ export function EditBundleSplitDialog({
         let allocatedH = 0;
         let allocatedC = 0;
         editableRows.forEach((r, idx) => {
-          const pct = percentages[r.scheduled_week] || 0;
+          const pct = effectivePct[r.scheduled_week] || 0;
           const isLast = idx === editableRows.length - 1;
           const newH = isLast
             ? Math.round((remainingHours - allocatedH) * 10) / 10
