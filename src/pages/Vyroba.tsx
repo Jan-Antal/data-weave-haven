@@ -5479,10 +5479,10 @@ function VykresynSection({ projectId, cachedDocCount }: { projectId: string; cac
                 Žádné výkresy
               </div>
             ) : (
-              files.map((file) => (
+              files.map((file, idx) => (
                 <button
                   type="button"
-                  key={file.itemId || file.name}
+                  key={`${file.itemId || "noid"}-${file.name}-${idx}`}
                   onClick={() => handleFileClick(file)}
                   className="flex items-center gap-2 px-2.5 py-2 rounded-md w-full text-left min-h-[44px] hover:bg-muted/50 transition-colors cursor-pointer"
                   style={{ border: "1px solid #ece8e2", background: "#ffffff" }}
