@@ -103,13 +103,13 @@ export function TpvHoursTab() {
                 <col style={{ width: 150 }} />
               </colgroup>
               <TableHeader className="sticky top-0 z-10 bg-card">
-                <TableRow className="bg-primary/5">
-                  <TableHead>Kód prvku</TableHead>
-                  <TableHead>Název prvku</TableHead>
-                  <TableHead className="text-right">Auto plán</TableHead>
-                  <TableHead className="text-right">Manuálny zásah</TableHead>
-                  <TableHead className="text-right">Rozdiel</TableHead>
-                  <TableHead>Stav</TableHead>
+                <TableRow className="bg-primary/5 hover:bg-primary/5">
+                  <TableHead className="font-semibold text-foreground">Kód prvku</TableHead>
+                  <TableHead className="font-semibold text-foreground">Název prvku</TableHead>
+                  <TableHead className="text-right font-semibold text-foreground">Auto plán</TableHead>
+                  <TableHead className="text-right font-semibold text-foreground">Manuálny zásah</TableHead>
+                  <TableHead className="text-right font-semibold text-foreground">Rozdiel</TableHead>
+                  <TableHead className="font-semibold text-foreground">Stav</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -138,7 +138,7 @@ export function TpvHoursTab() {
                           big && "bg-[#FCEBEB] hover:bg-[#FADADA]",
                         )}
                       >
-                        <TableCell className="text-xs font-bold px-2">{(item as any).item_code ?? "—"}</TableCell>
+                        <TableCell className="text-sm font-semibold px-2">{(item as any).item_code ?? "—"}</TableCell>
                         <TableCell className="text-xs px-2 truncate">{(item as any).nazev ?? ""}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs text-muted-foreground px-2">{auto} h</TableCell>
                         <TableCell className="px-2">
