@@ -348,6 +348,15 @@ const Index = () => {
                   recentProjects={recentProjects}
                   onProjectTap={handleMobileProjectTap}
                   onOpenDataLog={toggleDataLog}
+                  onSwitchToVyroba={() => {
+                    try {
+                      localStorage.setItem("datalog-panel-index", "false");
+                      localStorage.setItem("datalog-panel-vyroba", "false");
+                      localStorage.setItem("datalog-panel-plan-vyroby", "false");
+                    } catch {}
+                    window.dispatchEvent(new CustomEvent("mobile-nav-change"));
+                    setMobileModule("vyroba");
+                  }}
                 />
               ) : (
                 <MobileCardList

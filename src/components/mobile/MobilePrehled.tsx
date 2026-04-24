@@ -15,6 +15,7 @@ interface MobilePrehledProps {
   recentProjects: RecentProject[];
   onProjectTap: (project: Project) => void;
   onOpenDataLog?: () => void;
+  onSwitchToVyroba?: () => void;
 }
 
 function getISOWeekNumber(d: Date): number {
@@ -113,7 +114,7 @@ function formatUserShort(email: string): string {
   return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
 }
 
-export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap, onOpenDataLog }: MobilePrehledProps) {
+export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap, onOpenDataLog, onSwitchToVyroba }: MobilePrehledProps) {
   const navigate = useNavigate();
   const { profile, linkedPersonName } = useAuth();
   const pmName = linkedPersonName || null;
@@ -289,7 +290,13 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
       Výroba tento týden
     </h3>
     <button
-      onClick={() => navigate("/vyroba")}
+      onClick={() => {
+        if (onSwitchToVyroba) {
+          onSwitchToVyroba();
+        } else {
+          navigate("/vyroba");
+        }
+      }}
       className="w-full text-left active:scale-[0.98] transition-transform"
       style={{
         background: "#ffffff",
