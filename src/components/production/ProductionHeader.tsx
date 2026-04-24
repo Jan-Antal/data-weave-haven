@@ -208,7 +208,7 @@ export function ProductionHeader({
 
             <span className="w-px h-5 bg-primary-foreground/20 mx-1" />
 
-            {(isAdmin || isOwner) && (
+            {canSeeVyroba && (
               <button
                 onClick={module === "vyroba" ? undefined : () => navigate("/vyroba")}
                 className={cn(
@@ -223,7 +223,7 @@ export function ProductionHeader({
               </button>
             )}
 
-            {(isAdmin || isOwner) && (
+            {canSeePlanVyroby && (
               <button
                 onClick={module === "plan-vyroby" ? undefined : () => navigate("/plan-vyroby")}
                 className={cn(
@@ -238,7 +238,7 @@ export function ProductionHeader({
               </button>
             )}
 
-            {(isAdmin || isOwner) && (
+            {canSeeAnalytics && (
               <button
                 onClick={module === "analytics" ? undefined : () => navigate("/analytics")}
                 className={cn(
