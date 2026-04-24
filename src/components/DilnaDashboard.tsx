@@ -603,44 +603,74 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                         )}
                       </div>
 
-                      {/* Progress bar — gradient palette (Plan Výroby style) */}
-                      <div className="space-y-1">
-                        <div
-                          className="relative h-2.5 rounded-full bg-muted overflow-visible"
-                          title={
-                            `Hodiny ${card.trackedPct}%` +
-                            (card.completionPct != null ? ` · Dokončeno ${card.completionPct}%` : "") +
-                            (card.expectedPct != null ? ` · Očekávané ${card.expectedPct}%` : "")
-                          }
-                        >
-                          <div
-                            className="h-full rounded-full transition-all overflow-hidden"
-                            style={{ width: `${barWidthPct}%`, background: styles.bg }}
-                          />
-                          {/* Vertical teal marker = expected progress today */}
-                          {card.expectedPct != null && (
+                      {/* Progress bars — Hodiny (tracking) + Dokončeno (completion) */}
+                      <div className="flex flex-col gap-1.5">
+                        {/* Bar 1: HODINY — logged vs planned */}
+                        <div>
+                          <div className="relative h-[5px] rounded-full bg-muted overflow-visible">
                             <div
-                              className="absolute top-[-2px] bottom-[-2px] w-[2px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
-                              style={{ left: `${Math.min(100, Math.max(0, card.expectedPct))}%` }}
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${card.trackedPct > 100 ? 100 : barWidthPct}%`,
+                                background: card.trackedPct > 100 ? "#dc3545" : styles.bg,
+                              }}
                             />
-                          )}
+                            {card.expectedPct != null && (
+                              <div
+                                className="absolute top-[-2px] bottom-[-2px] w-[1.5px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
+                                style={{ left: `${Math.min(100, Math.max(0, card.expectedPct))}%` }}
+                              />
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums mt-0.5">
+                            <span>
+                              Hodiny <span className="font-medium text-foreground">{card.trackedPct}%</span>
+                            </span>
+                            <span>
+                              <span className="font-medium text-foreground">{fmtHours(card.loggedHours)}h</span>
+                              {card.plannedHours > 0 && <> / {fmtHours(card.plannedHours)}h</>}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-muted-foreground tabular-nums">
-                          <span>
-                            Hodiny <span className="font-medium text-foreground">{card.trackedPct}%</span>
-                          </span>
-                          {card.expectedPct != null && (
-                            <span>
-                              Očekáváno <span className="font-medium text-teal-600">{card.expectedPct}%</span>
-                            </span>
-                          )}
-                          {card.completionPct != null ? (
-                            <span>
-                              Dokončeno <span className="font-medium text-foreground">{card.completionPct}%</span>
-                            </span>
-                          ) : (
-                            <span className="italic">Bez denního logu</span>
-                          )}
+
+                        {/* Bar 2: DOKONČENO — daylog completion */}
+                        <div>
+                          <div className="relative h-[5px] rounded-full bg-muted overflow-visible">
+                            {card.completionPct != null && (
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, card.completionPct))}%`,
+                                  background: "#639922",
+                                }}
+                              />
+                            )}
+                            {card.expectedPct != null && (
+                              <div
+                                className="absolute top-[-2.5px] bottom-[-2.5px] w-[1.5px] rounded-sm shadow-sm pointer-events-none"
+                                style={{
+                                  left: `${Math.min(100, Math.max(0, card.expectedPct))}%`,
+                                  background: "var(--color-border-primary)",
+                                  height: "10px",
+                                }}
+                              />
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums mt-0.5">
+                            {card.completionPct != null ? (
+                              <span>
+                                Dokončeno <span className="font-medium text-foreground">{card.completionPct}%</span>
+                              </span>
+                            ) : (
+                              <span className="italic">Bez denního logu</span>
+                            )}
+                            {card.expectedPct != null && (
+                              <span>
+                                Očekáváno <span className="font-medium text-teal-600">{card.expectedPct}%</span>
+                              </span>
+                            )}
+                            <span />
+                          </div>
                         </div>
                       </div>
 
