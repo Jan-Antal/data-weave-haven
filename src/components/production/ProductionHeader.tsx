@@ -114,9 +114,27 @@ export function ProductionHeader({
     canManageExchangeRates,
     canManageStatuses,
     canAccessRecycleBin,
+    canManageOverheadProjects,
+    canAccessPlanVyroby,
+    canAccessAnalytics,
+    canManageProduction,
+    canQCOnly,
     profile,
     signOut,
   } = useAuth();
+
+  const canSeeVyroba = canManageProduction || canQCOnly || isAdmin || isOwner;
+  const canSeePlanVyroby = canAccessPlanVyroby || isAdmin || isOwner;
+  const canSeeAnalytics = canAccessAnalytics || isAdmin || isOwner;
+  const canOpenSettingsMenu =
+    canAccessSettings ||
+    canManageUsers ||
+    canManagePeople ||
+    canManageExchangeRates ||
+    canManageStatuses ||
+    canAccessRecycleBin ||
+    canManageOverheadProjects ||
+    isOwner;
   const { openPeopleManagement } = usePeopleManagement();
   const { undo, redo, canUndo, canRedo, lastUndoDescription, lastRedoDescription } = useUndoRedo();
 
