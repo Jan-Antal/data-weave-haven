@@ -667,7 +667,7 @@ function warningBorderColor(w: CardWarning, projectColor: string): string {
 
 /* ── component ───────────────────────────────────────────────────── */
 
-export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
+export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset: number; onOpenProjectDetail?: (projectId: string) => void }) {
   const { data, isLoading } = useDilnaData(weekOffset);
   const [allExpanded, setAllExpanded] = useState(false);
   const toggleAllExpand = () => setAllExpanded(prev => !prev);
