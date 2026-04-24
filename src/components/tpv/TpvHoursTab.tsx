@@ -50,9 +50,9 @@ export function TpvHoursTab() {
   const lowBudget = stats.budget > 0 && hasManualEdits && stats.zostatok / stats.budget < 0.1;
 
   return (
-    <div className="p-6 space-y-4 overflow-auto h-full">
+    <div className="p-4 space-y-4 overflow-auto h-full bg-background">
       <div className="flex items-center gap-3">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Projekt</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Projekt</div>
         <Select value={projectId} onValueChange={setProjectId}>
           <SelectTrigger className="w-[400px]"><SelectValue placeholder="Projekt" /></SelectTrigger>
           <SelectContent>
@@ -65,14 +65,14 @@ export function TpvHoursTab() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard label="Budget" value={`${Math.round(stats.budget)} h`} sub={stats.budgetCzk ? formatCzk(stats.budgetCzk) : ""} />
         <MetricCard label="Auto plán" value={`${Math.round(stats.auto)} h`} />
         <MetricCard label="Po úprave" value={`${Math.round(stats.manual)} h`} />
         <MetricCard
           label="Zostatok"
           value={`${Math.round(stats.zostatok)} h`}
-          accent={lowBudget ? "#D97706" : undefined}
+          accent={lowBudget ? "#B65D05" : undefined}
           warning={lowBudget}
         />
       </div>
@@ -197,15 +197,15 @@ function MetricCard({
 }: { label: string; value: string; sub?: string; accent?: string; warning?: boolean }) {
   return (
     <Card
-      className={cn("p-4 bg-muted border-0 shadow-none", warning && "border border-amber-300")}
+      className={cn("p-4 shadow-sm")}
       style={warning ? { borderColor: "#D97706", borderWidth: 1, borderStyle: "solid", background: "#FFF8EE" } : undefined}
     >
       <div className="flex items-center gap-1.5">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
         {warning && <AlertTriangle className="h-3 w-3 text-amber-600" />}
       </div>
-      <div className="text-2xl font-medium tabular-nums mt-1" style={accent ? { color: accent } : undefined}>{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>}
+      <div className="text-2xl font-bold tabular-nums mt-1" style={accent ? { color: accent } : undefined}>{value}</div>
+      {sub && <div className="text-[11px] text-muted-foreground mt-1">{sub}</div>}
     </Card>
   );
 }

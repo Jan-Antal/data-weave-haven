@@ -35,13 +35,13 @@ export function TpvSummaryTab() {
   }, [rows, filter]);
 
   return (
-    <div className="p-6 space-y-6 overflow-auto h-full">
+    <div className="p-4 space-y-4 overflow-auto h-full bg-background">
       {/* Metric cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard label="V pipeline" value={counts.all} />
         <MetricCard label="Ready" value={counts.ready} accent="#27500A" />
-        <MetricCard label="Rizikové" value={counts.riziko} accent="#633806" />
-        <MetricCard label="Blokované" value={counts.blokovane} accent="#791F1F" />
+        <MetricCard label="Rizikové" value={counts.riziko} accent="#B65D05" />
+        <MetricCard label="Blokované" value={counts.blokovane} accent="#B1232F" />
       </div>
 
       {/* Filter chips */}
@@ -100,10 +100,10 @@ export function TpvSummaryTab() {
 
 function MetricCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
   return (
-    <Card className="p-4 bg-muted border-0 shadow-none">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <Card className="p-4 shadow-sm">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div
-        className="text-2xl font-medium tabular-nums mt-1"
+        className="text-2xl font-bold mt-1 tabular-nums"
         style={accent ? { color: accent } : undefined}
       >
         {value}
