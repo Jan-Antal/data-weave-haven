@@ -1109,6 +1109,16 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
         />
       )}
 
+      {editSplitState && (
+        <EditBundleSplitDialog
+          open={!!editSplitState}
+          onOpenChange={open => !open && setEditSplitState(null)}
+          bundleName={editSplitState.bundleName}
+          splitGroupId={editSplitState.splitGroupId}
+          rows={editSplitState.rows}
+        />
+      )}
+
       {pauseState && (
         <PauseItemDialog open={!!pauseState} onOpenChange={open => !open && setPauseState(null)} {...pauseState} itemCode={pauseState.itemCode} />
       )}
