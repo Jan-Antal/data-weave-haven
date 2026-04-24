@@ -24,6 +24,7 @@ import PlanVyroby from "./pages/PlanVyroby";
 import Vyroba from "./pages/Vyroba";
 import Analytics from "./pages/Analytics";
 import Osoby from "./pages/Osoby";
+import Tpv from "./pages/Tpv";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -105,6 +106,14 @@ function PlanRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function TpvRoute({ children }: { children: React.ReactNode }) {
+  const { canAccessPlanVyroby, isAdmin, isOwner, role } = useAuth();
+  if (!canAccessPlanVyroby && !isAdmin && !isOwner && role !== "konstrukter" && role !== "pm") {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
 function VyrobaRoute({ children }: { children: React.ReactNode }) {
   const { canManageProduction, canQCOnly, canAccessPlanVyroby } = useAuth();
   if (!canManageProduction && !canQCOnly && !canAccessPlanVyroby) {
@@ -142,9 +151,11 @@ function PersistentDesktopHeader() {
           ? "analytics"
           : location.pathname === "/osoby"
             ? "osoby"
-            : location.pathname === "/"
-              ? "index"
-              : null;
+            : location.pathname === "/tpv"
+              ? "tpv"
+              : location.pathname === "/"
+                ? "index"
+                : null;
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -220,6 +231,7 @@ function AppRoutes() {
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/plan-vyroby" element={<PlanRoute><PlanVyroby /></PlanRoute>} />
+                <Route path="/tpv" element={<TpvRoute><Tpv /></TpvRoute>} />
                 <Route path="/vyroba" element={<VyrobaRoute><Vyroba /></VyrobaRoute>} />
                 <Route path="/analytics" element={<AnalyticsRoute><Analytics /></AnalyticsRoute>} />
                 <Route path="/osoby" element={<OsobyRoute><Osoby /></OsobyRoute>} />
