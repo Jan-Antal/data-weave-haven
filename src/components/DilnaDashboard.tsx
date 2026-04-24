@@ -437,8 +437,8 @@ function useDilnaData(weekOffset: number) {
             const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
             // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
             const bCompletion = completionPct;
-            // Slip color is computed against 100 % week target (matches legend "pod plánem"); teal marker shows today's expected separately
-            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, 100, loggedHours, isSpilled);
+            // Slip color porovnává completion proti dennímu targetu (bExpected) — pohyblivý cíl podle aktuálního dne v týdnu
+            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled);
             bundleRows.push({
               bundleId: b.bundleId,
               displayLabel,
