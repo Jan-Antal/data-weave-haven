@@ -239,6 +239,21 @@ export function ProductionHeader({
               </button>
             )}
 
+            {canSeeTpv && (
+              <button
+                onClick={module === "tpv" ? undefined : () => navigate("/tpv")}
+                className={cn(
+                  "p-2 rounded-md transition-colors",
+                  module === "tpv"
+                    ? "text-primary-foreground bg-primary-foreground/10 cursor-default"
+                    : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                )}
+                title="TPV — Príprava výroby"
+              >
+                <ClipboardCheck className="h-5 w-5" />
+              </button>
+            )}
+
             {canSeeAnalytics && (
               <button
                 onClick={module === "analytics" ? undefined : () => navigate("/analytics")}
