@@ -102,15 +102,47 @@ export function EditBundleSplitDialog({
     setPercentages(init);
   }, [open, weekBuckets, grandTotal]);
 
+  // Identify the last editable week — its value is auto-computed (100 - others)
+  const lastEditableKey = useMemo(() => {
+    const editable = weekBuckets.filter(b => !b.locked);
+    return editable.length > 0 ? editable[editable.length - 1].weekKey : null;
+  }, [weekBuckets]);
+
+  // Effective percentages: last editable week is always derived to make Σ = 100
+  const effectivePct = useMemo(() => {
+    const next: Record<string, number> = { ...percentages };
+    if (lastEditableKey !== null) {
+      const others = weekBuckets
+        .filter(b => b.weekKey !== lastEditableKey)
+        .reduce((s, b) => s + (Number(next[b.weekKey]) || 0), 0);
+      next[lastEditableKey] = Math.max(0, 100 - others);
+    }
+    return next;
+  }, [percentages, weekBuckets, lastEditableKey]);
+
   const totalPct = useMemo(
-    () => Object.values(percentages).reduce((s, v) => s + (Number(v) || 0), 0),
-    [percentages]
+    () => Object.values(effectivePct).reduce((s, v) => s + (Number(v) || 0), 0),
+    [effectivePct]
   );
   const isValid = totalPct === 100;
 
   const handleSliderChange = useCallback((weekKey: string, value: number) => {
-    setPercentages(prev => ({ ...prev, [weekKey]: value }));
-  }, []);
+    if (weekKey === lastEditableKey) return; // auto-computed
+    setPercentages(prev => {
+      const next = { ...prev, [weekKey]: value };
+      // Cap so that sum of non-last editable weeks does not exceed 100 - locked
+      const lockedSum = weekBuckets.filter(b => b.locked).reduce((s, b) => s + (next[b.weekKey] || 0), 0);
+      const othersSum = weekBuckets
+        .filter(b => !b.locked && b.weekKey !== lastEditableKey)
+        .reduce((s, b) => s + (next[b.weekKey] || 0), 0);
+      const max = 100 - lockedSum;
+      if (othersSum > max) {
+        // Reduce current slider to fit
+        next[weekKey] = Math.max(0, value - (othersSum - max));
+      }
+      return next;
+    });
+  }, [lastEditableKey, weekBuckets]);
 
   const handleAutoDistribute = useCallback(() => {
     const lockedSum = weekBuckets
