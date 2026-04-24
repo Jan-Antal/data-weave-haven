@@ -429,7 +429,7 @@ export default function Analytics() {
       {vykazMode ? (
         <VykazReport />
       ) : dilnaMode ? (
-        <DilnaDashboard weekOffset={dilnaWeekOffset} />
+        <DilnaDashboard weekOffset={dilnaWeekOffset} onOpenProjectDetail={setDetailProjectId} />
       ) : (
         <>
           {/* Summary cards */}

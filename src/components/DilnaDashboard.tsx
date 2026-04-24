@@ -667,7 +667,7 @@ function warningBorderColor(w: CardWarning, projectColor: string): string {
 
 /* ── component ───────────────────────────────────────────────────── */
 
-export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
+export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset: number; onOpenProjectDetail?: (projectId: string) => void }) {
   const { data, isLoading } = useDilnaData(weekOffset);
   const [allExpanded, setAllExpanded] = useState(false);
   const toggleAllExpand = () => setAllExpanded(prev => !prev);
@@ -793,8 +793,22 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                             </>
                           ) : (
                             <>
-                              <p className="text-[14px] font-medium leading-tight truncate" title={card.projectName}>{card.projectName}</p>
-                              <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{card.projectId}</p>
+                              <p
+                                className={cn(
+                                  "text-[14px] font-medium leading-tight truncate",
+                                  onOpenProjectDetail && "cursor-pointer hover:text-primary hover:underline underline-offset-2"
+                                )}
+                                title={card.projectName}
+                                onClick={onOpenProjectDetail ? () => onOpenProjectDetail(card.projectId) : undefined}
+                                role={onOpenProjectDetail ? "button" : undefined}
+                              >{card.projectName}</p>
+                              <p
+                                className={cn(
+                                  "text-[11px] text-muted-foreground mt-0.5 font-mono",
+                                  onOpenProjectDetail && "cursor-pointer hover:text-foreground"
+                                )}
+                                onClick={onOpenProjectDetail ? () => onOpenProjectDetail(card.projectId) : undefined}
+                              >{card.projectId}</p>
                             </>
                           )}
                         </div>
