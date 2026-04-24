@@ -140,7 +140,7 @@ function PerProjectView() {
               className="grid items-center px-3 py-2 text-sm border-t border-border hover:bg-muted/50"
               style={{ gridTemplateColumns: "120px minmax(220px,2fr) 110px 80px 140px 110px 110px 130px 32px" }}
             >
-              <div className="text-xs">{it?.code ?? "—"}</div>
+              <div className="text-xs font-bold">{it?.code ?? "—"}</div>
               <div className="min-w-0">
                 <div className="truncate">{m.nazov}</div>
                 <div className="text-[11px] text-muted-foreground truncate">{it?.name}</div>

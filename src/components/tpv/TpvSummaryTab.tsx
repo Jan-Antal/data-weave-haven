@@ -248,7 +248,7 @@ function ProjectDetailPanel({ row }: { row: TpvProjectRow }) {
               className="grid items-center px-3 py-2 text-sm border-t border-border"
               style={{ gridTemplateColumns: "120px minmax(200px,2fr) 80px 130px 100px 130px" }}
             >
-              <div className="text-xs">{(item as any).item_code ?? "—"}</div>
+              <div className="text-xs font-bold">{(item as any).item_code ?? "—"}</div>
               <div className="truncate">{(item as any).nazev ?? "—"}</div>
               <div className="flex justify-center">
                 <button
