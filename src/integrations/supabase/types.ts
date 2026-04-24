@@ -1679,6 +1679,118 @@ export type Database = {
         }
         Relationships: []
       }
+      tpv_hours_allocation: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          hodiny_navrh: number | null
+          id: string
+          notes: string | null
+          project_id: string
+          return_reason: string | null
+          stav: string
+          submitted_at: string | null
+          submitted_by: string | null
+          tpv_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          hodiny_navrh?: number | null
+          id?: string
+          notes?: string | null
+          project_id: string
+          return_reason?: string | null
+          stav?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          tpv_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          hodiny_navrh?: number | null
+          id?: string
+          notes?: string | null
+          project_id?: string
+          return_reason?: string | null
+          stav?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          tpv_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_hours_allocation_tpv_item_id_fkey"
+            columns: ["tpv_item_id"]
+            isOneToOne: true
+            referencedRelation: "tpv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tpv_inbox_task: {
+        Row: {
+          assigned_to: string | null
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string
+          project_id: string | null
+          status: string
+          title: string
+          tpv_item_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          project_id?: string | null
+          status?: string
+          title: string
+          tpv_item_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          project_id?: string | null
+          status?: string
+          title?: string
+          tpv_item_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_inbox_task_tpv_item_id_fkey"
+            columns: ["tpv_item_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tpv_items: {
         Row: {
           accepted_date: string | null
@@ -1862,6 +1974,39 @@ export type Database = {
           },
         ]
       }
+      tpv_project_preparation: {
+        Row: {
+          calc_status: string
+          created_at: string
+          id: string
+          notes: string | null
+          project_id: string
+          readiness_overall: number | null
+          target_release_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          calc_status?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id: string
+          readiness_overall?: number | null
+          target_release_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          calc_status?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          project_id?: string
+          readiness_overall?: number | null
+          target_release_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tpv_status_options: {
         Row: {
           color: string
@@ -1885,6 +2030,258 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      tpv_subcontract: {
+        Row: {
+          cena_finalna: number | null
+          cena_predpokladana: number | null
+          created_at: string
+          dodane_dat: string | null
+          dodavatel_id: string | null
+          id: string
+          jednotka: string | null
+          mena: string
+          mnozstvo: number | null
+          nazov: string
+          objednane_dat: string | null
+          popis: string | null
+          poznamka: string | null
+          project_id: string
+          stav: string
+          tpv_item_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cena_finalna?: number | null
+          cena_predpokladana?: number | null
+          created_at?: string
+          dodane_dat?: string | null
+          dodavatel_id?: string | null
+          id?: string
+          jednotka?: string | null
+          mena?: string
+          mnozstvo?: number | null
+          nazov: string
+          objednane_dat?: string | null
+          popis?: string | null
+          poznamka?: string | null
+          project_id: string
+          stav?: string
+          tpv_item_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cena_finalna?: number | null
+          cena_predpokladana?: number | null
+          created_at?: string
+          dodane_dat?: string | null
+          dodavatel_id?: string | null
+          id?: string
+          jednotka?: string | null
+          mena?: string
+          mnozstvo?: number | null
+          nazov?: string
+          objednane_dat?: string | null
+          popis?: string | null
+          poznamka?: string | null
+          project_id?: string
+          stav?: string
+          tpv_item_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_subcontract_dodavatel_id_fkey"
+            columns: ["dodavatel_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_supplier"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tpv_subcontract_tpv_item_id_fkey"
+            columns: ["tpv_item_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tpv_subcontract_request: {
+        Row: {
+          cena_nabidka: number | null
+          created_at: string
+          id: string
+          mena: string | null
+          poznamka: string | null
+          responded_at: string | null
+          sent_at: string | null
+          stav: string
+          subcontract_id: string
+          supplier_id: string
+          termin_dodani: string | null
+          updated_at: string
+        }
+        Insert: {
+          cena_nabidka?: number | null
+          created_at?: string
+          id?: string
+          mena?: string | null
+          poznamka?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          stav?: string
+          subcontract_id: string
+          supplier_id: string
+          termin_dodani?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cena_nabidka?: number | null
+          created_at?: string
+          id?: string
+          mena?: string | null
+          poznamka?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          stav?: string
+          subcontract_id?: string
+          supplier_id?: string
+          termin_dodani?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_subcontract_request_subcontract_id_fkey"
+            columns: ["subcontract_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_subcontract"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tpv_subcontract_request_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_supplier"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tpv_supplier: {
+        Row: {
+          adresa: string | null
+          created_at: string
+          dic: string | null
+          ico: string | null
+          id: string
+          is_active: boolean
+          kategorie: string[] | null
+          kontakt_email: string | null
+          kontakt_meno: string | null
+          kontakt_pozice: string | null
+          kontakt_telefon: string | null
+          nazov: string
+          notes: string | null
+          rating: number | null
+          updated_at: string
+          web: string | null
+        }
+        Insert: {
+          adresa?: string | null
+          created_at?: string
+          dic?: string | null
+          ico?: string | null
+          id?: string
+          is_active?: boolean
+          kategorie?: string[] | null
+          kontakt_email?: string | null
+          kontakt_meno?: string | null
+          kontakt_pozice?: string | null
+          kontakt_telefon?: string | null
+          nazov: string
+          notes?: string | null
+          rating?: number | null
+          updated_at?: string
+          web?: string | null
+        }
+        Update: {
+          adresa?: string | null
+          created_at?: string
+          dic?: string | null
+          ico?: string | null
+          id?: string
+          is_active?: boolean
+          kategorie?: string[] | null
+          kontakt_email?: string | null
+          kontakt_meno?: string | null
+          kontakt_pozice?: string | null
+          kontakt_telefon?: string | null
+          nazov?: string
+          notes?: string | null
+          rating?: number | null
+          updated_at?: string
+          web?: string | null
+        }
+        Relationships: []
+      }
+      tpv_supplier_task: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          project_id: string | null
+          status: string
+          subcontract_id: string | null
+          supplier_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          project_id?: string | null
+          status?: string
+          subcontract_id?: string | null
+          supplier_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          project_id?: string | null
+          status?: string
+          subcontract_id?: string | null
+          supplier_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_supplier_task_subcontract_id_fkey"
+            columns: ["subcontract_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_subcontract"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tpv_supplier_task_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_supplier"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       undo_sessions: {
         Row: {
