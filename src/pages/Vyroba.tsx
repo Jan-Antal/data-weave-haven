@@ -5912,7 +5912,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
           });
 
           return (
-            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+            <div className="space-y-3">
               {groups.map(group => (
                 <div key={group.key}>
                   <div className="flex items-center gap-2 mb-1.5 text-[12px] font-medium" style={{ color: "hsl(var(--foreground))" }}>
