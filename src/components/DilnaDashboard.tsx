@@ -847,7 +847,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                         </div>
                         {card.valueCzk > 0 && (
                           <div className="text-right">
-                            <div className="text-base font-semibold tabular-nums text-[#2f6f2c] leading-tight">
+                            <div className={`text-base font-semibold tabular-nums ${valueColorClass(card.valueCzk, card.valueTargetCzk)} leading-tight`}>
                               {fmtMCzk(card.valueCzk)}
                             </div>
                             {card.valueTargetCzk > 0 && (
