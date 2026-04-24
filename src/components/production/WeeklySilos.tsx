@@ -14,6 +14,7 @@ import { CompletionDialog } from "./CompletionDialog";
 import { SpillSuggestionPanel } from "./SpillSuggestionPanel";
 import { SplitItemDialog } from "./SplitItemDialog";
 import { SplitBundleDialog } from "./SplitBundleDialog";
+import { EditBundleSplitDialog, type EditBundleSplitRow } from "./EditBundleSplitDialog";
 import { PauseItemDialog } from "./PauseItemDialog";
 import { CancelItemDialog } from "./CancelItemDialog";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
@@ -240,6 +241,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
   const [splitState, setSplitState] = useState<SplitState | null>(null);
   const [bundleSplitState, setBundleSplitState] = useState<BundleSplitState | null>(null);
+  const [editSplitState, setEditSplitState] = useState<{ bundleName: string; splitGroupId: string; rows: EditBundleSplitRow[] } | null>(null);
   const [pauseState, setPauseState] = useState<PauseState | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const [dismissedSpillWeeks, setDismissedSpillWeeks] = useState<Set<string>>(new Set());
