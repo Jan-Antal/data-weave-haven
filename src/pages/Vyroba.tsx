@@ -913,14 +913,24 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return { totalHours, completedHours: 0, bundleProgress: getLatestPercent(pid) };
     }
 
-    // Primary signal: latest daylog of the viewed week (or chain fallback inside getLatestPercent).
+    // Primary signal: latest daylog of the viewed week (or chain/any-prior fallback inside getLatestPercent).
     const logsThisWeek = getLogsForProject(pid);
-    const hasLogThisWeekOrChain = logsThisWeek.length > 0 || findPriorChainLog(pid, weekKey) !== null;
+    const hasLogThisWeekOrChain =
+      logsThisWeek.length > 0 ||
+      findPriorChainLog(pid, weekKey) !== null ||
+      findPriorAnyLog(pid, weekKey) !== null;
     if (hasLogThisWeekOrChain) {
       return { totalHours, completedHours, bundleProgress: getLatestPercent(pid) };
     }
 
-    // Fallback only when no daylog/chain context exists.
+    // Past weeks must NOT be overwritten by live completion %. If no log exists
+    // for a past week (and no carry-forward applies), keep it at 0.
+    const todayWeekKey = weekKeyStr(getMonday(new Date()));
+    if (weekKey < todayWeekKey) {
+      return { totalHours, completedHours, bundleProgress: 0 };
+    }
+
+    // Fallback only for current/future weeks when no daylog/chain context exists.
     const completionPct = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
     return { totalHours, completedHours, bundleProgress: completionPct };
   }
