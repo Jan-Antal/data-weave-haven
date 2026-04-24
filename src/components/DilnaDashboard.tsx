@@ -62,12 +62,26 @@ function usekSortKey(kod: string): number {
 const SLIP_OK_TOL = 10;    // completion ≥ expected − 10  → green (on-track)
 const SLIP_RED = 25;       // completion ≥ expected − 25  → orange (at-risk); else red (behind)
 
+function fmtMCzk(n: number): string {
+  if (!n || n <= 0) return "—";
+  return `${(n / 1_000_000).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M Kč`;
+}
+
 /* ── types ───────────────────────────────────────────────────────── */
 
 interface UsekRow { kod: string; nazov: string; hodiny: number }
 
 type SlipStatus = "ok" | "slip" | "delay" | "none";
 type CardWarning = "none" | "off_plan" | "unmatched";
+
+interface BundleRow {
+  bundleId: string;            // schedule row id (first row of the bundle)
+  displayLabel: string;        // e.g. "A", "A 2/4"
+  scheduledHours: number;
+  expectedPct: number | null;
+  completionPct: number | null;
+  slipStatus: SlipStatus;
+}
 
 interface ProjectCard {
   projectId: string;
@@ -78,8 +92,10 @@ interface ProjectCard {
   trackedPct: number;          // logged / planned (0–∞)
   completionPct: number | null; // latest daily-log percent (0–100), null = no log
   expectedPct: number | null;   // expected progress today (chain-window aware)
-  slipStatus: SlipStatus;
-  valueCzk: number;
+  slipStatus: SlipStatus;       // worst across bundles
+  valueCzk: number;             // realne (logged) value
+  valueTargetCzk: number;       // cíl (planned) value
+  bundles: BundleRow[];
   usekBreakdown: UsekRow[];
 }
 
