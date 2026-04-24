@@ -179,9 +179,30 @@ function useDilnaData(weekOffset: number) {
 
       const hoursRaw = (hoursRes.data || []) as Array<{ ami_project_id: string; hodiny: number; created_at: string; datum_sync: string; cinnost_kod: string | null; cinnost_nazov: string | null }>;
       const hours = hoursRaw.filter(h => !overheadSet.has(h.ami_project_id));
-      const schedule = (schedRes.data || []) as Array<{ project_id: string; scheduled_hours: number; status: string; item_name: string }>;
-      const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null }>;
+      const schedule = (schedRes.data || []) as Array<{
+        id: string;
+        project_id: string;
+        stage_id: string | null;
+        scheduled_hours: number;
+        status: string;
+        item_name: string;
+        bundle_label: string | null;
+        bundle_type: string | null;
+        split_group_id: string | null;
+        split_part: number | null;
+        split_total: number | null;
+        position: number;
+      }>;
+      const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
       const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
+      const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
+      const exchangeRates = (exchangeRes.data || []) as Array<{ year: number; eur_czk: number }>;
+      const realHoursRows = (realHoursRes.data || []) as Array<{ ami_project_id: string; total_hodiny: number }>;
+
+      const planHoursMap = new Map<string, number>();
+      for (const r of planHoursRows) planHoursMap.set(r.project_id, Number(r.hodiny_plan) || 0);
+      const realHoursLifetimeMap = new Map<string, number>();
+      for (const r of realHoursRows) realHoursLifetimeMap.set(r.ami_project_id, Number(r.total_hodiny) || 0);
 
       const totalHoursWeek = hours.reduce((s, h) => s + Number(h.hodiny), 0);
       const today = toLocalDateStr(new Date());
@@ -209,6 +230,39 @@ function useDilnaData(weekOffset: number) {
         scheduledProjects.set(s.project_id, (scheduledProjects.get(s.project_id) || 0) + Number(s.scheduled_hours));
       }
 
+      // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part)
+      const bundlesByProject = new Map<string, Map<string, {
+        bundleId: string;
+        bundle_label: string | null;
+        bundle_type: string | null;
+        split_group_id: string | null;
+        split_part: number | null;
+        split_total: number | null;
+        scheduled_hours: number;
+        position: number;
+      }>>();
+      for (const s of schedule) {
+        if (s.status === "historical") continue;
+        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
+        if (!bundlesByProject.has(s.project_id)) bundlesByProject.set(s.project_id, new Map());
+        const bMap = bundlesByProject.get(s.project_id)!;
+        const existing = bMap.get(key);
+        if (existing) {
+          existing.scheduled_hours += Number(s.scheduled_hours);
+        } else {
+          bMap.set(key, {
+            bundleId: s.id,
+            bundle_label: s.bundle_label,
+            bundle_type: s.bundle_type,
+            split_group_id: s.split_group_id,
+            split_part: s.split_part,
+            split_total: s.split_total,
+            scheduled_hours: Number(s.scheduled_hours),
+            position: s.position,
+          });
+        }
+      }
+
       // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
       const latestPctByProject = new Map<string, number>();
       for (const log of dailyLogs) {
@@ -223,9 +277,7 @@ function useDilnaData(weekOffset: number) {
       const knownProjectIds = new Set(projMap.keys());
 
       // ── Chain windows for split projects (chain-window-aware expected progress) ──
-      // Group all schedule rows by project_id, then by week_key (sum of scheduled_hours).
-      // For each project compute cumulative-share window covering the displayed week.
-      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string }>);
+      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string; split_group_id: string | null; bundle_label: string | null }>);
       const chainByProject = new Map<string, Array<{ week: string; hours: number }>>();
       for (const row of allSched) {
         if (row.status === "historical" || row.status === "cancelled") continue;
@@ -259,11 +311,38 @@ function useDilnaData(weekOffset: number) {
           cum += share;
         }
         if (!found) {
-          // displayed week not in chain — fall back to cumulative position at displayed week
           start = 0;
           end = 100;
         }
         chainWindowByProject.set(pid, { start: Math.round(start), end: Math.round(end) });
+      }
+
+      // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
+      // For split bundles: chain across weeks of the same split_group_id, displayed week's window is its slice.
+      const chainWindowBySplitGroup = new Map<string, { start: number; end: number }>();
+      const splitGroupWeeks = new Map<string, Array<{ week: string; hours: number }>>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled") continue;
+        if (!row.split_group_id) continue;
+        const sg = row.split_group_id;
+        if (!splitGroupWeeks.has(sg)) splitGroupWeeks.set(sg, []);
+        const arr = splitGroupWeeks.get(sg)!;
+        const existing = arr.find(w => w.week === row.scheduled_week);
+        if (existing) existing.hours += Number(row.scheduled_hours);
+        else arr.push({ week: row.scheduled_week, hours: Number(row.scheduled_hours) });
+      }
+      for (const [sg, weeks] of splitGroupWeeks) {
+        weeks.sort((a, b) => a.week.localeCompare(b.week));
+        const total = weeks.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) { chainWindowBySplitGroup.set(sg, { start: 0, end: 100 }); continue; }
+        let cum = 0, start = 0, end = 100, found = false;
+        for (const w of weeks) {
+          const share = (w.hours / total) * 100;
+          if (w.week === weekInfo.weekKey) { start = cum; end = cum + share; found = true; break; }
+          cum += share;
+        }
+        if (!found) { start = 0; end = 100; }
+        chainWindowBySplitGroup.set(sg, { start: Math.round(start), end: Math.round(end) });
       }
 
       // ── Spilled projects: have prior weeks with active status (in_progress/paused) ──
@@ -289,6 +368,31 @@ function useDilnaData(weekOffset: number) {
         return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
       }
 
+      function expectedForBundle(splitGroupId: string | null, projectId: string): number | null {
+        const cw = (splitGroupId && chainWindowBySplitGroup.get(splitGroupId))
+          || chainWindowByProject.get(projectId)
+          || { start: 0, end: 100 };
+        return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
+      }
+
+      // ── Calculate prodej value (mirrors WeeklySilos.calcProdejValue) ──
+      function calcDilnaValue(weekHours: number, projectId: string): number {
+        const proj = projMap.get(projectId);
+        let prodejniCena = proj?.prodejni_cena ?? 0;
+        if (!prodejniCena || prodejniCena <= 0 || weekHours <= 0) return 0;
+        if (proj?.currency === 'EUR' && exchangeRates.length > 0) {
+          const projYear = proj.created_at ? new Date(proj.created_at).getFullYear() : new Date().getFullYear();
+          const sorted = [...exchangeRates].sort((a, b) => b.year - a.year);
+          const eurRate = sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
+          prodejniCena = prodejniCena * eurRate;
+        }
+        const planH = planHoursMap.get(projectId) ?? 0;
+        const realH = realHoursLifetimeMap.get(projectId) ?? 0;
+        const denom = Math.max(planH, realH);
+        if (denom <= 0) return 0;
+        return (weekHours / denom) * prodejniCena;
+      }
+
       const cards: ProjectCard[] = [];
 
       // 1) Scheduled (planned) projects — primary cards
@@ -300,11 +404,49 @@ function useDilnaData(weekOffset: number) {
         const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
         const expectedPctVal = isUnmatched ? null : expectedFor(pid, plannedHours);
         const isSpilled = spilledProjects.has(pid);
-        const slipStatus = isUnmatched ? "none" : computeSlip(completionPct, expectedPctVal, loggedHours, isSpilled);
 
-        const prodPct = (proj?.cost_production_pct ?? 30) / 100;
-        const cena = proj?.prodejni_cena ?? 0;
-        const valueCzk = cena * prodPct;
+        // Build bundle rows (sorted by bundle_label, then split_part, then position)
+        const bMap = bundlesByProject.get(pid);
+        const bundleRows: BundleRow[] = [];
+        if (bMap) {
+          const arr = Array.from(bMap.values()).sort((a, b) => {
+            const la = a.bundle_label || "Z";
+            const lb = b.bundle_label || "Z";
+            if (la !== lb) return la.localeCompare(lb);
+            const sa = a.split_part ?? 0;
+            const sb = b.split_part ?? 0;
+            if (sa !== sb) return sa - sb;
+            return a.position - b.position;
+          });
+          for (const b of arr) {
+            const label = b.bundle_label || "A";
+            const displayLabel = b.bundle_type === "split" && b.split_part
+              ? (b.split_total ? `${label} ${b.split_part}/${b.split_total}` : `${label}-${b.split_part}`)
+              : label;
+            const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
+            // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
+            const bCompletion = completionPct;
+            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled);
+            bundleRows.push({
+              bundleId: b.bundleId,
+              displayLabel,
+              scheduledHours: b.scheduled_hours,
+              expectedPct: bExpected,
+              completionPct: bCompletion,
+              slipStatus: bSlip,
+            });
+          }
+        }
+
+        // Project-level slip = worst bundle status (or fallback to project-level)
+        const slipRankMap: Record<SlipStatus, number> = { none: 0, ok: 1, slip: 2, delay: 3 };
+        const projectSlip: SlipStatus = bundleRows.length > 0
+          ? bundleRows.reduce<SlipStatus>((worst, br) =>
+              slipRankMap[br.slipStatus] > slipRankMap[worst] ? br.slipStatus : worst, "none")
+          : (isUnmatched ? "none" : computeSlip(completionPct, expectedPctVal, loggedHours, isSpilled));
+
+        const valueCzk = isUnmatched ? 0 : calcDilnaValue(loggedHours, pid);
+        const valueTargetCzk = isUnmatched ? 0 : calcDilnaValue(plannedHours, pid);
 
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
@@ -320,8 +462,10 @@ function useDilnaData(weekOffset: number) {
           trackedPct,
           completionPct,
           expectedPct: expectedPctVal,
-          slipStatus,
+          slipStatus: projectSlip,
           valueCzk,
+          valueTargetCzk,
+          bundles: bundleRows,
           usekBreakdown,
         });
       }
@@ -329,7 +473,7 @@ function useDilnaData(weekOffset: number) {
       // 2) Unmatched: hours logged this week to a project_id with no schedule and no project record
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
-        if (knownProjectIds.has(pid)) continue;          // matched but unscheduled — handled in step 3
+        if (knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
@@ -346,6 +490,8 @@ function useDilnaData(weekOffset: number) {
           expectedPct: null,
           slipStatus: "none",
           valueCzk: 0,
+          valueTargetCzk: 0,
+          bundles: [],
           usekBreakdown,
         });
       }
@@ -353,15 +499,14 @@ function useDilnaData(weekOffset: number) {
       // 3) Off-plan: project IS in DB (matched), has hours this week, but is not in production_schedule
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
-        if (!knownProjectIds.has(pid)) continue;        // unmatched handled above
+        if (!knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const proj = projMap.get(pid)!;
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
           ? Array.from(usekMap.values()).sort((a, b) => usekSortKey(a.kod) - usekSortKey(b.kod))
           : [];
-        const prodPct = (proj.cost_production_pct ?? 30) / 100;
-        const valueCzk = (proj.prodejni_cena ?? 0) * prodPct;
+        const valueCzk = calcDilnaValue(loggedHours, pid);
         cards.push({
           projectId: pid,
           projectName: proj.project_name || pid,
@@ -373,6 +518,8 @@ function useDilnaData(weekOffset: number) {
           expectedPct: null,
           slipStatus: "none",
           valueCzk,
+          valueTargetCzk: 0,
+          bundles: [],
           usekBreakdown,
         });
       }
@@ -392,6 +539,7 @@ function useDilnaData(weekOffset: number) {
       const delayCount = cards.filter(c => c.slipStatus === "delay").length;
       const slipCount = cards.filter(c => c.slipStatus === "slip").length;
       const totalValueCzk = cards.reduce((s, c) => s + (c.valueCzk || 0), 0);
+      const totalValueTargetCzk = cards.reduce((s, c) => s + (c.valueTargetCzk || 0), 0);
 
       return {
         weekInfo,
