@@ -93,7 +93,7 @@ async function buildProjectData(supabase: any, projectId: string): Promise<strin
 
   const tpvItems = tpvRes.data || [];
   const tpvCount = tpvItems.length;
-  const tpvValue = tpvItems.reduce((s, i) => s + (i.cena || 0) * (i.pocet || 1), 0);
+  const tpvValue = tpvItems.reduce((s: number, i: any) => s + (i.cena || 0) * (i.pocet || 1), 0);
 
   const schedItems = schedRes.data || [];
   const schedByStatus: Record<string, number> = {};
