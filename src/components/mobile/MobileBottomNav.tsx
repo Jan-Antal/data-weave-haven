@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,11 +12,17 @@ interface MobileBottomNavProps {
 }
 
 export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNavProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { isAdmin, isOwner, isVyroba, canManageProduction, canQCOnly, canAccessPlanVyroby } = useAuth();
 
-  const isProjectsActive = activeModule === "projekty";
-  const isDashboardActive = activeModule === "prehled";
-  const isVyrobaActive = activeModule === "vyroba";
+  // When embedded inside Index, use module state. When standalone (e.g. /vyroba), derive from route.
+  const isStandalone = !onModuleChange;
+  const isVyrobaRoute = location.pathname.startsWith("/vyroba");
+
+  const isProjectsActive = isStandalone ? false : activeModule === "projekty";
+  const isDashboardActive = isStandalone ? !isVyrobaRoute : activeModule === "prehled";
+  const isVyrobaActive = isStandalone ? isVyrobaRoute : activeModule === "vyroba";
 
   const canAccessProduction =
     isAdmin || isOwner || isVyroba || canManageProduction || canQCOnly || canAccessPlanVyroby;
@@ -37,6 +44,15 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
     window.dispatchEvent(new CustomEvent("mobile-nav-change"));
     if (onModuleChange) {
       onModuleChange(module);
+      return;
+    }
+    // Standalone fallback: navigate via router so menu remains usable from /vyroba etc.
+    if (module === "vyroba") {
+      navigate("/vyroba");
+    } else if (module === "projekty") {
+      navigate("/", { state: { view: "projects" } });
+    } else {
+      navigate("/", { state: { view: "dashboard" } });
     }
   };
 
