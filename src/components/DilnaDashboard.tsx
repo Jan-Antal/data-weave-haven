@@ -623,6 +623,15 @@ function slipLabel(status: SlipStatus): string {
   }
 }
 
+// Color for production value vs target: green ≥100% of plan, amber 95-99%, red <95%
+function valueColorClass(real: number, target: number): string {
+  if (target <= 0) return "text-[#2f6f2c]";
+  const ratio = real / target;
+  if (ratio >= 1) return "text-[#2f6f2c]";
+  if (ratio >= 0.95) return "text-[#b65d05]";
+  return "text-[#b1232f]";
+}
+
 function warningLabel(w: CardWarning): string {
   if (w === "off_plan") return "Mimo Plán výroby";
   if (w === "unmatched") return "Nespárované";
@@ -715,7 +724,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
           <Card className="p-4 shadow-sm">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Hodnota výroby</div>
             <div className="flex items-baseline gap-2 mt-1">
-              <div className="text-2xl font-bold tabular-nums text-[#2f6f2c]">
+              <div className={`text-2xl font-bold tabular-nums ${valueColorClass(totalValueCzk, totalValueTargetCzk)}`}>
                 {fmtMCzk(totalValueCzk)}
               </div>
               <div className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
@@ -838,7 +847,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                         </div>
                         {card.valueCzk > 0 && (
                           <div className="text-right">
-                            <div className="text-base font-semibold tabular-nums text-[#2f6f2c] leading-tight">
+                            <div className={`text-base font-semibold tabular-nums ${valueColorClass(card.valueCzk, card.valueTargetCzk)} leading-tight`}>
                               {fmtMCzk(card.valueCzk)}
                             </div>
                             {card.valueTargetCzk > 0 && (
