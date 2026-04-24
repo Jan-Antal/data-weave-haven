@@ -43,7 +43,11 @@ export function TpvHoursTab() {
     return { budget: budgetHours, budgetCzk, auto, manual, zostatok };
   }, [projectRow]);
 
-  const lowBudget = stats.budget > 0 && stats.zostatok / stats.budget < 0.1;
+  const hasManualEdits = projectRow?.items.some((it) => {
+    const prep = projectRow.prepByItemId.get(it.id);
+    return prep?.hodiny_manual != null;
+  }) ?? false;
+  const lowBudget = stats.budget > 0 && hasManualEdits && stats.zostatok / stats.budget < 0.1;
 
   return (
     <div className="p-6 space-y-4 overflow-auto h-full">
