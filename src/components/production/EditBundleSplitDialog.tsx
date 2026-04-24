@@ -102,15 +102,47 @@ export function EditBundleSplitDialog({
     setPercentages(init);
   }, [open, weekBuckets, grandTotal]);
 
+  // Identify the last editable week — its value is auto-computed (100 - others)
+  const lastEditableKey = useMemo(() => {
+    const editable = weekBuckets.filter(b => !b.locked);
+    return editable.length > 0 ? editable[editable.length - 1].weekKey : null;
+  }, [weekBuckets]);
+
+  // Effective percentages: last editable week is always derived to make Σ = 100
+  const effectivePct = useMemo(() => {
+    const next: Record<string, number> = { ...percentages };
+    if (lastEditableKey !== null) {
+      const others = weekBuckets
+        .filter(b => b.weekKey !== lastEditableKey)
+        .reduce((s, b) => s + (Number(next[b.weekKey]) || 0), 0);
+      next[lastEditableKey] = Math.max(0, 100 - others);
+    }
+    return next;
+  }, [percentages, weekBuckets, lastEditableKey]);
+
   const totalPct = useMemo(
-    () => Object.values(percentages).reduce((s, v) => s + (Number(v) || 0), 0),
-    [percentages]
+    () => Object.values(effectivePct).reduce((s, v) => s + (Number(v) || 0), 0),
+    [effectivePct]
   );
   const isValid = totalPct === 100;
 
   const handleSliderChange = useCallback((weekKey: string, value: number) => {
-    setPercentages(prev => ({ ...prev, [weekKey]: value }));
-  }, []);
+    if (weekKey === lastEditableKey) return; // auto-computed
+    setPercentages(prev => {
+      const next = { ...prev, [weekKey]: value };
+      // Cap so that sum of non-last editable weeks does not exceed 100 - locked
+      const lockedSum = weekBuckets.filter(b => b.locked).reduce((s, b) => s + (next[b.weekKey] || 0), 0);
+      const othersSum = weekBuckets
+        .filter(b => !b.locked && b.weekKey !== lastEditableKey)
+        .reduce((s, b) => s + (next[b.weekKey] || 0), 0);
+      const max = 100 - lockedSum;
+      if (othersSum > max) {
+        // Reduce current slider to fit
+        next[weekKey] = Math.max(0, value - (othersSum - max));
+      }
+      return next;
+    });
+  }, [lastEditableKey, weekBuckets]);
 
   const handleAutoDistribute = useCallback(() => {
     const lockedSum = weekBuckets
@@ -164,7 +196,7 @@ export function EditBundleSplitDialog({
           const bucket = weekBuckets.find(b => b.weekKey === r.scheduled_week);
           return bucket && !bucket.locked;
         });
-        const editablePctSum = editableRows.reduce((s, r) => s + (percentages[r.scheduled_week] || 0), 0);
+        const editablePctSum = editableRows.reduce((s, r) => s + (effectivePct[r.scheduled_week] || 0), 0);
 
         if (editablePctSum <= 0 || editableRows.length === 0) continue;
 
@@ -172,7 +204,7 @@ export function EditBundleSplitDialog({
         let allocatedH = 0;
         let allocatedC = 0;
         editableRows.forEach((r, idx) => {
-          const pct = percentages[r.scheduled_week] || 0;
+          const pct = effectivePct[r.scheduled_week] || 0;
           const isLast = idx === editableRows.length - 1;
           const newH = isLast
             ? Math.round((remainingHours - allocatedH) * 10) / 10
@@ -254,7 +286,7 @@ export function EditBundleSplitDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [isValid, submitting, rows, weekBuckets, percentages, pushUndo, qc, bundleName, onOpenChange]);
+  }, [isValid, submitting, rows, weekBuckets, effectivePct, pushUndo, qc, bundleName, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -268,20 +300,23 @@ export function EditBundleSplitDialog({
 
         <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
           {weekBuckets.map(b => {
-            const pct = percentages[b.weekKey] || 0;
+            const pct = effectivePct[b.weekKey] || 0;
             const previewHours = Math.round((grandTotal * pct / 100) * 10) / 10;
+            const isAuto = b.weekKey === lastEditableKey;
+            const showSlider = !b.locked && !isAuto;
             return (
               <div key={b.weekKey} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-medium text-foreground">
                     T{b.weekNum} · {fmtDate(b.weekKey)}
                     {b.locked && <span className="ml-1.5 text-muted-foreground">(zamknuto)</span>}
+                    {isAuto && !b.locked && <span className="ml-1.5 text-muted-foreground">(auto — zbytek)</span>}
                   </span>
                   <span className="font-sans text-muted-foreground">
                     {pct}% (~{previewHours}h)
                   </span>
                 </div>
-                {!b.locked && (
+                {showSlider && (
                   <Slider
                     value={[pct]}
                     min={0}
