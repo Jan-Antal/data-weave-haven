@@ -5893,46 +5893,69 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
           Žádné fotky
         </div>
       ) : (
-        <div className="space-y-1 max-h-[50vh] overflow-y-auto pr-1">
-          {photos.map((photo, idx) => {
-            const date = new Date(photo.lastModified);
-            const dateLabel = `${date.getDate()}.${date.getMonth() + 1}.`;
-            return (
-              <div
-                key={`${photo.itemId || "noid"}-${photo.name}-${idx}`}
-                onClick={() => {
-                  setLightboxIndex(idx);
-                  setLightboxOpen(true);
-                }}
-                className="group flex items-center gap-2 px-2.5 py-2 rounded-md w-full text-left min-h-[44px] hover:bg-muted/50 transition-colors cursor-pointer"
-                style={{ border: "1px solid #ece8e2", background: "#ffffff" }}
-              >
-                <img
-                  src={photo.thumbnailUrl || photo.downloadUrl || ""}
-                  alt={photo.name}
-                  className="w-8 h-8 rounded object-cover shrink-0"
-                  loading="lazy"
-                />
-                <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>
-                  {photo.name}
-                </span>
-                <span className="text-[11px] shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>
-                  {dateLabel}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(photo.name);
-                  }}
-                  className="p-1 rounded hover:bg-muted transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                  aria-label="Smazat fotku"
-                >
-                  <X className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
+        (() => {
+          const MONTHS_CS = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
+          const fotekLabel = (n: number) => {
+            if (n === 1) return "1 fotka";
+            if (n >= 2 && n <= 4) return `${n} fotky`;
+            return `${n} fotek`;
+          };
+          // Group photos by date (already sorted newest first by parent)
+          const groups: { key: string; label: string; items: { photo: typeof photos[number]; idx: number }[] }[] = [];
+          photos.forEach((photo, idx) => {
+            const d = new Date(photo.lastModified);
+            const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+            const label = `${d.getDate()}. ${MONTHS_CS[d.getMonth()]} ${d.getFullYear()}`;
+            const existing = groups.find(g => g.key === key);
+            if (existing) existing.items.push({ photo, idx });
+            else groups.push({ key, label, items: [{ photo, idx }] });
+          });
+
+          return (
+            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
+              {groups.map(group => (
+                <div key={group.key}>
+                  <div className="flex items-center gap-2 mb-1.5 text-[12px] font-medium" style={{ color: "hsl(var(--foreground))" }}>
+                    <span>{group.label}</span>
+                    <span style={{ color: "hsl(var(--muted-foreground))" }}>({fotekLabel(group.items.length)})</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {group.items.map(({ photo, idx }) => (
+                      <div
+                        key={`${photo.itemId || "noid"}-${photo.name}-${idx}`}
+                        className="relative group cursor-pointer"
+                        onClick={() => {
+                          setLightboxIndex(idx);
+                          setLightboxOpen(true);
+                        }}
+                      >
+                        <div className="aspect-square rounded-md overflow-hidden bg-muted">
+                          <img
+                            src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                            alt={photo.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(photo.name);
+                          }}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ background: "rgba(0,0,0,0.6)" }}
+                          aria-label="Smazat fotku"
+                        >
+                          <X className="h-3 w-3 text-white" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()
       )}
 
       {/* Hidden inputs for camera & file picker */}
