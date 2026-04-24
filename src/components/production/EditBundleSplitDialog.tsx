@@ -281,15 +281,16 @@ export function EditBundleSplitDialog({
                     {pct}% (~{previewHours}h)
                   </span>
                 </div>
-                <Slider
-                  value={[pct]}
-                  min={0}
-                  max={100}
-                  step={1}
-                  disabled={b.locked}
-                  onValueChange={([v]) => handleSliderChange(b.weekKey, v)}
-                  className="w-full"
-                />
+                {!b.locked && (
+                  <Slider
+                    value={[pct]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={([v]) => handleSliderChange(b.weekKey, v)}
+                    className="w-full"
+                  />
+                )}
               </div>
             );
           })}
