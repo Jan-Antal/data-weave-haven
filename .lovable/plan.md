@@ -1,184 +1,135 @@
-# Plán: Redesign Dílna kariet — bundle-level progress + správna Hodnota výroby
+## Plán: Modul TPV — Príprava výroby
 
-## Cieľ
-1. Opraviť Hodnotu výroby — počítať z reálnych odpracovaných hodín stejnou logikou ako Plán Výroby (`(hours / max(planHours, realLifetimeHours)) * prodejniCenaCZK` s EUR→CZK konverziou).
-2. Zobraziť dve čísla: **veľké** = realita (z `loggedHours`), **malé vedľa** = cíl (z `plannedHours` zo `production_schedule` — sedí na T17 v Pláne Výroby).
-3. Redesign project kariet — namiesto 2 progress barov pre celý projekt → tabuľka **bundle riadkov** s per-bundle completion.
-
-## Súbor
-`src/components/DilnaDashboard.tsx` (jediný súbor)
+Postavím samostatný modul na `/tpv` s tromi záložkami, vlastnou ikonou v topbare a dvomi novými DB tabuľkami. Existujúca `tpv_items` zostáva nedotknutá — len z nej čítame.
 
 ---
 
-## Časť A — Hodnota výroby (logged + cíl)
+### 1. Database (migrácia)
 
-### A1. Rozšíriť `useDilnaData`
-Načítať dodatočné dáta:
-- `projects` → pridať `currency`, `created_at`, `marze`, `prodejni_cena`, `cost_production_pct`
-- `project_plan_hours` → `hodiny_plan` per project (mapa `planHoursMap`)
-- RPC `get_hours_by_project` (bez date filtra) → `realHoursLifetimeMap` (celkové odpracované hodiny per project)
-- `exchange_rates` → pre EUR→CZK konverziu podľa roka projektu
+Vytvorím dve nové tabuľky presne podľa špecifikácie:
 
-### A2. Helper `calcDilnaValue(hours, projectId, lookups)`
-Replikuje `calcProdejValue` z `WeeklySilos.tsx`:
-```ts
-function calcDilnaValue(
-  weekHours: number,
-  projectId: string,
-  projects: ProjectLookup,
-  planHoursMap: Map<string, number>,
-  realHoursLifetimeMap: Map<string, number>,
-  exchangeRates: ExchangeRate[],
-): number {
-  if (weekHours <= 0) return 0;
-  const proj = projects[projectId];
-  if (!proj?.prodejni_cena) return 0;
-  
-  // EUR → CZK konverzia
-  const year = proj.created_at ? new Date(proj.created_at).getFullYear() : new Date().getFullYear();
-  const rate = getExchangeRate(exchangeRates, year);
-  const prodejniCenaCZK = proj.currency === "EUR" ? proj.prodejni_cena * rate : proj.prodejni_cena;
-  
-  // Plánované hodiny vs reálne (lifetime)
-  const planHours = planHoursMap.get(projectId) || 0;
-  const realLifetime = realHoursLifetimeMap.get(projectId) || 0;
-  const denom = Math.max(planHours, realLifetime);
-  if (denom <= 0) return 0;
-  
-  return (weekHours / denom) * prodejniCenaCZK;
-}
-```
+- **`tpv_preparation`** (1:1 k `tpv_items`)
+  - FK `tpv_item_id → tpv_items(id) ON DELETE CASCADE`, `UNIQUE(tpv_item_id)`
+  - polia: `doc_ok bool`, `hodiny_manual numeric`, `hodiny_schvalene bool`, `readiness_status text` s CHECK constraintom (`rozpracovane | ready | riziko | blokovane`), `notes`, `created_at`, `updated_at`
+- **`tpv_material`** (1:N k `tpv_items`)
+  - FK `tpv_item_id → tpv_items(id) ON DELETE CASCADE`
+  - polia: `nazov`, `mnozstvo`, `jednotka`, `dodavatel`, `objednane_dat`, `dodane_dat`, `stav` s CHECK (`nezadany | objednane | caka | dodane`), `poznamka`, timestamps
+- **RLS** pre obe podľa vzoru ostatných production tabuliek:
+  - SELECT pre `authenticated` = true
+  - INSERT/UPDATE/DELETE pre `owner | admin | pm | konstrukter` (TPV príprava je doména konstruktérov + nákupca = pm/admin)
+  - `is_test_project(project_id) = is_test_user()` izolácia, aby tester sandbox neunikol do produkcie (rovnaký vzor ako `data_log`)
+- **Trigger** `update_updated_at_column` na obe tabuľky
+- **Indexy** na `tpv_item_id` a `project_id` pre obe
 
-### A3. Per-card hodnoty
-V `cards.map` pre každý projekt:
-```ts
-const valueCzk = calcDilnaValue(loggedHours, pid, ...);          // realita
-const valueTargetCzk = calcDilnaValue(plannedHours, pid, ...);   // cíl
-```
-kde `plannedHours` = súčet `scheduled_hours` zo `production_schedule` pre daný projekt + `weekKey`.
+Po migrácii sa `src/integrations/supabase/types.ts` vygeneruje automaticky.
 
-### A4. Summary karta „Hodnota výroby"
-```tsx
-<Card className="p-4 shadow-sm">
-  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Hodnota výroby</div>
-  <div className="flex items-baseline gap-2 mt-1">
-    <div className="text-2xl font-bold tabular-nums text-[#2f6f2c]">
-      {fmtMCzk(totalValueCzk)}
-    </div>
-    <div className="text-sm text-muted-foreground tabular-nums">
-      / cíl {fmtMCzk(totalValueTargetCzk)}
-    </div>
-  </div>
-  <div className="text-[11px] text-muted-foreground mt-2">Reálne odpracované / plán týždňa</div>
-</Card>
-```
-
-### A5. Per-card display (pravý dolný roh)
-Nahradiť súčasný jediný `valueCzk` dvojicou:
-```tsx
-<div className="text-right">
-  <div className="text-base font-semibold tabular-nums text-[#2f6f2c]">{fmtMCzk(valueCzk)}</div>
-  <div className="text-[10px] text-muted-foreground tabular-nums">cíl {fmtMCzk(valueTargetCzk)}</div>
-</div>
-```
+> Readiness logika sa **nepočíta v DB** — počíta sa v UI/hooku z aktuálneho stavu `tpv_preparation` + `tpv_material`. Pole `readiness_status` zostane v tabuľke ako voliteľný manuálny override (zatiaľ ho len ukladáme, default `'rozpracovane'`).
 
 ---
 
-## Časť B — Bundle-level project karty
+### 2. Routing + topbar ikona
 
-### B1. Načítať bundles per projekt
-V `useDilnaData` pre aktuálny `weekKey` zo `production_schedule`:
-- Filter: `scheduled_week === weekKey`, `status IN ("scheduled","in_progress","paused")`
-- Pre každý projekt zoskupiť riadky cez `buildBundleKey({ weekKey, project_id, stage_id, bundle_label, split_part })`
-- Pre každý bundle vypočítať `bundle_id` rovnakým algoritmom aký používa `production_daily_logs.bundle_id` (treba overiť — pozri nižšie)
-- Použiť `deriveBundleSplitMeta` na zistenie `splitPart`/`splitTotal`
-- Display label: `formatBundleDisplayLabel({ bundle_label, split_part, bundle_type })` → napr. `"A"` alebo `"A-2"`. Pre split pridať `/splitTotal` → `"A 2/4"`.
+- **`src/App.tsx`**: nová route `/tpv` chránená novým `TpvRoute` guardom (rovnaký pattern ako `PlanRoute`). Prístup: `canAccessPlanVyroby || canManageTPV || isAdmin || isOwner` (TPV pripravujú konstruktéri + admini).
+- **`PersistentDesktopHeader`**: pridať `module: "tpv"` keď `pathname === "/tpv"`.
+- **`ProductionHeader.tsx`**:
+  - rozšíriť `HeaderModule` o `"tpv"`
+  - moduleLabel: `"TPV — Príprava výroby"`
+  - **Nová ikona** medzi LayoutDashboard (Project Info) a CalendarRange (Plán výroby). Použijem `ClipboardCheck` z lucide-react. Aktívny stav rovnaký ako ostatné — `bg-primary-foreground/10`.
 
-### B2. Per-bundle completion z `production_daily_logs`
-- Už máme `dailyLogs` načítané (`useProductionDailyLogs(weekKey)` — Map<bundle_id, DailyLog[]>).
-- Pre každý bundle: `completionPct = max(percent)` zo všetkých logov daného `bundle_id`.
-- Ak žiadny log → `null` (zobraziť ako prázdny šedý bar).
+### 3. Stránka `src/pages/Tpv.tsx` — shell
 
-**⚠️ Otvorená otázka:** musím overiť, ako sa mapuje `production_schedule` riadok → `production_daily_logs.bundle_id`. V kóde sa `bundle_id` v daily logs javí ako `string` (text), nie UUID schedule riadku. V default móde najprv preskúmam `useDilnaData` (existujúcu logiku per-card completion) a `WeeklySilos`/`Vyroba` aby som potvrdil mapping. Ak je to `production_schedule.id` (jeden zo splitnutých riadkov), použijem prvý riadok bundle. Ak je to `bundle_key`, použijem `buildBundleKey`.
+Použijem existujúci `PageTabsShell` (rovnako ako Analytics/Osoby) s tromi záložkami:
+- `summary` → "Prehľad pipeline"
+- `material` → "Materiál"
+- `hodiny` → "Hodinová dotácia"
 
-### B3. Per-bundle expectedPct (chain window logika)
-Pre každý bundle vypočítať `expectedPct` rovnakou logikou akú dnes `useDilnaData` používa pre celý projekt (chain window: počet dní od začiatku chainu do dnes / celkový počet dní chainu × 100). Aplikované per bundle pomocou `chainWindowMap` keyed cez `split_group_id` alebo `bundle_id`.
+URL param `?tab=`. Defaultne `summary`.
 
-### B4. Per-bundle slip status
-```ts
-const slip = computeSlip(completionPct, expectedPct, /* loggedHours irrelevant per bundle */ 0, false);
-```
-Status: `ok` (zelený), `slip` (jantárový), `delay` (červený), `none` (šedý — žiadny log).
+### 4. Hooks (nové súbory v `src/hooks/`)
 
-### B5. Project-level slip badge
-```ts
-const projectSlip = bundles.reduce((worst, b) => 
-  rank(b.slip) > rank(worst) ? b.slip : worst, "ok");
-// rank: none=0, ok=1, slip=2, delay=3
-```
+- **`useTpvPipelineProjects.ts`** — vracia projekty s `status IN ('Příprava','Konstrukce','TPV')` ktoré majú aspoň jednu `tpv_items` položku. Používa `useProjects` + `useAllTPVItems`, joinuje a vracia agregáty (počet items, termín výroby z `expedice/montaz/predani/datum_smluvni` cez existujúci `resolveDeadline`, sum hodín).
+- **`useTpvPreparation.ts`** — `useTpvPreparationForProject(projectId)`, `useUpsertTpvPreparation()` (upsert na `tpv_item_id` UNIQUE), `useBulkApproveHours(projectId)` (set `hodiny_schvalene=true`).
+- **`useTpvMaterial.ts`** — CRUD: `useTpvMaterialsForProject(projectId)`, `useTpvMaterialsAll()` (cez všetky projekty pre per-materiál view s konsolidáciou), `useUpsertTpvMaterial()`, `useDeleteTpvMaterial()`.
+- **`src/lib/tpvReadiness.ts`** — čistá funkcia `computeReadiness(prep, materials): 'blokovane' | 'riziko' | 'ready' | 'rozpracovane'` podľa pravidiel zo zadania.
 
-### B6. Render kariet
-**Odstrániť:**
-- Per-projekt hours bar (Hodiny: `loggedHours / weeklyTarget`)
-- Per-projekt completion bar
-- Sekcia s Úseky breakdown (alebo nechať pod expand?)
+### 5. Tab 1 — Summary (`src/components/tpv/TpvSummaryTab.tsx`)
 
-**Pridať:** Tabuľka bundlov:
-```tsx
-<div className="space-y-1">
-  {bundles.map(b => (
-    <div key={b.bundle_id} className="flex items-center gap-2 text-xs">
-      <div className="w-16 font-medium tabular-nums">{b.displayLabel}</div>
-      <div className="flex-1 relative h-2 bg-gray-100 rounded">
-        {b.completionPct != null && (
-          <div 
-            className={`absolute inset-y-0 left-0 rounded ${slipBarStyles(b.slip).bar}`}
-            style={{ width: `${Math.min(100, b.completionPct)}%` }}
-          />
-        )}
-        {b.expectedPct != null && (
-          <div 
-            className="absolute inset-y-0 w-px bg-teal-600"
-            style={{ left: `${Math.min(100, b.expectedPct)}%` }}
-          />
-        )}
-      </div>
-      <div className="w-10 text-right tabular-nums text-muted-foreground">
-        {b.completionPct != null ? `${Math.round(b.completionPct)}%` : "—"}
-      </div>
-    </div>
-  ))}
-</div>
-```
+- 4 metric cards: V pipeline / Ready / Rizikové / Blokované
+- Filter chips: Všetky | Blokované | Rizikové | Ready
+- **Project pipeline table** so stĺpcami zo zadania. Ľavý 3px accent border z `getProjectColor(project_id)`. Termín výroby s countdown (red <14 dní, amber <30) — využijem existujúci `resolveDeadline` z `src/lib/deadlineWarning.ts`.
+- **Rozbaľovacia inline detail karta** pri kliknutí na riadok (state `expandedProjectId`):
+  - tabuľka items: kód, názov, výkres dot (8px green/red), agreg. materiál stav, hodiny (read-only z `tpv_items.hodiny_plan` + editable override `hodiny_manual`), stav badge
+  - footer: Celkom hodín + tlačidlá `Uložiť`, `Odoslať rizikovo` (red outline), `Odoslať do výroby` (blue filled, disabled kým nie sú všetky `ready`/`riziko`)
+  - "Odoslať do výroby" volá existujúci flow z `TPVList.tsx` (`executeSendToProduction`) — vyextrahujem ho do hooku `useSendItemsToProduction` aby sa dal volať aj odtiaľto bez duplikácie.
 
-### B7. Project slip badge top-right
-```tsx
-<span className={`text-[10px] px-2 py-0.5 rounded-full ${slipPillClass(projectSlip)}`}>
-  {slipLabel(projectSlip)}
-</span>
-```
+### 6. Tab 2 — Materiál (`src/components/tpv/TpvMaterialTab.tsx`)
+
+Toggle `Per projekt | Per materiál` (Tabs alebo button group).
+
+**Per projekt view:**
+- Filter: project selector (Select) + stav selector
+- Tabuľka materiálov pre vybraný projekt (alebo všetky), spojená s `tpv_items` cez `tpv_item_id` aby sme vedeli kód/názov položky
+- Inline edit pre `stav`, `objednane_dat`, `dodane_dat`, `poznamka`, `dodavatel` — využijem existujúci `InlineEditableCell`
+- Pri každom item-e tlačidlo `+` na pridanie ďalšieho materiálu (jeden item môže mať viac materiálov)
+
+**Per materiál view (read-only):**
+- 3 metric cards: Unikátnych materiálov | Zdieľané 2+ projektov (blue badge) | Čaká na dodanie
+- Grupovanie cez `tpv_material.nazov` (case-insensitive trim). Pre každú skupinu:
+  - hlavný riadok: názov + dodávateľ, celkom množstvo, "X proj." badge (modrý ak ≥2, šedý inak), agreg. stav
+  - rozbalené: sub-riadky per project — kód, mini horizontálny bar (proportional quantity vzhľadom k max v skupine), množstvo + jednotka, stav
+
+### 7. Tab 3 — Hodinová dotácia (`src/components/tpv/TpvHoursTab.tsx`)
+
+- Project selector (len projekty z TPV pipeline)
+- 4 metric cards:
+  - **Budget** = `prodejni_cena × cost_production_pct / 100` (z `projects` tabuľky; `cost_production_pct` má fallback z `cost_breakdown_presets` defaultu rovnako ako v RozpadCeny)
+  - **Auto plán** = `Σ tpv_items.hodiny_plan`
+  - **Po úprave** = `Σ COALESCE(tpv_preparation.hodiny_manual, tpv_items.hodiny_plan)`
+  - **Zostatok** = budget − po úprave (amber border + warning ak <10% budgetu)
+- Alert banner ak zostatok <10% budgetu
+- Tabuľka: Kód | Názov | Auto (gray) | Manuálny zásah (editable, modrý border po zmene) | Rozdiel (+amber/-red/0 gray) | Stav (OK / Upravené / Veľká odchýlka >50% → row bg `#FCEBEB`)
+- Footer: Celkom / Budget / Zostatok + `Uložiť` + `Schváliť hodiny` (set `hodiny_schvalene=true` pre všetky items projektu)
+
+### 8. Status badges + design tokens
+
+Vytvorím malý helper `src/components/tpv/TpvStatusBadge.tsx`:
+- Ready `#EAF3DE` / `#27500A`
+- Riziko `#FAEEDA` / `#633806`
+- Blokované `#FCEBEB` / `#791F1F`
+- Rozpracované `#F1EFE8` / `#5F5E5A`
+- pill, 10px font, uppercase letter-spacing
+
+Tabuľky používajú existujúce shadcn `Table` so štýlmi rovnakými ako Project Info / Analytics (header `bg-muted`, 10px uppercase, hover `bg-muted/50`).
+
+### 9. Notifikácie (light)
+
+Pri "Odoslať do výroby" / "Odoslať rizikovo" — využijem existujúce `createNotification` aby PM dostal notifikáciu (rovnaký vzor ako v `useTPVItems`). Žiadne nové typy notifikácií, použijem existujúce TPV-related typy + nový `tpv_sent_to_production_risky`.
+
+### 10. Memory update
+
+Pridám `mem://features/tpv-status/preparation-module.md` s popisom modulu a aktualizujem `mem://index.md`.
 
 ---
 
-## Časť C — Summary karty (top)
-**Bez zmeny** — 4 pôvodné (Hodiny týždňa, Denný cíl, Slip, Off-plan) **+** nová 5. „Hodnota výroby" (z časti A4). Grid `md:grid-cols-5`.
+### Súbory ktoré vytvorím
+1. migrácia (`tpv_preparation`, `tpv_material` + RLS + trigger + indexy)
+2. `src/pages/Tpv.tsx`
+3. `src/components/tpv/TpvSummaryTab.tsx`
+4. `src/components/tpv/TpvMaterialTab.tsx`
+5. `src/components/tpv/TpvHoursTab.tsx`
+6. `src/components/tpv/TpvStatusBadge.tsx`
+7. `src/hooks/useTpvPipelineProjects.ts`
+8. `src/hooks/useTpvPreparation.ts`
+9. `src/hooks/useTpvMaterial.ts`
+10. `src/lib/tpvReadiness.ts`
 
----
+### Súbory ktoré upravím
+- `src/App.tsx` — route + guard + module detection
+- `src/components/production/ProductionHeader.tsx` — `"tpv"` module + nová ikona medzi Project Info a Plán výroby
+- `src/components/TPVList.tsx` — vyextrahovať `executeSendToProduction` do reusable hooku (alebo vytvoriť shared `src/lib/sendTpvToProduction.ts`)
+- `mem://index.md`
 
-## Akceptačné kritériá
-1. ✅ Karta „Hodnota výroby" hore zobrazuje veľké realne (`X,XX M Kč`) + malé `cíl Y,YY M Kč`. Cíl sumár sedí na hodnotu z Plánu Výroby T17 (~1,9 M Kč).
-2. ✅ Per-card hodnota dole vpravo zobrazuje rovnakú dvojicu (realne / cíl).
-3. ✅ Hodiny zostávajú **iba v top summary** (Hodiny týždňa, Denný cíl) — žiadny per-projekt hours bar.
-4. ✅ Každá project karta zobrazuje tabuľku bundlov s labelom (vrátane split formátu `A 2/4`), thin progress barom (completion %), tyrkysovou ryskou (expectedPct), a číslom %.
-5. ✅ Bar farba: zelená (ok), jantárová (slip), červená (delay), prázdna šedá (none / no daylog).
-6. ✅ Project slip badge = najhorší stav medzi bundlami.
-7. ✅ Bundle group respektuje `bundle_label`, `stage_id`, `split_part`/`split_total` z `production_schedule`.
-
-## Mimo rozsah
-- Žiadne DB migrácie.
-- Žiadne zmeny v `WeeklySilos`, `PlanVyroby`, `production_daily_logs` schéme.
-- Žiadne zmeny mobile UI.
-
-## Otvorené otázky pred implementáciou
-1. **Bundle ID mapping:** v default móde najprv overím (`code--exec rg "bundle_id"` v src/) ako sa `production_daily_logs.bundle_id` priraďuje k schedule riadkom. Podľa toho zvolím správny join key (buď `production_schedule.id` prvého riadku v bundli, alebo `buildBundleKey(...)`, alebo `bundle_label`).
-2. Ak existuje viacero schedule riadkov pre 1 bundle (split na rovnakom týždni), ich completion je **rovnaký** (jeden daily log per bundle), takže netreba spriemerovať.
+### Otvorené otázky (pokračujem s defaultmi ak nepovieš inak)
+- **Mobile**: zatiaľ len desktop (`hidden md:block` shell). Mobil neriešim v prvej iterácii.
+- **Permissions**: prístup na `/tpv` pre `admin | owner | pm | konstrukter`. `vyroba` a `viewer` nemajú prístup.
+- **Per-materiál konsolidácia**: kľúč skupiny = `lower(trim(nazov))`. Ak chceš striktnejšie (vrátane `dodavatel` alebo jednotky), povedz.

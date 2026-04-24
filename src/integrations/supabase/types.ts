@@ -1741,6 +1741,109 @@ export type Database = {
           },
         ]
       }
+      tpv_material: {
+        Row: {
+          created_at: string
+          dodane_dat: string | null
+          dodavatel: string | null
+          id: string
+          jednotka: string | null
+          mnozstvo: number | null
+          nazov: string
+          objednane_dat: string | null
+          poznamka: string | null
+          project_id: string
+          stav: string
+          tpv_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dodane_dat?: string | null
+          dodavatel?: string | null
+          id?: string
+          jednotka?: string | null
+          mnozstvo?: number | null
+          nazov: string
+          objednane_dat?: string | null
+          poznamka?: string | null
+          project_id: string
+          stav?: string
+          tpv_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dodane_dat?: string | null
+          dodavatel?: string | null
+          id?: string
+          jednotka?: string | null
+          mnozstvo?: number | null
+          nazov?: string
+          objednane_dat?: string | null
+          poznamka?: string | null
+          project_id?: string
+          stav?: string
+          tpv_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_material_tpv_item_id_fkey"
+            columns: ["tpv_item_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tpv_preparation: {
+        Row: {
+          created_at: string
+          doc_ok: boolean
+          hodiny_manual: number | null
+          hodiny_schvalene: boolean
+          id: string
+          notes: string | null
+          project_id: string
+          readiness_status: string
+          tpv_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          doc_ok?: boolean
+          hodiny_manual?: number | null
+          hodiny_schvalene?: boolean
+          id?: string
+          notes?: string | null
+          project_id: string
+          readiness_status?: string
+          tpv_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          doc_ok?: boolean
+          hodiny_manual?: number | null
+          hodiny_schvalene?: boolean
+          id?: string
+          notes?: string | null
+          project_id?: string
+          readiness_status?: string
+          tpv_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_preparation_tpv_item_id_fkey"
+            columns: ["tpv_item_id"]
+            isOneToOne: true
+            referencedRelation: "tpv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tpv_status_options: {
         Row: {
           color: string
