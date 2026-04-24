@@ -114,7 +114,7 @@ function formatUserShort(email: string): string {
   return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
 }
 
-export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap, onOpenDataLog }: MobilePrehledProps) {
+export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onProjectTap, onOpenDataLog, onSwitchToVyroba }: MobilePrehledProps) {
   const navigate = useNavigate();
   const { profile, linkedPersonName } = useAuth();
   const pmName = linkedPersonName || null;
