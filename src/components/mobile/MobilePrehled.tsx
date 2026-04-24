@@ -290,7 +290,13 @@ export const MobilePrehled = memo(function MobilePrehled({ recentProjects, onPro
       Výroba tento týden
     </h3>
     <button
-      onClick={() => navigate("/vyroba")}
+      onClick={() => {
+        if (onSwitchToVyroba) {
+          onSwitchToVyroba();
+        } else {
+          navigate("/vyroba");
+        }
+      }}
       className="w-full text-left active:scale-[0.98] transition-transform"
       style={{
         background: "#ffffff",
