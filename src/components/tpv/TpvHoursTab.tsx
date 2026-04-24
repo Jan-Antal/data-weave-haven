@@ -197,15 +197,15 @@ function MetricCard({
 }: { label: string; value: string; sub?: string; accent?: string; warning?: boolean }) {
   return (
     <Card
-      className={cn("p-4 bg-muted border-0 shadow-none", warning && "border border-amber-300")}
+      className={cn("p-4 shadow-sm")}
       style={warning ? { borderColor: "#D97706", borderWidth: 1, borderStyle: "solid", background: "#FFF8EE" } : undefined}
     >
       <div className="flex items-center gap-1.5">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
         {warning && <AlertTriangle className="h-3 w-3 text-amber-600" />}
       </div>
-      <div className="text-2xl font-medium tabular-nums mt-1" style={accent ? { color: accent } : undefined}>{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>}
+      <div className="text-2xl font-bold tabular-nums mt-1" style={accent ? { color: accent } : undefined}>{value}</div>
+      {sub && <div className="text-[11px] text-muted-foreground mt-1">{sub}</div>}
     </Card>
   );
 }
