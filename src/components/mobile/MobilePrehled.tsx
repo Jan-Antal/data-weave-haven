@@ -15,6 +15,7 @@ interface MobilePrehledProps {
   recentProjects: RecentProject[];
   onProjectTap: (project: Project) => void;
   onOpenDataLog?: () => void;
+  onSwitchToVyroba?: () => void;
 }
 
 function getISOWeekNumber(d: Date): number {
