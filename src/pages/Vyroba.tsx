@@ -2751,7 +2751,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
           return (
             <Dialog open={mobileDaylogOpen} onOpenChange={setMobileDaylogOpen}>
-              <DialogContent className="w-[min(94vw,860px)] max-w-[860px] max-h-[96vh] overflow-hidden p-5 gap-0 flex flex-col max-sm:mx-4">{logModalContent}</DialogContent>
+              <DialogContent className="w-[min(94vw,860px)] max-w-[860px] h-[95vh] max-h-[95vh] overflow-hidden p-5 gap-0 flex flex-col max-sm:mx-4">{logModalContent}</DialogContent>
             </Dialog>
           );
         })()}
@@ -5893,7 +5893,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
           Žádné fotky
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-1.5" style={{ maxHeight: 200, overflowY: "auto" }}>
+        <div className="grid grid-cols-2 gap-2" style={{ maxHeight: 460, overflowY: "auto" }}>
           {photos.map((photo, idx) => {
             const date = new Date(photo.lastModified);
             const dateLabel = `${date.getDate()}.${date.getMonth() + 1}.`;
@@ -5906,7 +5906,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
                   setLightboxOpen(true);
                 }}
               >
-                <div className="aspect-square rounded-md overflow-hidden bg-muted">
+                <div className="aspect-[4/3] rounded-md overflow-hidden bg-muted">
                   <img
                     src={photo.thumbnailUrl || photo.downloadUrl || ""}
                     alt={photo.name}
@@ -5914,7 +5914,7 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
                     loading="lazy"
                   />
                 </div>
-                <div className="text-[9px] text-center mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>
+                <div className="text-[10px] text-center mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>
                   {dateLabel}
                 </div>
                 <button
