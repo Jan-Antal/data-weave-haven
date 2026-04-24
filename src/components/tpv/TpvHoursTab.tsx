@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Save, CheckCircle2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useTpvPipelineProjects } from "@/hooks/useTpvPipelineProjects";
-import { useUpsertTpvPreparation, useApproveAllHours } from "@/hooks/useTpvPreparation";
-import { toast } from "@/hooks/use-toast";
+import { useUpsertTpvPreparation } from "@/hooks/useTpvPreparation";
+import { HoursWorkflowBar } from "@/components/tpv/HoursWorkflowBar";
 
 const DEFAULT_PRODUCTION_PCT = 25;
 
@@ -20,7 +19,6 @@ export function TpvHoursTab() {
   const { rows } = useTpvPipelineProjects();
   const [projectId, setProjectId] = useState<string>("");
   const upsert = useUpsertTpvPreparation();
-  const approveAll = useApproveAllHours();
 
   const projectRow = rows.find((r) => r.project.project_id === projectId) ?? rows[0];
 
@@ -186,28 +184,21 @@ export function TpvHoursTab() {
             </Table>
           </div>
 
-          <div className="flex items-center justify-between px-3 py-3 border-t bg-muted/30">
-            <div className="text-sm flex gap-6">
-              <div>Celkom: <span className="font-medium tabular-nums">{Math.round(stats.manual)} h</span></div>
-              <div>Budget: <span className="font-medium tabular-nums">{Math.round(stats.budget)} h</span></div>
-              <div>Zostatok: <span className="font-medium tabular-nums" style={lowBudget ? { color: "#D97706" } : undefined}>{Math.round(stats.zostatok)} h</span></div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => toast({ title: "Uložené" })}>
-                <Save className="h-4 w-4 mr-1.5" /> Uložiť
-              </Button>
-              <Button
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => approveAll.mutate({
-                  projectId: projectRow.project.project_id,
-                  items: projectRow.items.map((i) => ({ tpv_item_id: i.id })),
-                })}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1.5" /> Schváliť hodiny
-              </Button>
-            </div>
+          <div className="flex items-center gap-6 px-3 py-2 border-t text-sm bg-muted/10">
+            <div>Celkom: <span className="font-medium tabular-nums">{Math.round(stats.manual)} h</span></div>
+            <div>Budget: <span className="font-medium tabular-nums">{Math.round(stats.budget)} h</span></div>
+            <div>Zostatok: <span className="font-medium tabular-nums" style={lowBudget ? { color: "#D97706" } : undefined}>{Math.round(stats.zostatok)} h</span></div>
           </div>
+
+          <HoursWorkflowBar
+            projectId={projectRow.project.project_id}
+            items={projectRow.items.map((item) => {
+              const prep = projectRow.prepByItemId.get(item.id);
+              const auto = Number((item as any).hodiny_plan ?? 0);
+              const manual = prep?.hodiny_manual != null ? Number(prep.hodiny_manual) : null;
+              return { tpv_item_id: item.id, hodiny_effective: manual ?? auto };
+            })}
+          />
         </div>
       )}
     </div>
