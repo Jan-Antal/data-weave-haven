@@ -9,7 +9,12 @@ interface ExternalFilters {
   statusFilter?: string[];
 }
 
-export function useSortFilter<T extends Record<string, any>>(data: T[], externalFilters?: ExternalFilters, externalSearch?: string) {
+export function useSortFilter<T extends Record<string, any>>(
+  data: T[],
+  externalFilters?: ExternalFilters,
+  externalSearch?: string,
+  options?: { statusOrder?: Record<string, number>; statusColumns?: string[] }
+) {
   const [sortCol, setSortCol] = useState<string | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [internalSearch, setInternalSearch] = useState("");
