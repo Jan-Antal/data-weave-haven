@@ -91,81 +91,102 @@ export function TpvHoursTab() {
       {!projectRow && <div className="text-sm text-muted-foreground">Žiaden projekt v TPV pipeline.</div>}
 
       {projectRow && (
-        <div className="border border-border rounded-md overflow-hidden">
-          <div
-            className="grid px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground bg-muted font-medium"
-            style={{ gridTemplateColumns: "120px minmax(220px,2fr) 100px 130px 100px 140px" }}
-          >
-            <div>Kód</div>
-            <div>Názov</div>
-            <div className="text-right">Auto</div>
-            <div className="text-right">Manuálny zásah</div>
-            <div className="text-right">Rozdiel</div>
-            <div>Stav</div>
+        <div className="rounded-lg border bg-card flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-auto rounded-t-lg">
+            <Table style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: 120 }} />
+                <col />
+                <col style={{ width: 110 }} />
+                <col style={{ width: 140 }} />
+                <col style={{ width: 110 }} />
+                <col style={{ width: 150 }} />
+              </colgroup>
+              <TableHeader className="sticky top-0 z-10 bg-card">
+                <TableRow className="bg-primary/5">
+                  <TableHead>Kód prvku</TableHead>
+                  <TableHead>Název prvku</TableHead>
+                  <TableHead className="text-right">Auto plán</TableHead>
+                  <TableHead className="text-right">Manuálny zásah</TableHead>
+                  <TableHead className="text-right">Rozdiel</TableHead>
+                  <TableHead>Stav</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projectRow.items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      Žádné položky
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  projectRow.items.map((item) => {
+                    const prep = projectRow.prepByItemId.get(item.id);
+                    const auto = Number((item as any).hodiny_plan ?? 0);
+                    const manual = prep?.hodiny_manual != null ? Number(prep.hodiny_manual) : null;
+                    const effective = manual != null ? manual : auto;
+                    const diff = effective - auto;
+                    const ratio = auto > 0 ? Math.abs(diff) / auto : 0;
+                    const big = ratio > 0.5;
+                    const status = manual == null || manual === auto ? "ok" : big ? "big" : "edited";
+
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={cn(
+                          "hover:bg-muted/50 transition-colors h-9",
+                          big && "bg-[#FCEBEB] hover:bg-[#FADADA]",
+                        )}
+                      >
+                        <TableCell className="font-mono text-xs px-2">{(item as any).item_code ?? "—"}</TableCell>
+                        <TableCell className="text-xs px-2 truncate">{(item as any).nazev ?? ""}</TableCell>
+                        <TableCell className="text-right tabular-nums text-xs text-muted-foreground px-2">{auto} h</TableCell>
+                        <TableCell className="px-2">
+                          <div className="flex justify-end">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              defaultValue={manual ?? ""}
+                              placeholder={String(auto)}
+                              onBlur={(e) => {
+                                const v = e.target.value === "" ? null : Number(e.target.value);
+                                if (v === manual) return;
+                                upsert.mutate({
+                                  tpv_item_id: item.id,
+                                  project_id: projectRow.project.project_id,
+                                  patch: { hodiny_manual: v },
+                                });
+                              }}
+                              className="h-7 text-right tabular-nums w-24"
+                              style={{
+                                border: manual != null && manual !== auto ? "1px solid #378ADD" : "1px solid transparent",
+                                background: "transparent",
+                              }}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell
+                          className="text-right tabular-nums text-xs px-2"
+                          style={{
+                            color: diff === 0 ? "#5F5E5A" : diff > 0 ? "#D97706" : "#DC2626",
+                          }}
+                        >
+                          {diff > 0 ? "+" : ""}{diff} h
+                        </TableCell>
+                        <TableCell className="text-xs px-2">
+                          {status === "big" ? <span className="text-red-700 font-medium">Veľká odchýlka</span>
+                            : status === "edited" ? <span className="text-blue-700">Upravené</span>
+                            : <span className="text-muted-foreground">OK</span>}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
           </div>
 
-          {projectRow.items.map((item) => {
-            const prep = projectRow.prepByItemId.get(item.id);
-            const auto = Number((item as any).hodiny_plan ?? 0);
-            const manual = prep?.hodiny_manual != null ? Number(prep.hodiny_manual) : null;
-            const effective = manual != null ? manual : auto;
-            const diff = effective - auto;
-            const ratio = auto > 0 ? Math.abs(diff) / auto : 0;
-            const big = ratio > 0.5;
-            const status = manual == null || manual === auto ? "ok" : big ? "big" : "edited";
-
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  "grid items-center px-3 py-2 text-sm border-t border-border",
-                  big && "bg-[#FCEBEB]"
-                )}
-                style={{ gridTemplateColumns: "120px minmax(220px,2fr) 100px 130px 100px 140px" }}
-              >
-                <div className="font-mono text-xs">{(item as any).item_code ?? "—"}</div>
-                <div className="truncate">{(item as any).nazev ?? ""}</div>
-                <div className="text-right tabular-nums text-muted-foreground">{auto} h</div>
-                <div className="flex justify-end">
-                  <Input
-                    type="number"
-                    step="0.5"
-                    defaultValue={manual ?? ""}
-                    placeholder={String(auto)}
-                    onBlur={(e) => {
-                      const v = e.target.value === "" ? null : Number(e.target.value);
-                      if (v === manual) return;
-                      upsert.mutate({
-                        tpv_item_id: item.id,
-                        project_id: projectRow.project.project_id,
-                        patch: { hodiny_manual: v },
-                      });
-                    }}
-                    className="h-7 text-right tabular-nums w-24"
-                    style={{
-                      border: manual != null && manual !== auto ? "1px solid #378ADD" : "1px solid transparent",
-                      background: "transparent",
-                    }}
-                  />
-                </div>
-                <div
-                  className="text-right tabular-nums"
-                  style={{
-                    color: diff === 0 ? "#5F5E5A" : diff > 0 ? "#D97706" : "#DC2626",
-                  }}
-                >
-                  {diff > 0 ? "+" : ""}{diff} h
-                </div>
-                <div className="text-xs">
-                  {status === "big" ? <span className="text-red-700 font-medium">Veľká odchýlka</span>
-                    : status === "edited" ? <span className="text-blue-700">Upravené</span>
-                    : <span className="text-muted-foreground">OK</span>}
-                </div>
-              </div>
-            );
-          })}
-
-          <div className="flex items-center justify-between px-3 py-3 border-t border-border bg-muted/30">
+          <div className="flex items-center justify-between px-3 py-3 border-t bg-muted/30">
             <div className="text-sm flex gap-6">
               <div>Celkom: <span className="font-medium tabular-nums">{Math.round(stats.manual)} h</span></div>
               <div>Budget: <span className="font-medium tabular-nums">{Math.round(stats.budget)} h</span></div>
