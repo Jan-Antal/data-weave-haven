@@ -554,6 +554,7 @@ function useDilnaData(weekOffset: number) {
         delayCount,
         slipCount,
         totalValueCzk,
+        totalValueTargetCzk,
       };
     },
     staleTime: 60_000,
