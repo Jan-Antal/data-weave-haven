@@ -669,17 +669,18 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
       // Collect all rows of all split chains across the WHOLE schedule (all weeks)
       const splitGroupIds = new Set<string>();
       for (const item of bundle.items) {
-        if (item.split_group_id && item.status !== "expedice" && item.status !== "completed" && item.status !== "cancelled") {
-          splitGroupIds.add(item.split_group_id);
-        }
+        if (item.split_group_id) splitGroupIds.add(item.split_group_id);
       }
       const allScheduleItems = (scheduleData ? Array.from(scheduleData.values()) : [])
         .flatMap(silo => silo.bundles)
         .flatMap(b => b.items);
 
-      // Edit split distribution per week (visible if any split_group spans 2+ weeks in the project)
+      // Edit split distribution per week (visible if chain has 2+ active weeks across the project)
       const editableSplitGroups = Array.from(splitGroupIds).filter(sgId => {
-        const chainRows = allScheduleItems.filter(i => i.split_group_id === sgId);
+        const chainRows = allScheduleItems.filter(i =>
+          i.split_group_id === sgId &&
+          i.status !== "cancelled"
+        );
         const weeks = new Set(chainRows.map(i => i.scheduled_week));
         return weeks.size >= 2;
       });
