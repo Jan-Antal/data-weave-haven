@@ -364,6 +364,7 @@ function useDilnaData(weekOffset: number) {
       const unmatchedCount = cards.filter(c => c.warning === "unmatched").length;
       const delayCount = cards.filter(c => c.slipStatus === "delay").length;
       const slipCount = cards.filter(c => c.slipStatus === "slip").length;
+      const totalValueCzk = cards.reduce((s, c) => s + (c.valueCzk || 0), 0);
 
       return {
         weekInfo,
@@ -377,6 +378,7 @@ function useDilnaData(weekOffset: number) {
         unmatchedCount,
         delayCount,
         slipCount,
+        totalValueCzk,
       };
     },
     staleTime: 60_000,
@@ -486,7 +488,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
     );
   }
 
-  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount } = data;
+  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount, totalValueCzk } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
   const todayPct = dailyTarget > 0 ? Math.min(100, Math.round((todayHours / dailyTarget) * 100)) : 0;
 
@@ -495,7 +497,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
       {/* ── Scrollable content ─────────────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Summary cards (matches VykazReport) */}
-        <div className="px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card className="p-4 shadow-sm">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Odpracováno tento týden</div>
             <div className="text-2xl font-bold mt-1 tabular-nums">{fmtHours(totalHoursWeek)}<span className="text-base font-medium text-muted-foreground"> / {fmtHours(weeklyCapacity)} h</span></div>
@@ -532,6 +534,15 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
             <div className="text-[11px] text-muted-foreground mt-2">
               Aktualizováno {fmtTimestamp(lastSync)}
             </div>
+          </Card>
+          <Card className="p-4 shadow-sm">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Hodnota výroby</div>
+            <div className="text-2xl font-bold mt-1 tabular-nums text-[#2f6f2c]">
+              {totalValueCzk > 0
+                ? `${(totalValueCzk / 1_000_000).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M Kč`
+                : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-2">Suma napříč projekty týdne</div>
           </Card>
         </div>
 
