@@ -472,7 +472,12 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
   const qc = useQueryClient();
-  const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const statusOrderObj = useMemo(() => {
+    const o: Record<string, number> = {};
+    statusOptions.forEach((s, i) => { o[s.label] = s.sort_order ?? i; });
+    return o;
+  }, [statusOptions]);
+  const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch, { statusOrder: statusOrderObj });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showAddButton, setShowAddButton] = useState<Set<string>>(new Set());
   const { pmStatus: { isVisible } } = useAllColumnVisibility();
