@@ -18,6 +18,7 @@ import { useUserAchievements } from "@/hooks/useAchievements";
 import { AchievementShowcase } from "@/components/AchievementShowcase";
 import { TestModeBanner } from "./TestModeBanner";
 import { Switch } from "@/components/ui/switch";
+import { BackupSettings } from "@/components/settings/BackupSettings";
 
 
 const ROLE_LABELS: Record<string, string> = {
@@ -310,6 +311,14 @@ export function AccountSettings({ open, onOpenChange }: AccountSettingsProps) {
           {/* ÚSPĚCHY */}
           <SectionHeader icon="🏆" label="Úspěchy" />
           <AchievementShowcase earned={achievements} userRole={role || undefined} />
+
+          {/* ZÁLOHY (Owner/Admin) */}
+          {(role === "owner" || role === "admin") && (
+            <>
+              <SectionHeader icon="💾" label="Zálohy dat" />
+              <BackupSettings />
+            </>
+          )}
 
         </div>
 
