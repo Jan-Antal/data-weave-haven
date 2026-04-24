@@ -1513,12 +1513,12 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
             );
           })()}
           <DraggableInboxProject project={project} />
-          {onNavigateToTPV && (
-            <button onClick={() => onNavigateToTPV(project.project_id)} className="w-full text-[9px] text-center py-1 hover:underline transition-colors" style={{ color: "#6b7a78" }}>
-              📋 Zobrazit položky
-            </button>
-          )}
         </div>
+      )}
+      {onNavigateToTPV && (
+        <button onClick={(e) => { e.stopPropagation(); onNavigateToTPV(project.project_id); }} className="w-full text-[9px] text-center py-1 hover:underline transition-colors" style={{ color: "#6b7a78" }}>
+          📋 Zobrazit položky
+        </button>
       )}
     </div>
   );
