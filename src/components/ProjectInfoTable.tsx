@@ -540,7 +540,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const updateProject = useUpdateProject();
   const { columns: customColumns } = useAllCustomColumns("projects");
   const updateCustomField = useUpdateCustomField();
-  const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch);
+  const statusOrderObj = useMemo(() => Object.fromEntries(statusOrderMap), [statusOrderMap]);
+  const { sorted: baseSorted, sortCol, sortDir, toggleSort } = useSortFilter(projects, { personFilter, statusFilter }, externalSearch, { statusOrder: statusOrderObj });
   const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
   const projectStatuses = useMemo(() => {
     const map: Record<string, string | null> = {};
