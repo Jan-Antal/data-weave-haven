@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, Factory, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +12,8 @@ interface MobileBottomNavProps {
 }
 
 export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNavProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { isAdmin, isOwner, isVyroba, canManageProduction, canQCOnly, canAccessPlanVyroby } = useAuth();
 
   const isProjectsActive = activeModule === "projekty";
