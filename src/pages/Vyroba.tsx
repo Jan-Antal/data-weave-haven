@@ -3890,6 +3890,11 @@ function DetailPanel({
                 {completedGroups.map(({ item, itemIds, completedParts, splitTotal }) => {
                   const qcCheck = itemIds.map((id) => hotoveCheckMap.get(id)).find(Boolean);
                   const isSplit = completedParts > 1 || (splitTotal ?? 0) > 1;
+                  const bLabel = formatBundleDisplayLabel({
+                    bundle_label: item.bundle_label ?? null,
+                    split_part: item.split_part ?? null,
+                    bundle_type: (item.bundle_type as any) ?? (item.split_group_id ? "split" : "full"),
+                  });
                   return (
                     <div
                       key={itemIds.join("-")}
@@ -3898,6 +3903,12 @@ function DetailPanel({
                     >
                       <div className="flex items-center gap-2.5">
                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#3a8a36" }} />
+                        <span
+                          className="text-[9px] font-sans font-bold px-1 py-[1px] rounded shrink-0"
+                          style={{ background: "rgba(58,138,54,0.1)", color: "#3a8a36" }}
+                        >
+                          {bLabel}
+                        </span>
                         {item.item_code && (
                           <span className="font-sans text-[10px] shrink-0" style={{ color: "#3a8a36" }}>
                             {item.item_code}
