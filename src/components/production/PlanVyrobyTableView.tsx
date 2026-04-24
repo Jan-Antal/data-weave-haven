@@ -1817,6 +1817,17 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
         <SplitBundleDialog open={!!bundleSplitState} onOpenChange={open => !open && setBundleSplitState(null)} bundleName={bundleSplitState.bundleName} currentWeekKey={bundleSplitState.currentWeekKey} items={bundleSplitState.items} weeks={splitWeekOptions} />
       )}
 
+      {/* Edit per-week split distribution */}
+      {editSplitState && (
+        <EditBundleSplitDialog
+          open={!!editSplitState}
+          onOpenChange={open => !open && setEditSplitState(null)}
+          bundleName={editSplitState.bundleName}
+          splitGroupId={editSplitState.splitGroupId}
+          rows={editSplitState.rows}
+        />
+      )}
+
       {/* Pause dialog */}
       {pauseState && (
         <PauseItemDialog open={!!pauseState} onOpenChange={open => !open && setPauseState(null)} {...pauseState} itemCode={pauseState.itemCode} />
