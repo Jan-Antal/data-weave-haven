@@ -3832,31 +3832,44 @@ function DetailPanel({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="mt-2 space-y-1">
-                {futureItems.map(({ item, weekNum: wn }) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-md"
-                    style={{ border: "1px solid #ece8e2", background: "#f5f3f0" }}
-                  >
-                    <span
-                      className="text-[9px] font-sans font-bold px-1 py-[1px] rounded shrink-0"
-                      style={{ background: "rgba(37,99,235,0.08)", color: "#2563eb" }}
+                {futureItems.map(({ item, weekNum: wn }) => {
+                  const bLabel = formatBundleDisplayLabel({
+                    bundle_label: item.bundle_label ?? null,
+                    split_part: item.split_part ?? null,
+                    bundle_type: (item.bundle_type as any) ?? (item.split_group_id ? "split" : "full"),
+                  });
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-md"
+                      style={{ border: "1px solid #ece8e2", background: "#f5f3f0" }}
                     >
-                      T{wn}
-                    </span>
-                    {item.item_code && (
-                      <span className="font-sans text-[10px] shrink-0" style={{ color: "#223937" }}>
-                        {item.item_code}
+                      <span
+                        className="text-[9px] font-sans font-bold px-1 py-[1px] rounded shrink-0"
+                        style={{ background: "rgba(37,99,235,0.08)", color: "#2563eb" }}
+                      >
+                        T{wn}
                       </span>
-                    )}
-                    <span className="text-[13px] flex-1 truncate" style={{ color: "#666666" }}>
-                      {item.item_name}
-                    </span>
-                    <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
-                      {formatHours(item.scheduled_hours)}h
-                    </span>
-                  </div>
-                ))}
+                      <span
+                        className="text-[9px] font-sans font-bold px-1 py-[1px] rounded shrink-0"
+                        style={{ background: "rgba(107,114,128,0.1)", color: "#374151" }}
+                      >
+                        {bLabel}
+                      </span>
+                      {item.item_code && (
+                        <span className="font-sans text-[10px] shrink-0" style={{ color: "#223937" }}>
+                          {item.item_code}
+                        </span>
+                      )}
+                      <span className="text-[13px] flex-1 truncate" style={{ color: "#666666" }}>
+                        {item.item_name}
+                      </span>
+                      <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
+                        {formatHours(item.scheduled_hours)}h
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>
