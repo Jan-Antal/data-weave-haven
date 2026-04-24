@@ -680,8 +680,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [scheduleData, weekKey, getWeekCapacityHours]);
 
   const capacityPct = weekCapacity.total > 0 ? Math.round((weekCapacity.used / weekCapacity.total) * 100) : 0;
-  // Match Plán Výroby thresholds: green ≤100%, orange 100–120%, red >120%
-  const capacityColor = capacityPct > 120 ? "#c0392b" : capacityPct > 100 ? "#d97706" : "#3a8a36";
+  // Match Plán Výroby thresholds & visuals: green ≤100%, orange 100–120%, red >120%
+  const capacityIsOverloaded = capacityPct > 120;
+  const capacityIsWarning = capacityPct > 100 && capacityPct <= 120;
+  const capacityColor = capacityIsOverloaded ? "#c0392b" : capacityIsWarning ? "#d97706" : "#3a8a36";
+  const capacityBarBg = capacityIsOverloaded
+    ? "linear-gradient(90deg, #fca5a5, #c0392b)"
+    : capacityIsWarning
+    ? "linear-gradient(90deg, #fcd34d, #d97706)"
+    : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
   // Today info
   const todayDayIndex = useMemo(() => {
@@ -2108,23 +2115,28 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                 background: "#ffffff",
               }}
             >
-              {/* Capacity bar */}
+              {/* Capacity bar — same visual as Plán Výroby silos */}
               <div
-                className="px-3 py-2 flex items-center gap-2"
+                className="px-3 py-2"
                 style={{ borderBottom: "1px solid #f0eeea", background: "#fafaf8" }}
               >
-                <span className="text-[10px] font-sans font-semibold" style={{ color: "#6b7280" }}>
-                  T{weekNum}
-                </span>
-                <div className="flex-1 h-[6px] rounded-full overflow-hidden" style={{ background: "#e5e2dd" }}>
+                <div className="h-[7px] rounded" style={{ backgroundColor: "#f0eee9", overflow: "hidden" }}>
                   <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityColor }}
+                    className="h-full rounded transition-all duration-300"
+                    style={{ width: `${Math.min(capacityPct, 100)}%`, background: capacityBarBg }}
                   />
                 </div>
-                <span className="text-[10px] font-sans" style={{ color: capacityColor }}>
-                  {formatHours(weekCapacity.used)}h/{formatHours(weekCapacity.total)}h · {capacityPct}%
-                </span>
+                <div className="flex items-baseline justify-between mt-[3px]">
+                  <span className="font-sans text-[11px] font-bold" style={{ color: capacityColor }}>
+                    {formatHours(weekCapacity.used)}h
+                  </span>
+                  <span className="font-sans text-[10px]" style={{ color: "#99a5a3" }}>
+                    / {formatHours(weekCapacity.total)}h
+                  </span>
+                  <span className="font-sans text-[10px] font-bold" style={{ color: capacityColor }}>
+                    {capacityPct}%
+                  </span>
+                </div>
               </div>
 
               <div
