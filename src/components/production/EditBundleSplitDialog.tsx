@@ -201,16 +201,17 @@ export function EditBundleSplitDialog({
     if (editable.length === 0) return;
     const remaining = Math.max(0, 100 - lockedSum);
     const each = Math.floor(remaining / editable.length);
-    // last editable absorbs leftover automatically via effectivePct
+    // Reset auto-anchor to default (last editable) so leftover lands there.
+    setAutoKey(defaultAutoKey);
     setPercentages(prev => {
       const next = { ...prev };
       for (const b of editable) {
-        if (b.weekKey === lastEditableKey) continue;
+        if (b.weekKey === defaultAutoKey) continue;
         next[b.weekKey] = each;
       }
       return next;
     });
-  }, [weekBuckets, lockedPct, lastEditableKey]);
+  }, [weekBuckets, lockedPct, defaultAutoKey]);
 
   const handleSave = useCallback(async () => {
     if (!isValid || submitting) return;
