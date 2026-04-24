@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
 // ── Types ─────────────────────────────────────────────────────────────
-export type UndoPage = "plan-vyroby" | "vyroba" | "project-table" | "tpv-list" | "settings";
+export type UndoPage = "plan-vyroby" | "vyroba" | "project-table" | "tpv-list" | "tpv" | "settings";
 
 export function generateUndoGroupId(): string {
   return crypto.randomUUID();
