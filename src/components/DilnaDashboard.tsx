@@ -748,10 +748,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                 {cards.map((card) => {
                   const maxUsekHours = card.usekBreakdown.reduce((max, u) => Math.max(max, u.hodiny), 1);
                   const projectColor = getProjectColor(card.projectId);
-                  const styles = slipBarStyles(card.slipStatus);
-                  const barWidthPct = card.plannedHours > 0
-                    ? Math.min(100, Math.round((card.loggedHours / card.plannedHours) * 100))
-                    : (card.loggedHours > 0 ? 100 : 0);
+
 
                   return (
                     <div
