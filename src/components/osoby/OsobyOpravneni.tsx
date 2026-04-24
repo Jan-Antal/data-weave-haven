@@ -497,6 +497,7 @@ export function OsobyOpravneni() {
     fetchAll();
   };
 
+  const handleDuplicate = () => {
     toast({
       title: "Duplikovať",
       description:
