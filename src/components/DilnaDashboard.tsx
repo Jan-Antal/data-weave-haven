@@ -841,9 +841,9 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                       {/* Stats row — value (real / cíl) on the right */}
                       <div className="flex items-end justify-between gap-2 mt-auto">
                         <div className="text-[11px] text-muted-foreground tabular-nums">
-                          {card.bundles.length > 0 && (
-                            <span>{card.bundles.length} bundle{card.bundles.length === 1 ? "" : "s"}</span>
-                          )}
+                          <span className="font-medium text-foreground">{fmtHours(card.loggedHours)} h</span>
+                          <span className="mx-1">/</span>
+                          <span>plán {fmtHours(card.plannedHours)} h</span>
                         </div>
                         {card.valueCzk > 0 && (
                           <div className="text-right">
