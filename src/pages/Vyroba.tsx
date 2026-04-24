@@ -810,17 +810,18 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       });
       return sorted[0].percent;
     }
-    // Fallback: only for split bundles — find latest non-MF log from a PRIOR week
-    // belonging to the same split_group_id chain.
-    const prior = findPriorChainLog(pid, weekKey);
-    if (!prior) return 0;
-    // Chain-safe: if prior chain log was completed (≥95%), this week starts a new
-    // chunk — start at this week's chain window start, not inherit 100%.
-    const cw = getChainWindow(pid);
-    if (cw && prior.percent >= 95) {
-      return Math.round(cw.start);
+    // Split-chain fallback first (preserves chain reset at ≥95%)
+    const priorChain = findPriorChainLog(pid, weekKey);
+    if (priorChain) {
+      const cw = getChainWindow(pid);
+      if (cw && priorChain.percent >= 95) {
+        return Math.round(cw.start);
+      }
+      return priorChain.percent;
     }
-    return prior.percent;
+    // General carry-forward: any prior week's last log (e.g. spilled projects)
+    const priorAny = findPriorAnyLog(pid, weekKey);
+    return priorAny ? priorAny.percent : 0;
   }
 
   function getLatestPhase(pid: string): string | null {
@@ -829,9 +830,21 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
       return sorted[0].phase;
     }
-    // Fallback: only for split bundles
-    const prior = findPriorChainLog(pid, weekKey);
-    return prior ? prior.phase : null;
+    const priorChain = findPriorChainLog(pid, weekKey);
+    if (priorChain) return priorChain.phase;
+    const priorAny = findPriorAnyLog(pid, weekKey);
+    return priorAny ? priorAny.phase : null;
+  }
+
+  // Find latest non-MF daily log from any PRIOR week for this project
+  // (regardless of split chain). Used for carry-forward of spilled/regular bundles.
+  function findPriorAnyLog(pid: string, currentWeekKey: string): DailyLog | null {
+    const all = allLatestLogs?.get(pid);
+    if (!all) return null;
+    for (const log of all) {
+      if (log.week_key < currentWeekKey) return log;
+    }
+    return null;
   }
 
   // Find latest non-MF daily log from a PRIOR week belonging to the same split chain
