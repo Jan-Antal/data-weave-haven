@@ -895,15 +895,15 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
         <div className="px-4 pb-4 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-2 rounded-sm" style={{ background: "linear-gradient(90deg, #a7d9a2, #3a8a36)" }} />
-            V plánu (do +5 %)
+            V plánu (na pláne nebo nad)
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-2 rounded-sm" style={{ background: "linear-gradient(90deg, #fcd34d, #d97706)" }} />
-            Ve skluzu (+5 % až +20 %)
+            Ve skluzu (do 5 % pod plánem)
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-2 rounded-sm" style={{ background: "linear-gradient(90deg, #fca5a5, #dc3545)" }} />
-            V omeškání (nad +20 %)
+            V omeškání (více než 5 % pod plánem)
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-2 rounded-sm bg-muted border border-border" />
