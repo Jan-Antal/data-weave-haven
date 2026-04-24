@@ -288,6 +288,7 @@ interface CumulativeInfo {
   phase: string | null;
   isCarryForward: boolean;
   hasLog: boolean;
+  noteText: string | null;
 }
 
 /* ═══ Quality checks hook ═══ */
@@ -848,9 +849,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getCumulativeForDay(pid: string, dayIndex: number): CumulativeInfo | null {
     const logs = getLogsForProject(pid);
     const exact = logs.find((l) => l.day_index === dayIndex);
-    if (exact) return { percent: exact.percent, phase: exact.phase, isCarryForward: false, hasLog: true };
+    if (exact) return { percent: exact.percent, phase: exact.phase, isCarryForward: false, hasLog: true, noteText: exact.note_text ?? null };
     const prev = logs.filter((l) => l.day_index < dayIndex).sort((a, b) => b.day_index - a.day_index);
-    if (prev.length > 0) return { percent: prev[0].percent, phase: prev[0].phase, isCarryForward: true, hasLog: false };
+    if (prev.length > 0) return { percent: prev[0].percent, phase: prev[0].phase, isCarryForward: true, hasLog: false, noteText: null };
     return null;
   }
 
@@ -3488,6 +3489,31 @@ function DetailPanel({
     return m;
   }, [hotoveChecks]);
 
+  // Photos for this week → count by dayIndex (0=Mon..4=Fri)
+  const { filesByCategory, listFiles } = useSharePointDocs(project.projectId);
+  useEffect(() => {
+    listFiles("fotky").catch(() => {});
+  }, [project.projectId, listFiles]);
+  const photoCountByDay = useMemo(() => {
+    const counts: Record<number, number> = {};
+    const photos = filesByCategory?.fotky ?? [];
+    const monday = new Date(currentMonday);
+    monday.setHours(0, 0, 0, 0);
+    for (const f of photos) {
+      const m = f.name.match(/(\d{4})-(\d{2})-(\d{2})/);
+      let d: Date | null = null;
+      if (m) d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+      else if (f.lastModified) d = new Date(f.lastModified);
+      if (!d || isNaN(d.getTime())) continue;
+      d.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((d.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays >= 0 && diffDays <= 4) {
+        counts[diffDays] = (counts[diffDays] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [filesByCategory, currentMonday]);
+
   // Collapsible states for sections
   const [futureOpen, setFutureOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -3713,6 +3739,7 @@ function DetailPanel({
                 statusColor={statusColor}
                 logs={logs}
                 weeklyGoal={weeklyGoal}
+                photoCount={photoCountByDay[di] || 0}
               />
             ))}
           </div>
@@ -5473,6 +5500,7 @@ function DayCell({
   statusColor,
   logs,
   weeklyGoal = 100,
+  photoCount = 0,
 }: {
   dayIndex: number;
   todayDayIndex: number;
@@ -5481,6 +5509,7 @@ function DayCell({
   statusColor: string;
   logs: DailyLog[];
   weeklyGoal?: number;
+  photoCount?: number;
 }) {
   const isMobile = useIsMobile();
   const isToday = dayIndex === todayDayIndex;
@@ -5519,8 +5548,6 @@ function DayCell({
     borderWidth = "2px";
   } else if (isPast && isNoProduction) {
     bg = "#f5f3f0";
-    3548;
-
     border = "#d0cdc8";
   } else if (isPast && cumulative?.hasLog && !isRetroactive) {
     // On-time log: green tint
@@ -5538,6 +5565,7 @@ function DayCell({
   }
 
   const clickable = isToday || (isPast && !isFuture);
+  const noteText = cumulative?.noteText?.trim() || "";
 
   return (
     <div
@@ -5565,8 +5593,9 @@ function DayCell({
 
       {hasData ? (
         <>
+          {/* Row: percent + phase on right */}
           <div
-            className="flex items-center justify-between"
+            className="flex items-baseline justify-between gap-2"
             style={{ opacity: cumulative?.hasLog ? 1 : 0.4 }}
             title={cumulative?.hasLog ? undefined : "Chybí denní log – přenesená hodnota"}
           >
@@ -5576,16 +5605,38 @@ function DayCell({
             >
               {pct}%
             </div>
+            {cumulative?.phase && !isNoProduction && (
+              <span
+                className="text-[10px] font-medium truncate text-right min-w-0"
+                style={{ color: "#6b7280" }}
+                title={cumulative.phase}
+              >
+                {cumulative.phase}
+              </span>
+            )}
           </div>
-          {cumulative?.phase && !isNoProduction && (
-            <p
-              className="text-[10px] text-muted-foreground truncate"
-              style={{ opacity: cumulative?.hasLog ? 1 : 0.4 }}
-              title={cumulative.phase}
+
+          {/* Row: photo count + note start (full note via tooltip) */}
+          {(photoCount > 0 || noteText) && (
+            <div
+              className="flex items-center gap-1.5 text-[10px] min-w-0"
+              style={{ color: "#6b7280", opacity: cumulative?.hasLog ? 1 : 0.4 }}
+              title={noteText || undefined}
             >
-              {cumulative.phase}
-            </p>
+              {photoCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 shrink-0" aria-label={`${photoCount} fotek`}>
+                  <Camera className="h-3 w-3" />
+                  {photoCount}
+                </span>
+              )}
+              {noteText && (
+                <span className="truncate min-w-0" style={{ fontStyle: "italic" }}>
+                  {noteText}
+                </span>
+              )}
+            </div>
           )}
+
           {isToday && !isMobile && (
             <span
               className="mt-0.5 w-full text-[9px] font-medium py-0.5 rounded transition-colors text-center"
