@@ -98,11 +98,53 @@ export function useProductionProgress() {
         weekDate.setUTCDate(weekDate.getUTCDate() + 4 - dayNum);
         const yearStart = new Date(Date.UTC(weekDate.getUTCFullYear(), 0, 1));
         const weekNum = Math.ceil(((weekDate.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-        
+        const isManufactured = expediceScheduleIds.has(row.id) || row.status === "completed";
+
         scheduledItemsByProject.get(pid)!.push({
           id: row.id, item_name: row.item_name, item_code: row.item_code,
-          week_label: `T${weekNum}`, status: row.status,
-        });
+          week_label: `T${weekNum}`, status: isManufactured ? "completed" : row.status,
+          _weekNum: weekNum, _dedupKey: row.item_code ? `code:${row.item_code}` : `name:${row.item_name}`,
+        } as any);
+      }
+
+      // Deduplicate split items spanning multiple weeks: merge same-item rows into one entry
+      // with combined week label (e.g. "T17, T18" or "T17-T19" if consecutive).
+      for (const [pid, items] of scheduledItemsByProject) {
+        const groups = new Map<string, any[]>();
+        for (const it of items as any[]) {
+          const k = it._dedupKey;
+          if (!groups.has(k)) groups.set(k, []);
+          groups.get(k)!.push(it);
+        }
+        const merged: ProjectProgress["scheduled_items"] = [];
+        for (const group of groups.values()) {
+          if (group.length === 1) {
+            const { _weekNum, _dedupKey, ...rest } = group[0];
+            merged.push(rest);
+            continue;
+          }
+          const weeks = Array.from(new Set(group.map(g => g._weekNum as number))).sort((a, b) => a - b);
+          const runs: string[] = [];
+          let runStart = weeks[0];
+          let prev = weeks[0];
+          for (let i = 1; i <= weeks.length; i++) {
+            const w = weeks[i];
+            if (w === prev + 1) { prev = w; continue; }
+            runs.push(runStart === prev ? `T${runStart}` : `T${runStart}-T${prev}`);
+            if (w !== undefined) { runStart = w; prev = w; }
+          }
+          const label = runs.join(", ");
+          const allCompleted = group.every(g => g.status === "completed");
+          const status = allCompleted ? "completed" : (group.find(g => g.status !== "completed")?.status ?? group[0].status);
+          merged.push({
+            id: group[0].id,
+            item_name: group[0].item_name,
+            item_code: group[0].item_code,
+            week_label: label,
+            status,
+          });
+        }
+        scheduledItemsByProject.set(pid, merged);
       }
 
       const allProjectIds = new Set<string>();
