@@ -3739,6 +3739,7 @@ function DetailPanel({
                 statusColor={statusColor}
                 logs={logs}
                 weeklyGoal={weeklyGoal}
+                photoCount={photoCountByDay[di] || 0}
               />
             ))}
           </div>
