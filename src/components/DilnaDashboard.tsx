@@ -59,8 +59,8 @@ function usekSortKey(kod: string): number {
 }
 
 /** Slip tolerance thresholds (in % points) — aligned with Vyroba module. */
-const SLIP_OK_TOL = 10;    // completion ≥ expected − 10  → green (on-track)
-const SLIP_RED = 25;       // completion ≥ expected − 25  → orange (at-risk); else red (behind)
+const SLIP_OK_TOL = 0;     // completion ≥ expected → green (on plan or ahead)
+const SLIP_RED = 5;        // completion ≥ expected − 5 → orange (≤5 % below); else red (>5 % below)
 
 function fmtMCzk(n: number): string {
   if (!n || n <= 0) return "—";
