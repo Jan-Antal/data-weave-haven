@@ -3489,6 +3489,31 @@ function DetailPanel({
     return m;
   }, [hotoveChecks]);
 
+  // Photos for this week → count by dayIndex (0=Mon..4=Fri)
+  const { filesByCategory, listFiles } = useSharePointDocs(project.projectId);
+  useEffect(() => {
+    listFiles("fotky").catch(() => {});
+  }, [project.projectId, listFiles]);
+  const photoCountByDay = useMemo(() => {
+    const counts: Record<number, number> = {};
+    const photos = filesByCategory?.fotky ?? [];
+    const monday = new Date(currentMonday);
+    monday.setHours(0, 0, 0, 0);
+    for (const f of photos) {
+      const m = f.name.match(/(\d{4})-(\d{2})-(\d{2})/);
+      let d: Date | null = null;
+      if (m) d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+      else if (f.lastModified) d = new Date(f.lastModified);
+      if (!d || isNaN(d.getTime())) continue;
+      d.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((d.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays >= 0 && diffDays <= 4) {
+        counts[diffDays] = (counts[diffDays] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [filesByCategory, currentMonday]);
+
   // Collapsible states for sections
   const [futureOpen, setFutureOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
