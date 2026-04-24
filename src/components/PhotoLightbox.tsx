@@ -241,11 +241,11 @@ export function PhotoTimelineGrid({
               {/* Thumbnail grid */}
               {!isCollapsed && (
                 <div className={cn("grid gap-1.5 mt-1", isMobile ? "grid-cols-2" : "grid-cols-3")}>
-                  {group.files.map((f) => {
+                  {group.files.map((f, fi) => {
                     const flatIdx = flatFiles.indexOf(f);
                     return (
                       <LazyThumbnail
-                        key={f.itemId}
+                        key={`${f.itemId || "noid"}-${f.name}-${fi}`}
                         file={f}
                         onClick={() => onOpenLightbox(flatIdx)}
                         isDraggable={isDraggable}
