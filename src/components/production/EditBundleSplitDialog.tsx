@@ -45,10 +45,13 @@ export function EditBundleSplitDialog({
 }: EditBundleSplitDialogProps) {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
-  // percentages = user-edited values for non-last editable weeks (1..N-1).
+  // percentages = user-edited values for editable weeks (excluding the auto-anchor week).
   // Locked week percentages are derived from DB hours (read-only).
-  // The last editable week is auto-derived as 100 - sum(locked) - sum(other editable).
+  // The "auto" week absorbs the remainder (100 - sum(locked) - sum(others)).
+  // By default the auto-anchor is the LAST editable week, but it shifts when the user
+  // moves that week's slider so the user's input is always preserved.
   const [percentages, setPercentages] = useState<Record<string, number>>({});
+  const [autoKey, setAutoKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const initializedFor = useRef<string | null>(null);
 
