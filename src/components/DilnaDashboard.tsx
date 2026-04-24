@@ -62,12 +62,26 @@ function usekSortKey(kod: string): number {
 const SLIP_OK_TOL = 10;    // completion ≥ expected − 10  → green (on-track)
 const SLIP_RED = 25;       // completion ≥ expected − 25  → orange (at-risk); else red (behind)
 
+function fmtMCzk(n: number): string {
+  if (!n || n <= 0) return "—";
+  return `${(n / 1_000_000).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M Kč`;
+}
+
 /* ── types ───────────────────────────────────────────────────────── */
 
 interface UsekRow { kod: string; nazov: string; hodiny: number }
 
 type SlipStatus = "ok" | "slip" | "delay" | "none";
 type CardWarning = "none" | "off_plan" | "unmatched";
+
+interface BundleRow {
+  bundleId: string;            // schedule row id (first row of the bundle)
+  displayLabel: string;        // e.g. "A", "A 2/4"
+  scheduledHours: number;
+  expectedPct: number | null;
+  completionPct: number | null;
+  slipStatus: SlipStatus;
+}
 
 interface ProjectCard {
   projectId: string;
@@ -78,8 +92,10 @@ interface ProjectCard {
   trackedPct: number;          // logged / planned (0–∞)
   completionPct: number | null; // latest daily-log percent (0–100), null = no log
   expectedPct: number | null;   // expected progress today (chain-window aware)
-  slipStatus: SlipStatus;
-  valueCzk: number;
+  slipStatus: SlipStatus;       // worst across bundles
+  valueCzk: number;             // realne (logged) value
+  valueTargetCzk: number;       // cíl (planned) value
+  bundles: BundleRow[];
   usekBreakdown: UsekRow[];
 }
 
@@ -96,16 +112,17 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes] = await Promise.all([
+      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
           .gte("datum_sync", weekInfo.weekKey)
           .lt("datum_sync", sundayStr)
           .not("cinnost_kod", "in", '("TPV","ENG","PRO")'),
+        // Per-bundle schedule rows for THIS week (for bundle table + planned hours)
         supabase
           .from("production_schedule")
-          .select("project_id, scheduled_hours, status, item_name")
+          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position")
           .eq("scheduled_week", weekInfo.weekKey)
           .not("status", "eq", "cancelled"),
         supabase
@@ -115,7 +132,7 @@ function useDilnaData(weekOffset: number) {
           .single(),
         supabase
           .from("projects")
-          .select("project_id, project_name, prodejni_cena, cost_production_pct, currency")
+          .select("project_id, project_name, prodejni_cena, cost_production_pct, currency, created_at")
           .is("deleted_at", null),
         supabase
           .from("production_capacity")
@@ -134,11 +151,21 @@ function useDilnaData(weekOffset: number) {
           .from("overhead_projects" as any)
           .select("project_code")
           .eq("is_active", true),
-        // All schedule rows (across weeks) for chain-window calculation
+        // All schedule rows (across weeks) for chain-window calculation (incl. split_group_id for per-bundle chain)
         supabase
           .from("production_schedule")
-          .select("project_id, scheduled_week, scheduled_hours, status")
+          .select("project_id, scheduled_week, scheduled_hours, status, split_group_id, bundle_label")
           .not("status", "eq", "cancelled"),
+        // Plan hours per project (for value calculation denominator)
+        supabase
+          .from("project_plan_hours")
+          .select("project_id, hodiny_plan"),
+        // Exchange rates for EUR → CZK conversion
+        supabase
+          .from("exchange_rates")
+          .select("year, eur_czk"),
+        // Real lifetime hours per project (RPC, mirrors WeeklySilos logic)
+        (supabase.rpc as any)("get_hours_by_project"),
       ]);
 
       const weeklyCapacity =
@@ -152,9 +179,30 @@ function useDilnaData(weekOffset: number) {
 
       const hoursRaw = (hoursRes.data || []) as Array<{ ami_project_id: string; hodiny: number; created_at: string; datum_sync: string; cinnost_kod: string | null; cinnost_nazov: string | null }>;
       const hours = hoursRaw.filter(h => !overheadSet.has(h.ami_project_id));
-      const schedule = (schedRes.data || []) as Array<{ project_id: string; scheduled_hours: number; status: string; item_name: string }>;
-      const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null }>;
+      const schedule = (schedRes.data || []) as Array<{
+        id: string;
+        project_id: string;
+        stage_id: string | null;
+        scheduled_hours: number;
+        status: string;
+        item_name: string;
+        bundle_label: string | null;
+        bundle_type: string | null;
+        split_group_id: string | null;
+        split_part: number | null;
+        split_total: number | null;
+        position: number;
+      }>;
+      const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
       const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
+      const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
+      const exchangeRates = (exchangeRes.data || []) as Array<{ year: number; eur_czk: number }>;
+      const realHoursRows = (realHoursRes.data || []) as Array<{ ami_project_id: string; total_hodiny: number }>;
+
+      const planHoursMap = new Map<string, number>();
+      for (const r of planHoursRows) planHoursMap.set(r.project_id, Number(r.hodiny_plan) || 0);
+      const realHoursLifetimeMap = new Map<string, number>();
+      for (const r of realHoursRows) realHoursLifetimeMap.set(r.ami_project_id, Number(r.total_hodiny) || 0);
 
       const totalHoursWeek = hours.reduce((s, h) => s + Number(h.hodiny), 0);
       const today = toLocalDateStr(new Date());
@@ -182,6 +230,39 @@ function useDilnaData(weekOffset: number) {
         scheduledProjects.set(s.project_id, (scheduledProjects.get(s.project_id) || 0) + Number(s.scheduled_hours));
       }
 
+      // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part)
+      const bundlesByProject = new Map<string, Map<string, {
+        bundleId: string;
+        bundle_label: string | null;
+        bundle_type: string | null;
+        split_group_id: string | null;
+        split_part: number | null;
+        split_total: number | null;
+        scheduled_hours: number;
+        position: number;
+      }>>();
+      for (const s of schedule) {
+        if (s.status === "historical") continue;
+        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
+        if (!bundlesByProject.has(s.project_id)) bundlesByProject.set(s.project_id, new Map());
+        const bMap = bundlesByProject.get(s.project_id)!;
+        const existing = bMap.get(key);
+        if (existing) {
+          existing.scheduled_hours += Number(s.scheduled_hours);
+        } else {
+          bMap.set(key, {
+            bundleId: s.id,
+            bundle_label: s.bundle_label,
+            bundle_type: s.bundle_type,
+            split_group_id: s.split_group_id,
+            split_part: s.split_part,
+            split_total: s.split_total,
+            scheduled_hours: Number(s.scheduled_hours),
+            position: s.position,
+          });
+        }
+      }
+
       // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
       const latestPctByProject = new Map<string, number>();
       for (const log of dailyLogs) {
@@ -196,9 +277,7 @@ function useDilnaData(weekOffset: number) {
       const knownProjectIds = new Set(projMap.keys());
 
       // ── Chain windows for split projects (chain-window-aware expected progress) ──
-      // Group all schedule rows by project_id, then by week_key (sum of scheduled_hours).
-      // For each project compute cumulative-share window covering the displayed week.
-      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string }>);
+      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string; split_group_id: string | null; bundle_label: string | null }>);
       const chainByProject = new Map<string, Array<{ week: string; hours: number }>>();
       for (const row of allSched) {
         if (row.status === "historical" || row.status === "cancelled") continue;
@@ -232,11 +311,38 @@ function useDilnaData(weekOffset: number) {
           cum += share;
         }
         if (!found) {
-          // displayed week not in chain — fall back to cumulative position at displayed week
           start = 0;
           end = 100;
         }
         chainWindowByProject.set(pid, { start: Math.round(start), end: Math.round(end) });
+      }
+
+      // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
+      // For split bundles: chain across weeks of the same split_group_id, displayed week's window is its slice.
+      const chainWindowBySplitGroup = new Map<string, { start: number; end: number }>();
+      const splitGroupWeeks = new Map<string, Array<{ week: string; hours: number }>>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled") continue;
+        if (!row.split_group_id) continue;
+        const sg = row.split_group_id;
+        if (!splitGroupWeeks.has(sg)) splitGroupWeeks.set(sg, []);
+        const arr = splitGroupWeeks.get(sg)!;
+        const existing = arr.find(w => w.week === row.scheduled_week);
+        if (existing) existing.hours += Number(row.scheduled_hours);
+        else arr.push({ week: row.scheduled_week, hours: Number(row.scheduled_hours) });
+      }
+      for (const [sg, weeks] of splitGroupWeeks) {
+        weeks.sort((a, b) => a.week.localeCompare(b.week));
+        const total = weeks.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) { chainWindowBySplitGroup.set(sg, { start: 0, end: 100 }); continue; }
+        let cum = 0, start = 0, end = 100, found = false;
+        for (const w of weeks) {
+          const share = (w.hours / total) * 100;
+          if (w.week === weekInfo.weekKey) { start = cum; end = cum + share; found = true; break; }
+          cum += share;
+        }
+        if (!found) { start = 0; end = 100; }
+        chainWindowBySplitGroup.set(sg, { start: Math.round(start), end: Math.round(end) });
       }
 
       // ── Spilled projects: have prior weeks with active status (in_progress/paused) ──
@@ -262,6 +368,31 @@ function useDilnaData(weekOffset: number) {
         return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
       }
 
+      function expectedForBundle(splitGroupId: string | null, projectId: string): number | null {
+        const cw = (splitGroupId && chainWindowBySplitGroup.get(splitGroupId))
+          || chainWindowByProject.get(projectId)
+          || { start: 0, end: 100 };
+        return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
+      }
+
+      // ── Calculate prodej value (mirrors WeeklySilos.calcProdejValue) ──
+      function calcDilnaValue(weekHours: number, projectId: string): number {
+        const proj = projMap.get(projectId);
+        let prodejniCena = proj?.prodejni_cena ?? 0;
+        if (!prodejniCena || prodejniCena <= 0 || weekHours <= 0) return 0;
+        if (proj?.currency === 'EUR' && exchangeRates.length > 0) {
+          const projYear = proj.created_at ? new Date(proj.created_at).getFullYear() : new Date().getFullYear();
+          const sorted = [...exchangeRates].sort((a, b) => b.year - a.year);
+          const eurRate = sorted.find(r => r.year === projYear)?.eur_czk ?? sorted[0]?.eur_czk ?? 25;
+          prodejniCena = prodejniCena * eurRate;
+        }
+        const planH = planHoursMap.get(projectId) ?? 0;
+        const realH = realHoursLifetimeMap.get(projectId) ?? 0;
+        const denom = Math.max(planH, realH);
+        if (denom <= 0) return 0;
+        return (weekHours / denom) * prodejniCena;
+      }
+
       const cards: ProjectCard[] = [];
 
       // 1) Scheduled (planned) projects — primary cards
@@ -273,11 +404,49 @@ function useDilnaData(weekOffset: number) {
         const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
         const expectedPctVal = isUnmatched ? null : expectedFor(pid, plannedHours);
         const isSpilled = spilledProjects.has(pid);
-        const slipStatus = isUnmatched ? "none" : computeSlip(completionPct, expectedPctVal, loggedHours, isSpilled);
 
-        const prodPct = (proj?.cost_production_pct ?? 30) / 100;
-        const cena = proj?.prodejni_cena ?? 0;
-        const valueCzk = cena * prodPct;
+        // Build bundle rows (sorted by bundle_label, then split_part, then position)
+        const bMap = bundlesByProject.get(pid);
+        const bundleRows: BundleRow[] = [];
+        if (bMap) {
+          const arr = Array.from(bMap.values()).sort((a, b) => {
+            const la = a.bundle_label || "Z";
+            const lb = b.bundle_label || "Z";
+            if (la !== lb) return la.localeCompare(lb);
+            const sa = a.split_part ?? 0;
+            const sb = b.split_part ?? 0;
+            if (sa !== sb) return sa - sb;
+            return a.position - b.position;
+          });
+          for (const b of arr) {
+            const label = b.bundle_label || "A";
+            const displayLabel = b.bundle_type === "split" && b.split_part
+              ? (b.split_total ? `${label} ${b.split_part}/${b.split_total}` : `${label}-${b.split_part}`)
+              : label;
+            const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
+            // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
+            const bCompletion = completionPct;
+            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled);
+            bundleRows.push({
+              bundleId: b.bundleId,
+              displayLabel,
+              scheduledHours: b.scheduled_hours,
+              expectedPct: bExpected,
+              completionPct: bCompletion,
+              slipStatus: bSlip,
+            });
+          }
+        }
+
+        // Project-level slip = worst bundle status (or fallback to project-level)
+        const slipRankMap: Record<SlipStatus, number> = { none: 0, ok: 1, slip: 2, delay: 3 };
+        const projectSlip: SlipStatus = bundleRows.length > 0
+          ? bundleRows.reduce<SlipStatus>((worst, br) =>
+              slipRankMap[br.slipStatus] > slipRankMap[worst] ? br.slipStatus : worst, "none")
+          : (isUnmatched ? "none" : computeSlip(completionPct, expectedPctVal, loggedHours, isSpilled));
+
+        const valueCzk = isUnmatched ? 0 : calcDilnaValue(loggedHours, pid);
+        const valueTargetCzk = isUnmatched ? 0 : calcDilnaValue(plannedHours, pid);
 
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
@@ -293,8 +462,10 @@ function useDilnaData(weekOffset: number) {
           trackedPct,
           completionPct,
           expectedPct: expectedPctVal,
-          slipStatus,
+          slipStatus: projectSlip,
           valueCzk,
+          valueTargetCzk,
+          bundles: bundleRows,
           usekBreakdown,
         });
       }
@@ -302,7 +473,7 @@ function useDilnaData(weekOffset: number) {
       // 2) Unmatched: hours logged this week to a project_id with no schedule and no project record
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
-        if (knownProjectIds.has(pid)) continue;          // matched but unscheduled — handled in step 3
+        if (knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
@@ -319,6 +490,8 @@ function useDilnaData(weekOffset: number) {
           expectedPct: null,
           slipStatus: "none",
           valueCzk: 0,
+          valueTargetCzk: 0,
+          bundles: [],
           usekBreakdown,
         });
       }
@@ -326,15 +499,14 @@ function useDilnaData(weekOffset: number) {
       // 3) Off-plan: project IS in DB (matched), has hours this week, but is not in production_schedule
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
-        if (!knownProjectIds.has(pid)) continue;        // unmatched handled above
+        if (!knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const proj = projMap.get(pid)!;
         const usekMap = usekByProject.get(pid);
         const usekBreakdown = usekMap
           ? Array.from(usekMap.values()).sort((a, b) => usekSortKey(a.kod) - usekSortKey(b.kod))
           : [];
-        const prodPct = (proj.cost_production_pct ?? 30) / 100;
-        const valueCzk = (proj.prodejni_cena ?? 0) * prodPct;
+        const valueCzk = calcDilnaValue(loggedHours, pid);
         cards.push({
           projectId: pid,
           projectName: proj.project_name || pid,
@@ -346,6 +518,8 @@ function useDilnaData(weekOffset: number) {
           expectedPct: null,
           slipStatus: "none",
           valueCzk,
+          valueTargetCzk: 0,
+          bundles: [],
           usekBreakdown,
         });
       }
@@ -365,6 +539,7 @@ function useDilnaData(weekOffset: number) {
       const delayCount = cards.filter(c => c.slipStatus === "delay").length;
       const slipCount = cards.filter(c => c.slipStatus === "slip").length;
       const totalValueCzk = cards.reduce((s, c) => s + (c.valueCzk || 0), 0);
+      const totalValueTargetCzk = cards.reduce((s, c) => s + (c.valueTargetCzk || 0), 0);
 
       return {
         weekInfo,
@@ -379,6 +554,7 @@ function useDilnaData(weekOffset: number) {
         delayCount,
         slipCount,
         totalValueCzk,
+        totalValueTargetCzk,
       };
     },
     staleTime: 60_000,
@@ -488,7 +664,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
     );
   }
 
-  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount, totalValueCzk } = data;
+  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount, totalValueCzk, totalValueTargetCzk } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
   const todayPct = dailyTarget > 0 ? Math.min(100, Math.round((todayHours / dailyTarget) * 100)) : 0;
 
@@ -537,12 +713,15 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
           </Card>
           <Card className="p-4 shadow-sm">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Hodnota výroby</div>
-            <div className="text-2xl font-bold mt-1 tabular-nums text-[#2f6f2c]">
-              {totalValueCzk > 0
-                ? `${(totalValueCzk / 1_000_000).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M Kč`
-                : "—"}
+            <div className="flex items-baseline gap-2 mt-1">
+              <div className="text-2xl font-bold tabular-nums text-[#2f6f2c]">
+                {fmtMCzk(totalValueCzk)}
+              </div>
+              <div className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                / cíl {fmtMCzk(totalValueTargetCzk)}
+              </div>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2">Suma napříč projekty týdne</div>
+            <div className="text-[11px] text-muted-foreground mt-2">Reálne odpracované / plán týždne</div>
           </Card>
         </div>
 
@@ -569,10 +748,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                 {cards.map((card) => {
                   const maxUsekHours = card.usekBreakdown.reduce((max, u) => Math.max(max, u.hodiny), 1);
                   const projectColor = getProjectColor(card.projectId);
-                  const styles = slipBarStyles(card.slipStatus);
-                  const barWidthPct = card.plannedHours > 0
-                    ? Math.min(100, Math.round((card.loggedHours / card.plannedHours) * 100))
-                    : (card.loggedHours > 0 ? 100 : 0);
+
 
                   return (
                     <div
@@ -614,89 +790,62 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
                         )}
                       </div>
 
-                      {/* Progress bars — Hodiny (tracking) + Dokončeno (completion) */}
-                      <div className="flex flex-col gap-1.5">
-                        {/* Bar 1: HODINY — logged vs planned */}
-                        <div>
-                          <div className="relative h-[5px] rounded-full bg-muted overflow-visible">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${card.trackedPct > 100 ? 100 : barWidthPct}%`,
-                                background: card.trackedPct > 100 ? "#dc3545" : styles.bg,
-                              }}
-                            />
-                            {card.expectedPct != null && (
-                              <div
-                                className="absolute top-[-2px] bottom-[-2px] w-[1.5px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
-                                style={{ left: `${Math.min(100, Math.max(0, card.expectedPct))}%` }}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                            <span>
-                              Hodiny <span className="font-medium text-foreground">{card.trackedPct}%</span>
-                            </span>
-                            <span>
-                              <span className="font-medium text-foreground">{fmtHours(card.loggedHours)}h</span>
-                              {card.plannedHours > 0 && <> / {fmtHours(card.plannedHours)}h</>}
-                            </span>
-                          </div>
+                      {/* Bundle rows — per-bundle completion vs expected */}
+                      {card.bundles.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {card.bundles.map((b) => {
+                            const bStyles = slipBarStyles(b.slipStatus);
+                            return (
+                              <div key={b.bundleId} className="flex items-center gap-2 text-[11px]">
+                                <div className="w-14 font-medium tabular-nums truncate shrink-0" title={b.displayLabel}>
+                                  {b.displayLabel}
+                                </div>
+                                <div className="flex-1 relative h-[6px] rounded-full bg-muted overflow-visible">
+                                  {b.completionPct != null && (
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${Math.min(100, Math.max(0, b.completionPct))}%`,
+                                        background: bStyles.bg,
+                                      }}
+                                    />
+                                  )}
+                                  {b.expectedPct != null && (
+                                    <div
+                                      className="absolute top-[-2px] bottom-[-2px] w-[1.5px] rounded-sm bg-teal-500 shadow-sm pointer-events-none"
+                                      style={{ left: `${Math.min(100, Math.max(0, b.expectedPct))}%` }}
+                                    />
+                                  )}
+                                </div>
+                                <div className="w-9 text-right tabular-nums text-muted-foreground shrink-0">
+                                  {b.completionPct != null ? `${Math.round(b.completionPct)}%` : "—"}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
+                      ) : card.warning === "off_plan" || card.warning === "unmatched" ? null : (
+                        <div className="text-[11px] text-muted-foreground italic">Bez bundlu</div>
+                      )}
 
-                        {/* Bar 2: DOKONČENO — daylog completion */}
-                        <div>
-                          <div className="relative h-[5px] rounded-full bg-muted overflow-visible">
-                            {card.completionPct != null && (
-                              <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, card.completionPct))}%`,
-                                  background: "#639922",
-                                }}
-                              />
-                            )}
-                            {card.expectedPct != null && (
-                              <div
-                                className="absolute top-[-2.5px] bottom-[-2.5px] w-[1.5px] rounded-sm shadow-sm pointer-events-none"
-                                style={{
-                                  left: `${Math.min(100, Math.max(0, card.expectedPct))}%`,
-                                  background: "var(--color-border-primary)",
-                                  height: "10px",
-                                }}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums mt-0.5">
-                            {card.completionPct != null ? (
-                              <span>
-                                Dokončeno <span className="font-medium text-foreground">{card.completionPct}%</span>
-                              </span>
-                            ) : (
-                              <span className="italic">Bez denního logu</span>
-                            )}
-                            {card.expectedPct != null && (
-                              <span>
-                                Očekáváno <span className="font-medium text-teal-600">{card.expectedPct}%</span>
-                              </span>
-                            )}
-                            <span />
-                          </div>
+                      {/* Stats row — value (real / cíl) on the right */}
+                      <div className="flex items-end justify-between gap-2 mt-auto">
+                        <div className="text-[11px] text-muted-foreground tabular-nums">
+                          {card.bundles.length > 0 && (
+                            <span>{card.bundles.length} bundle{card.bundles.length === 1 ? "" : "s"}</span>
+                          )}
                         </div>
-                      </div>
-
-                      {/* Stats row */}
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>
-                          <span className="font-medium text-foreground tabular-nums">{fmtHours(card.loggedHours)}h</span>
-                          {card.plannedHours > 0 && <> / {fmtHours(card.plannedHours)}h</>}
-                        </span>
                         {card.valueCzk > 0 && (
-                          <span>
-                            <span className="font-medium text-foreground tabular-nums">
-                              {(card.valueCzk / 1_000_000).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} M Kč
-                            </span>
-                          </span>
+                          <div className="text-right">
+                            <div className="text-base font-semibold tabular-nums text-[#2f6f2c] leading-tight">
+                              {fmtMCzk(card.valueCzk)}
+                            </div>
+                            {card.valueTargetCzk > 0 && (
+                              <div className="text-[10px] text-muted-foreground tabular-nums leading-tight">
+                                cíl {fmtMCzk(card.valueTargetCzk)}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
 
