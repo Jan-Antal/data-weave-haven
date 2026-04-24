@@ -230,6 +230,16 @@ function useDilnaData(weekOffset: number) {
         scheduledProjects.set(s.project_id, (scheduledProjects.get(s.project_id) || 0) + Number(s.scheduled_hours));
       }
 
+      // Track per-project: are all (non-historical, non-cancelled) schedule rows for this week completed?
+      // Used to credit planned-hours value when project is closed but logged < planned.
+      const projectAllDoneThisWeek = new Map<string, boolean>();
+      for (const s of schedule) {
+        if (s.status === "historical" || s.status === "cancelled") continue;
+        const pid = s.project_id;
+        const prev = projectAllDoneThisWeek.has(pid) ? projectAllDoneThisWeek.get(pid)! : true;
+        projectAllDoneThisWeek.set(pid, prev && s.status === "completed");
+      }
+
       // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part)
       const bundlesByProject = new Map<string, Map<string, {
         bundleId: string;
