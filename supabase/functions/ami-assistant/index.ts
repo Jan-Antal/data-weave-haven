@@ -34,7 +34,8 @@ PRAVIDLA:
 - Čísla zaokrouhluj, procenta uváděj
 - Pokud data nemáš nebo dotaz je mimo aplikaci: "Toto je nápověda pro AMI aplikaci. Mohu ti pomoci s projekty nebo ovládáním."`;
 
-async function buildProjectContext(supabase: ReturnType<typeof createClient>): Promise<string> {
+// deno-lint-ignore no-explicit-any
+async function buildProjectContext(supabase: any): Promise<string> {
   const [projectsRes, tpvRes, scheduleRes, planRes, actualRes] = await Promise.all([
     supabase
       .from("projects")

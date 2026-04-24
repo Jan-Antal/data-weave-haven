@@ -57,7 +57,8 @@ function parseCzechDate(raw: string | null): Date | null {
   return null;
 }
 
-async function buildProjectData(supabase: ReturnType<typeof createClient>, projectId: string): Promise<string | null> {
+// deno-lint-ignore no-explicit-any
+async function buildProjectData(supabase: any, projectId: string): Promise<string | null> {
   // Find project by partial match
   let { data: projects } = await supabase
     .from("projects")
@@ -92,7 +93,7 @@ async function buildProjectData(supabase: ReturnType<typeof createClient>, proje
 
   const tpvItems = tpvRes.data || [];
   const tpvCount = tpvItems.length;
-  const tpvValue = tpvItems.reduce((s, i) => s + (i.cena || 0) * (i.pocet || 1), 0);
+  const tpvValue = tpvItems.reduce((s: number, i: any) => s + (i.cena || 0) * (i.pocet || 1), 0);
 
   const schedItems = schedRes.data || [];
   const schedByStatus: Record<string, number> = {};
