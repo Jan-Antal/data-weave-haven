@@ -724,7 +724,7 @@ export function DilnaDashboard({ weekOffset }: { weekOffset: number }) {
           <Card className="p-4 shadow-sm">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Hodnota výroby</div>
             <div className="flex items-baseline gap-2 mt-1">
-              <div className="text-2xl font-bold tabular-nums text-[#2f6f2c]">
+              <div className={`text-2xl font-bold tabular-nums ${valueColorClass(totalValueCzk, totalValueTargetCzk)}`}>
                 {fmtMCzk(totalValueCzk)}
               </div>
               <div className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
