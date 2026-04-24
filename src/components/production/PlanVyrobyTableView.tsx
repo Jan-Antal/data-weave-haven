@@ -26,6 +26,7 @@ import { CancelItemDialog } from "./CancelItemDialog";
 import { CompletionDialog } from "./CompletionDialog";
 import { SplitItemDialog } from "./SplitItemDialog";
 import { SplitBundleDialog } from "./SplitBundleDialog";
+import { EditBundleSplitDialog, type EditBundleSplitRow } from "./EditBundleSplitDialog";
 import { PauseItemDialog } from "./PauseItemDialog";
 import { ProductionContextMenu, type ContextMenuAction } from "./ProductionContextMenu";
 import { InboxPlanningDialog, type SchedulePlanEntry, type PlanningItem, type PlanningWeek } from "./InboxPlanningDialog";
@@ -198,6 +199,9 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     bundleName: string; currentWeekKey: string;
     items: Array<{ id: string; item_name: string; item_code: string | null; project_id: string; stage_id: string | null; scheduled_hours: number; scheduled_czk: number; split_group_id: string | null; }>;
   } | null>(null);
+
+  // Edit per-week split distribution dialog state
+  const [editSplitState, setEditSplitState] = useState<{ bundleName: string; splitGroupId: string; rows: EditBundleSplitRow[] } | null>(null);
 
   // Pause dialog state
   const [pauseState, setPauseState] = useState<{
@@ -1028,12 +1032,42 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     if (activeItems.length > 0 || pausedItems.length > 0) {
       actions.push({ label: "Vrátit do Inboxu", icon: "←", onClick: () => returnBundleToInbox(projectId, weekKey) });
     }
-    // Merge option
+    // Collect all schedule items across all weeks for chain-aware checks
+    const allScheduleItems = (scheduleData ? Array.from(scheduleData.values()) : [])
+      .flatMap(silo => silo.bundles)
+      .flatMap(b => b.items);
     const splitGroupIds = new Set<string>();
     for (const item of bundle.items) {
       if (item.split_group_id && item.status !== "expedice" && item.status !== "completed" && item.status !== "cancelled") splitGroupIds.add(item.split_group_id);
     }
-    const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => bundle.items.filter(i => i.split_group_id === sgId && i.status !== "expedice" && i.status !== "completed" && i.status !== "cancelled").length >= 2);
+    // Edit per-week distribution: visible if chain spans 2+ weeks
+    const editableSplitGroups = Array.from(splitGroupIds).filter(sgId => {
+      const weeks = new Set(allScheduleItems.filter(i => i.split_group_id === sgId).map(i => i.scheduled_week));
+      return weeks.size >= 2;
+    });
+    if (editableSplitGroups.length > 0) {
+      actions.push({
+        label: "Upravit rozdělení po týdnech", icon: "⚙",
+        onClick: () => {
+          const sgId = editableSplitGroups[0];
+          const chainRows = allScheduleItems
+            .filter(i => i.split_group_id === sgId && i.status !== "cancelled")
+            .map<EditBundleSplitRow>(i => ({
+              id: i.id, item_code: i.item_code, scheduled_week: i.scheduled_week,
+              scheduled_hours: i.scheduled_hours, scheduled_czk: i.scheduled_czk,
+              status: i.status, is_midflight: i.is_midflight,
+            }));
+          setEditSplitState({ bundleName: bundle.project_name, splitGroupId: sgId, rows: chainRows });
+        },
+      });
+    }
+    // Merge: only if chain has 2+ active rows ACROSS the project (not just this week)
+    const mergeableSplitGroups = Array.from(splitGroupIds).filter(sgId => {
+      const totalActiveInChain = allScheduleItems.filter(i =>
+        i.split_group_id === sgId && i.status !== "expedice" && i.status !== "completed" && i.status !== "cancelled"
+      ).length;
+      return totalActiveInChain >= 2;
+    });
     if (mergeableSplitGroups.length > 0) {
       actions.push({ label: `Spojit části (${mergeableSplitGroups.length} skupin)`, icon: "🔗", onClick: async () => { await mergeBundleSplitGroups(mergeableSplitGroups); } });
     }
@@ -1781,6 +1815,17 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
       {/* Bundle split dialog */}
       {bundleSplitState && (
         <SplitBundleDialog open={!!bundleSplitState} onOpenChange={open => !open && setBundleSplitState(null)} bundleName={bundleSplitState.bundleName} currentWeekKey={bundleSplitState.currentWeekKey} items={bundleSplitState.items} weeks={splitWeekOptions} />
+      )}
+
+      {/* Edit per-week split distribution */}
+      {editSplitState && (
+        <EditBundleSplitDialog
+          open={!!editSplitState}
+          onOpenChange={open => !open && setEditSplitState(null)}
+          bundleName={editSplitState.bundleName}
+          splitGroupId={editSplitState.splitGroupId}
+          rows={editSplitState.rows}
+        />
       )}
 
       {/* Pause dialog */}
