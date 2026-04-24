@@ -300,20 +300,23 @@ export function EditBundleSplitDialog({
 
         <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
           {weekBuckets.map(b => {
-            const pct = percentages[b.weekKey] || 0;
+            const pct = effectivePct[b.weekKey] || 0;
             const previewHours = Math.round((grandTotal * pct / 100) * 10) / 10;
+            const isAuto = b.weekKey === lastEditableKey;
+            const showSlider = !b.locked && !isAuto;
             return (
               <div key={b.weekKey} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-medium text-foreground">
                     T{b.weekNum} · {fmtDate(b.weekKey)}
                     {b.locked && <span className="ml-1.5 text-muted-foreground">(zamknuto)</span>}
+                    {isAuto && !b.locked && <span className="ml-1.5 text-muted-foreground">(auto — zbytek)</span>}
                   </span>
                   <span className="font-sans text-muted-foreground">
                     {pct}% (~{previewHours}h)
                   </span>
                 </div>
-                {!b.locked && (
+                {showSlider && (
                   <Slider
                     value={[pct]}
                     min={0}
