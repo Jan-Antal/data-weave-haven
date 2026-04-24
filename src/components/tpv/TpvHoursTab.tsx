@@ -138,7 +138,7 @@ export function TpvHoursTab() {
                           big && "bg-[#FCEBEB] hover:bg-[#FADADA]",
                         )}
                       >
-                        <TableCell className="font-mono text-xs px-2">{(item as any).item_code ?? "—"}</TableCell>
+                        <TableCell className="text-xs px-2">{(item as any).item_code ?? "—"}</TableCell>
                         <TableCell className="text-xs px-2 truncate">{(item as any).nazev ?? ""}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs text-muted-foreground px-2">{auto} h</TableCell>
                         <TableCell className="px-2">

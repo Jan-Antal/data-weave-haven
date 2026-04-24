@@ -140,7 +140,7 @@ function PerProjectView() {
               className="grid items-center px-3 py-2 text-sm border-t border-border hover:bg-muted/50"
               style={{ gridTemplateColumns: "120px minmax(220px,2fr) 110px 80px 140px 110px 110px 130px 32px" }}
             >
-              <div className="font-mono text-xs">{it?.code ?? "—"}</div>
+              <div className="text-xs">{it?.code ?? "—"}</div>
               <div className="min-w-0">
                 <div className="truncate">{m.nazov}</div>
                 <div className="text-[11px] text-muted-foreground truncate">{it?.name}</div>
@@ -381,7 +381,7 @@ function PerMaterialView() {
                         className="grid items-center px-3 py-1.5 text-xs border-t border-border/60"
                         style={{ gridTemplateColumns: "120px 1fr 110px 100px" }}
                       >
-                        <div className="font-mono text-muted-foreground">{m.project_id}</div>
+                        <div className="text-muted-foreground">{m.project_id}</div>
                         <div className="px-3">
                           <div className="h-1.5 bg-muted rounded">
                             <div className="h-full rounded bg-primary/60" style={{ width: `${pct}%` }} />
