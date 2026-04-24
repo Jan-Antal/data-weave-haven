@@ -420,8 +420,9 @@ function useDilnaData(weekOffset: number) {
           });
           for (const b of arr) {
             const label = b.bundle_label || "A";
+            // Match Plán Výroby / Výroba convention: "A" for full, "A-5" for split parts
             const displayLabel = b.bundle_type === "split" && b.split_part
-              ? (b.split_total ? `${label} ${b.split_part}/${b.split_total}` : `${label}-${b.split_part}`)
+              ? `${label}-${b.split_part}`
               : label;
             const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
             // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
