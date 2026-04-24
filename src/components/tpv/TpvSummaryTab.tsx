@@ -100,10 +100,10 @@ export function TpvSummaryTab() {
 
 function MetricCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
   return (
-    <Card className="p-4 bg-muted border-0 shadow-none">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <Card className="p-4 shadow-sm">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div
-        className="text-2xl font-medium tabular-nums mt-1"
+        className="text-2xl font-bold mt-1 tabular-nums"
         style={accent ? { color: accent } : undefined}
       >
         {value}
