@@ -327,6 +327,16 @@ export function OsobyOpravneni() {
     return counts;
   }, [roles]);
 
+  // Count users in selected role that have custom (non-null, non-empty) overrides
+  const customOverrideCount = useMemo(() => {
+    return roles.filter(
+      (r) =>
+        r.role === selectedRole &&
+        r.permissions &&
+        Object.keys(r.permissions).length > 0,
+    ).length;
+  }, [roles, selectedRole]);
+
   const roleByUserId = useMemo(() => {
     const m = new Map<string, AppRole>();
     roles.forEach((r) => m.set(r.user_id, r.role));
