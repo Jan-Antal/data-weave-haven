@@ -9,7 +9,12 @@ interface ExternalFilters {
   statusFilter?: string[];
 }
 
-export function useSortFilter<T extends Record<string, any>>(data: T[], externalFilters?: ExternalFilters, externalSearch?: string) {
+export function useSortFilter<T extends Record<string, any>>(
+  data: T[],
+  externalFilters?: ExternalFilters,
+  externalSearch?: string,
+  options?: { statusOrder?: Record<string, number>; statusColumns?: string[] }
+) {
   const [sortCol, setSortCol] = useState<string | null>("project_id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [internalSearch, setInternalSearch] = useState("");
@@ -66,9 +71,18 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
 
   const sorted = useMemo(() => {
     if (!sortCol || !sortDir) return filtered;
+    const statusCols = options?.statusColumns ?? ["status", "status_vyroba"];
+    const isStatusCol = statusCols.includes(sortCol) && options?.statusOrder;
     return [...filtered].sort((a, b) => {
       const av = a[sortCol] ?? "";
       const bv = b[sortCol] ?? "";
+      if (isStatusCol) {
+        const order = options!.statusOrder!;
+        const ai = av in order ? order[av as string] : Number.MAX_SAFE_INTEGER;
+        const bi = bv in order ? order[bv as string] : Number.MAX_SAFE_INTEGER;
+        if (ai !== bi) return sortDir === "asc" ? ai - bi : bi - ai;
+        return 0;
+      }
       const numA = Number(av);
       const numB = Number(bv);
       if (!isNaN(numA) && !isNaN(numB) && av !== "" && bv !== "") {
@@ -77,7 +91,7 @@ export function useSortFilter<T extends Record<string, any>>(data: T[], external
       const cmp = String(av).localeCompare(String(bv), "cs");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filtered, sortCol, sortDir]);
+  }, [filtered, sortCol, sortDir, options?.statusOrder, options?.statusColumns]);
 
   return { sorted, search, setSearch, sortCol, sortDir, toggleSort };
 }
