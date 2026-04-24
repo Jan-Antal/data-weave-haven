@@ -50,9 +50,9 @@ export function TpvHoursTab() {
   const lowBudget = stats.budget > 0 && hasManualEdits && stats.zostatok / stats.budget < 0.1;
 
   return (
-    <div className="p-6 space-y-4 overflow-auto h-full">
+    <div className="p-4 space-y-4 overflow-auto h-full bg-background">
       <div className="flex items-center gap-3">
-        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Projekt</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Projekt</div>
         <Select value={projectId} onValueChange={setProjectId}>
           <SelectTrigger className="w-[400px]"><SelectValue placeholder="Projekt" /></SelectTrigger>
           <SelectContent>
@@ -65,14 +65,14 @@ export function TpvHoursTab() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard label="Budget" value={`${Math.round(stats.budget)} h`} sub={stats.budgetCzk ? formatCzk(stats.budgetCzk) : ""} />
         <MetricCard label="Auto plán" value={`${Math.round(stats.auto)} h`} />
         <MetricCard label="Po úprave" value={`${Math.round(stats.manual)} h`} />
         <MetricCard
           label="Zostatok"
           value={`${Math.round(stats.zostatok)} h`}
-          accent={lowBudget ? "#D97706" : undefined}
+          accent={lowBudget ? "#B65D05" : undefined}
           warning={lowBudget}
         />
       </div>
