@@ -45,10 +45,13 @@ export function EditBundleSplitDialog({
 }: EditBundleSplitDialogProps) {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
-  // percentages = user-edited values for non-last editable weeks (1..N-1).
+  // percentages = user-edited values for editable weeks (excluding the auto-anchor week).
   // Locked week percentages are derived from DB hours (read-only).
-  // The last editable week is auto-derived as 100 - sum(locked) - sum(other editable).
+  // The "auto" week absorbs the remainder (100 - sum(locked) - sum(others)).
+  // By default the auto-anchor is the LAST editable week, but it shifts when the user
+  // moves that week's slider so the user's input is always preserved.
   const [percentages, setPercentages] = useState<Record<string, number>>({});
+  const [autoKey, setAutoKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const initializedFor = useRef<string | null>(null);
 
@@ -97,8 +100,8 @@ export function EditBundleSplitDialog({
     return result;
   }, [weekBuckets, grandTotal]);
 
-  // Identify the last editable week — its percent is auto-computed from the rest
-  const lastEditableKey = useMemo(() => {
+  // Default auto-anchor = last editable week
+  const defaultAutoKey = useMemo(() => {
     const editable = weekBuckets.filter(b => !b.locked);
     return editable.length > 0 ? editable[editable.length - 1].weekKey : null;
   }, [weekBuckets]);
@@ -113,48 +116,48 @@ export function EditBundleSplitDialog({
     if (initializedFor.current === splitGroupId) return;
     initializedFor.current = splitGroupId;
 
-    if (grandTotal <= 0) { setPercentages({}); return; }
+    if (grandTotal <= 0) { setPercentages({}); setAutoKey(defaultAutoKey); return; }
 
-    const init: Record<string, number> = {};
     // Compute raw percent for every week (locked + editable)
     const rawPct: Record<string, number> = {};
     for (const b of weekBuckets) {
       rawPct[b.weekKey] = Math.round((b.totalHours / grandTotal) * 100);
     }
-    // Adjust rounding so total = 100 (absorb diff into last editable)
+    // Adjust rounding so total = 100 (absorb diff into default auto week)
     const sum = Object.values(rawPct).reduce((s, v) => s + v, 0);
-    if (sum !== 100 && lastEditableKey) {
-      rawPct[lastEditableKey] = (rawPct[lastEditableKey] || 0) + (100 - sum);
+    if (sum !== 100 && defaultAutoKey) {
+      rawPct[defaultAutoKey] = (rawPct[defaultAutoKey] || 0) + (100 - sum);
     }
-    // Keep only non-last editable in `percentages` state.
-    // Last editable is derived live from (100 - locked - others).
+    // Keep ALL editable values in `percentages` state — even the auto-anchor,
+    // so its slider can show + the user can grab it (which then shifts the anchor).
+    const init: Record<string, number> = {};
     for (const b of weekBuckets) {
       if (b.locked) continue;
-      if (b.weekKey === lastEditableKey) continue;
       init[b.weekKey] = rawPct[b.weekKey] ?? 0;
     }
     setPercentages(init);
-  }, [open, splitGroupId, grandTotal, weekBuckets, lastEditableKey]);
+    setAutoKey(defaultAutoKey);
+  }, [open, splitGroupId, grandTotal, weekBuckets, defaultAutoKey]);
 
   // Live effective percentages used for display + save.
   const effectivePct = useMemo<Record<string, number>>(() => {
     const next: Record<string, number> = {};
     // Locked weeks = derived from DB
     for (const b of weekBuckets) if (b.locked) next[b.weekKey] = lockedPct[b.weekKey] ?? 0;
-    // Editable non-last = user-controlled
+    // Editable non-auto = user-controlled
     for (const b of weekBuckets) {
-      if (b.locked || b.weekKey === lastEditableKey) continue;
+      if (b.locked || b.weekKey === autoKey) continue;
       next[b.weekKey] = Number(percentages[b.weekKey]) || 0;
     }
-    // Last editable = remainder
-    if (lastEditableKey) {
+    // Auto week = remainder
+    if (autoKey) {
       const others = weekBuckets
-        .filter(b => b.weekKey !== lastEditableKey)
+        .filter(b => b.weekKey !== autoKey)
         .reduce((s, b) => s + (next[b.weekKey] || 0), 0);
-      next[lastEditableKey] = Math.max(0, 100 - others);
+      next[autoKey] = Math.max(0, 100 - others);
     }
     return next;
-  }, [weekBuckets, lockedPct, percentages, lastEditableKey]);
+  }, [weekBuckets, lockedPct, percentages, autoKey]);
 
   const totalPct = useMemo(
     () => Object.values(effectivePct).reduce((s, v) => s + (Number(v) || 0), 0),
@@ -163,21 +166,34 @@ export function EditBundleSplitDialog({
   const isValid = totalPct === 100;
 
   const handleSliderChange = useCallback((weekKey: string, value: number) => {
-    if (weekKey === lastEditableKey) return; // auto-computed
+    const lockedSum = Object.values(lockedPct).reduce((s, v) => s + (v || 0), 0);
+    const max = 100 - lockedSum;
+
+    // If user grabs the current auto-anchor, shift the anchor to another editable
+    // week so this week becomes a fixed user value.
+    let nextAutoKey = autoKey;
+    if (weekKey === autoKey) {
+      const editable = weekBuckets.filter(b => !b.locked).map(b => b.weekKey);
+      // Prefer the last editable that isn't this one; fallback to first other.
+      const candidates = editable.filter(k => k !== weekKey);
+      nextAutoKey = candidates.length > 0
+        ? (candidates[candidates.length - 1] ?? null)
+        : weekKey; // only one editable: nothing to shift to
+    }
+
     setPercentages(prev => {
       const next = { ...prev, [weekKey]: value };
-      // Cap so editable sum (non-last) does not exceed available room
-      const lockedSum = Object.values(lockedPct).reduce((s, v) => s + (v || 0), 0);
+      // Cap so editable sum (excluding the new auto week) does not exceed available room
       const othersSum = weekBuckets
-        .filter(b => !b.locked && b.weekKey !== lastEditableKey)
+        .filter(b => !b.locked && b.weekKey !== nextAutoKey)
         .reduce((s, b) => s + (next[b.weekKey] || 0), 0);
-      const max = 100 - lockedSum;
       if (othersSum > max) {
         next[weekKey] = Math.max(0, value - (othersSum - max));
       }
       return next;
     });
-  }, [lastEditableKey, weekBuckets, lockedPct]);
+    if (nextAutoKey !== autoKey) setAutoKey(nextAutoKey);
+  }, [autoKey, weekBuckets, lockedPct]);
 
   const handleAutoDistribute = useCallback(() => {
     const lockedSum = Object.values(lockedPct).reduce((s, v) => s + (v || 0), 0);
@@ -185,16 +201,17 @@ export function EditBundleSplitDialog({
     if (editable.length === 0) return;
     const remaining = Math.max(0, 100 - lockedSum);
     const each = Math.floor(remaining / editable.length);
-    // last editable absorbs leftover automatically via effectivePct
+    // Reset auto-anchor to default (last editable) so leftover lands there.
+    setAutoKey(defaultAutoKey);
     setPercentages(prev => {
       const next = { ...prev };
       for (const b of editable) {
-        if (b.weekKey === lastEditableKey) continue;
+        if (b.weekKey === defaultAutoKey) continue;
         next[b.weekKey] = each;
       }
       return next;
     });
-  }, [weekBuckets, lockedPct, lastEditableKey]);
+  }, [weekBuckets, lockedPct, defaultAutoKey]);
 
   const handleSave = useCallback(async () => {
     if (!isValid || submitting) return;
@@ -340,8 +357,10 @@ export function EditBundleSplitDialog({
           {weekBuckets.map(b => {
             const pct = effectivePct[b.weekKey] || 0;
             const previewHours = Math.round((grandTotal * pct / 100) * 10) / 10;
-            const isAuto = b.weekKey === lastEditableKey;
-            const showSlider = !b.locked && !isAuto;
+            const isAuto = b.weekKey === autoKey;
+            // Slider is shown for ALL editable weeks (including the auto-anchor).
+            // Locked weeks have no slider.
+            const showSlider = !b.locked;
             return (
               <div key={b.weekKey} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
