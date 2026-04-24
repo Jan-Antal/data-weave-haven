@@ -286,7 +286,7 @@ export function EditBundleSplitDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [isValid, submitting, rows, weekBuckets, percentages, pushUndo, qc, bundleName, onOpenChange]);
+  }, [isValid, submitting, rows, weekBuckets, effectivePct, pushUndo, qc, bundleName, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
