@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Clock, Bell, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Factory, CalendarRange, Settings, Check, User, UserCog, LogOut, Undo2, Redo2, Clock, Bell, BarChart3, ClipboardCheck } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NotificationPanel } from "@/components/NotificationPanel";
 import { useNotifications } from "@/hooks/useNotifications";
@@ -24,7 +24,7 @@ import { CapacitySettings } from "@/components/production/CapacitySettings";
 import { FormulaBuilder } from "@/components/settings/FormulaBuilder";
 import { cn } from "@/lib/utils";
 
-type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics" | "osoby";
+type HeaderModule = "index" | "plan-vyroby" | "vyroba" | "analytics" | "osoby" | "tpv";
 
 interface ProductionHeaderProps {
   module?: HeaderModule;
@@ -153,7 +153,7 @@ export function ProductionHeader({
   const hasRedo = undoPage ? canRedo(undoPage) : canRedo();
   const undoDesc = undoPage ? lastUndoDescription(undoPage) : lastUndoDescription();
   const redoDesc = undoPage ? lastRedoDescription(undoPage) : lastRedoDescription();
-  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : module === "analytics" ? "Analytics" : module === "osoby" ? "Správa osob" : "Plán Výroby";
+  const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : module === "analytics" ? "Analytics" : module === "osoby" ? "Správa osob" : module === "tpv" ? "TPV — Príprava výroby" : "Plán Výroby";
   const showDataLog = module === "index"
     ? canAccessSettings || realRole === "owner" || role === "pm"
     : isAdmin || role === "pm" || isOwner;
