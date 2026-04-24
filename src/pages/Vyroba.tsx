@@ -288,6 +288,7 @@ interface CumulativeInfo {
   phase: string | null;
   isCarryForward: boolean;
   hasLog: boolean;
+  noteText: string | null;
 }
 
 /* ═══ Quality checks hook ═══ */
@@ -848,9 +849,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getCumulativeForDay(pid: string, dayIndex: number): CumulativeInfo | null {
     const logs = getLogsForProject(pid);
     const exact = logs.find((l) => l.day_index === dayIndex);
-    if (exact) return { percent: exact.percent, phase: exact.phase, isCarryForward: false, hasLog: true };
+    if (exact) return { percent: exact.percent, phase: exact.phase, isCarryForward: false, hasLog: true, noteText: exact.note_text ?? null };
     const prev = logs.filter((l) => l.day_index < dayIndex).sort((a, b) => b.day_index - a.day_index);
-    if (prev.length > 0) return { percent: prev[0].percent, phase: prev[0].phase, isCarryForward: true, hasLog: false };
+    if (prev.length > 0) return { percent: prev[0].percent, phase: prev[0].phase, isCarryForward: true, hasLog: false, noteText: null };
     return null;
   }
 
