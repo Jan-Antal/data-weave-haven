@@ -1277,7 +1277,16 @@ function MissingItemProjectCard({ progress, projectInfo, urgency, daysLabel, isS
       </button>
       {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
-          {progress.scheduled_items.map(si => (
+          {(() => {
+            const sortByCode = (a: typeof progress.scheduled_items[number], b: typeof progress.scheduled_items[number]) => {
+              const ac = (a.item_code || a.item_name || "").toString();
+              const bc = (b.item_code || b.item_name || "").toString();
+              return ac.localeCompare(bc, undefined, { numeric: true, sensitivity: "base" });
+            };
+            const active = progress.scheduled_items.filter(i => i.status !== "expedice" && i.status !== "completed").slice().sort(sortByCode);
+            const completed = progress.scheduled_items.filter(i => i.status === "expedice" || i.status === "completed").slice().sort(sortByCode);
+            return [...active, ...completed];
+          })().map(si => (
             <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
               <span style={{ fontSize: 11, color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
               {si.item_code && <span className="font-sans shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
@@ -1443,7 +1452,17 @@ function InboxProjectGroup({ project, hourlyRate, defaultExpanded, displayMode =
       </button>
     {expanded && (
         <div className="px-2 pb-2 space-y-[2px]">
-          {progress?.scheduled_items.map(si => (
+          {(() => {
+            const items = progress?.scheduled_items ?? [];
+            const sortByCode = (a: typeof items[number], b: typeof items[number]) => {
+              const ac = (a.item_code || a.item_name || "").toString();
+              const bc = (b.item_code || b.item_name || "").toString();
+              return ac.localeCompare(bc, undefined, { numeric: true, sensitivity: "base" });
+            };
+            const active = items.filter(i => i.status !== "expedice" && i.status !== "completed").slice().sort(sortByCode);
+            const completed = items.filter(i => i.status === "expedice" || i.status === "completed").slice().sort(sortByCode);
+            return [...active, ...completed];
+          })().map(si => (
             <div key={si.id} className="flex items-center gap-1.5 px-2 py-[3px] rounded-[5px]" style={{ opacity: si.status === "completed" ? 0.6 : 0.7 }}>
               <span style={{ fontSize: 11, color: si.status === "completed" ? "#3a8a36" : "#3b82f6" }}>{si.status === "completed" ? "✓" : "→"}</span>
               {si.item_code && <span className="font-sans shrink-0" style={{ fontSize: 11, color: si.status === "completed" ? "#9ca3af" : "#223937", fontWeight: 500 }}>{si.item_code}</span>}
