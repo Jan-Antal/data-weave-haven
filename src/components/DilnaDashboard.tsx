@@ -457,7 +457,11 @@ function useDilnaData(weekOffset: number) {
               slipRankMap[br.slipStatus] > slipRankMap[worst] ? br.slipStatus : worst, "none")
           : (isUnmatched ? "none" : computeSlip(completionPct, expectedPctVal, loggedHours, isSpilled));
 
-        const valueCzk = isUnmatched ? 0 : calcDilnaValue(loggedHours, pid);
+        // If all bundles for this week are completed but logged < planned,
+        // credit the remaining planned hours toward this week's value (project closed for the week).
+        const allDoneThisWeek = projectAllDoneThisWeek.get(pid) === true;
+        const valueHours = allDoneThisWeek && loggedHours < plannedHours ? plannedHours : loggedHours;
+        const valueCzk = isUnmatched ? 0 : calcDilnaValue(valueHours, pid);
         const valueTargetCzk = isUnmatched ? 0 : calcDilnaValue(plannedHours, pid);
 
         const usekMap = usekByProject.get(pid);
