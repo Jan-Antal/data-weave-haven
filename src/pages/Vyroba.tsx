@@ -5893,39 +5893,41 @@ function VyrobaPhotoTab({ projectId }: { projectId: string }) {
           Žádné fotky
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2" style={{ maxHeight: 460, overflowY: "auto" }}>
+        <div className="space-y-1 max-h-[50vh] overflow-y-auto pr-1">
           {photos.map((photo, idx) => {
             const date = new Date(photo.lastModified);
             const dateLabel = `${date.getDate()}.${date.getMonth() + 1}.`;
             return (
               <div
                 key={`${photo.itemId || "noid"}-${photo.name}-${idx}`}
-                className="relative group cursor-pointer"
                 onClick={() => {
                   setLightboxIndex(idx);
                   setLightboxOpen(true);
                 }}
+                className="group flex items-center gap-2 px-2.5 py-2 rounded-md w-full text-left min-h-[44px] hover:bg-muted/50 transition-colors cursor-pointer"
+                style={{ border: "1px solid #ece8e2", background: "#ffffff" }}
               >
-                <div className="aspect-[4/3] rounded-md overflow-hidden bg-muted">
-                  <img
-                    src={photo.thumbnailUrl || photo.downloadUrl || ""}
-                    alt={photo.name}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="text-[10px] text-center mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>
+                <img
+                  src={photo.thumbnailUrl || photo.downloadUrl || ""}
+                  alt={photo.name}
+                  className="w-8 h-8 rounded object-cover shrink-0"
+                  loading="lazy"
+                />
+                <span className="text-[12px] flex-1 truncate" style={{ color: "#1a1a1a" }}>
+                  {photo.name}
+                </span>
+                <span className="text-[11px] shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>
                   {dateLabel}
-                </div>
+                </span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(photo.name);
                   }}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: "rgba(0,0,0,0.6)" }}
+                  className="p-1 rounded hover:bg-muted transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                  aria-label="Smazat fotku"
                 >
-                  <X className="h-3 w-3 text-white" />
+                  <X className="h-3.5 w-3.5" style={{ color: "#6b7280" }} />
                 </button>
               </div>
             );
