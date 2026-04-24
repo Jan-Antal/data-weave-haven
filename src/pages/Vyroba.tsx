@@ -680,8 +680,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [scheduleData, weekKey, getWeekCapacityHours]);
 
   const capacityPct = weekCapacity.total > 0 ? Math.round((weekCapacity.used / weekCapacity.total) * 100) : 0;
-  // Match Plán Výroby thresholds: green ≤100%, orange 100–120%, red >120%
-  const capacityColor = capacityPct > 120 ? "#c0392b" : capacityPct > 100 ? "#d97706" : "#3a8a36";
+  // Match Plán Výroby thresholds & visuals: green ≤100%, orange 100–120%, red >120%
+  const capacityIsOverloaded = capacityPct > 120;
+  const capacityIsWarning = capacityPct > 100 && capacityPct <= 120;
+  const capacityColor = capacityIsOverloaded ? "#c0392b" : capacityIsWarning ? "#d97706" : "#3a8a36";
+  const capacityBarBg = capacityIsOverloaded
+    ? "linear-gradient(90deg, #fca5a5, #c0392b)"
+    : capacityIsWarning
+    ? "linear-gradient(90deg, #fcd34d, #d97706)"
+    : "linear-gradient(90deg, #a7d9a2, #3a8a36)";
 
   // Today info
   const todayDayIndex = useMemo(() => {
