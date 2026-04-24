@@ -247,6 +247,18 @@ serve(async (req) => {
     // ----- Export all tables (service role bypasses RLS) -----
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Sync cron secret into app_config (idempotent) so pg_cron can read it.
+    if (CRON_SECRET) {
+      try {
+        await adminClient.from("app_config").upsert(
+          { key: "backup_cron_secret", value: CRON_SECRET, updated_at: new Date().toISOString() },
+          { onConflict: "key" },
+        );
+      } catch (e) {
+        console.error("app_config sync failed:", e);
+      }
+    }
+
     const exportedAt = new Date().toISOString();
     const datePart = exportedAt.slice(0, 10); // YYYY-MM-DD
 
