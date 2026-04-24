@@ -126,6 +126,7 @@ export function ProductionHeader({
   const canSeeVyroba = canManageProduction || canQCOnly || isAdmin || isOwner;
   const canSeePlanVyroby = canAccessPlanVyroby || isAdmin || isOwner;
   const canSeeAnalytics = canAccessAnalytics || isAdmin || isOwner;
+  const canSeeTpv = isAdmin || isOwner || role === "pm" || role === "konstrukter";
   const canOpenSettingsMenu =
     canAccessSettings ||
     canManageUsers ||
