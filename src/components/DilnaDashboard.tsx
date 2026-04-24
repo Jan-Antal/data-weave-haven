@@ -427,6 +427,7 @@ function useDilnaData(weekOffset: number) {
             const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
             // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
             const bCompletion = completionPct;
+            // Slip color matches legend: green ≥ today's expected (teal marker), orange ≤5pp below, red >5pp below
             const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled);
             bundleRows.push({
               bundleId: b.bundleId,
