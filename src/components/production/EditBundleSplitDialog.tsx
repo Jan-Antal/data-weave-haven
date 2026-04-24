@@ -357,8 +357,10 @@ export function EditBundleSplitDialog({
           {weekBuckets.map(b => {
             const pct = effectivePct[b.weekKey] || 0;
             const previewHours = Math.round((grandTotal * pct / 100) * 10) / 10;
-            const isAuto = b.weekKey === lastEditableKey;
-            const showSlider = !b.locked && !isAuto;
+            const isAuto = b.weekKey === autoKey;
+            // Slider is shown for ALL editable weeks (including the auto-anchor).
+            // Locked weeks have no slider.
+            const showSlider = !b.locked;
             return (
               <div key={b.weekKey} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
