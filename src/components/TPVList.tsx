@@ -378,8 +378,34 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
         let sentCount = 0;
         const skipped: string[] = [];
+        const missingPrice: string[] = [];
 
-        for (const item of itemsToSend) {
+        // Pre-validation: bez ceny nelze odeslat (nelze dopočítat hodiny na výrobu)
+        const itemsWithPrice = itemsToSend.filter((item) => {
+          const cena = Number(item.cena) || 0;
+          if (cena <= 0) {
+            missingPrice.push(item.item_code);
+            return false;
+          }
+          return true;
+        });
+
+        if (missingPrice.length > 0) {
+          toast({
+            title: "Chybí cena položky",
+            description: `Před odesláním do výroby je potřeba doplnit cenu u: ${missingPrice.join(", ")}`,
+            variant: "destructive",
+            duration: 6000,
+          });
+        }
+
+        if (itemsWithPrice.length === 0) {
+          setIsSending(false);
+          setSendDialogOpen(false);
+          return;
+        }
+
+        for (const item of itemsWithPrice) {
           const itemCode = item.item_code;
 
           // Check if already planned in schedule, or already waiting in inbox.
