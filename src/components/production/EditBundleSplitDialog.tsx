@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
@@ -45,10 +45,14 @@ export function EditBundleSplitDialog({
 }: EditBundleSplitDialogProps) {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
+  // percentages = user-edited values for non-last editable weeks (1..N-1).
+  // Locked week percentages are derived from DB hours (read-only).
+  // The last editable week is auto-derived as 100 - sum(locked) - sum(other editable).
   const [percentages, setPercentages] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
+  const initializedFor = useRef<string | null>(null);
 
-  // Group rows by week
+  // Group rows by week — recomputes when `rows` reference changes
   const weekBuckets = useMemo<WeekBucket[]>(() => {
     const map = new Map<string, WeekBucket>();
     for (const r of rows) {
@@ -65,7 +69,6 @@ export function EditBundleSplitDialog({
       b.rows.push(r);
       b.totalHours += Number(r.scheduled_hours) || 0;
     }
-    // Lock weeks where ANY row is completed/expedice/cancelled or midflight
     for (const b of map.values()) {
       b.locked = b.rows.some(r =>
         r.is_midflight ||
@@ -82,43 +85,76 @@ export function EditBundleSplitDialog({
     [weekBuckets]
   );
 
-  // Initialize percentages from current hour distribution
-  useEffect(() => {
-    if (!open) return;
-    const init: Record<string, number> = {};
-    if (grandTotal > 0) {
-      for (const b of weekBuckets) {
-        init[b.weekKey] = Math.round((b.totalHours / grandTotal) * 100);
-      }
-      // Adjust rounding so sum equals 100
-      const sum = Object.values(init).reduce((s, v) => s + v, 0);
-      if (sum !== 100 && weekBuckets.length > 0) {
-        // Find last editable week to absorb the diff
-        const editable = weekBuckets.filter(b => !b.locked);
-        const last = editable[editable.length - 1] ?? weekBuckets[weekBuckets.length - 1];
-        if (last) init[last.weekKey] = (init[last.weekKey] || 0) + (100 - sum);
+  // Locked weeks: percentages are derived from current DB hours, displayed read-only
+  const lockedPct = useMemo<Record<string, number>>(() => {
+    const result: Record<string, number> = {};
+    if (grandTotal <= 0) return result;
+    for (const b of weekBuckets) {
+      if (b.locked) {
+        result[b.weekKey] = Math.round((b.totalHours / grandTotal) * 100);
       }
     }
-    setPercentages(init);
-  }, [open, weekBuckets, grandTotal]);
+    return result;
+  }, [weekBuckets, grandTotal]);
 
-  // Identify the last editable week — its value is auto-computed (100 - others)
+  // Identify the last editable week — its percent is auto-computed from the rest
   const lastEditableKey = useMemo(() => {
     const editable = weekBuckets.filter(b => !b.locked);
     return editable.length > 0 ? editable[editable.length - 1].weekKey : null;
   }, [weekBuckets]);
 
-  // Effective percentages: last editable week is always derived to make Σ = 100
-  const effectivePct = useMemo(() => {
-    const next: Record<string, number> = { ...percentages };
-    if (lastEditableKey !== null) {
+  // Initialize ONLY when the dialog opens for a new splitGroupId — never on re-render.
+  // Reads exact hour ratios from DB so the dialog mirrors what the user sees in silos.
+  useEffect(() => {
+    if (!open) {
+      initializedFor.current = null;
+      return;
+    }
+    if (initializedFor.current === splitGroupId) return;
+    initializedFor.current = splitGroupId;
+
+    if (grandTotal <= 0) { setPercentages({}); return; }
+
+    const init: Record<string, number> = {};
+    // Compute raw percent for every week (locked + editable)
+    const rawPct: Record<string, number> = {};
+    for (const b of weekBuckets) {
+      rawPct[b.weekKey] = Math.round((b.totalHours / grandTotal) * 100);
+    }
+    // Adjust rounding so total = 100 (absorb diff into last editable)
+    const sum = Object.values(rawPct).reduce((s, v) => s + v, 0);
+    if (sum !== 100 && lastEditableKey) {
+      rawPct[lastEditableKey] = (rawPct[lastEditableKey] || 0) + (100 - sum);
+    }
+    // Keep only non-last editable in `percentages` state.
+    // Last editable is derived live from (100 - locked - others).
+    for (const b of weekBuckets) {
+      if (b.locked) continue;
+      if (b.weekKey === lastEditableKey) continue;
+      init[b.weekKey] = rawPct[b.weekKey] ?? 0;
+    }
+    setPercentages(init);
+  }, [open, splitGroupId, grandTotal, weekBuckets, lastEditableKey]);
+
+  // Live effective percentages used for display + save.
+  const effectivePct = useMemo<Record<string, number>>(() => {
+    const next: Record<string, number> = {};
+    // Locked weeks = derived from DB
+    for (const b of weekBuckets) if (b.locked) next[b.weekKey] = lockedPct[b.weekKey] ?? 0;
+    // Editable non-last = user-controlled
+    for (const b of weekBuckets) {
+      if (b.locked || b.weekKey === lastEditableKey) continue;
+      next[b.weekKey] = Number(percentages[b.weekKey]) || 0;
+    }
+    // Last editable = remainder
+    if (lastEditableKey) {
       const others = weekBuckets
         .filter(b => b.weekKey !== lastEditableKey)
-        .reduce((s, b) => s + (Number(next[b.weekKey]) || 0), 0);
+        .reduce((s, b) => s + (next[b.weekKey] || 0), 0);
       next[lastEditableKey] = Math.max(0, 100 - others);
     }
     return next;
-  }, [percentages, weekBuckets, lastEditableKey]);
+  }, [weekBuckets, lockedPct, percentages, lastEditableKey]);
 
   const totalPct = useMemo(
     () => Object.values(effectivePct).reduce((s, v) => s + (Number(v) || 0), 0),
@@ -130,43 +166,41 @@ export function EditBundleSplitDialog({
     if (weekKey === lastEditableKey) return; // auto-computed
     setPercentages(prev => {
       const next = { ...prev, [weekKey]: value };
-      // Cap so that sum of non-last editable weeks does not exceed 100 - locked
-      const lockedSum = weekBuckets.filter(b => b.locked).reduce((s, b) => s + (next[b.weekKey] || 0), 0);
+      // Cap so editable sum (non-last) does not exceed available room
+      const lockedSum = Object.values(lockedPct).reduce((s, v) => s + (v || 0), 0);
       const othersSum = weekBuckets
         .filter(b => !b.locked && b.weekKey !== lastEditableKey)
         .reduce((s, b) => s + (next[b.weekKey] || 0), 0);
       const max = 100 - lockedSum;
       if (othersSum > max) {
-        // Reduce current slider to fit
         next[weekKey] = Math.max(0, value - (othersSum - max));
       }
       return next;
     });
-  }, [lastEditableKey, weekBuckets]);
+  }, [lastEditableKey, weekBuckets, lockedPct]);
 
   const handleAutoDistribute = useCallback(() => {
-    const lockedSum = weekBuckets
-      .filter(b => b.locked)
-      .reduce((s, b) => s + (percentages[b.weekKey] || 0), 0);
+    const lockedSum = Object.values(lockedPct).reduce((s, v) => s + (v || 0), 0);
     const editable = weekBuckets.filter(b => !b.locked);
     if (editable.length === 0) return;
     const remaining = Math.max(0, 100 - lockedSum);
     const each = Math.floor(remaining / editable.length);
-    const leftover = remaining - each * editable.length;
+    // last editable absorbs leftover automatically via effectivePct
     setPercentages(prev => {
       const next = { ...prev };
-      editable.forEach((b, idx) => {
-        next[b.weekKey] = each + (idx === editable.length - 1 ? leftover : 0);
-      });
+      for (const b of editable) {
+        if (b.weekKey === lastEditableKey) continue;
+        next[b.weekKey] = each;
+      }
       return next;
     });
-  }, [weekBuckets, percentages]);
+  }, [weekBuckets, lockedPct, lastEditableKey]);
 
   const handleSave = useCallback(async () => {
     if (!isValid || submitting) return;
     setSubmitting(true);
     try {
-      // Group rows by item_code across all weeks (only non-locked weeks need updating)
+      // Group rows by item_code across all weeks
       const rowsByCode = new Map<string, EditBundleSplitRow[]>();
       for (const r of rows) {
         const code = r.item_code || "__no_code__";
@@ -179,33 +213,39 @@ export function EditBundleSplitDialog({
       const undoRecords: Array<{ id: string; scheduled_hours: number; scheduled_czk: number }> = [];
 
       for (const [, codeRows] of rowsByCode) {
+        // Skip codes that exist only in locked weeks (they stay untouched)
+        const editableRowsAll = codeRows.filter(r => {
+          const bucket = weekBuckets.find(b => b.weekKey === r.scheduled_week);
+          return bucket && !bucket.locked;
+        });
+        if (editableRowsAll.length === 0) continue;
+
+        // Total hours/czk for this code (across all rows of this code, all weeks)
         const totalHours = codeRows.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
         const totalCzk = codeRows.reduce((s, r) => s + (Number(r.scheduled_czk) || 0), 0);
 
-        // Calculate locked hours/czk for this code
+        // Locked rows for this code (preserve their hours)
         const lockedRows = codeRows.filter(r => {
           const bucket = weekBuckets.find(b => b.weekKey === r.scheduled_week);
           return bucket?.locked;
         });
         const lockedHours = lockedRows.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
         const lockedCzk = lockedRows.reduce((s, r) => s + (Number(r.scheduled_czk) || 0), 0);
+
         const remainingHours = Math.max(0, totalHours - lockedHours);
         const remainingCzk = Math.max(0, totalCzk - lockedCzk);
 
-        const editableRows = codeRows.filter(r => {
-          const bucket = weekBuckets.find(b => b.weekKey === r.scheduled_week);
-          return bucket && !bucket.locked;
-        });
-        const editablePctSum = editableRows.reduce((s, r) => s + (effectivePct[r.scheduled_week] || 0), 0);
+        // Sum of editable percentages used for THIS code (only weeks where this code has rows)
+        const editablePctSum = editableRowsAll.reduce(
+          (s, r) => s + (effectivePct[r.scheduled_week] || 0), 0
+        );
+        if (editablePctSum <= 0) continue;
 
-        if (editablePctSum <= 0 || editableRows.length === 0) continue;
-
-        // For each editable row, allocate proportionally to its week's pct
         let allocatedH = 0;
         let allocatedC = 0;
-        editableRows.forEach((r, idx) => {
+        editableRowsAll.forEach((r, idx) => {
           const pct = effectivePct[r.scheduled_week] || 0;
-          const isLast = idx === editableRows.length - 1;
+          const isLast = idx === editableRowsAll.length - 1;
           const newH = isLast
             ? Math.round((remainingHours - allocatedH) * 10) / 10
             : Math.round((remainingHours * pct / editablePctSum) * 10) / 10;
@@ -231,7 +271,6 @@ export function EditBundleSplitDialog({
         return;
       }
 
-      // Apply updates one by one (Supabase doesn't support multi-row update in single call without upsert)
       for (const u of updates) {
         const { error } = await supabase
           .from("production_schedule")
@@ -240,7 +279,6 @@ export function EditBundleSplitDialog({
         if (error) throw error;
       }
 
-      // Push undo
       const productionQueryKeys = [
         ["production-schedule"],
         ["production-progress"],
@@ -276,7 +314,7 @@ export function EditBundleSplitDialog({
       for (const k of productionQueryKeys) qc.invalidateQueries({ queryKey: k });
 
       const summary = weekBuckets
-        .map(b => `T${b.weekNum} ${percentages[b.weekKey] || 0}%`)
+        .map(b => `T${b.weekNum} ${effectivePct[b.weekKey] || 0}%`)
         .join(" / ");
       toast({ title: `↻ Rozdělení uloženo: ${summary}` });
       onOpenChange(false);
