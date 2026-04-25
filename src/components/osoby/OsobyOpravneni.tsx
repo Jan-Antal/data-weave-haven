@@ -858,57 +858,78 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
             </div>
           </section>
 
-          {/* Permissions */}
-          {GROUPS.map((g) => (
-            <section
-              key={g.title}
-              className="rounded-md overflow-hidden border border-border/40"
-              style={{
-                borderLeft: g.icon ? `3px solid ${g.icon.color}` : undefined,
-                background: g.icon ? `${g.icon.bg}40` : undefined,
-              }}
-            >
-              <h3
-                className="text-[12px] font-semibold uppercase tracking-wider px-3 py-2"
+          {/* Permissions — module-based with master switch */}
+          {GROUPS.map((g) => {
+            const masterOn = !!draftPerms[g.master];
+            return (
+              <section
+                key={g.title}
+                className="rounded-md overflow-hidden border border-border/40"
                 style={{
-                  background: g.icon?.bg,
-                  color: g.icon?.color,
+                  borderLeft: g.icon ? `3px solid ${g.icon.color}` : undefined,
+                  background: g.icon ? `${g.icon.bg}40` : undefined,
                 }}
               >
-                {g.title}
-              </h3>
-              <div className="divide-y divide-border/40 px-3">
-                {g.rows.map((row, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between gap-4 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[13px] text-foreground">
-                        {row.label}
-                      </div>
-                      {row.desc && (
-                        <div className="text-[11px] text-muted-foreground mt-0.5">
-                          {row.desc}
-                        </div>
-                      )}
-                    </div>
-                    {row.kind === "tri" ? (
-                      <TriToggle
-                        value={triState(row)}
-                        onChange={(v) => setTri(row, v)}
-                      />
-                    ) : (
-                      <BinToggle
-                        value={binState(row)}
-                        onChange={(v) => setBin(row.flags, v)}
-                      />
-                    )}
+                <div
+                  className="flex items-center justify-between gap-3 px-3 py-2"
+                  style={{
+                    background: g.icon?.bg,
+                    color: g.icon?.color,
+                  }}
+                >
+                  <h3 className="text-[12px] font-semibold uppercase tracking-wider">
+                    {g.title}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-medium uppercase tracking-wider opacity-70">
+                      {masterOn ? "Modul zapnutý" : "Modul vypnutý"}
+                    </span>
+                    <Switch
+                      checked={masterOn}
+                      onCheckedChange={(v) => setBin([g.master], v)}
+                    />
                   </div>
-                ))}
-              </div>
-            </section>
-          ))}
+                </div>
+                {masterOn ? (
+                  <div className="divide-y divide-border/40 px-3">
+                    {g.rows.map((row, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-4 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-[13px] text-foreground">
+                            {row.label}
+                          </div>
+                          {row.desc && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                              {row.desc}
+                            </div>
+                          )}
+                        </div>
+                        {row.kind === "tri" ? (
+                          <TriToggle
+                            value={triState(row)}
+                            onChange={(v) => setTri(row, v)}
+                          />
+                        ) : (
+                          <BinToggle
+                            value={binState(row)}
+                            onChange={(v) => setBin(row.flags, v)}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-3 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5" />
+                    Najprv zapni modul, aby si mohol nastaviť záložky a oprávnenia.
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       </div>
 
