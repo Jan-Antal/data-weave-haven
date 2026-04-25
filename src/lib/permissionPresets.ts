@@ -62,6 +62,8 @@ export type PermissionFlag =
   | "canAccessForecast"
   // ===== Sub-záložky Modul Výroba =====
   | "canAccessQC"
+  | "canWriteDaylog"
+  | "canWriteQC"
   // ===== Sub-záložky TPV =====
   | "canViewTpvPrehlad"
   | "canWriteTpvPrehlad"
@@ -124,6 +126,8 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canWriteHarmonogram",
   "canAccessForecast",
   "canAccessQC",
+  "canWriteDaylog",
+  "canWriteQC",
   "canViewTpvPrehlad",
   "canWriteTpvPrehlad",
   "canViewTpvMaterial",
@@ -185,7 +189,9 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canViewHarmonogram: "View: Harmonogram",
   canWriteHarmonogram: "Write: Harmonogram",
   canAccessForecast: "Záložka: Forecast",
-  canAccessQC: "Záložka: Kontrola kvality (QC)",
+  canAccessQC: "View: Kontrola kvality (QC)",
+  canWriteDaylog: "Write: Daylog",
+  canWriteQC: "Write: Kontrola kvality (QC)",
   canViewTpvPrehlad: "View: TPV Prehľad",
   canWriteTpvPrehlad: "Write: TPV Prehľad",
   canViewTpvMaterial: "View: TPV Materiál",
@@ -276,7 +282,7 @@ const MODULE_CASCADE: Array<{ master: PermissionFlag; subs: PermissionFlag[] }> 
   },
   {
     master: "canManageProduction",
-    subs: ["canAccessDaylog", "canAccessQC", "canQCOnly"],
+    subs: ["canAccessDaylog", "canAccessQC", "canQCOnly", "canWriteDaylog", "canWriteQC"],
   },
   {
     master: "canAccessAnalytics",
@@ -321,6 +327,8 @@ function applyCascade(p: Permissions): Permissions {
     ["canViewTpvPrehlad", "canWriteTpvPrehlad"],
     ["canViewTpvMaterial", "canWriteTpvMaterial"],
     ["canViewTpvHodinovaDotacia", "canWriteTpvHodinovaDotacia"],
+    ["canAccessDaylog", "canWriteDaylog"],
+    ["canAccessQC", "canWriteQC"],
   ];
   for (const [view, write] of RW_PAIRS) {
     if (out[write]) out[view] = true;
