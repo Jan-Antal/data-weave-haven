@@ -14,7 +14,7 @@ interface MobileBottomNavProps {
 export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAdmin, isOwner, isVyroba, canManageProduction, canQCOnly, canAccessPlanVyroby } = useAuth();
+  const { canManageProduction, canQCOnly, canAccessPlanVyroby } = useAuth();
 
   // When embedded inside Index, use module state. When standalone (e.g. /vyroba), derive from route.
   const isStandalone = !onModuleChange;
@@ -25,7 +25,7 @@ export function MobileBottomNav({ onModuleChange, activeModule }: MobileBottomNa
   const isVyrobaActive = isStandalone ? isVyrobaRoute : activeModule === "vyroba";
 
   const canAccessProduction =
-    isAdmin || isOwner || isVyroba || canManageProduction || canQCOnly || canAccessPlanVyroby;
+    canManageProduction || canQCOnly || canAccessPlanVyroby;
 
   // Close DataLog panels on all modules when navigating via bottom nav
   const closeDataLog = () => {

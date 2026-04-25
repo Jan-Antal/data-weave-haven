@@ -199,10 +199,10 @@ function RecordList({
 }
 
 export function RecycleBin({ open, onOpenChange }: RecycleBinProps) {
-  const { canPermanentDelete, isKonstrukter, isAdmin, isTestUser } = useAuth();
+  const { canPermanentDelete, isKonstrukter, isTestUser } = useAuth();
 
   const defaultTab = isKonstrukter ? "tpv" : "projects";
-  const canPermDeleteProjectsStages = isAdmin && !isTestUser;
+  const canPermDeleteProjectsStages = canPermanentDelete && !isTestUser;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
