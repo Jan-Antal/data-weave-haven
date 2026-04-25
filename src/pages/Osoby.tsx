@@ -9,34 +9,41 @@ import { TestModeBanner } from "@/components/TestModeBanner";
 import { PageTabsShell, type ShellTabDef } from "@/components/shell/PageTabsShell";
 
 export default function Osoby() {
-  const { isAdmin, isOwner, canManageUsers, isTestUser } = useAuth();
-  const canSeeAdminTabs = isAdmin || isOwner;
+  const {
+    canAccessZamestnanci,
+    canAccessExternistiTab,
+    canAccessUzivateleTab,
+    canAccessOpravneni,
+    canAccessKatalog,
+    canAccessKapacita,
+    isTestUser,
+  } = useAuth();
 
   const tabs: ShellTabDef[] = [
-    { key: "zamestnanci", label: "Zaměstnanci", visible: canSeeAdminTabs },
-    { key: "externisti", label: "Externisté" },
-    { key: "uzivatele", label: "Uživatelé", visible: canManageUsers },
-    { key: "opravneni", label: "Oprávnění", visible: canSeeAdminTabs },
-    { key: "katalog", label: "Pozice & číselníky", visible: canSeeAdminTabs },
-    { key: "kapacita", label: "Kapacita", visible: canSeeAdminTabs },
+    { key: "zamestnanci", label: "Zaměstnanci", visible: canAccessZamestnanci },
+    { key: "externisti", label: "Externisté", visible: canAccessExternistiTab },
+    { key: "uzivatele", label: "Uživatelé", visible: canAccessUzivateleTab },
+    { key: "opravneni", label: "Oprávnění", visible: canAccessOpravneni },
+    { key: "katalog", label: "Pozice & číselníky", visible: canAccessKatalog },
+    { key: "kapacita", label: "Kapacita", visible: canAccessKapacita },
   ];
 
-  const defaultTab = canSeeAdminTabs ? "zamestnanci" : "externisti";
+  const firstVisible = tabs.find((t) => t.visible !== false)?.key ?? "zamestnanci";
 
   return (
     <PageTabsShell
       tabs={tabs}
-      defaultTab={defaultTab}
+      defaultTab={firstVisible}
       belowTabsSlot={isTestUser ? <div className="px-5 py-2 border-b border-border/60"><TestModeBanner /></div> : null}
     >
       {(active) => (
         <>
-          {active === "zamestnanci" && canSeeAdminTabs && <OsobyZamestnanci />}
-          {active === "externisti" && <OsobyExternisti />}
-          {active === "uzivatele" && canManageUsers && <OsobyUzivatele />}
-          {active === "opravneni" && canSeeAdminTabs && <OsobyOpravneni />}
-          {active === "katalog" && canSeeAdminTabs && <OsobyKatalog />}
-          {active === "kapacita" && canSeeAdminTabs && <OsobyKapacita />}
+          {active === "zamestnanci" && canAccessZamestnanci && <OsobyZamestnanci />}
+          {active === "externisti" && canAccessExternistiTab && <OsobyExternisti />}
+          {active === "uzivatele" && canAccessUzivateleTab && <OsobyUzivatele />}
+          {active === "opravneni" && canAccessOpravneni && <OsobyOpravneni />}
+          {active === "katalog" && canAccessKatalog && <OsobyKatalog />}
+          {active === "kapacita" && canAccessKapacita && <OsobyKapacita />}
         </>
       )}
     </PageTabsShell>

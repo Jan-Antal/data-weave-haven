@@ -293,15 +293,22 @@ export default function Analytics() {
     return visibleCols.map((c) => getLabel(c.key, ANALYTICS_LABEL_MAP[c.key] || c.label));
   }, [visibleCols, getLabel]);
 
+  const {
+    canAccessAnalyticsProjekty,
+    canAccessAnalyticsRezije,
+    canAccessAnalyticsDilna,
+    canAccessAnalyticsVykaz,
+  } = useAuth();
   const tabs: ShellTabDef[] = [
-    { key: "projekty", label: "Projekty" },
-    { key: "rezie", label: "Režije" },
-    { key: "dilna", label: "Dílna" },
-    { key: "vykaz", label: "Výkaz" },
+    { key: "projekty", label: "Projekty", visible: canAccessAnalyticsProjekty },
+    { key: "rezie", label: "Režije", visible: canAccessAnalyticsRezije },
+    { key: "dilna", label: "Dílna", visible: canAccessAnalyticsDilna },
+    { key: "vykaz", label: "Výkaz", visible: canAccessAnalyticsVykaz },
   ];
+  const firstVisible = tabs.find((t) => t.visible !== false)?.key ?? "dilna";
 
   return (
-    <PageTabsShell tabs={tabs} defaultTab="dilna" paramName="tab">
+    <PageTabsShell tabs={tabs} defaultTab={firstVisible} paramName="tab">
       {() => (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Per-tab toolbar */}

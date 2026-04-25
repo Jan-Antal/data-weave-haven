@@ -1,6 +1,7 @@
 import type { AppRole } from "@/hooks/useAuth";
 
 export type PermissionFlag =
+  // ===== Existujúce =====
   | "canEdit"
   | "canCreateProject"
   | "canDeleteProject"
@@ -25,7 +26,49 @@ export type PermissionFlag =
   | "canManageStatuses"
   | "canAccessRecycleBin"
   | "canAccessTpv"
-  | "canWriteTpv";
+  | "canWriteTpv"
+  // ===== NOVÉ master flagy modulov =====
+  | "canAccessSystem"
+  | "canAccessOsoby"
+  | "canAccessProjectInfo"
+  // ===== Sub-záložky Systém =====
+  | "canAccessExchangeRates"
+  | "canAccessOverheadProjects"
+  | "canAccessFormulaBuilder"
+  // ===== Sub-záložky Správa osob =====
+  | "canAccessZamestnanci"
+  | "canAccessExternistiTab"
+  | "canAccessUzivateleTab"
+  | "canAccessOpravneni"
+  | "canAccessKatalog"
+  | "canAccessKapacita"
+  // ===== Sub-záložky Analytics =====
+  | "canAccessAnalyticsProjekty"
+  | "canAccessAnalyticsRezije"
+  | "canAccessAnalyticsDilna"
+  | "canAccessAnalyticsVykaz"
+  // ===== Sub-záložky Project Info (R/W) =====
+  | "canViewProjectInfoTab"
+  | "canWriteProjectInfoTab"
+  | "canViewPMStatusTab"
+  | "canWritePMStatusTab"
+  | "canViewTPVStatusTab"
+  | "canWriteTPVStatusTab"
+  | "canViewTPVListTab"
+  | "canWriteTPVListTab"
+  | "canViewHarmonogram"
+  | "canWriteHarmonogram"
+  // ===== Sub-záložky Plán výroby =====
+  | "canAccessForecast"
+  // ===== Sub-záložky Modul Výroba =====
+  | "canAccessQC"
+  // ===== Sub-záložky TPV =====
+  | "canViewTpvPrehlad"
+  | "canWriteTpvPrehlad"
+  | "canViewTpvMaterial"
+  | "canWriteTpvMaterial"
+  | "canViewTpvHodinovaDotacia"
+  | "canWriteTpvHodinovaDotacia";
 
 export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canEdit",
@@ -53,6 +96,40 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canAccessRecycleBin",
   "canAccessTpv",
   "canWriteTpv",
+  "canAccessSystem",
+  "canAccessOsoby",
+  "canAccessProjectInfo",
+  "canAccessExchangeRates",
+  "canAccessOverheadProjects",
+  "canAccessFormulaBuilder",
+  "canAccessZamestnanci",
+  "canAccessExternistiTab",
+  "canAccessUzivateleTab",
+  "canAccessOpravneni",
+  "canAccessKatalog",
+  "canAccessKapacita",
+  "canAccessAnalyticsProjekty",
+  "canAccessAnalyticsRezije",
+  "canAccessAnalyticsDilna",
+  "canAccessAnalyticsVykaz",
+  "canViewProjectInfoTab",
+  "canWriteProjectInfoTab",
+  "canViewPMStatusTab",
+  "canWritePMStatusTab",
+  "canViewTPVStatusTab",
+  "canWriteTPVStatusTab",
+  "canViewTPVListTab",
+  "canWriteTPVListTab",
+  "canViewHarmonogram",
+  "canWriteHarmonogram",
+  "canAccessForecast",
+  "canAccessQC",
+  "canViewTpvPrehlad",
+  "canWriteTpvPrehlad",
+  "canViewTpvMaterial",
+  "canWriteTpvMaterial",
+  "canViewTpvHodinovaDotacia",
+  "canWriteTpvHodinovaDotacia",
 ];
 
 export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
@@ -72,7 +149,7 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canAccessPlanVyroby: "Prístup do Plánu výroby",
   canWritePlanVyroby: "Upravovať Plán výroby",
   canAccessDaylog: "Prístup do Daylog",
-  canQCOnly: "Iba kontrola kvality (QC)",
+  canQCOnly: "Iba kontrola kvality (legacy)",
   canUploadDocuments: "Nahrávať dokumenty",
   canPermanentDelete: "Trvalé mazanie",
   canManageExchangeRates: "Spravovať kurzy",
@@ -81,6 +158,40 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canAccessRecycleBin: "Prístup do Koša",
   canAccessTpv: "Prístup do TPV modulu",
   canWriteTpv: "Upravovať dáta v TPV module",
+  canAccessSystem: "Modul Systém",
+  canAccessOsoby: "Modul Správa osob",
+  canAccessProjectInfo: "Modul Project Info",
+  canAccessExchangeRates: "Záložka: Kurzový lístok",
+  canAccessOverheadProjects: "Záložka: Réžijné projekty",
+  canAccessFormulaBuilder: "Záložka: Výpočetná logika",
+  canAccessZamestnanci: "Záložka: Zamestnanci",
+  canAccessExternistiTab: "Záložka: Externisti",
+  canAccessUzivateleTab: "Záložka: Užívatelia",
+  canAccessOpravneni: "Záložka: Oprávnení",
+  canAccessKatalog: "Záložka: Pozície & číselníky",
+  canAccessKapacita: "Záložka: Kapacita",
+  canAccessAnalyticsProjekty: "Záložka: Projekty",
+  canAccessAnalyticsRezije: "Záložka: Réžie",
+  canAccessAnalyticsDilna: "Záložka: Dílna",
+  canAccessAnalyticsVykaz: "Záložka: Výkaz",
+  canViewProjectInfoTab: "View: Project Info",
+  canWriteProjectInfoTab: "Write: Project Info",
+  canViewPMStatusTab: "View: PM Status",
+  canWritePMStatusTab: "Write: PM Status",
+  canViewTPVStatusTab: "View: TPV Status",
+  canWriteTPVStatusTab: "Write: TPV Status",
+  canViewTPVListTab: "View: TPV List",
+  canWriteTPVListTab: "Write: TPV List",
+  canViewHarmonogram: "View: Harmonogram",
+  canWriteHarmonogram: "Write: Harmonogram",
+  canAccessForecast: "Záložka: Forecast",
+  canAccessQC: "Záložka: Kontrola kvality (QC)",
+  canViewTpvPrehlad: "View: TPV Prehľad",
+  canWriteTpvPrehlad: "Write: TPV Prehľad",
+  canViewTpvMaterial: "View: TPV Materiál",
+  canWriteTpvMaterial: "Write: TPV Materiál",
+  canViewTpvHodinovaDotacia: "View: TPV Hodinová dotácia",
+  canWriteTpvHodinovaDotacia: "Write: TPV Hodinová dotácia",
 };
 
 export type Permissions = Record<PermissionFlag, boolean>;
@@ -102,101 +213,293 @@ function preset(...flags: PermissionFlag[]): Permissions {
   return out;
 }
 
+/**
+ * MASTER → SUB cascade. Ak je master modulu vypnutý,
+ * vynuluje všetky jeho sub-flagy.
+ * Volá sa v resolvePermissions() po merge.
+ */
+const MODULE_CASCADE: Array<{ master: PermissionFlag; subs: PermissionFlag[] }> = [
+  {
+    master: "canAccessSystem",
+    subs: [
+      "canAccessExchangeRates",
+      "canAccessOverheadProjects",
+      "canAccessFormulaBuilder",
+      "canManageExchangeRates",
+      "canManageOverheadProjects",
+      "canManageStatuses",
+      "canAccessSettings",
+    ],
+  },
+  {
+    master: "canAccessOsoby",
+    subs: [
+      "canAccessZamestnanci",
+      "canAccessExternistiTab",
+      "canAccessUzivateleTab",
+      "canAccessOpravneni",
+      "canAccessKatalog",
+      "canAccessKapacita",
+      "canManagePeople",
+      "canManageExternisti",
+      "canManageUsers",
+    ],
+  },
+  {
+    master: "canAccessProjectInfo",
+    subs: [
+      "canViewProjectInfoTab",
+      "canWriteProjectInfoTab",
+      "canViewPMStatusTab",
+      "canWritePMStatusTab",
+      "canViewTPVStatusTab",
+      "canWriteTPVStatusTab",
+      "canViewTPVListTab",
+      "canWriteTPVListTab",
+      "canViewHarmonogram",
+      "canWriteHarmonogram",
+      "canCreateProject",
+      "canDeleteProject",
+      "canEditProjectCode",
+      "canEditSmluvniTermin",
+      "canSeePrices",
+      "canUploadDocuments",
+      "canPermanentDelete",
+      "canAccessRecycleBin",
+      "canManageTPV",
+      "canEdit",
+    ],
+  },
+  {
+    master: "canAccessPlanVyroby",
+    subs: ["canWritePlanVyroby", "canAccessForecast"],
+  },
+  {
+    master: "canManageProduction",
+    subs: ["canAccessDaylog", "canAccessQC", "canQCOnly"],
+  },
+  {
+    master: "canAccessAnalytics",
+    subs: [
+      "canAccessAnalyticsProjekty",
+      "canAccessAnalyticsRezije",
+      "canAccessAnalyticsDilna",
+      "canAccessAnalyticsVykaz",
+    ],
+  },
+  {
+    master: "canAccessTpv",
+    subs: [
+      "canWriteTpv",
+      "canViewTpvPrehlad",
+      "canWriteTpvPrehlad",
+      "canViewTpvMaterial",
+      "canWriteTpvMaterial",
+      "canViewTpvHodinovaDotacia",
+      "canWriteTpvHodinovaDotacia",
+    ],
+  },
+];
+
+/**
+ * Aplikuje cascade: ak master je false, sub-flagy sa vynulujú.
+ */
+function applyCascade(p: Permissions): Permissions {
+  const out = { ...p };
+  for (const { master, subs } of MODULE_CASCADE) {
+    if (!out[master]) {
+      for (const s of subs) out[s] = false;
+    }
+  }
+  // Write implikuje Read v R/W pároch
+  const RW_PAIRS: Array<[PermissionFlag, PermissionFlag]> = [
+    ["canViewProjectInfoTab", "canWriteProjectInfoTab"],
+    ["canViewPMStatusTab", "canWritePMStatusTab"],
+    ["canViewTPVStatusTab", "canWriteTPVStatusTab"],
+    ["canViewTPVListTab", "canWriteTPVListTab"],
+    ["canViewHarmonogram", "canWriteHarmonogram"],
+    ["canViewTpvPrehlad", "canWriteTpvPrehlad"],
+    ["canViewTpvMaterial", "canWriteTpvMaterial"],
+    ["canViewTpvHodinovaDotacia", "canWriteTpvHodinovaDotacia"],
+  ];
+  for (const [view, write] of RW_PAIRS) {
+    if (out[write]) out[view] = true;
+  }
+  return out;
+}
+
+// Helper: granted všetky sub-flagy modulu
+const projectInfoFull: PermissionFlag[] = [
+  "canAccessProjectInfo",
+  "canViewProjectInfoTab",
+  "canWriteProjectInfoTab",
+  "canViewPMStatusTab",
+  "canWritePMStatusTab",
+  "canViewTPVStatusTab",
+  "canWriteTPVStatusTab",
+  "canViewTPVListTab",
+  "canWriteTPVListTab",
+  "canViewHarmonogram",
+  "canWriteHarmonogram",
+];
+
+const projectInfoReadOnly: PermissionFlag[] = [
+  "canAccessProjectInfo",
+  "canViewProjectInfoTab",
+  "canViewPMStatusTab",
+  "canViewTPVStatusTab",
+  "canViewTPVListTab",
+  "canViewHarmonogram",
+];
+
+const analyticsFull: PermissionFlag[] = [
+  "canAccessAnalytics",
+  "canAccessAnalyticsProjekty",
+  "canAccessAnalyticsRezije",
+  "canAccessAnalyticsDilna",
+  "canAccessAnalyticsVykaz",
+];
+
+const osobyFull: PermissionFlag[] = [
+  "canAccessOsoby",
+  "canAccessZamestnanci",
+  "canAccessExternistiTab",
+  "canAccessUzivateleTab",
+  "canAccessOpravneni",
+  "canAccessKatalog",
+  "canAccessKapacita",
+];
+
+const systemFull: PermissionFlag[] = [
+  "canAccessSystem",
+  "canAccessExchangeRates",
+  "canAccessOverheadProjects",
+  "canAccessFormulaBuilder",
+];
+
 export const ROLE_PRESETS: Record<AppRole, Permissions> = {
   owner: { ...ALL_TRUE },
-  admin: { ...ALL_TRUE, canQCOnly: false, canAccessTpv: false, canWriteTpv: false },
+  admin: { ...ALL_TRUE, canQCOnly: false, canAccessTpv: false, canWriteTpv: false, canViewTpvPrehlad: false, canWriteTpvPrehlad: false, canViewTpvMaterial: false, canWriteTpvMaterial: false, canViewTpvHodinovaDotacia: false, canWriteTpvHodinovaDotacia: false },
   vedouci_pm: preset(
-    "canEdit",
+    ...projectInfoFull,
     "canCreateProject",
     "canDeleteProject",
     "canEditProjectCode",
     "canEditSmluvniTermin",
     "canManageTPV",
-    "canManagePeople",
-    "canManageExternisti",
-    "canAccessAnalytics",
+    "canEdit",
     "canSeePrices",
-    "canAccessPlanVyroby",
-    "canWritePlanVyroby",
-    "canAccessDaylog",
     "canUploadDocuments",
     "canPermanentDelete",
-    "canManageOverheadProjects",
     "canAccessRecycleBin",
+    ...analyticsFull,
+    ...osobyFull,
+    "canManagePeople",
+    "canManageExternisti",
+    "canAccessPlanVyroby",
+    "canWritePlanVyroby",
+    "canAccessForecast",
+    "canAccessDaylog",
+    "canManageOverheadProjects",
   ),
   pm: preset(
-    "canEdit",
+    ...projectInfoFull,
     "canCreateProject",
     "canManageTPV",
+    "canEdit",
+    "canSeePrices",
+    "canUploadDocuments",
+    "canAccessRecycleBin",
+    ...analyticsFull,
+    ...osobyFull,
     "canManagePeople",
     "canManageExternisti",
-    "canAccessAnalytics",
-    "canSeePrices",
     "canAccessPlanVyroby",
     "canAccessDaylog",
-    "canUploadDocuments",
-    "canAccessRecycleBin",
   ),
   vedouci_konstrukter: preset(
-    "canEdit",
+    ...projectInfoFull,
     "canManageTPV",
-    "canManagePeople",
-    "canManageExternisti",
-    "canAccessAnalytics",
+    "canEdit",
     "canUploadDocuments",
     "canAccessRecycleBin",
+    ...analyticsFull,
+    ...osobyFull,
+    "canManagePeople",
+    "canManageExternisti",
   ),
   konstrukter: preset(
-    "canEdit",
+    ...projectInfoFull,
     "canManageTPV",
+    "canEdit",
     "canUploadDocuments",
     "canAccessRecycleBin",
   ),
   vedouci_vyroby: preset(
+    ...projectInfoReadOnly,
     "canEdit",
     "canManageProduction",
-    "canAccessAnalytics",
+    "canAccessDaylog",
+    "canAccessQC",
+    ...analyticsFull,
     "canAccessPlanVyroby",
     "canWritePlanVyroby",
-    "canAccessDaylog",
+    "canAccessForecast",
     "canUploadDocuments",
   ),
   mistr: preset(
+    ...projectInfoReadOnly,
     "canManageProduction",
-    "canAccessPlanVyroby",
     "canAccessDaylog",
+    "canAccessQC",
+    "canAccessPlanVyroby",
     "canUploadDocuments",
   ),
-  quality: preset("canAccessDaylog", "canQCOnly"),
-  kalkulant: preset("canAccessAnalytics", "canSeePrices", "canManageOverheadProjects"),
+  quality: preset(
+    "canManageProduction",
+    "canAccessDaylog",
+    "canAccessQC",
+    "canQCOnly",
+  ),
+  kalkulant: preset(
+    ...analyticsFull,
+    "canSeePrices",
+    "canAccessSystem",
+    "canAccessOverheadProjects",
+    "canManageOverheadProjects",
+  ),
   viewer: preset(
+    ...projectInfoReadOnly,
     "canAccessPlanVyroby",
     "canAccessDaylog",
-    "canAccessAnalytics",
+    ...analyticsFull,
   ),
-  // Backward-compat: vyroba mirrors vedouci_vyroby
   vyroba: preset(
+    ...projectInfoReadOnly,
     "canEdit",
     "canManageProduction",
-    "canAccessAnalytics",
+    "canAccessDaylog",
+    "canAccessQC",
+    ...analyticsFull,
     "canAccessPlanVyroby",
     "canWritePlanVyroby",
-    "canAccessDaylog",
+    "canAccessForecast",
     "canUploadDocuments",
   ),
-  // Tester mirrors PM (sandbox)
   tester: preset(
-    "canEdit",
+    ...projectInfoFull,
     "canCreateProject",
     "canManageTPV",
-    "canManagePeople",
-    "canManageExternisti",
-    "canAccessAnalytics",
+    "canEdit",
     "canSeePrices",
-    "canAccessPlanVyroby",
-    "canAccessDaylog",
     "canUploadDocuments",
     "canAccessRecycleBin",
+    ...analyticsFull,
+    ...osobyFull,
+    "canManagePeople",
+    "canManageExternisti",
+    "canAccessPlanVyroby",
+    "canAccessDaylog",
   ),
 };
 
@@ -218,20 +521,21 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 
 /**
  * Resolve final permissions for a user.
- * - If `overrides` is null/undefined → use the role preset as-is.
- * - If `overrides` is provided → use overrides for any keys present, fall back to preset for missing keys.
+ * - merge: preset → role default (DB) → user override (DB).
+ * - Cascade master → sub sa aplikuje na konci.
  */
 export function resolvePermissions(
   role: AppRole | null,
   overrides: Partial<Permissions> | null | undefined,
 ): Permissions {
   const base: Permissions = role ? { ...ROLE_PRESETS[role] } : { ...ALL_FALSE };
-  if (!overrides) return base;
-  const out = { ...base };
-  for (const key of PERMISSION_FLAGS) {
-    if (typeof overrides[key] === "boolean") {
-      out[key] = overrides[key] as boolean;
+  const merged = { ...base };
+  if (overrides) {
+    for (const key of PERMISSION_FLAGS) {
+      if (typeof overrides[key] === "boolean") {
+        merged[key] = overrides[key] as boolean;
+      }
     }
   }
-  return out;
+  return applyCascade(merged);
 }
