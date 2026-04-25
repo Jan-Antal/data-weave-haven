@@ -204,8 +204,18 @@ const Index = () => {
   }, [userPrefs]);
 
   useEffect(() => {
-    setActiveTab(defaultTab);
-  }, [defaultTab]);
+    if (visibleTabs.length === 0) return;
+    const safe = visibleTabs.includes(defaultTab) ? defaultTab : visibleTabs[0];
+    setActiveTab(safe);
+  }, [defaultTab, visibleTabs]);
+
+  // If the current activeTab becomes invisible (permissions changed), snap back.
+  useEffect(() => {
+    if (visibleTabs.length === 0) return;
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0]);
+    }
+  }, [activeTab, visibleTabs]);
 
   // Handle openProjectId from DataLog navigation
   const openProjectIdHandled = useRef(false);
