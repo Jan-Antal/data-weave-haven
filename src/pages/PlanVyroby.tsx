@@ -115,8 +115,8 @@ interface MergeState {
 }
 
 export default function PlanVyroby() {
-  const { isAdmin, isOwner, isTestUser, loading, profile, role, canAccessPlanVyroby, canWritePlanVyroby } = useAuth();
-  const canUseForecast = canWritePlanVyroby;
+  const { isAdmin, isOwner, isTestUser, loading, profile, role, canAccessPlanVyroby, canWritePlanVyroby, canAccessForecast } = useAuth();
+  const canUseForecast = canAccessForecast && canWritePlanVyroby;
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();

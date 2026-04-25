@@ -551,7 +551,7 @@ function ConnectorLine({
 // ── Substage loader ─────────────────────────────────────────────────
 function SubstageRows({
   projectId, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly,
-  weeks, months, showWeeks, hoveredRow, setHoveredRow,
+  weeks, months, showWeeks, hoveredRow, setHoveredRow, canWriteHarmonogram,
 }: {
   projectId: string; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
@@ -561,6 +561,7 @@ function SubstageRows({
   showWeeks: boolean;
   hoveredRow: string | null;
   setHoveredRow: (id: string | null) => void;
+  canWriteHarmonogram: boolean;
 }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const updateStage = useUpdateStage();
@@ -568,7 +569,7 @@ function SubstageRows({
   return (
     <>
       {stages.map((stage) => (
-        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />
+        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} canWriteHarmonogram={canWriteHarmonogram} />
       ))}
     </>
   );
@@ -576,7 +577,7 @@ function SubstageRows({
 
 function SubstageRow({
   stage, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly, updateStage,
-  weeks, months, showWeeks, hoveredRow, setHoveredRow,
+  weeks, months, showWeeks, hoveredRow, setHoveredRow, canWriteHarmonogram,
 }: {
   stage: ProjectStage; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
@@ -587,6 +588,7 @@ function SubstageRow({
   showWeeks: boolean;
   hoveredRow: string | null;
   setHoveredRow: (id: string | null) => void;
+  canWriteHarmonogram: boolean;
 }) {
   const barData = getStageBarData(stage, project, statusColorMap);
   const midY = SUBSTAGE_ROW_HEIGHT / 2;
@@ -654,7 +656,7 @@ function SubstageRow({
       })}
       {barData.diamonds.map((m, i, arr) => {
         const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
-        const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (stage as any)[m.fieldKey!] ?? null);
+        const canDrag = canWriteHarmonogram && DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (stage as any)[m.fieldKey!] ?? null);
         return (
           <MilestoneDiamond
             key={i} date={m.date} color={m.color} label={m.label} name={m.name}
@@ -731,7 +733,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const [editStage, setEditStage] = useState<ProjectStage | null>(null);
   const [editStageProject, setEditStageProject] = useState<Project | null>(null);
   const updateProject = useUpdateProject();
-  const { isFieldReadOnly } = useAuth();
+  const { isFieldReadOnly, canWriteHarmonogram } = useAuth();
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -1085,7 +1087,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     {/* Milestone diamonds */}
                     {barData.diamonds.map((m, i, arr) => {
                       const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
-                      const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (p as any)[m.fieldKey!] ?? null);
+                      const canDrag = canWriteHarmonogram && DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (p as any)[m.fieldKey!] ?? null);
                       return (
                         <MilestoneDiamond
                           key={i} date={m.date} color={m.color} label={m.label} name={m.name}
@@ -1109,7 +1111,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
                   {/* Substage rows */}
                   {isExp && (
-                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />
+                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} canWriteHarmonogram={canWriteHarmonogram} />
                   )}
                 </div>
               );

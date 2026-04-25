@@ -25,6 +25,7 @@ import {
   ROLE_LABELS,
   ROLE_PRESETS,
   PERMISSION_FLAGS,
+  applyCascade,
   type Permissions,
   type PermissionFlag,
 } from "@/lib/permissionPresets";
@@ -500,9 +501,11 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     if (guardOwnerRole()) return;
     setSaving(true);
     setConfirmOverwrite(null);
+    // Force-apply cascade so we never persist stale sub-flags when their master is OFF.
+    const sanitized = applyCascade({ ...draftPerms });
     const { error } = await supabase
       .from("user_roles")
-      .update({ permissions: draftPerms as any })
+      .update({ permissions: sanitized as any })
       .eq("role", selectedRole);
     if (error) {
       setSaving(false);
@@ -517,7 +520,7 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     const { error: defErr } = await supabase
       .from("role_permission_defaults")
       .upsert(
-        { role: selectedRole, permissions: draftPerms as any },
+        { role: selectedRole, permissions: sanitized as any },
         { onConflict: "role" },
       );
     setSaving(false);
