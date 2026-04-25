@@ -130,11 +130,25 @@ function AnalyticsRoute({ children }: { children: React.ReactNode }) {
 }
 
 function OsobyRoute({ children }: { children: React.ReactNode }) {
-  const { canManagePeople, canManageExternisti, canManageUsers } = useAuth();
-  if (!canManagePeople && !canManageExternisti && !canManageUsers) {
+  const { canAccessOsoby } = useAuth();
+  if (!canAccessOsoby) {
     return <Navigate to="/" replace />;
   }
 
+  return <>{children}</>;
+}
+
+function IndexRoute({ children }: { children: React.ReactNode }) {
+  const { canAccessProjectInfo, defaultTab, canAccessPlanVyroby, canManageProduction, canAccessAnalytics, canAccessTpv, canAccessOsoby, canAccessSystem } = useAuth();
+  if (!canAccessProjectInfo) {
+    // fallback do prvého dostupného modulu
+    if (canAccessPlanVyroby) return <Navigate to="/plan-vyroby" replace />;
+    if (canManageProduction) return <Navigate to="/vyroba" replace />;
+    if (canAccessAnalytics) return <Navigate to="/analytics" replace />;
+    if (canAccessTpv) return <Navigate to="/tpv" replace />;
+    if (canAccessOsoby) return <Navigate to="/osoby" replace />;
+    return <div className="h-screen flex items-center justify-center text-muted-foreground">Nemáš prístup k žiadnemu modulu. Kontaktuj správcu.</div>;
+  }
   return <>{children}</>;
 }
 
@@ -229,7 +243,7 @@ function AppRoutes() {
             <PersistentDesktopHeader />
             <main style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               <Routes>
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<IndexRoute><Index /></IndexRoute>} />
                 <Route path="/plan-vyroby" element={<PlanRoute><PlanVyroby /></PlanRoute>} />
                 <Route path="/tpv" element={<TpvRoute><Tpv /></TpvRoute>} />
                 <Route path="/vyroba" element={<VyrobaRoute><Vyroba /></VyrobaRoute>} />
