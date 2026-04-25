@@ -94,6 +94,8 @@ interface AuthContextType {
   canWriteHarmonogram: boolean;
   canAccessForecast: boolean;
   canAccessQC: boolean;
+  canWriteDaylog: boolean;
+  canWriteQC: boolean;
   canViewTpvPrehlad: boolean;
   canWriteTpvPrehlad: boolean;
   canViewTpvMaterial: boolean;
