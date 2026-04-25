@@ -1774,7 +1774,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       </div>
     );
   }
-  if (!isOwner && !isAdmin && !isTester) return null;
+  if (!canManageProduction && !canQCOnly && !isTester) return null;
 
   const statusColors = { "on-track": "#3a8a36", "at-risk": "#d97706", behind: "#dc2626" };
 
