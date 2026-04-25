@@ -557,8 +557,12 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
   const [activeTPVProject, setActiveTPVProject] = useState<{ projectId: string; projectName: string; autoImport?: boolean } | null>(null);
   const handleOpenTPVList = useCallback((projectId: string, projectName: string, autoImport?: boolean) => {
+    if (!canViewTPVListTab) {
+      toast({ title: "Nemáte oprávnění zobraziť TPV List.", variant: "destructive" });
+      return;
+    }
     setActiveTPVProject({ projectId, projectName, autoImport });
-  }, []);
+  }, [canViewTPVListTab]);
 
   // Expose close-detail callback to parent
   useEffect(() => {
@@ -576,7 +580,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit: canEditGlobal, canEditColumns, canDeleteProject, isViewer, isFieldReadOnly, canWriteProjectInfoTab } = useAuth();
+  const { canEdit: canEditGlobal, canEditColumns, canDeleteProject, isViewer, isFieldReadOnly, canWriteProjectInfoTab, canViewTPVListTab } = useAuth();
   const canEdit = canEditGlobal && canWriteProjectInfoTab;
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
