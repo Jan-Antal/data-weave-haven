@@ -107,8 +107,9 @@ function PlanRoute({ children }: { children: React.ReactNode }) {
 }
 
 function TpvRoute({ children }: { children: React.ReactNode }) {
-  const { canAccessPlanVyroby, isAdmin, isOwner, role } = useAuth();
-  if (!canAccessPlanVyroby && !isAdmin && !isOwner && role !== "konstrukter" && role !== "pm") {
+  const { isOwner } = useAuth();
+  // TPV modul je počas vývoja prístupný len pre owner
+  if (!isOwner) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
