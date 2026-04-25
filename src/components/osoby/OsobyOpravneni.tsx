@@ -158,16 +158,16 @@ const GROUPS: ModuleGroup[] = [
     icon: { bg: "#FAEEDA", color: "#633806" },
     rows: [
       {
-        kind: "bin",
+        kind: "tri",
         label: "Daylog",
         desc: "Denný záznam progressu",
-        flags: ["canAccessDaylog"],
+        flags: ["canAccessDaylog", "canWriteDaylog"],
       },
       {
-        kind: "bin",
+        kind: "tri",
         label: "QC — Kontrola kvality",
         desc: "Označovanie hotovo / chyby",
-        flags: ["canAccessQC"],
+        flags: ["canAccessQC", "canWriteQC"],
       },
     ],
   },
