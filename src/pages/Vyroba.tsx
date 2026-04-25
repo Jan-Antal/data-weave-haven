@@ -418,11 +418,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   }, [dataLogOpen]);
   const [capacitySettingsOpen, setCapacitySettingsOpen] = useState(false);
 
-  // Owner/Admin/Tester guard
+  // Production access guard — gated by canManageProduction flag
+  const { canManageProduction, canQCOnly } = useAuth();
   const isTester = role === "tester";
   useEffect(() => {
-    if (!loading && !isOwner && !isAdmin && !isTester) navigate("/", { replace: true });
-  }, [loading, isOwner, isAdmin, isTester, navigate]);
+    if (!loading && !canManageProduction && !canQCOnly && !isTester) navigate("/", { replace: true });
+  }, [loading, canManageProduction, canQCOnly, isTester, navigate]);
 
   // Close all overlays when mobile bottom nav changes module
   useEffect(() => {

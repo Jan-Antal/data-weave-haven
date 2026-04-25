@@ -115,8 +115,8 @@ interface MergeState {
 }
 
 export default function PlanVyroby() {
-  const { isAdmin, isOwner, isTestUser, loading, profile, role } = useAuth();
-  const canUseForecast = isOwner || isAdmin || role === "vedouci_vyroby";
+  const { isAdmin, isOwner, isTestUser, loading, profile, role, canAccessPlanVyroby, canWritePlanVyroby } = useAuth();
+  const canUseForecast = canWritePlanVyroby;
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
@@ -332,10 +332,10 @@ export default function PlanVyroby() {
 
   const isTester = role === "tester";
   useEffect(() => {
-    if (!loading && !isAdmin && !isTester) {
+    if (!loading && !canAccessPlanVyroby && !isTester) {
       navigate("/", { replace: true });
     }
-  }, [isAdmin, isTester, loading, navigate]);
+  }, [canAccessPlanVyroby, isTester, loading, navigate]);
 
 
   const tpvProject = tpvProjectId ? allProjects.find(p => p.project_id === tpvProjectId) : null;
@@ -787,7 +787,7 @@ export default function PlanVyroby() {
     );
   }
 
-  if (!isAdmin && !isTester && role !== "vedouci_vyroby") return null;
+  if (!canAccessPlanVyroby && !isTester) return null;
 
   if (isMobile) {
     return (
