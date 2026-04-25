@@ -654,7 +654,7 @@ function SubstageRow({
       })}
       {barData.diamonds.map((m, i, arr) => {
         const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
-        const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (stage as any)[m.fieldKey!] ?? null);
+        const canDrag = canWriteHarmonogram && DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (stage as any)[m.fieldKey!] ?? null);
         return (
           <MilestoneDiamond
             key={i} date={m.date} color={m.color} label={m.label} name={m.name}
@@ -731,7 +731,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
   const [editStage, setEditStage] = useState<ProjectStage | null>(null);
   const [editStageProject, setEditStageProject] = useState<Project | null>(null);
   const updateProject = useUpdateProject();
-  const { isFieldReadOnly } = useAuth();
+  const { isFieldReadOnly, canWriteHarmonogram } = useAuth();
 
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
@@ -1085,7 +1085,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
                     {/* Milestone diamonds */}
                     {barData.diamonds.map((m, i, arr) => {
                       const showLabel = !arr.some((other, j) => j > i && Math.abs(differenceInDays(other.date, m.date)) <= 5);
-                      const canDrag = DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (p as any)[m.fieldKey!] ?? null);
+                      const canDrag = canWriteHarmonogram && DRAGGABLE_MILESTONES.has(m.name) && m.fieldKey && !isFieldReadOnly(m.fieldKey, (p as any)[m.fieldKey!] ?? null);
                       return (
                         <MilestoneDiamond
                           key={i} date={m.date} color={m.color} label={m.label} name={m.name}
