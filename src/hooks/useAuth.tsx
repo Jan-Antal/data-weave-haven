@@ -211,11 +211,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Effective role: only owner can simulate
   const effectiveRole: AppRole | null = (simulatedRole && realRole === "owner") ? simulatedRole : realRole;
 
-  // When simulating, ignore DB overrides — use preset only.
+  // Resolve permissions in priority: user override > DB role default > static preset.
+  // During simulation by owner: ignore the owner's own user override, but still respect DB role defaults
+  // so the owner sees the same effective permissions as a real user in that role.
   const isSimulating = !!simulatedRole && realRole === "owner";
+  const dbDefaultsForRole = effectiveRole ? roleDefaults[effectiveRole] : null;
+  const userOverride = isSimulating ? null : dbPermissions;
+  const mergedOverride: Partial<Permissions> = {
+    ...(dbDefaultsForRole ?? {}),
+    ...(userOverride ?? {}),
+  };
   const permissions: Permissions = resolvePermissions(
     effectiveRole,
-    isSimulating ? null : dbPermissions,
+    Object.keys(mergedOverride).length > 0 ? mergedOverride : null,
   );
 
   const isTestUser = user?.email === "alfred@ami-test.cz" || effectiveRole === "tester";
