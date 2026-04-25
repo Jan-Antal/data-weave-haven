@@ -551,7 +551,7 @@ function ConnectorLine({
 // ── Substage loader ─────────────────────────────────────────────────
 function SubstageRows({
   projectId, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly,
-  weeks, months, showWeeks, hoveredRow, setHoveredRow,
+  weeks, months, showWeeks, hoveredRow, setHoveredRow, canWriteHarmonogram,
 }: {
   projectId: string; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
@@ -561,6 +561,7 @@ function SubstageRows({
   showWeeks: boolean;
   hoveredRow: string | null;
   setHoveredRow: (id: string | null) => void;
+  canWriteHarmonogram: boolean;
 }) {
   const { data: stages = [] } = useProjectStages(projectId);
   const updateStage = useUpdateStage();
@@ -568,7 +569,7 @@ function SubstageRows({
   return (
     <>
       {stages.map((stage) => (
-        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />
+        <SubstageRow key={stage.id} stage={stage} project={project} origin={origin} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} updateStage={updateStage} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} canWriteHarmonogram={canWriteHarmonogram} />
       ))}
     </>
   );
@@ -1110,7 +1111,7 @@ export function PlanView({ personFilter, statusFilter, search, zoom: zoomProp }:
 
                   {/* Substage rows */}
                   {isExp && (
-                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} />
+                    <SubstageRows projectId={p.project_id} project={p} origin={timelineStart} dayPx={dayPx} timelineWidth={timelineWidth} statusColorMap={statusColorMap} isFieldReadOnly={isFieldReadOnly} weeks={weeks} months={months} showWeeks={showWeeks} hoveredRow={hoveredRow} setHoveredRow={setHoveredRow} canWriteHarmonogram={canWriteHarmonogram} />
                   )}
                 </div>
               );
