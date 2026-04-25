@@ -71,101 +71,91 @@ type BinRow = {
   flags: PermissionFlag[]; // toggled together
 };
 type Row = TriRow | BinRow;
-type Group = { title: string; icon?: { bg: string; color: string }; rows: Row[] };
+type ModuleGroup = {
+  title: string;
+  /** Master flag — controls the whole module visibility/access */
+  master: PermissionFlag;
+  icon?: { bg: string; color: string };
+  /** Sub-rows shown only when master is true */
+  rows: Row[];
+};
 
-const GROUPS: Group[] = [
+const GROUPS: ModuleGroup[] = [
   {
     title: "Project Info",
+    master: "canAccessProjectInfo",
     icon: { bg: "#E6F1FB", color: "#0C447C" },
     rows: [
       {
-        kind: "bin",
+        kind: "tri",
         label: "Project Info",
         desc: "Základní info, finance, dokumenty",
-        flags: ["canEdit"],
+        read: "canViewProjectInfoTab",
+        write: "canWriteProjectInfoTab",
       },
       {
-        kind: "bin",
+        kind: "tri",
         label: "PM Status",
         desc: "Riadenie projektu, milníky",
-        flags: ["canEdit"],
+        read: "canViewPMStatusTab",
+        write: "canWritePMStatusTab",
       },
       {
-        kind: "bin",
+        kind: "tri",
         label: "TPV Status",
         desc: "Prehľad TPV položiek",
-        flags: ["canEdit"],
+        read: "canViewTPVStatusTab",
+        write: "canWriteTPVStatusTab",
       },
       {
-        kind: "bin",
+        kind: "tri",
         label: "TPV List",
         desc: "Položky, ceny, odoslanie do výroby",
-        flags: ["canManageTPV"],
-      },
-      { kind: "bin", label: "Vytvořit projekt", flags: ["canCreateProject"] },
-      { kind: "bin", label: "Smazat projekt", flags: ["canDeleteProject"] },
-      {
-        kind: "bin",
-        label: "Upravit kód / smluvní termín",
-        flags: ["canEditProjectCode", "canEditSmluvniTermin"],
-      },
-      { kind: "bin", label: "Vidět ceny & marže", flags: ["canSeePrices"] },
-      { kind: "bin", label: "Réžijné projekty", flags: ["canManageOverheadProjects"] },
-      {
-        kind: "bin",
-        label: "Nahrávať dokumenty",
-        desc: "Upload do SharePoint",
-        flags: ["canUploadDocuments"],
+        read: "canViewTPVListTab",
+        write: "canWriteTPVListTab",
       },
       {
-        kind: "bin",
-        label: "Trvalé mazanie",
-        desc: "Definitívne mazanie z koša (nezvratné)",
-        flags: ["canPermanentDelete"],
+        kind: "tri",
+        label: "Harmonogram",
+        desc: "Plánovanie etáp",
+        read: "canViewHarmonogram",
+        write: "canWriteHarmonogram",
       },
-      {
-        kind: "bin",
-        label: "Prístup do Koša",
-        desc: "Zobraziť a obnoviť zmazané položky",
-        flags: ["canAccessRecycleBin"],
-      },
+      { kind: "bin", label: "a) Vytvořit projekt", flags: ["canCreateProject"] },
+      { kind: "bin", label: "b) Smazat projekt", flags: ["canDeleteProject"] },
+      { kind: "bin", label: "c) Upravit kód projektu", flags: ["canEditProjectCode"] },
+      { kind: "bin", label: "d) Upravit smluvní termín", flags: ["canEditSmluvniTermin"] },
+      { kind: "bin", label: "e) Vidět ceny & marže", flags: ["canSeePrices"] },
+      { kind: "bin", label: "f) Nahrávať dokumenty", desc: "Upload do SharePoint", flags: ["canUploadDocuments"] },
+      { kind: "bin", label: "g) Trvalé mazanie", desc: "Definitívne mazanie z koša (nezvratné)", flags: ["canPermanentDelete"] },
+      { kind: "bin", label: "h) Prístup do Koša", desc: "Zobraziť a obnoviť zmazané položky", flags: ["canAccessRecycleBin"] },
     ],
   },
   {
     title: "Plán výroby",
+    master: "canAccessPlanVyroby",
     icon: { bg: "#EAF3DE", color: "#27500A" },
     rows: [
       {
         kind: "tri",
-        label: "Plán výroby — Kanban / Tabulka",
+        label: "Kanban / Tabulka",
         desc: "Zobrazenie a editácia plánovaných blokov",
         read: "canAccessPlanVyroby",
         write: "canWritePlanVyroby",
       },
       {
         kind: "bin",
-        label: "Midflight",
-        desc: "Import histórie do plánu",
-        flags: ["canWritePlanVyroby"],
-      },
-      {
-        kind: "bin",
         label: "Forecast",
         desc: "Generovanie a potvrdenie forecastu",
-        flags: ["canWritePlanVyroby"],
+        flags: ["canAccessForecast"],
       },
     ],
   },
   {
     title: "Modul výroba",
+    master: "canManageProduction",
     icon: { bg: "#FAEEDA", color: "#633806" },
     rows: [
-      {
-        kind: "bin",
-        label: "Modul výroba",
-        desc: "Bundles, QC tracking",
-        flags: ["canManageProduction"],
-      },
       {
         kind: "bin",
         label: "Daylog",
@@ -174,71 +164,88 @@ const GROUPS: Group[] = [
       },
       {
         kind: "bin",
-        label: "Pouze QC",
-        desc: "Len označenie hotovo / QC",
-        flags: ["canQCOnly"],
+        label: "QC — Kontrola kvality",
+        desc: "Označovanie hotovo / chyby",
+        flags: ["canAccessQC"],
+      },
+    ],
+  },
+  {
+    title: "TPV — Príprava výroby",
+    master: "canAccessTpv",
+    icon: { bg: "#FEF3C7", color: "#92400E" },
+    rows: [
+      {
+        kind: "tri",
+        label: "Prehľad pipeline",
+        read: "canViewTpvPrehlad",
+        write: "canWriteTpvPrehlad",
+      },
+      {
+        kind: "tri",
+        label: "Materiál",
+        read: "canViewTpvMaterial",
+        write: "canWriteTpvMaterial",
+      },
+      {
+        kind: "tri",
+        label: "Hodinová dotácia",
+        read: "canViewTpvHodinovaDotacia",
+        write: "canWriteTpvHodinovaDotacia",
       },
     ],
   },
   {
     title: "Analytics",
+    master: "canAccessAnalytics",
     icon: { bg: "#EEEDFE", color: "#3C3489" },
     rows: [
-      {
-        kind: "bin",
-        label: "Analytics",
-        desc: "Projektová analýza, Dílna, Výkaz",
-        flags: ["canAccessAnalytics"],
-      },
+      { kind: "bin", label: "Projekty", flags: ["canAccessAnalyticsProjekty"] },
+      { kind: "bin", label: "Réžije", flags: ["canAccessAnalyticsRezije"] },
+      { kind: "bin", label: "Dílna", flags: ["canAccessAnalyticsDilna"] },
+      { kind: "bin", label: "Výkaz", flags: ["canAccessAnalyticsVykaz"] },
     ],
   },
   {
-    title: "Správa osob & Nastavenia",
+    title: "Správa osob",
+    master: "canAccessOsoby",
     icon: { bg: "#F1EFE8", color: "#5F5E5A" },
+    rows: [
+      { kind: "bin", label: "Zamestnanci", flags: ["canAccessZamestnanci", "canManagePeople"] },
+      { kind: "bin", label: "Externisti", flags: ["canAccessExternistiTab", "canManageExternisti"] },
+      { kind: "bin", label: "Užívatelia", flags: ["canAccessUzivateleTab", "canManageUsers"] },
+      { kind: "bin", label: "Oprávnenia", desc: "Správa rolí a oprávnení", flags: ["canAccessOpravneni"] },
+      { kind: "bin", label: "Pozície & číselníky", flags: ["canAccessKatalog"] },
+      { kind: "bin", label: "Kapacita", flags: ["canAccessKapacita"] },
+    ],
+  },
+  {
+    title: "Systém",
+    master: "canAccessSystem",
+    icon: { bg: "#E0F2FE", color: "#075985" },
     rows: [
       {
         kind: "bin",
-        label: "Správa osob",
-        desc: "Zamestnanci, externisti, kapacita",
-        flags: ["canManagePeople"],
-      },
-      { kind: "bin", label: "Externisti", flags: ["canManageExternisti"] },
-      {
-        kind: "bin",
-        label: "Oprávnění",
-        desc: "Správa rolí a oprávnení",
-        flags: ["canManageUsers"],
-      },
-      {
-        kind: "bin",
-        label: "Nastavenia",
-        desc: "Číselníky, kurzy, réžia, statusy",
-        flags: ["canAccessSettings"],
-      },
-      {
-        kind: "bin",
-        label: "Spravovať kurzy mien",
+        label: "Kurzový lístok",
         desc: "Editácia EUR/CZK kurzov",
-        flags: ["canManageExchangeRates"],
+        flags: ["canAccessExchangeRates", "canManageExchangeRates"],
+      },
+      {
+        kind: "bin",
+        label: "Réžijné projekty",
+        flags: ["canAccessOverheadProjects", "canManageOverheadProjects"],
+      },
+      {
+        kind: "bin",
+        label: "Výpočetná logika",
+        desc: "Formula Builder — vzorce",
+        flags: ["canAccessFormulaBuilder", "canAccessSettings"],
       },
       {
         kind: "bin",
         label: "Spravovať stavy",
         desc: "Project status options, TPV status options",
         flags: ["canManageStatuses"],
-      },
-    ],
-  },
-  {
-    title: "TPV — Príprava výroby",
-    icon: { bg: "#FEF3C7", color: "#92400E" },
-    rows: [
-      {
-        kind: "tri",
-        label: "TPV modul",
-        desc: "Prístup do modulu Príprava výroby (vo vývoji — predvolene vypnuté)",
-        read: "canAccessTpv",
-        write: "canWriteTpv",
       },
     ],
   },
