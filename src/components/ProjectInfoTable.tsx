@@ -553,6 +553,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const [newProj, setNewProj] = useState({ ...emptyProject, status: getDefaultStatus(statusOptions) });
   const [datumWarning, setDatumWarning] = useState(false);
   const qc = useQueryClient();
+  const { canEdit: canEditGlobal, canEditColumns, canDeleteProject, isViewer, isFieldReadOnly, canWriteProjectInfoTab, canViewTPVListTab } = useAuth();
+  const canEdit = canEditGlobal && canWriteProjectInfoTab;
   const [editProject, setEditProject] = useState<typeof projects[0] | null>(null);
   const { itemsByProject: tpvItemsByProject } = useAllTPVItems();
   const [activeTPVProject, setActiveTPVProject] = useState<{ projectId: string; projectName: string; autoImport?: boolean } | null>(null);
@@ -580,8 +582,6 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit: canEditGlobal, canEditColumns, canDeleteProject, isViewer, isFieldReadOnly, canWriteProjectInfoTab, canViewTPVListTab } = useAuth();
-  const canEdit = canEditGlobal && canWriteProjectInfoTab;
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
 
