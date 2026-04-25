@@ -126,7 +126,8 @@ export function ProductionHeader({
   const canSeeVyroba = canManageProduction || canQCOnly || isAdmin || isOwner;
   const canSeePlanVyroby = canAccessPlanVyroby || isAdmin || isOwner;
   const canSeeAnalytics = canAccessAnalytics || isAdmin || isOwner;
-  const canSeeTpv = isAdmin || isOwner || role === "pm" || role === "konstrukter";
+  // TPV modul je počas vývoja viditeľný len pre owner
+  const canSeeTpv = isOwner;
   const canOpenSettingsMenu =
     canAccessSettings ||
     canManageUsers ||
