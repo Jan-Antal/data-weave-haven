@@ -576,7 +576,7 @@ function SubstageRows({
 
 function SubstageRow({
   stage, project, origin, dayPx, timelineWidth, statusColorMap, isFieldReadOnly, updateStage,
-  weeks, months, showWeeks, hoveredRow, setHoveredRow,
+  weeks, months, showWeeks, hoveredRow, setHoveredRow, canWriteHarmonogram,
 }: {
   stage: ProjectStage; project: Project; origin: Date; dayPx: number;
   timelineWidth: number; statusColorMap: Record<string, string>;
@@ -587,6 +587,7 @@ function SubstageRow({
   showWeeks: boolean;
   hoveredRow: string | null;
   setHoveredRow: (id: string | null) => void;
+  canWriteHarmonogram: boolean;
 }) {
   const barData = getStageBarData(stage, project, statusColorMap);
   const midY = SUBSTAGE_ROW_HEIGHT / 2;
