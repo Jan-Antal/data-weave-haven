@@ -127,7 +127,16 @@ const Index = () => {
     return () => window.removeEventListener("desktop-header-toggle-datalog", handler);
   }, [toggleDataLog]);
 
-  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, isTestUser, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, isTestUser, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab, canViewProjectInfoTab, canViewPMStatusTab, canViewTPVStatusTab, canViewHarmonogram } = useAuth();
+
+  const visibleTabs = useMemo(() => {
+    const v: string[] = [];
+    if (canViewProjectInfoTab) v.push("project-info");
+    if (canViewPMStatusTab) v.push("pm-status");
+    if (canViewTPVStatusTab) v.push("tpv-status");
+    if (canViewHarmonogram) v.push("plan");
+    return v;
+  }, [canViewProjectInfoTab, canViewPMStatusTab, canViewTPVStatusTab, canViewHarmonogram]);
 
   const { data: userPrefs } = useUserPreferences();
   const achievementChecker = useAchievementChecker();
