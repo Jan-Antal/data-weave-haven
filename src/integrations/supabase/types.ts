@@ -1697,6 +1697,27 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permission_defaults: {
+        Row: {
+          permissions: Json
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          permissions?: Json
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          permissions?: Json
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       sharepoint_document_cache: {
         Row: {
           category_counts: Json
@@ -2512,6 +2533,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["app_role"]
       }
       has_any_role: { Args: { _user_id: string }; Returns: boolean }
+      has_permission: {
+        Args: { _flag: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
