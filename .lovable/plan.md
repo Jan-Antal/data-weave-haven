@@ -1,49 +1,65 @@
-# Fix oprávnení – stale overrides, sekcia Daylog, PM read-only
+# Bug: Oprávnenia sa po uložení tvária že sa "vrátili" po refreshi
 
-## Problém
-- PM (a možno aj iné role) majú v `user_roles.permissions` JSONB **starý snapshot** uložený pred pridaním flagov `canAccessPlanVyroby` / `canWritePlanVyroby` / `canAccessTpv` / `canWriteTpv`. Helper `has_permission()` najprv pozrie do JSONB a ak kľúč chýba → vráti **false** (nepadá na role default). Preto PM nevidí Plán Výroby aj keď preset hovorí že má.
-- V UI `OsobyOpravneni.tsx` je riadok **Daylog** v sekcii „Plán výroby". Patrí do **Modul Výroba**.
-- `useAuth.tsx` flag `isQCOnlyUser` môže reštrikčne ovplyvňovať PM ak má omylom `canQCOnly = true` v starom snapshote.
+## Príčina
+V `src/components/osoby/OsobyOpravneni.tsx` (riadky 336–338) sa pri každej zmene zvolenej role `draftPerms` resetuje **vždy na statický `ROLE_PRESETS[selectedRole]`**, namiesto aby sa načítali aktuálne uložené `permissions` z DB.
 
-## Plán
-
-### 1. DB: cleanup migrácia – reset stale overrides pre VŠETKY role
-Migrácia jednorázovo:
-```sql
-UPDATE public.user_roles
-SET permissions = NULL
-WHERE permissions IS NOT NULL
-  AND NOT (permissions ? 'canAccessTpv');
+```tsx
+useEffect(() => {
+  setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
+}, [selectedRole]);
 ```
-Účinok: každý user, ktorého JSONB neobsahuje nový kľúč `canAccessTpv`, stratí svoj uložený snapshot a začne dediť aktuálny **role preset** z `role_permission_defaults` (čo už obsahuje všetky nové flagy podľa `permissionPresets.ts`). Owner-uložené explicitné overrides (kde už `canAccessTpv` je) zostanú nedotknuté.
 
-### 2. UI: presun Daylog do sekcie „Modul Výroba"
-Súbor: `src/components/osoby/OsobyOpravneni.tsx`
-- V poli `GROUPS` presunúť riadok `canAccessDaylog` zo skupiny **„Plán výroby"** do skupiny **„Modul Výroba"** (vedľa `canManageProduction`, `canQCOnly`).
+Overené v DB — `handleSave` reálne uloží zmeny správne (PM má v `user_roles.permissions` `canAccessAnalytics: false` pre všetkých 4 userov). Po F5 sa však UI postaví zo statického presetu (`canAccessAnalytics: true`) a checkbox je zase zapnutý → vyzerá to ako že sa zmena stratila. **Reálne všetko funguje, len UI klame.**
 
-### 3. useAuth.tsx – PM nesmie spadnúť do QC-only módu
-Súbor: `src/hooks/useAuth.tsx`
-- `isQCOnlyUser` upraviť tak, aby vracal `true` len ak `canQCOnly === true` **a zároveň** `canManageProduction === false` **a** `canEdit === false` (zabráni omylu, že editor s QC flagom dostane read-only UI).
+## Plán opravy
 
-### 4. Verifikácia po nasadení
-SQL kontrola pre každú rolu:
-```sql
-SELECT ur.role, p.email,
-  has_permission(ur.user_id, 'canAccessPlanVyroby') AS plan,
-  has_permission(ur.user_id, 'canWritePlanVyroby') AS plan_w,
-  has_permission(ur.user_id, 'canAccessDaylog') AS daylog,
-  has_permission(ur.user_id, 'canManageProduction') AS prod,
-  has_permission(ur.user_id, 'canAccessTpv') AS tpv
-FROM public.user_roles ur
-JOIN public.profiles p ON p.id = ur.user_id
-ORDER BY ur.role;
+### 1. `OsobyOpravneni.tsx` — odvodiť `draftPerms` od skutočne uložených dát
+- V `useEffect` reset draft brať z **prvého userov override** danej role (alebo zo session ak existuje konzistentný stav). Konkrétne: ak všetci useri v role majú rovnaký JSONB override, použiť ho. Inak fallback na `ROLE_PRESETS`.
+- Závislosti effect-u rozšíriť na `[selectedRole, roles]`, aby sa po `fetchAll()` po uložení zobrazil aktuálny DB stav.
+
+```tsx
+useEffect(() => {
+  const usersInRole = roles.filter((r) => r.role === selectedRole);
+  const firstWithOverride = usersInRole.find(
+    (r) => r.permissions && Object.keys(r.permissions).length > 0,
+  );
+  if (firstWithOverride?.permissions) {
+    // Zlúčiť s presetom aby sa doplnili chýbajúce flagy
+    setDraftPerms({
+      ...ROLE_PRESETS[selectedRole],
+      ...firstWithOverride.permissions,
+    });
+  } else {
+    setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
+  }
+}, [selectedRole, roles]);
 ```
-Očakávané hodnoty musia zodpovedať `ROLE_PRESETS` v `src/lib/permissionPresets.ts` (PM má `canAccessPlanVyroby = true`, `canWritePlanVyroby = false`, `canAccessTpv = false`, atď.).
+
+### 2. `handleSave` — udržať konzistentnosť aj cez `role_permission_defaults`
+Aktuálny save zapisuje len do `user_roles.permissions` per user. Ak owner zmení preset role (logická intencia tejto UI), mali by sme aj **upsertnúť `role_permission_defaults`** pre danú rolu, aby:
+- noví user pridelený k role dostal okamžite správne defaults,
+- `has_permission()` SQL helper vrátil správnu hodnotu aj pre userov bez explicit override.
+
+```ts
+// V persistSave po update user_roles:
+await supabase.from("role_permission_defaults").upsert(
+  { role: selectedRole, permissions: draftPerms as any },
+  { onConflict: "role" },
+);
+```
+
+### 3. Verifikácia po fixe
+1. Odhlásiť/refresh, otvoriť Oprávnenia → PM → Analytics má byť **vypnuté** (čo je aktuálne reálne v DB).
+2. Zapnúť Analytics, Uložiť, F5 → checkbox musí ostať zapnutý.
+3. Vypnúť Analytics, Uložiť, F5 → checkbox musí ostať vypnutý.
+4. SQL kontrola:
+   ```sql
+   SELECT role, permissions->>'canAccessAnalytics' FROM role_permission_defaults WHERE role='pm';
+   SELECT user_id, permissions->>'canAccessAnalytics' FROM user_roles WHERE role='pm';
+   ```
 
 ## Files to edit
-- **new migration** – UPDATE user_roles (reset stale snapshots)
-- `src/components/osoby/OsobyOpravneni.tsx` – presun Daylog
-- `src/hooks/useAuth.tsx` – spresnenie `isQCOnlyUser`
+- `src/components/osoby/OsobyOpravneni.tsx` — fix reset effect (1) + rozšíriť `persistSave` o upsert do `role_permission_defaults` (2)
 
 ## Riziko
-Žiadne owner-explicitné nastavenie sa nestratí (filter `NOT (permissions ? 'canAccessTpv')`). Po reset-e budú všetci dotknutí useri dediť presety – čo je presne to, čo chceš („nastavené pristupy ktoré majú mať"). Nové úpravy v Oprávneniach sa odteraz uložia s kompletným kľúčovým setom (vrátane `canAccessTpv`) takže tento problém sa nezopakuje.
+Nulové na DB strane (žiadna migrácia). UI fix je čisto čítací — žiadne dáta sa nemažú. Upsert do `role_permission_defaults` je bezpečný (owner-only RLS). Owner aktuálne uložené overrides v DB zostanú nedotknuté.

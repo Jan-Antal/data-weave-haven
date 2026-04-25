@@ -332,10 +332,20 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     }
   }, [selectedRole, visibleRoles]);
 
-  // Reset draft when switching role
+  // Reset draft when switching role — prefer actual saved overrides from DB
   useEffect(() => {
-    setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
-  }, [selectedRole]);
+    const preset = ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin;
+    const usersInRole = roles.filter((r) => r.role === selectedRole);
+    const firstWithOverride = usersInRole.find(
+      (r) => r.permissions && Object.keys(r.permissions).length > 0,
+    );
+    if (firstWithOverride?.permissions) {
+      // Merge preset with stored overrides so missing flags fall back to preset defaults
+      setDraftPerms({ ...preset, ...firstWithOverride.permissions } as Permissions);
+    } else {
+      setDraftPerms({ ...preset });
+    }
+  }, [selectedRole, roles]);
 
   const profileById = useMemo(() => {
     const m = new Map<string, ProfileLite>();
@@ -484,8 +494,8 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
       .from("user_roles")
       .update({ permissions: draftPerms as any })
       .eq("role", selectedRole);
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast({
         title: "Chyba pri ukladaní",
         description: error.message,
@@ -493,7 +503,23 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
       });
       return;
     }
-    toast({ title: `Uložené pre ${ROLE_LABELS[selectedRole]}` });
+    // Also upsert the role default so newly assigned users inherit the same preset
+    const { error: defErr } = await supabase
+      .from("role_permission_defaults")
+      .upsert(
+        { role: selectedRole, permissions: draftPerms as any },
+        { onConflict: "role" },
+      );
+    setSaving(false);
+    if (defErr) {
+      toast({
+        title: "Uložené pre používateľov, ale default role sa neaktualizoval",
+        description: defErr.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: `Uložené pre ${ROLE_LABELS[selectedRole]}` });
+    }
     fetchAll();
   };
 
