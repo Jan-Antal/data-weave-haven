@@ -119,6 +119,7 @@ export function ProductionHeader({
     canAccessAnalytics,
     canManageProduction,
     canQCOnly,
+    canAccessDaylog,
     profile,
     signOut,
   } = useAuth();
