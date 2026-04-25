@@ -271,6 +271,10 @@ export function OsobyOpravneni() {
       </div>
     );
   }
+  return <OsobyOpravneniInner isOwner={isOwner} />;
+}
+
+function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [roles, setRoles] = useState<UserRoleRow[]>([]);
   const [loading, setLoading] = useState(false);
