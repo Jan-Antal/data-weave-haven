@@ -477,38 +477,40 @@ const Index = () => {
                   </button>
                 </div>
 
-                <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
-                  {activeTab === "plan" && (
-                    <>
-                      {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
-                        <button
-                          key={z}
-                          onClick={() => setPlanZoom(z)}
-                          className={cn(
-                            "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-                            planZoom === z
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {z}
-                        </button>
-                      ))}
-                      <div className="w-px h-4 bg-border mx-1 shrink-0" />
-                    </>
-                  )}
-                  <button
-                    onClick={() => handleTabChange("plan")}
-                    className={cn(
-                      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-                      activeTab === "plan"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                {canViewHarmonogram && (
+                  <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
+                    {activeTab === "plan" && (
+                      <>
+                        {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
+                          <button
+                            key={z}
+                            onClick={() => setPlanZoom(z)}
+                            className={cn(
+                              "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                              planZoom === z
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {z}
+                          </button>
+                        ))}
+                        <div className="w-px h-4 bg-border mx-1 shrink-0" />
+                      </>
                     )}
-                  >
-                    📅 Harmonogram
-                  </button>
-                </div>
+                    <button
+                      onClick={() => handleTabChange("plan")}
+                      className={cn(
+                        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                        activeTab === "plan"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      📅 Harmonogram
+                    </button>
+                  </div>
+                )}
               </div>
 
               <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "project-info" ? "hidden" : "")}>
