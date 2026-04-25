@@ -156,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setRealRole(null);
           setDbPermissions(null);
+          setRoleDefaults({});
           setSimulatedRole(null);
           setLinkedPersonName(null);
           prevUserRef.current = null;
