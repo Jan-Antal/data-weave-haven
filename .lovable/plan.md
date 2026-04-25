@@ -1,65 +1,60 @@
-# Bug: Oprávnenia sa po uložení tvária že sa "vrátili" po refreshi
+## Problém
 
-## Príčina
-V `src/components/osoby/OsobyOpravneni.tsx` (riadky 336–338) sa pri každej zmene zvolenej role `draftPerms` resetuje **vždy na statický `ROLE_PRESETS[selectedRole]`**, namiesto aby sa načítali aktuálne uložené `permissions` z DB.
+Keď si ako Owner zapneš simuláciu PM v hornej lište, **stále vidíš Analytics**, hoci v Oprávnení je pre PM Analytics vypnuté. Save a DB stav sú správne (overené: všetci 4 reálni PM majú `canAccessAnalytics: false` v `user_roles.permissions` aj v `role_permission_defaults`). Problém je výlučne v `useAuth.tsx`:
 
-```tsx
-useEffect(() => {
-  setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
-}, [selectedRole]);
+```ts
+const isSimulating = !!simulatedRole && realRole === "owner";
+const permissions = resolvePermissions(effectiveRole, isSimulating ? null : dbPermissions);
 ```
 
-Overené v DB — `handleSave` reálne uloží zmeny správne (PM má v `user_roles.permissions` `canAccessAnalytics: false` pre všetkých 4 userov). Po F5 sa však UI postaví zo statického presetu (`canAccessAnalytics: true`) a checkbox je zase zapnutý → vyzerá to ako že sa zmena stratila. **Reálne všetko funguje, len UI klame.**
+Pri simulácii sa zámerne **ignorujú DB overrides** a použije sa statický `ROLE_PRESETS.pm` z `permissionPresets.ts`, kde je `canAccessAnalytics` natvrdo zapnuté. Owner teda vidí inú realitu než skutočný PM.
+
+Druhotný problém: ak by sa v budúcnosti vytvoril user bez `permissions` overrides (čerstvá rola), padne na ten istý statický preset → opäť divergencia od `role_permission_defaults` v DB.
 
 ## Plán opravy
 
-### 1. `OsobyOpravneni.tsx` — odvodiť `draftPerms` od skutočne uložených dát
-- V `useEffect` reset draft brať z **prvého userov override** danej role (alebo zo session ak existuje konzistentný stav). Konkrétne: ak všetci useri v role majú rovnaký JSONB override, použiť ho. Inak fallback na `ROLE_PRESETS`.
-- Závislosti effect-u rozšíriť na `[selectedRole, roles]`, aby sa po `fetchAll()` po uložení zobrazil aktuálny DB stav.
+### 1. `useAuth.tsx` — načítať `role_permission_defaults` z DB
+- Pri každom prihlásení (alebo reaktívne pri zmene `effectiveRole`) načítať z `role_permission_defaults` riadok pre `effectiveRole` a uložiť do stavu `roleDefaults: Partial<Permissions> | null`.
+- Realtime subscription na `role_permission_defaults` (UPDATE/INSERT) cez existujúci `useRealtimeSync` alebo dedikovaný kanál, aby zmena v Oprávnení okamžite premietla aj bez F5.
 
-```tsx
-useEffect(() => {
-  const usersInRole = roles.filter((r) => r.role === selectedRole);
-  const firstWithOverride = usersInRole.find(
-    (r) => r.permissions && Object.keys(r.permissions).length > 0,
-  );
-  if (firstWithOverride?.permissions) {
-    // Zlúčiť s presetom aby sa doplnili chýbajúce flagy
-    setDraftPerms({
-      ...ROLE_PRESETS[selectedRole],
-      ...firstWithOverride.permissions,
-    });
-  } else {
-    setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
-  }
-}, [selectedRole, roles]);
-```
+### 2. Nová resolve poradie (zhora nadol víťazí prvé)
+1. **DB user override** (`user_roles.permissions`) — ale iba pre **reálneho** usera, NIE pri simulácii.
+2. **DB role default** (`role_permission_defaults`) — vždy, tj. aj počas simulácie.
+3. **Statický preset z kódu** (`ROLE_PRESETS`) — len ako bezpečnostný fallback, ak DB defaults chýbajú.
 
-### 2. `handleSave` — udržať konzistentnosť aj cez `role_permission_defaults`
-Aktuálny save zapisuje len do `user_roles.permissions` per user. Ak owner zmení preset role (logická intencia tejto UI), mali by sme aj **upsertnúť `role_permission_defaults`** pre danú rolu, aby:
-- noví user pridelený k role dostal okamžite správne defaults,
-- `has_permission()` SQL helper vrátil správnu hodnotu aj pre userov bez explicit override.
-
+Implementácia v `useAuth.tsx`:
 ```ts
-// V persistSave po update user_roles:
-await supabase.from("role_permission_defaults").upsert(
-  { role: selectedRole, permissions: draftPerms as any },
-  { onConflict: "role" },
+const dbDefaults = roleDefaults; // načítané z role_permission_defaults pre effectiveRole
+const userOverrides = isSimulating ? null : dbPermissions;
+const permissions = resolvePermissions(
+  effectiveRole,
+  // merge: defaults najprv, potom user overrides ich pretlačia
+  { ...(dbDefaults ?? {}), ...(userOverrides ?? {}) }
 );
 ```
+`resolvePermissions` upraviť tak, aby `ROLE_PRESETS` bol **iba fallback** pre flag, ktorý chýba aj v DB (zatiaľ to vďaka tomu funguje pre nové flagy ako `canAccessTpv`, ale v DB defaults už `canAccessTpv` je všade).
 
-### 3. Verifikácia po fixe
-1. Odhlásiť/refresh, otvoriť Oprávnenia → PM → Analytics má byť **vypnuté** (čo je aktuálne reálne v DB).
-2. Zapnúť Analytics, Uložiť, F5 → checkbox musí ostať zapnutý.
-3. Vypnúť Analytics, Uložiť, F5 → checkbox musí ostať vypnutý.
-4. SQL kontrola:
-   ```sql
-   SELECT role, permissions->>'canAccessAnalytics' FROM role_permission_defaults WHERE role='pm';
-   SELECT user_id, permissions->>'canAccessAnalytics' FROM user_roles WHERE role='pm';
-   ```
+### 3. `OsobyOpravneni.tsx` — load draft z `role_permission_defaults`
+Aktuálne `useEffect` číta override z prvého usera v `roles` poli. Toto je nespoľahlivé (závisí od existencie usera v role) a líši sa od toho, čo sa použije v simulácii. Zmeniť tak, aby:
+- Najprv načítal `role_permission_defaults` z DB pre `selectedRole` cez `useQuery`.
+- `draftPerms` = `{ ...ROLE_PRESETS[selectedRole], ...rolePermissionDefaults }`.
+- Pri Save (už hotové) updatovať `user_roles` aj `role_permission_defaults` (zachovať existujúce správanie).
 
-## Files to edit
-- `src/components/osoby/OsobyOpravneni.tsx` — fix reset effect (1) + rozšíriť `persistSave` o upsert do `role_permission_defaults` (2)
+### 4. Audit ostatných miest s tvrdou rolou
+Rýchla revízia, či nikde inde sa nerobí logika typu „ak rola = pm tak ukáž X" mimo `useAuth`:
+- `Index.tsx`, `MobilePrehled.tsx`, `DashboardStats.tsx` — overiť, či používajú permission flagy a nie `isPM`/`isAdmin` tam, kde by to malo byť granular.
+- Cieľ: jediný zdroj pravdy = `permissions` z `useAuth`.
 
-## Riziko
-Nulové na DB strane (žiadna migrácia). UI fix je čisto čítací — žiadne dáta sa nemažú. Upsert do `role_permission_defaults` je bezpečný (owner-only RLS). Owner aktuálne uložené overrides v DB zostanú nedotknuté.
+### 5. Verifikácia (po implementácii)
+1. Owner si zapne simuláciu PM → Analytics ikona v hlavičke **zmizne**, `/analytics` route presmeruje na `/`.
+2. Owner si v Oprávnení vypne pre PM `canAccessPlanVyroby` → save → reálnemu PM po refreshi (alebo realtime) zmizne Plán Výroby.
+3. Owner si zapne pre PM `canAccessAnalytics` → save → reálnemu PM aj simulácii sa Analytics objaví.
+4. SQL kontrola: `SELECT role, permissions FROM role_permission_defaults` vráti zmeny; `SELECT permissions FROM user_roles WHERE role='pm'` má rovnaké hodnoty.
+
+## Dotknuté súbory
+- `src/hooks/useAuth.tsx` — pridať load `role_permission_defaults`, upraviť resolve poradie.
+- `src/lib/permissionPresets.ts` — drobná úprava `resolvePermissions` (akceptovať merged objekt).
+- `src/components/osoby/OsobyOpravneni.tsx` — draft z DB defaults namiesto z prvého usera.
+- `src/hooks/useRealtimeSync.ts` — pridať subscription na `role_permission_defaults` (invalidate query).
+
+Žiadna DB migrácia nie je potrebná — schéma a dáta sú správne, opravujeme len frontend logiku.

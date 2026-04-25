@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
   const [realRole, setRealRole] = useState<AppRole | null>(null);
   const [dbPermissions, setDbPermissions] = useState<Partial<Permissions> | null>(null);
+  const [roleDefaults, setRoleDefaults] = useState<Record<string, Partial<Permissions>>>({});
   const [loading, setLoading] = useState(true);
   const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
   const [linkedPersonName, setLinkedPersonName] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           prevUserRef.current = session.user.id;
 
           setTimeout(async () => {
-            const [{ data: profileData }, { data: roleData }] = await Promise.all([
+            const [{ data: profileData }, { data: roleData }, { data: defaultsData }] = await Promise.all([
               supabase
                 .from("profiles")
                 .select("full_name, email, is_active, person_id, password_set")
@@ -115,6 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .select("role, permissions")
                 .eq("user_id", session.user.id)
                 .single(),
+              supabase
+                .from("role_permission_defaults")
+                .select("role, permissions"),
             ]);
             setProfile(
               profileData
@@ -128,6 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
             setRealRole((roleData?.role as AppRole) ?? null);
             setDbPermissions(((roleData as any)?.permissions as Partial<Permissions>) ?? null);
+            const defaultsMap: Record<string, Partial<Permissions>> = {};
+            ((defaultsData ?? []) as any[]).forEach((row) => {
+              defaultsMap[row.role] = (row.permissions as Partial<Permissions>) ?? {};
+            });
+            setRoleDefaults(defaultsMap);
 
             const personId = (profileData as any)?.person_id;
             if (personId) {
@@ -147,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfile(null);
           setRealRole(null);
           setDbPermissions(null);
+          setRoleDefaults({});
           setSimulatedRole(null);
           setLinkedPersonName(null);
           prevUserRef.current = null;
@@ -202,11 +212,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Effective role: only owner can simulate
   const effectiveRole: AppRole | null = (simulatedRole && realRole === "owner") ? simulatedRole : realRole;
 
-  // When simulating, ignore DB overrides — use preset only.
+  // Resolve permissions in priority: user override > DB role default > static preset.
+  // During simulation by owner: ignore the owner's own user override, but still respect DB role defaults
+  // so the owner sees the same effective permissions as a real user in that role.
   const isSimulating = !!simulatedRole && realRole === "owner";
+  const dbDefaultsForRole = effectiveRole ? roleDefaults[effectiveRole] : null;
+  const userOverride = isSimulating ? null : dbPermissions;
+  const mergedOverride: Partial<Permissions> = {
+    ...(dbDefaultsForRole ?? {}),
+    ...(userOverride ?? {}),
+  };
   const permissions: Permissions = resolvePermissions(
     effectiveRole,
-    isSimulating ? null : dbPermissions,
+    Object.keys(mergedOverride).length > 0 ? mergedOverride : null,
   );
 
   const isTestUser = user?.email === "alfred@ami-test.cz" || effectiveRole === "tester";
