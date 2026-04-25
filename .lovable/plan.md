@@ -1,103 +1,104 @@
-# Plán: Oprava prázdneho modulu Project Info pre rolu Vedoucí výroby (a všeobecne pre Read/Write/Off)
+# Plán: Opraviť „Zobrazení jako Vedoucí PM nezodpovedá nastaveniu Oprávnění"
 
-## Čo som zistil (vizuálna verifikácia + analýza kódu)
+## Čo som zistil (vizuálne overené v preview)
 
-Otestoval som v preview rolu **Vedoucí výroby** (cez „Zobrazit jako"). Po prepnutí sa stránka `/` (Project Info) ukáže s hlavičkou, dashboardom a tabmi **Project Info / PM Status / TPV Status / Harmonogram**, ale **obsahová časť pod tabmi je úplne prázdna** — žiadna tabuľka. Všetky 3 taby vyzerajú ako neaktívne (sivé), nikto nie je „selected".
+1. **V Oprávnění → Vedoucí PM** vidí Admin: Project Info modul **zapnutý**, všetky sub-záložky (Project Info / PM Status / TPV Status / TPV List / Harmonogram) na **„Upraviť"**, všetky features (a–h) na **„Áno"**.
+2. **V „Zobrazit jako: vedouci_pm"** ale Vedoucí PM v reále:
+   - V hlavičke chýba ikona **Výroba** (Daylog) – aj keď preset má `canAccessDaylog: true`.
+   - V „Project Info" tabe **chýba TPV List ako záložka** (TPV List sa otvára až cez Project Info detail – existuje ale nemá vlastný visible flag v `Index.tsx`).
+   - Nie je istota, že write/read flagy v UI majú reálny dopad na tabuľky (PM Status / TPV Status / Harmonogram).
 
-### Skutočná príčina (root cause) — bug v `useAuth.tsx` `defaultTab`
+## Skutočné root causes
 
-V `src/hooks/useAuth.tsx` (riadky 299–309) sa `defaultTab` počíta takto:
+### A) Nesúlad medzi `ROLE_PRESETS` a `MODULE_CASCADE` (najväčší bug)
+
+V `src/lib/permissionPresets.ts`:
 
 ```ts
-let defaultTab = "project-info";
-if (permissions.canQCOnly && !permissions.canCreateProject) {
-  defaultTab = "vyroba";
-} else if (permissions.canAccessPlanVyroby && !permissions.canCreateProject) {
-  defaultTab = "vyroba";   // ← TU
-} else if (permissions.canManageTPV && !permissions.canCreateProject) {
-  defaultTab = "tpv-status";
-} else if (permissions.canCreateProject) {
-  defaultTab = "pm-status";
-}
+// Cascade group:
+{ master: "canManageProduction",
+  subs: ["canAccessDaylog", "canAccessQC", "canQCOnly", "canWriteDaylog", "canWriteQC"] }
+
+// Vedoucí PM preset:
+vedouci_pm: preset(
+  ...projectInfoFull,
+  "canCreateProject", ...
+  "canAccessPlanVyroby", "canWritePlanVyroby", "canAccessForecast",
+  "canAccessDaylog",            // ← sub-flag bez mastera
+  "canManageOverheadProjects",
+)
+// chýba: canManageProduction
 ```
 
-Vedoucí výroby má v DB defaultoch (overené `role_permission_defaults`):
-- `canAccessPlanVyroby: true`
-- `canCreateProject: false`
+Pri `applyCascade()` sa `canAccessDaylog` **premaže na `false`**, lebo master `canManageProduction` je `false`. Výsledok: Vedoucí PM nemá Daylog, hoci v presete ho má — a v UI Oprávnění Admin vidí toggle „zapnutý". Ten je z `ROLE_PRESETS` pred kaskádou; po vypočítaní permissions cez `resolvePermissions()` sa ale flag stratí.
 
-→ `defaultTab = "vyroba"`.
+Rovnaký problém má **Vedoucí výroby** preset (riadky 446–453): tiež má `canAccessDaylog` ale preset má aj `canManageProduction`, takže to prežije. Treba prejsť **všetky presety** a zaručiť, že každý sub-flag ide ruka v ruke s príslušným masterom.
 
-`src/pages/Index.tsx` (r. 197–199) tento `defaultTab` natvrdo nasadí:
-```ts
-useEffect(() => { setActiveTab(defaultTab); }, [defaultTab]);
-```
+Konkrétne nálezy v `ROLE_PRESETS`:
+- `vedouci_pm`: chýba `canManageProduction` (má sub `canAccessDaylog`).
+- `pm`: chýba `canManageProduction` (má sub `canAccessDaylog`).
+- `admin`: má `ALL_TRUE` ale potom vypína `canQCOnly`, `canAccessTpv` atď. — `canAccessTpv=false` zhasne všetky TPV sub-flagy. Treba overiť, že je to zámer (asi áno – admin nemá vidieť TPV modul počas vývoja).
 
-Lenže `Index.tsx` má len `TabsContent` pre **`project-info`, `pm-status`, `tpv-status`, `plan`**. Pre `value="vyroba"` neexistuje žiadny `TabsContent` → `Tabs` nezobrazí nič → **prázdny modul**.
+**Oprava:** doplniť `canManageProduction` do `vedouci_pm` a `pm` presetov, aby Daylog ostal po kaskáde aktívny.
 
-Hodnota `"vyroba"` zjavne pôvodne mala znamenať „presmeruj na route `/vyroba`", nie „aktívny tab v Index". Tabu `vyroba` v `/` nebola nikdy.
+### B) UI Oprávnění (`OsobyOpravneni.tsx`) zobrazuje toggle „pred-kaskádou"
 
-### Vedľajšie chyby ktoré odhalí ten istý prípad
+UI číta surové presety (resp. uložené overrides) a zobrazuje toggle bez aplikácie kaskády. Admin vidí, že „canAccessDaylog = ON" pre Vedoucí PM, ale runtime flag je `false`. Treba:
 
-1. **Visibility tabov v Index.tsx neexistuje.** Aj keď `useAuth` vystavuje `canViewProjectInfoTab / canViewPMStatusTab / canViewTPVStatusTab / canViewHarmonogram`, `Index.tsx` ich vôbec nepoužíva. Taby sa renderujú vždy bez ohľadu na permissions. Takže ak napr. PM má vypnutý PM Status sub-flag, tab sa aj tak ukáže a klikateľný je.
-2. **Read-only mód nefunguje.** Tabuľky (`ProjectInfoTable`, `PMStatusTable`, `TPVStatusTable`) berú `canEdit` z `useAuth`, ale ten sa nepárouje s novými flagmi `canWriteProjectInfoTab` / `canWritePMStatusTab` / `canWriteTPVStatusTab`. Vedoucí výroby má `canEdit: true` → čítanie aj zapisovanie sú rovnaké, hoci nastavenie hovorí „len Čítať" pre PM Status / TPV Status.
-3. **Harmonogram (`activeTab="plan"`) sa rovnako neguje** podľa `canViewHarmonogram`.
+1. Pri renderovaní sub-toggle ho **vizuálne disable-nuť** (sivý + tooltip „Modul je vypnutý") keď master flag je OFF.
+2. Pri ukladaní force-nuť `false` do payloadu pre všetky sub-flagy, ktorých master je OFF (single source of truth = `applyCascade`).
+3. (Voliteľne) Pri **zapnutí mastera** ponúknuť „obnoviť default sub-flagy z presetu" – ale táto logika môže prísť v ďalšom ticketu.
 
-## Návrh opravy
+### C) TPV List nie je samostatná záložka v `/`
 
-### A) `src/hooks/useAuth.tsx` — `defaultTab`
-Vrátiť hodnotu, ktorú reálne pozná `Index.tsx` (jeden z `project-info` / `pm-status` / `tpv-status` / `plan`). Pre roly bez prístupu k Project Info modulu sa o presmerovanie už stará `IndexRoute` v `App.tsx` (na `/plan-vyroby`, `/vyroba`, …), takže `defaultTab` stačí, aby vrátil prvý **viditeľný** tab v Project Info module. Nová priorita:
+V Oprávnění je riadok **„TPV List"** s read/write toggle, ale `Index.tsx` **nerenderuje TabsTrigger pre TPV List** – modul sa otvára len cez stĺpec v Project Info tabuľke (`onOpenTPVList`). Toggle teda nemá UI ekvivalent.
 
-```
-1. canViewProjectInfoTab → "project-info"
-2. canViewPMStatusTab    → "pm-status"
-3. canViewTPVStatusTab   → "tpv-status"
-4. canViewHarmonogram    → "plan"
-5. fallback              → "project-info"
-```
+Možnosti:
+- (Odporúčam) **Zmazať „TPV List" z Oprávnění** ako samostatný pod-tab a nechať len `canViewTPVListTab` / `canWriteTPVListTab` ako interný flag, ktorý gate-uje otvorenie TPV List view (aj cez stĺpcové tlačidlo). Užívateľ nesmie otvoriť TPV List ak `canViewTPVListTab=false` aj keď klikne na ikonu v stĺpci.
+- Alternatíva: pridať TPV List ako 4. tab v `Index.tsx` (väčšia zmena UX, ide proti súčasnému contextu).
 
-Tým padne hodnota `"vyroba"` (nikdy nebola validná v `/`). Routovacia časť (do `/vyroba`, `/plan-vyroby`) ostáva v `IndexRoute` nedotknutá.
+### D) Forecast tlačidlo v Plán Výroby nie je gate-nuté
 
-### B) `src/pages/Index.tsx` — gating tabov + safe activeTab
-1. Z `useAuth` načítať `canViewProjectInfoTab, canViewPMStatusTab, canViewTPVStatusTab, canViewHarmonogram`.
-2. Vyrátať `visibleTabs: string[]`.
-3. Po načítaní `defaultTab` ho cez `useEffect` zvalidovať: ak `defaultTab` nie je vo `visibleTabs`, použiť `visibleTabs[0]` (alebo `"project-info"` ako bezpečný default — IndexRoute už zaručil, že máme `canAccessProjectInfo`).
-4. Renderovať jednotlivé `TabsTrigger` len ak je daný flag true. Pri `Harmonogram` tlačidle (vpravo) tiež skryť, ak `!canViewHarmonogram`.
-5. Tlačidlo „Nový projekt" už správne podlieha `canCreateProject` — netreba meniť.
+`src/pages/PlanVyroby.tsx` zobrazuje Forecast prepínač vždy, hoci máme flag `canAccessForecast`. Treba podmieniť render Forecast tlačidla v `ToolbarRow2` cez `canAccessForecast`.
 
-### C) Read-only podľa `canWrite*`
-Tabuľky berú jeden globálny `canEdit`. Pre per-tab read/write potrebujeme jemnejší prísup:
-- **`ProjectInfoTable`**: `canEdit = useAuth().canWriteProjectInfoTab` (namiesto generického `canEdit`).
-- **`PMStatusTable`**: `canEdit = useAuth().canWritePMStatusTab`.
-- **`TPVStatusTable`**: `canEdit = useAuth().canWriteTPVStatusTab`.
-- **`PlanView` (Harmonogram)**: ak je len read, vypnúť drag-drop / inline editácie pomocou `canWriteHarmonogram` (preposlať ako prop a respektovať v stage edit dialógoch).
-- Globálny `canEdit` v `useAuth` ostáva pre back-compat (používa ho viac miest), iba tabuľky prejdú na granulárny flag.
+### E) Verifikácia, že write-flagy reálne fungujú v Harmonogram-e
 
-Existujúca cascade logika v `permissionPresets.ts` zaručuje, že `canWrite* = true ⇒ canView* = true`, takže nie je potrebná žiadna ďalšia stráž.
-
-### D) Mobilná stránka
-`MobileCardList`, `MobileTPVCardList` a `MobileDetailProjektSheet` momentálne nerešpektujú per-tab read/write — sú prevažne read-only (s výnimkami). Pre tento ticket ponechať ako je; mobile sa rieši samostatne neskôr (nech sa doplní samostatne, aby sme nerozbehli viacero zmien naraz).
+V minulom kole sa write flag pre Harmonogram (`canWriteHarmonogram`) spomenul ale nie je integrovaný v `PlanView.tsx` (ani v `StageDateEditDialog`, `PlanDateEditDialog`). Vedoucí výroby (read-only Project Info) môže stále drag-nuť stage dátumy. Treba doplniť.
 
 ## Akceptačné kritériá
 
-1. **Vedoucí výroby (simulácia z Owner-a)** otvorí `/` → vidí Project Info tabuľku s projektmi (žiadny prázdny obsah). Aktívny tab je farebne zvýraznený.
-2. Pre Vedoucí výroby tabuľky **Project Info / PM Status / TPV Status sú read-only** (žiadna inline editácia, žiadne tlačidlo „Pridať etapu", žiadne tlačidlo „Nový projekt").
-3. Ak v Oprávnění vypnem `canViewPMStatusTab` pre PM rolu → PM už **nevidí tab „PM Status"** v hlavičke `/`.
-4. Ak v Oprávnění zapnem **Read** pre Project Info → tab je viditeľný, ale všetky polia sú read-only (badge a inline edity sa neotvárajú).
-5. Ak vypnem `canViewHarmonogram` → tlačidlo „📅 Harmonogram" vpravo zmizne; prepnúť na `plan` cez URL nepôjde (resp. spadne na default tab).
-6. Existujúce roly (Owner, Admin, PM, Vedoucí PM, Konstruktér) vidia presne to isté čo doteraz — žiadna regresia.
-7. Po refreshi `/` vždy spadne na prvý povolený tab (žiadny stav „prázdne pod tabmi").
+1. **Vedoucí PM** v simulácii uvidí:
+   - V hlavičke ikonu **Výroba** (Daylog) ✅
+   - V hlavičke ikony Plán Výroby, Analytics, Project Info ✅
+   - Tlačidlo **„Nový projekt"** ✅
+   - Settings gear → „Správa osob", „Režijní projekty", „Koš" (ostatné podľa preset-u skryté).
+2. **PM** rovnako uvidí Vyroba modul (Daylog), keďže v presete je `canAccessDaylog` a teraz aj `canManageProduction`.
+3. V UI Oprávnění:
+   - Keď admin vypne **master „Modul výroba"** (canManageProduction) → sub toggle „Daylog R/W/Off", „QC R/W/Off" sa zobrazí **sivo s tooltipom „Modul je vypnutý"** a save ich force-uje na `false`.
+   - To isté platí pre všetky moduly s mastrom.
+4. **Forecast** tlačidlo v Plán Výroby je viditeľné iba ak `canAccessForecast=true`.
+5. **TPV List** sa neotvorí (cez stĺpcovú ikonu v Project Info tabuľke) ak `canViewTPVListTab=false`.
+6. **Harmonogram** drag-nutie stage milestone funguje len ak `canWriteHarmonogram=true`. Inak je drag vypnutý a edit dialógy sú read-only.
+7. Žiadna regresia pre Owner / Admin / Konstruktér / Vedoucí výroby.
 
 ## Súbory, ktorých sa zmena dotkne
 
-- `src/hooks/useAuth.tsx` — oprava `defaultTab`.
-- `src/pages/Index.tsx` — gating tabov, validácia `activeTab`, skrytie Harmonogramu.
-- `src/components/ProjectInfoTable.tsx` — `canEdit` z `canWriteProjectInfoTab`.
-- `src/components/PMStatusTable.tsx` — `canEdit` z `canWritePMStatusTab`.
-- `src/components/TPVStatusTable.tsx` — `canEdit` z `canWriteTPVStatusTab`.
-- `src/components/PlanView.tsx` (a stage edit dialógy v ňom) — rešpektovať `canWriteHarmonogram`.
+- `src/lib/permissionPresets.ts`
+  - Pridať `canManageProduction` do `vedouci_pm` a `pm` presetov.
+  - Voliteľne: prejsť všetky presety auditom skript-grepom proti `MODULE_CASCADE` (manuálna verifikácia v PR popise).
+- `src/components/osoby/OsobyOpravneni.tsx`
+  - Pri rendere sub-toggle čítať `draftPerms[masterFlag]`; ak `false`, pridať `disabled` + tooltip „Najprv zapnite modul {label}".
+  - Pri save vstupe spustiť `applyCascade(draft)` aby sa do DB uložil len konzistentný stav (žiadne sub=true ak master=false).
+- `src/pages/PlanVyroby.tsx` (`ToolbarRow2`)
+  - Forecast prepínač: `{canAccessForecast && (...)}`.
+  - Importovať `canAccessForecast` z `useAuth()`.
+- `src/components/ProjectInfoTable.tsx`
+  - Stĺpcovú ikonu „TPV List" gate-nuť: `canViewTPVListTab` (skryť alebo disable s tooltipom).
+- `src/components/PlanView.tsx` + `src/components/StageDateEditDialog.tsx` + `src/components/PlanDateEditDialog.tsx`
+  - Z `useAuth()` čítať `canWriteHarmonogram`, drag handler-y a save tlačidlá podmieniť.
 
-## Mimo rozsahu
+## Mimo rozsahu (následné tickety)
 
-- Mobilné karty / sheets (samostatný follow-up).
-- TPV List read/write (`canWriteTPVListTab`) — rieši samostatný ticket pre TPV modul.
-- Migrácia DB — netreba; všetko v JSONB, defaults už sedia.
+- Auditovacia stránka pre admina, ktorá zobrazí „efektívne" permissions po kaskáde (debug nástroj).
+- Mobile karty / TPV List view úprava read/write — samostatný ticket.
+- Migrácia `user_roles.permissions` — netreba; po doplnení master flagov sa cascade správne prepočíta sám pri prvom načítaní.
