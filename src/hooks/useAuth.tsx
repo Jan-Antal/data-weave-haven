@@ -65,6 +65,41 @@ interface AuthContextType {
   canAccessRecycleBin: boolean;
   canAccessTpv: boolean;
   canWriteTpv: boolean;
+  // Nové master & sub flagy
+  canAccessSystem: boolean;
+  canAccessOsoby: boolean;
+  canAccessProjectInfo: boolean;
+  canAccessExchangeRates: boolean;
+  canAccessOverheadProjects: boolean;
+  canAccessFormulaBuilder: boolean;
+  canAccessZamestnanci: boolean;
+  canAccessExternistiTab: boolean;
+  canAccessUzivateleTab: boolean;
+  canAccessOpravneni: boolean;
+  canAccessKatalog: boolean;
+  canAccessKapacita: boolean;
+  canAccessAnalyticsProjekty: boolean;
+  canAccessAnalyticsRezije: boolean;
+  canAccessAnalyticsDilna: boolean;
+  canAccessAnalyticsVykaz: boolean;
+  canViewProjectInfoTab: boolean;
+  canWriteProjectInfoTab: boolean;
+  canViewPMStatusTab: boolean;
+  canWritePMStatusTab: boolean;
+  canViewTPVStatusTab: boolean;
+  canWriteTPVStatusTab: boolean;
+  canViewTPVListTab: boolean;
+  canWriteTPVListTab: boolean;
+  canViewHarmonogram: boolean;
+  canWriteHarmonogram: boolean;
+  canAccessForecast: boolean;
+  canAccessQC: boolean;
+  canViewTpvPrehlad: boolean;
+  canWriteTpvPrehlad: boolean;
+  canViewTpvMaterial: boolean;
+  canWriteTpvMaterial: boolean;
+  canViewTpvHodinovaDotacia: boolean;
+  canWriteTpvHodinovaDotacia: boolean;
   canEditColumns: boolean;
   isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   defaultTab: string;
@@ -314,6 +349,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canAccessRecycleBin: permissions.canAccessRecycleBin,
     canAccessTpv: permissions.canAccessTpv,
     canWriteTpv: permissions.canWriteTpv,
+    canAccessSystem: permissions.canAccessSystem,
+    canAccessOsoby: permissions.canAccessOsoby,
+    canAccessProjectInfo: permissions.canAccessProjectInfo,
+    canAccessExchangeRates: permissions.canAccessExchangeRates,
+    canAccessOverheadProjects: permissions.canAccessOverheadProjects,
+    canAccessFormulaBuilder: permissions.canAccessFormulaBuilder,
+    canAccessZamestnanci: permissions.canAccessZamestnanci,
+    canAccessExternistiTab: permissions.canAccessExternistiTab,
+    canAccessUzivateleTab: permissions.canAccessUzivateleTab,
+    canAccessOpravneni: permissions.canAccessOpravneni,
+    canAccessKatalog: permissions.canAccessKatalog,
+    canAccessKapacita: permissions.canAccessKapacita,
+    canAccessAnalyticsProjekty: permissions.canAccessAnalyticsProjekty,
+    canAccessAnalyticsRezije: permissions.canAccessAnalyticsRezije,
+    canAccessAnalyticsDilna: permissions.canAccessAnalyticsDilna,
+    canAccessAnalyticsVykaz: permissions.canAccessAnalyticsVykaz,
+    canViewProjectInfoTab: permissions.canViewProjectInfoTab,
+    canWriteProjectInfoTab: permissions.canWriteProjectInfoTab,
+    canViewPMStatusTab: permissions.canViewPMStatusTab,
+    canWritePMStatusTab: permissions.canWritePMStatusTab,
+    canViewTPVStatusTab: permissions.canViewTPVStatusTab,
+    canWriteTPVStatusTab: permissions.canWriteTPVStatusTab,
+    canViewTPVListTab: permissions.canViewTPVListTab,
+    canWriteTPVListTab: permissions.canWriteTPVListTab,
+    canViewHarmonogram: permissions.canViewHarmonogram,
+    canWriteHarmonogram: permissions.canWriteHarmonogram,
+    canAccessForecast: permissions.canAccessForecast,
+    canAccessQC: permissions.canAccessQC,
+    canViewTpvPrehlad: permissions.canViewTpvPrehlad,
+    canWriteTpvPrehlad: permissions.canWriteTpvPrehlad,
+    canViewTpvMaterial: permissions.canViewTpvMaterial,
+    canWriteTpvMaterial: permissions.canWriteTpvMaterial,
+    canViewTpvHodinovaDotacia: permissions.canViewTpvHodinovaDotacia,
+    canWriteTpvHodinovaDotacia: permissions.canWriteTpvHodinovaDotacia,
     canEditColumns,
     isFieldReadOnly,
     defaultTab,
