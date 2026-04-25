@@ -130,8 +130,8 @@ function AnalyticsRoute({ children }: { children: React.ReactNode }) {
 }
 
 function OsobyRoute({ children }: { children: React.ReactNode }) {
-  const { canManagePeople, canManageExternisti, canManageUsers, isAdmin, isOwner } = useAuth();
-  if (!canManagePeople && !canManageExternisti && !canManageUsers && !isAdmin && !isOwner) {
+  const { canManagePeople, canManageExternisti, canManageUsers } = useAuth();
+  if (!canManagePeople && !canManageExternisti && !canManageUsers) {
     return <Navigate to="/" replace />;
   }
 

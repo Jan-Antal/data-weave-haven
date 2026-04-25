@@ -124,9 +124,9 @@ export function ProductionHeader({
   } = useAuth();
 
   const { canAccessTpv } = useAuth();
-  const canSeeVyroba = canManageProduction || canQCOnly || isAdmin || isOwner;
-  const canSeePlanVyroby = canAccessPlanVyroby || isAdmin || isOwner;
-  const canSeeAnalytics = canAccessAnalytics || isAdmin || isOwner;
+  const canSeeVyroba = canManageProduction || canQCOnly;
+  const canSeePlanVyroby = canAccessPlanVyroby;
+  const canSeeAnalytics = canAccessAnalytics;
   // TPV modul je viditeľný len ak má používateľ flag canAccessTpv (počas vývoja iba owner)
   const canSeeTpv = canAccessTpv;
   const canOpenSettingsMenu =
@@ -157,9 +157,7 @@ export function ProductionHeader({
   const undoDesc = undoPage ? lastUndoDescription(undoPage) : lastUndoDescription();
   const redoDesc = undoPage ? lastRedoDescription(undoPage) : lastRedoDescription();
   const moduleLabel = module === "index" ? "Project Info 2026" : module === "vyroba" ? "Výroba" : module === "analytics" ? "Analytics" : module === "osoby" ? "Správa osob" : module === "tpv" ? "TPV — Príprava výroby" : "Plán Výroby";
-  const showDataLog = module === "index"
-    ? canAccessSettings || realRole === "owner" || role === "pm"
-    : isAdmin || role === "pm" || isOwner;
+  const showDataLog = canAccessSettings || canAccessDaylog || canManageProduction;
 
   return (
     <>

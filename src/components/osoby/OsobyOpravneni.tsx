@@ -263,7 +263,14 @@ function permsEqual(a: Permissions, b: Partial<Permissions> | null | undefined) 
 }
 
 export function OsobyOpravneni() {
-  const { isOwner } = useAuth();
+  const { isOwner, canManageUsers } = useAuth();
+  if (!canManageUsers && !isOwner) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground p-8 text-sm">
+        Nemáš oprávnenie spravovať oprávnenia používateľov.
+      </div>
+    );
+  }
   const [profiles, setProfiles] = useState<ProfileLite[]>([]);
   const [roles, setRoles] = useState<UserRoleRow[]>([]);
   const [loading, setLoading] = useState(false);
