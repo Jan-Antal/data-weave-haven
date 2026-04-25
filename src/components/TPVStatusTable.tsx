@@ -490,7 +490,8 @@ export function TPVStatusTable({ personFilter, statusFilter, search: externalSea
   const { tpvStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("tpv-status");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit, canEditColumns, isFieldReadOnly } = useAuth();
+  const { canEdit: canEditGlobal, canEditColumns, isFieldReadOnly, canWriteTPVStatusTab } = useAuth();
+  const canEdit = canEditGlobal && canWriteTPVStatusTab;
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
   const { itemsByProject: tpvItemsByProject } = useAllTPVItems();

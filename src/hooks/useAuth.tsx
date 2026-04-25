@@ -296,15 +296,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  // defaultTab derived from permissions
+  // defaultTab — first VISIBLE tab inside the Project Info module (`/`).
+  // Cross-module routing (e.g. → /vyroba) is handled by IndexRoute in App.tsx,
+  // so here we must always return one of the tab values that Index.tsx renders:
+  // "project-info" | "pm-status" | "tpv-status" | "plan".
   let defaultTab = "project-info";
-  if (permissions.canQCOnly && !permissions.canCreateProject) {
-    defaultTab = "vyroba";
-  } else if (permissions.canAccessPlanVyroby && !permissions.canCreateProject) {
-    defaultTab = "vyroba";
-  } else if (permissions.canManageTPV && !permissions.canCreateProject) {
+  if (permissions.canViewProjectInfoTab) {
+    defaultTab = "project-info";
+  } else if (permissions.canViewPMStatusTab) {
+    defaultTab = "pm-status";
+  } else if (permissions.canViewTPVStatusTab) {
     defaultTab = "tpv-status";
-  } else if (permissions.canCreateProject) {
+  } else if (permissions.canViewHarmonogram) {
+    defaultTab = "plan";
+  }
+  // PM-style roles that can create projects start on PM Status by convention.
+  if (permissions.canCreateProject && permissions.canViewPMStatusTab) {
     defaultTab = "pm-status";
   }
 

@@ -19,7 +19,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 
 import { AdminInboxButton } from "@/components/AdminInbox";
 import { usePeopleManagement } from "@/components/PeopleManagementContext";
-import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } from "react";
 import { RiskHighlightType } from "@/hooks/useRiskHighlight";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
 import { StatusManagement } from "@/components/StatusManagement";
@@ -127,7 +127,16 @@ const Index = () => {
     return () => window.removeEventListener("desktop-header-toggle-datalog", handler);
   }, [toggleDataLog]);
 
-  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, isTestUser, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab } = useAuth();
+  const { profile, signOut, canAccessSettings, canCreateProject, isAdmin, isOwner, isTestUser, realRole, simulatedRole, setSimulatedRole, role, isKonstrukter, canManageUsers, canManagePeople, canManageExchangeRates, canManageStatuses, canAccessRecycleBin, defaultTab, canViewProjectInfoTab, canViewPMStatusTab, canViewTPVStatusTab, canViewHarmonogram } = useAuth();
+
+  const visibleTabs = useMemo(() => {
+    const v: string[] = [];
+    if (canViewProjectInfoTab) v.push("project-info");
+    if (canViewPMStatusTab) v.push("pm-status");
+    if (canViewTPVStatusTab) v.push("tpv-status");
+    if (canViewHarmonogram) v.push("plan");
+    return v;
+  }, [canViewProjectInfoTab, canViewPMStatusTab, canViewTPVStatusTab, canViewHarmonogram]);
 
   const { data: userPrefs } = useUserPreferences();
   const achievementChecker = useAchievementChecker();
@@ -195,8 +204,18 @@ const Index = () => {
   }, [userPrefs]);
 
   useEffect(() => {
-    setActiveTab(defaultTab);
-  }, [defaultTab]);
+    if (visibleTabs.length === 0) return;
+    const safe = visibleTabs.includes(defaultTab) ? defaultTab : visibleTabs[0];
+    setActiveTab(safe);
+  }, [defaultTab, visibleTabs]);
+
+  // If the current activeTab becomes invisible (permissions changed), snap back.
+  useEffect(() => {
+    if (visibleTabs.length === 0) return;
+    if (!visibleTabs.includes(activeTab)) {
+      setActiveTab(visibleTabs[0]);
+    }
+  }, [activeTab, visibleTabs]);
 
   // Handle openProjectId from DataLog navigation
   const openProjectIdHandled = useRef(false);
@@ -411,27 +430,33 @@ const Index = () => {
               <div className="flex items-center justify-between mb-3 shrink-0">
                 <div className="flex items-center">
                   <TabsList className="bg-card border">
-                    <TabsTrigger value="project-info" className={cn(
-                      anyTpvListActive
-                        ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
-                        : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                    )}>
-                      Project Info
-                    </TabsTrigger>
-                    <TabsTrigger value="pm-status" className={cn(
-                      anyTpvListActive
-                        ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
-                        : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                    )}>
-                      PM Status
-                    </TabsTrigger>
-                    <TabsTrigger value="tpv-status" className={cn(
-                      anyTpvListActive
-                        ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
-                        : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                    )} onClick={() => tpvCloseDetailRef.current?.()}>
-                      TPV Status
-                    </TabsTrigger>
+                    {canViewProjectInfoTab && (
+                      <TabsTrigger value="project-info" className={cn(
+                        anyTpvListActive
+                          ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
+                          : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      )}>
+                        Project Info
+                      </TabsTrigger>
+                    )}
+                    {canViewPMStatusTab && (
+                      <TabsTrigger value="pm-status" className={cn(
+                        anyTpvListActive
+                          ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
+                          : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      )}>
+                        PM Status
+                      </TabsTrigger>
+                    )}
+                    {canViewTPVStatusTab && (
+                      <TabsTrigger value="tpv-status" className={cn(
+                        anyTpvListActive
+                          ? "text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-muted-foreground data-[state=active]:shadow-none"
+                          : "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                      )} onClick={() => tpvCloseDetailRef.current?.()}>
+                        TPV Status
+                      </TabsTrigger>
+                    )}
                     {anyTpvListActive && (
                       <>
                         <span className="text-muted-foreground/50 mx-1 select-none">›</span>
@@ -452,38 +477,40 @@ const Index = () => {
                   </button>
                 </div>
 
-                <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
-                  {activeTab === "plan" && (
-                    <>
-                      {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
-                        <button
-                          key={z}
-                          onClick={() => setPlanZoom(z)}
-                          className={cn(
-                            "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-                            planZoom === z
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {z}
-                        </button>
-                      ))}
-                      <div className="w-px h-4 bg-border mx-1 shrink-0" />
-                    </>
-                  )}
-                  <button
-                    onClick={() => handleTabChange("plan")}
-                    className={cn(
-                      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
-                      activeTab === "plan"
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                {canViewHarmonogram && (
+                  <div className="inline-flex h-10 items-center rounded-md bg-card border p-1">
+                    {activeTab === "plan" && (
+                      <>
+                        {(["3M", "6M", "1R"] as ZoomLevel[]).map((z) => (
+                          <button
+                            key={z}
+                            onClick={() => setPlanZoom(z)}
+                            className={cn(
+                              "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                              planZoom === z
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {z}
+                          </button>
+                        ))}
+                        <div className="w-px h-4 bg-border mx-1 shrink-0" />
+                      </>
                     )}
-                  >
-                    📅 Harmonogram
-                  </button>
-                </div>
+                    <button
+                      onClick={() => handleTabChange("plan")}
+                      className={cn(
+                        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                        activeTab === "plan"
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      📅 Harmonogram
+                    </button>
+                  </div>
+                )}
               </div>
 
               <TabsContent value="project-info" forceMount className={cn("flex-1 min-h-0 overflow-hidden", activeTab !== "project-info" ? "hidden" : "")}>

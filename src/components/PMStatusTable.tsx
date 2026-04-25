@@ -483,7 +483,8 @@ export function PMStatusTable({ personFilter, statusFilter, search: externalSear
   const { pmStatus: { isVisible } } = useAllColumnVisibility();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("pm-status");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit, canEditColumns, isFieldReadOnly } = useAuth();
+  const { canEdit: canEditGlobal, canEditColumns, isFieldReadOnly, canWritePMStatusTab } = useAuth();
+  const canEdit = canEditGlobal && canWritePMStatusTab;
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
   const allProjectIds = useMemo(() => projects.map((p) => p.project_id), [projects]);
