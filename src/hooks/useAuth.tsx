@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
   const [realRole, setRealRole] = useState<AppRole | null>(null);
   const [dbPermissions, setDbPermissions] = useState<Partial<Permissions> | null>(null);
+  const [roleDefaults, setRoleDefaults] = useState<Record<string, Partial<Permissions>>>({});
   const [loading, setLoading] = useState(true);
   const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
   const [linkedPersonName, setLinkedPersonName] = useState<string | null>(null);
