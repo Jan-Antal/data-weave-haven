@@ -576,7 +576,8 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
   const { idExists, checkProjectId, reset: resetIdCheck } = useProjectIdCheck();
   const { getLabel, getWidth, updateLabel, updateWidth, getOrderedKeys, getDisplayOrderedKeys, updateDisplayOrder } = useColumnLabels("project-info");
   const [editMode, setEditMode] = useState(false);
-  const { canEdit, canEditColumns, canDeleteProject, isViewer, isFieldReadOnly } = useAuth();
+  const { canEdit: canEditGlobal, canEditColumns, canDeleteProject, isViewer, isFieldReadOnly, canWriteProjectInfoTab } = useAuth();
+  const canEdit = canEditGlobal && canWriteProjectInfoTab;
   const { registerExport } = useExportContext();
   const { stagesByProject } = useStagesByProject();
 
