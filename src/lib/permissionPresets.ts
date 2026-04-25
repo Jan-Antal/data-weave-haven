@@ -23,7 +23,9 @@ export type PermissionFlag =
   | "canManageExchangeRates"
   | "canManageOverheadProjects"
   | "canManageStatuses"
-  | "canAccessRecycleBin";
+  | "canAccessRecycleBin"
+  | "canAccessTpv"
+  | "canWriteTpv";
 
 export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canEdit",
@@ -49,6 +51,8 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canManageOverheadProjects",
   "canManageStatuses",
   "canAccessRecycleBin",
+  "canAccessTpv",
+  "canWriteTpv",
 ];
 
 export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
@@ -75,6 +79,8 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canManageOverheadProjects: "Spravovať réžijné projekty",
   canManageStatuses: "Spravovať stavy",
   canAccessRecycleBin: "Prístup do Koša",
+  canAccessTpv: "Prístup do TPV modulu",
+  canWriteTpv: "Upravovať dáta v TPV module",
 };
 
 export type Permissions = Record<PermissionFlag, boolean>;
@@ -98,7 +104,7 @@ function preset(...flags: PermissionFlag[]): Permissions {
 
 export const ROLE_PRESETS: Record<AppRole, Permissions> = {
   owner: { ...ALL_TRUE },
-  admin: { ...ALL_TRUE, canQCOnly: false },
+  admin: { ...ALL_TRUE, canQCOnly: false, canAccessTpv: false, canWriteTpv: false },
   vedouci_pm: preset(
     "canEdit",
     "canCreateProject",

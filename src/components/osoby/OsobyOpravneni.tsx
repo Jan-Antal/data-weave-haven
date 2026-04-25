@@ -229,6 +229,19 @@ const GROUPS: Group[] = [
       },
     ],
   },
+  {
+    title: "TPV — Príprava výroby",
+    icon: { bg: "#FEF3C7", color: "#92400E" },
+    rows: [
+      {
+        kind: "tri",
+        label: "TPV modul",
+        desc: "Prístup do modulu Príprava výroby (vo vývoji — predvolene vypnuté)",
+        read: "canAccessTpv",
+        write: "canWriteTpv",
+      },
+    ],
+  },
 ];
 
 function initials(name: string, email: string) {

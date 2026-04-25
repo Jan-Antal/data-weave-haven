@@ -123,11 +123,12 @@ export function ProductionHeader({
     signOut,
   } = useAuth();
 
+  const { canAccessTpv } = useAuth();
   const canSeeVyroba = canManageProduction || canQCOnly || isAdmin || isOwner;
   const canSeePlanVyroby = canAccessPlanVyroby || isAdmin || isOwner;
   const canSeeAnalytics = canAccessAnalytics || isAdmin || isOwner;
-  // TPV modul je počas vývoja viditeľný len pre owner
-  const canSeeTpv = isOwner;
+  // TPV modul je viditeľný len ak má používateľ flag canAccessTpv (počas vývoja iba owner)
+  const canSeeTpv = canAccessTpv;
   const canOpenSettingsMenu =
     canAccessSettings ||
     canManageUsers ||

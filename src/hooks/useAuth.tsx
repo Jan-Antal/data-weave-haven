@@ -63,6 +63,8 @@ interface AuthContextType {
   canManageOverheadProjects: boolean;
   canManageStatuses: boolean;
   canAccessRecycleBin: boolean;
+  canAccessTpv: boolean;
+  canWriteTpv: boolean;
   canEditColumns: boolean;
   isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   defaultTab: string;
@@ -292,6 +294,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canManageOverheadProjects: permissions.canManageOverheadProjects,
     canManageStatuses: permissions.canManageStatuses,
     canAccessRecycleBin: permissions.canAccessRecycleBin,
+    canAccessTpv: permissions.canAccessTpv,
+    canWriteTpv: permissions.canWriteTpv,
     canEditColumns,
     isFieldReadOnly,
     defaultTab,
