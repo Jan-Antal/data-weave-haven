@@ -1,135 +1,201 @@
-## Plán: Modul TPV v2 — Príprava výroby (rozšírená špec)
 
-**Princíp:** READ-everywhere, WRITE-own. Modul číta z `projects`, `tpv_items`, `project_stages`, `people`, `production_*` atď., ale **zapisuje výhradne** do nových `tpv_*` tabuliek vyhradených pre tento modul. Existujúce live tabuľky zostávajú nedotknuté.
+# Oprava systému Oprávnění — B1 (DB-level granular) + UI sync + TPV sekcia
 
-Stav: existujúce tabuľky `tpv_preparation` a `tpv_material` z v1 zostávajú a rozšírime ich o nové sady tabuliek pre subdodávky, dodávateľov, schvaľovanie hodín a TPV inbox/úlohy.
-
----
-
-### 1. Database (migrácia v2)
-
-#### 1.1 Nová rola
-- Pridať `'kalkulant'` do enum `public.app_role`.
-- RLS pravidlá pre TPV tabuľky budú akceptovať: `owner | admin | pm | konstrukter | kalkulant`.
-
-#### 1.2 Nové tabuľky (všetky TPV-OWNED)
-
-- **`tpv_project_preparation`** (1:1 k projektu, agreguje stav prípravy)
-  - `project_id text UNIQUE` (FK na `projects.project_id`)
-  - `calc_status text` CHECK (`draft | review | released`) default `draft`
-  - `readiness_overall numeric` (0–100, počíta UI, len cache)
-  - `target_release_date date`, `notes text`, timestamps
-  - trigger updated_at
-
-- **`tpv_subcontract`** (1:N k projektu, subdodávky)
-  - `project_id text`, `tpv_item_id uuid NULL` (voliteľne viazané na položku)
-  - `nazov text`, `popis text`, `mnozstvo numeric`, `jednotka text`
-  - `dodavatel_id uuid NULL` (FK na `tpv_supplier`)
-  - `cena_predpokladana numeric`, `cena_finalna numeric`, `mena text default 'CZK'`
-  - `stav text` CHECK (`navrh | rfq | ponuka | objednane | dodane | zruseno`) default `navrh`
-  - `objednane_dat date`, `dodane_dat date`, `poznamka text`, timestamps
-
-- **`tpv_supplier`** (CRM dodávateľov — **merge supplier + contact**)
-  - `nazov text NOT NULL`, `ico text`, `dic text`
-  - kontaktné polia priamo: `kontakt_meno text`, `kontakt_email text`, `kontakt_telefon text`, `kontakt_pozice text`
-  - `web text`, `adresa text`, `kategorie text[]` (napr. `['kov','sklo']`)
-  - `rating int` (1–5), `notes text`, `is_active bool default true`, timestamps
-  - **POZNÁMKA:** ak v budúcnosti bude treba viacero kontaktov per dodávateľ, doplníme samostatný `tpv_supplier_contact`. Zatiaľ jeden kontakt per riadok stačí.
-
-- **`tpv_supplier_task`** (úlohy/follow-upy s dodávateľom)
-  - `supplier_id uuid` (FK), `subcontract_id uuid NULL` (FK), `project_id text NULL`
-  - `title text`, `description text`, `due_date date`
-  - `status text` CHECK (`open | in_progress | done | cancelled`) default `open`
-  - `assigned_to uuid` (FK na `auth.users`), `created_by uuid`, timestamps
-
-- **`tpv_subcontract_request`** (RFQ — žiadosť o cenovú ponuku)
-  - `subcontract_id uuid` (FK), `supplier_id uuid` (FK)
-  - `sent_at timestamptz`, `responded_at timestamptz`, `cena_nabidka numeric`, `mena text`
-  - `termin_dodani date`, `stav text` CHECK (`sent | received | accepted | rejected`) default `sent`
-  - `poznamka text`, timestamps
-
-- **`tpv_hours_allocation`** (workflow schvaľovania hodín — bez dotyku do `tpv_items`)
-  - `project_id text`, `tpv_item_id uuid` (FK), `hodiny_navrh numeric`
-  - `stav text` CHECK (`draft | submitted | approved | returned`) default `draft`
-  - `submitted_by uuid`, `submitted_at timestamptz`
-  - `approved_by uuid`, `approved_at timestamptz`
-  - `return_reason text`, `notes text`, timestamps
-
-- **`tpv_inbox_task`** (TPV-vlastné úlohy/inbox — pre denné riadenie konstruktérov a kalkulantov)
-  - `project_id text NULL`, `tpv_item_id uuid NULL`
-  - `title text`, `description text`, `category text` (napr. `material | doc | rfq | hours | other`)
-  - `priority text` CHECK (`low | normal | high | urgent`) default `normal`
-  - `assigned_to uuid`, `due_date date`
-  - `status text` CHECK (`open | in_progress | done | cancelled`) default `open`
-  - `created_by uuid`, timestamps
-
-> **`tpv_supplier_price_list` zatiaľ nerealizujeme** — neskôr ako samostatná migrácia, ak bude potrebné.
-
-#### 1.3 Notifikácie — bez novej tabuľky
-- Použijeme existujúcu `public.notifications` (RLS už máme: user vidí len svoje).
-- Nové hodnoty `type`:
-  - `tpv_task_assigned` — pridelená TPV úloha
-  - `tpv_task_due_soon` — úloha do 24h
-  - `tpv_supplier_response_received` — RFQ odpoveď
-  - `tpv_hours_submitted` — kalkulant odoslal návrh hodín
-  - `tpv_hours_approved` / `tpv_hours_returned`
-  - `tpv_subcontract_status_changed`
-- Notifikačný panel rozšírime v ďalšej iterácii o sekciu „Inbox / Moje úlohy" napojenú na `tpv_inbox_task` + `tpv_supplier_task`.
-
-#### 1.4 Views
-- `vw_project_tpv_status` — agregát na projekt (z `tpv_project_preparation` + počty z `tpv_material`, `tpv_subcontract`, `tpv_hours_allocation`)
-- `vw_open_tpv_tasks_by_user` — otvorené `tpv_inbox_task` + `tpv_supplier_task` per `assigned_to` (pre rozšírenie notifikačného panelu)
-
-#### 1.5 RLS (jednotný vzor pre všetky nové tpv_* tabuľky)
-- SELECT pre `authenticated` = true (s `is_test_project / is_test_user` izoláciou tam, kde je `project_id`)
-- INSERT/UPDATE/DELETE pre `owner | admin | pm | konstrukter | kalkulant`
-- Trigger `update_updated_at_column` na všetky tabuľky
-- Indexy: `project_id`, `tpv_item_id`, `assigned_to`, `supplier_id`, `subcontract_id`, `status`
+## Cieľ
+1. **B1** — UI toggly v Oprávneniach reálne menia DB-level prístup cez nový SQL helper `has_permission(user, flag)`. RLS policies sa prepíšu z hardcoded `has_role(...)` na `has_permission(...)`.
+2. **UI ↔ realita** — všetky hardcoded role checky (`isAdmin`, `isPM`, `isKonstrukter`, `isVyroba`, `isOwner` použité na gating funkcií) nahradiť granular flagmi tak, aby UI presne odrážalo, čo používateľ reálne smie v DB.
+3. **TPV sekcia v Oprávneniach** — pridať novú sekciu "TPV — Príprava výroby" s flagmi `canAccessTpv` / `canWriteTpv`. Globálne disabled na presetoch (okrem owner) → modul ostane vypnutý pre všetkých okrem ownera, ale dá sa zapnúť kliknutím v UI keď bude pripravený.
 
 ---
 
-### 2. Routing + topbar
-- Existujúca route `/tpv` zostáva. Žiadny meeting mode v tejto iterácii.
-- TPV bell (mini inbox) **odložíme** spolu s prerábkou notifikačného panelu — pripravíme len dáta a hooky.
+## Etapa 1 — DB: nový helper `has_permission()` + presety v DB
 
-### 3. Stránka `src/pages/Tpv.tsx` — rozšírenie na 5 záložiek
+### 1.1 Migrácia: tabuľka `role_permission_defaults`
+Single source of truth pre presety jednotlivých rolí (zrkadlo `ROLE_PRESETS` z `permissionPresets.ts`). Umožní DB-side fallback keď používateľ nemá `permissions` JSONB override.
 
-| Tab key | Label | Komponent |
+```sql
+CREATE TABLE public.role_permission_defaults (
+  role app_role PRIMARY KEY,
+  permissions jsonb NOT NULL DEFAULT '{}'::jsonb,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.role_permission_defaults ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated read role_permission_defaults"
+  ON public.role_permission_defaults FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Owner manage role_permission_defaults"
+  ON public.role_permission_defaults FOR ALL TO authenticated
+  USING (has_role(auth.uid(), 'owner')) WITH CHECK (has_role(auth.uid(), 'owner'));
+```
+
+Seed initial rows pre všetky roly (owner=všetko true, viewer=skoro všetko false, atď.) — presná kópia `ROLE_PRESETS` + nové TPV flagy nastavené `false` pre všetkých okrem `owner`.
+
+### 1.2 Helper funkcia `has_permission`
+```sql
+CREATE OR REPLACE FUNCTION public.has_permission(_user_id uuid, _flag text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT COALESCE(
+    -- 1) per-user override v user_roles.permissions
+    (SELECT (ur.permissions ->> _flag)::boolean
+       FROM public.user_roles ur
+      WHERE ur.user_id = _user_id
+        AND ur.permissions ? _flag
+      LIMIT 1),
+    -- 2) preset z role_permission_defaults
+    (SELECT (rpd.permissions ->> _flag)::boolean
+       FROM public.user_roles ur
+       JOIN public.role_permission_defaults rpd ON rpd.role = ur.role
+      WHERE ur.user_id = _user_id
+      LIMIT 1),
+    false
+  )
+$$;
+```
+
+### 1.3 Prepísanie RLS policies
+Nahradiť `has_role(...)` checky v policies cez `has_permission(...)` na všetkých "user-facing" tabuľkách. Konkrétne (zoznam je výsledok auditu):
+
+| Tabuľka | Akcia | Nový check (`has_permission(auth.uid(), …)`) |
 |---|---|---|
-| `summary` | Prehľad pipeline | `TpvSummaryTab` (existuje, len doplniť KPI o subdodávky a hodiny workflow) |
-| `material` | Materiál | `TpvMaterialTab` (existuje) |
-| `subcontracts` | Subdodávky | **nový** `TpvSubcontractsTab` |
-| `suppliers` | Dodávatelia | **nový** `TpvSuppliersTab` |
-| `hodiny` | Hodinová dotácia | `TpvHoursTab` (existuje, doplniť workflow Draft → Submitted → Approved/Returned cez `tpv_hours_allocation`) |
+| `projects` | INSERT | `canCreateProject` |
+| `projects` | UPDATE | `canEdit` |
+| `projects` | DELETE | `canDeleteProject` |
+| `project_stages` | INSERT/UPDATE | `canEdit` |
+| `project_stages` | DELETE | `canDeleteProject` |
+| `tpv_items` | INSERT/UPDATE/DELETE | `canManageTPV` |
+| `production_schedule` | INSERT | `canWritePlanVyroby` |
+| `production_schedule` | UPDATE/DELETE | `canWritePlanVyroby` |
+| `production_inbox` | INSERT/UPDATE/DELETE | `canWritePlanVyroby` |
+| `production_daily_logs` | INSERT/UPDATE/DELETE | `canAccessDaylog` |
+| `production_quality_checks` | INSERT/UPDATE/DELETE | `canAccessDaylog` (alebo `canQCOnly OR canManageProduction`) |
+| `production_quality_defects` | INSERT/UPDATE/DELETE | `canAccessDaylog` |
+| `production_expedice` | INSERT/UPDATE/DELETE | `canManageProduction` |
+| `production_capacity` (+ employees) | INSERT/UPDATE/DELETE | `canManageProduction` |
+| `people` | INSERT/UPDATE/DELETE | `canManagePeople` |
+| `ami_employees` / `ami_absences` | INSERT/UPDATE/DELETE | `canManagePeople` |
+| `position_catalogue` | INSERT/UPDATE/DELETE | `canManagePeople` |
+| `exchange_rates` | INSERT/UPDATE/DELETE | `canManageExchangeRates` |
+| `overhead_projects` | INSERT/UPDATE/DELETE | `canManageOverheadProjects` |
+| `cost_breakdown_presets` | INSERT/UPDATE/DELETE | `canAccessSettings` |
+| `column_labels` / `custom_column_definitions` | INSERT/UPDATE/DELETE | `canAccessSettings` |
+| `project_status_options` / `tpv_status_options` | INSERT/UPDATE/DELETE | `canManageStatuses` |
+| `formula_config` | ALL | `canAccessSettings` |
+| `company_holidays` | INSERT/UPDATE/DELETE | `canManageProduction` |
+| `production_settings` | UPDATE | `canAccessSettings` |
+| `data_log` | INSERT | `has_any_role` (necháme — log slúži všetkým auth) |
+| `tpv_*` (všetkých 7 tabuliek) | ALL | `canWriteTpv` (write), `canAccessTpv` (read kde to platí) |
+| `user_roles` / `profiles` | INSERT/UPDATE/DELETE | `canManageUsers` |
+| `role_permission_defaults` | UPDATE | iba `owner` (nie cez permission) |
 
-### 4. Hooks (nové súbory)
-- `useTpvProjectPreparation.ts` — CRUD k `tpv_project_preparation`
-- `useTpvSubcontracts.ts` — CRUD + RFQ wizard helpers
-- `useTpvSuppliers.ts` — CRUD k `tpv_supplier` (vrátane kontaktných polí v jednom riadku)
-- `useTpvSupplierTasks.ts`
-- `useTpvHoursAllocation.ts` — submit/approve/return workflow
-- `useTpvInboxTasks.ts` — pre budúci inbox panel; už teraz vrátime `useMyOpenTpvTasks()` pre topbar badge
-- `src/lib/tpvNotifications.ts` — helpery na vytvorenie notifikácií s `type='tpv_*'`
+**SELECT** policies ostanú väčšinou otvorené pre `authenticated` (čítanie všetci, gating len writes a UI viditeľnosť) — okrem `tpv_*` kde SELECT zviažeme na `canAccessTpv` (aby sa modul dal reálne vypnúť aj na DB úrovni).
 
-### 5. Komponenty (nové)
-- `src/components/tpv/TpvSubcontractsTab.tsx` — tabuľka subdodávok + RFQ wizard (`SendRfqDialog`)
-- `src/components/tpv/TpvSuppliersTab.tsx` — zoznam dodávateľov + `SupplierDialog` (edit/create) s kontaktnými poľami v jednom formulári
-- `src/components/tpv/SupplierDialog.tsx`
-- `src/components/tpv/SendRfqDialog.tsx`
-- `src/components/tpv/HoursWorkflowBar.tsx` — submit/approve/return tlačidlá pre `TpvHoursTab`
-
-### 6. Súbory ktoré upravím
-- `src/pages/Tpv.tsx` — pridať 2 nové taby
-- `src/components/tpv/TpvSummaryTab.tsx` — KPI rozšíriť o subdodávky a hours workflow stav
-- `src/components/tpv/TpvHoursTab.tsx` — napojiť na `tpv_hours_allocation` (read pôvodných hodín z `tpv_items.hodiny_plan`, write výhradne do allocation)
-
-### 7. Memory
-- Nový súbor `mem://features/tpv/preparation-module-v2.md` s popisom architektúry "READ-everywhere, WRITE-own", zoznamom tabuliek a workflow.
-- Update `mem://index.md`.
+### 1.4 Edge functions
+`update-user`, `create-user`, `delete-user`, `setup-admin` — overovanie autorizácie cez `has_permission(caller, 'canManageUsers')` namiesto hardcoded `admin/owner`. Dôvod: granular flag `canManageUsers` má teraz reálnu váhu.
 
 ---
 
-### Otvorené otázky (pokračujem s defaultmi ak nepovieš inak)
-- **Kalkulant prístupy mimo `/tpv`:** zatiaľ rovnaké ako konstrukter (read-only všade, write len do `tpv_*`). OK?
-- **TPV inbox panel v topbare:** v tejto iterácii len pripravím dáta + hook `useMyOpenTpvTasks`. UI panel doriešime v ďalšej iterácii spolu s mergom do existujúceho notifikačného panelu.
-- **Subcontract ↔ tpv_item naviazanie:** voliteľné (`tpv_item_id NULL`). Subdodávka môže existovať aj na úrovni projektu bez konkrétnej položky.
+## Etapa 2 — UI: zosúladenie s realitou
+
+### 2.1 `useAuth.tsx` — odstránenie zavádzajúcich legacy boolov
+- Ponechať `isOwner`, `isAdmin`, `isTestUser`, `realRole`, `role` (potrebné pre owner-only operácie a simulačný režim).
+- Označiť `isPM`, `isKonstrukter`, `isVyroba`, `isViewer` ako **deprecated** a postupne nahradiť granular flagmi na všetkých call sites.
+- Pridať nové flagy: `canAccessTpv`, `canWriteTpv` (aj v `permissionPresets.ts`).
+
+### 2.2 `permissionPresets.ts`
+- Pridať `canAccessTpv` a `canWriteTpv` do `PERMISSION_FLAGS` + `PERMISSION_LABELS`.
+- Všetky presety dostanú `canAccessTpv: false, canWriteTpv: false` okrem `owner` (true/true). Tým je modul vypnutý plošne, ale v Oprávneniach zapnuteľný.
+
+### 2.3 `App.tsx` — opravy route guardov
+- `TpvRoute` → `if (!canAccessTpv) return <Navigate to="/" />` (namiesto `!isOwner`).
+- `OsobyRoute` — odstrániť `|| isAdmin || isOwner` ako fallback (oba sú aj tak pokryté granular flagmi cez presety).
+
+### 2.4 `ProductionHeader.tsx`
+- `canSeeVyroba = canManageProduction || canQCOnly` (odstrániť `|| isAdmin || isOwner` — owner aj admin majú flagy v presete).
+- `canSeePlanVyroby = canAccessPlanVyroby`.
+- `canSeeAnalytics = canAccessAnalytics`.
+- `canSeeTpv = canAccessTpv` (namiesto `isOwner`).
+- `canOpenSettingsMenu` — odstrániť `|| isOwner` fallback.
+- `showDataLog` — odvodiť z `canAccessDaylog || canAccessSettings` (zbaviť sa `role === "pm"`).
+- Položky settings menu (`User mgmt`, `Exchange rates`, `Statuses`, `Recycle bin`, `Overhead`, `Cost presets`, `Formula builder`) — gateovať každú zvlášť cez svoj flag, nie cez `isAdmin`.
+
+### 2.5 `pages/Vyroba.tsx`
+- Nahradiť `if (!loading && !isOwner && !isAdmin && !isTester) navigate("/")` cez `canManageProduction || canQCOnly || canAccessPlanVyroby` check (v súlade s `VyrobaRoute`).
+- Riadky 1776, 3155 — preniesť do granular flagov (`canManageProduction`, `canAccessSettings`).
+
+### 2.6 `pages/PlanVyroby.tsx`, `pages/Index.tsx`, `pages/Tpv.tsx`
+- Audit a zámena `isAdmin`/`isPM`/`isOwner` checkov za príslušné `can*` flagy. Owner-only operácie (transfer ownership, simulovaná rola, role_permission_defaults edit) ostávajú na `isOwner`.
+
+### 2.7 Komponenty
+- `ProjectInfoTable.tsx`, `TPVList.tsx`, `MobileTPVCardList.tsx` — `canEdit`/`canManageTPV` už používajú flagy, len pridať `canAccessTpv` gate kde je potreba (TPV list zobraziť aj keď `canAccessTpv=false`? — necháme kontrolu na úrovni TPV modulu, TPV List vnútri projektu zostáva pod `canManageTPV`).
+- `RecycleBin.tsx` — `canPermDeleteProjectsStages = canPermanentDelete && !isTestUser` (zbaviť sa `isAdmin`). `isKonstrukter` tab logika sa zjednoduší: zobraziť všetky taby ak `canAccessRecycleBin`, gate akcií cez `canDeleteProject`/`canManageTPV`.
+- `PeopleManagement.tsx` — `canDelete/canRename/canToggleAllRoles = canManagePeople && !isTestUser`.
+- `NotificationSettings.tsx` — admin-only prefs gateovať cez `canManageUsers` namiesto `isAdmin || isOwner`.
+- `AccountSettings.tsx` — backup section gate cez `canAccessSettings` namiesto `isAdmin`.
+- `OsobyOpravneni.tsx` — pridať guard `if (!canManageUsers) return <NoAccess/>` na začiatok komponentu.
+- `MobileBottomNav.tsx` — `canSeeVyroba = canManageProduction || canQCOnly || canAccessPlanVyroby`.
+- `CapacitySettings.tsx` — `isAdmin` (lokálny derived) prepísať na `canManageProduction`.
+- `UserManagement.tsx` — owner-only operácie (transfer ownership) nechať na `isOwner`; ostatné na `canManageUsers`.
+
+### 2.8 `OsobyOpravneni.tsx` — nová sekcia TPV + sync presetov do DB
+- Pridať novú sekciu `GROUPS` na koniec:
+  ```ts
+  {
+    title: "TPV — Príprava výroby",
+    icon: { bg: "#FEF3C7", color: "#92400E" },
+    rows: [
+      { kind: "tri", label: "TPV modul", desc: "Príprava výroby (vo vývoji)",
+        read: "canAccessTpv", write: "canWriteTpv" },
+    ],
+  }
+  ```
+- Po `Save` v `persistSave()`:
+  1. Update `user_roles.permissions` per user (existujúci kód).
+  2. **Update `role_permission_defaults` row pre selectedRole** — aby DB-side fallback zodpovedal UI presetu. Toto je nové.
+- "Reset to preset" tlačidlo načíta z `role_permission_defaults` (nie iba z FE konštanty).
+
+### 2.9 `useProjects.ts`, ostatné read-only hooky
+Žiadna zmena potrebná — SELECT policies ostanú otvorené pre authenticated (gating len writes).
+
+---
+
+## Etapa 3 — Validácia
+
+### 3.1 Manual smoke test (po nasadení)
+Pre každú rolu (`owner`, `admin`, `vedouci_pm`, `pm`, `vedouci_konstrukter`, `konstrukter`, `vedouci_vyroby`, `mistr`, `quality`, `kalkulant`, `viewer`):
+- Header — viditeľné len ikony modulov ku ktorým má prístup.
+- Settings menu — viditeľné len položky pre granted flagy.
+- Pokus o write do tabuľky bez flagu → DB vráti RLS error (potvrdí, že B1 funguje).
+- Toggling flagu v Oprávneniach → okamžite mení dostupnosť (po reload session).
+
+### 3.2 TPV vypnutý overiť
+- Owner: ikona TPV viditeľná, route prístupná.
+- Všetci ostatní: ikona skrytá, route redirectuje na `/`, `tpv_*` SELECT vráti `[]`.
+- V Oprávneniach pri ktorejkoľvek roli zapnúť `canAccessTpv` + `canWriteTpv` → daná rola začne vidieť TPV.
+
+---
+
+## Súbory ktoré sa upravia
+
+**Migrácia (1 nová):**
+- `supabase/migrations/<ts>_permission_system_b1.sql` — `role_permission_defaults` tabuľka + seed, `has_permission()` funkcia, prepis RLS policies pre ~25 tabuliek.
+
+**Frontend:**
+- `src/lib/permissionPresets.ts` — pridanie `canAccessTpv`, `canWriteTpv`.
+- `src/hooks/useAuth.tsx` — vystavenie nových flagov.
+- `src/App.tsx` — `TpvRoute`, `OsobyRoute`.
+- `src/components/production/ProductionHeader.tsx` — gating.
+- `src/components/osoby/OsobyOpravneni.tsx` — TPV sekcia + sync do `role_permission_defaults` + guard.
+- `src/components/RecycleBin.tsx`, `PeopleManagement.tsx`, `NotificationSettings.tsx`, `AccountSettings.tsx`, `UserManagement.tsx`, `mobile/MobileBottomNav.tsx`, `production/CapacitySettings.tsx` — prepis hardcoded role checkov.
+- `src/pages/Vyroba.tsx`, `PlanVyroby.tsx`, `Index.tsx`, `Tpv.tsx`, `Osoby.tsx` — prepis legacy gateov.
+
+**Edge functions:**
+- `supabase/functions/update-user/index.ts`, `create-user/index.ts`, `delete-user/index.ts` — autorizácia cez `has_permission('canManageUsers')`.
+
+**Memory:**
+- Update `mem://features/authentication/role-based-access-control` — nový popis: granular permissions presadené v DB cez `has_permission()`, presety v `role_permission_defaults`, TPV vypnutý cez `canAccessTpv` flag.
+
+---
+
+## Otvorené body
+- `production_quality_checks/defects` — gateovať cez `canAccessDaylog` alebo cez nový samostatný `canManageQuality`? Návrh: **`canAccessDaylog OR canManageProduction`** (kvalita patrí k dennému logu). Ak chceš samostatný flag, dopíš.
+- Po nasadení etapy 1 (DB) sa môže stať, že existujúci používatelia stratia prístup, ak ich rola v `role_permission_defaults` nemá flag, ktorý reálne potrebujú. Seed bude **1:1 kópia** súčasných `ROLE_PRESETS`, takže nemalo by sa to stať — ale po deploy je odporúčané prejsť cez Oprávnenia a verifikovať.

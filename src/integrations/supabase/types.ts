@@ -1655,6 +1655,48 @@ export type Database = {
           },
         ]
       }
+      rls_policy_backups: {
+        Row: {
+          backed_up_at: string | null
+          backup_label: string
+          cmd: string | null
+          id: string
+          permissive: string | null
+          policyname: string | null
+          qual: string | null
+          roles: string[] | null
+          schemaname: string | null
+          tablename: string | null
+          with_check: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          backup_label: string
+          cmd?: string | null
+          id?: string
+          permissive?: string | null
+          policyname?: string | null
+          qual?: string | null
+          roles?: string[] | null
+          schemaname?: string | null
+          tablename?: string | null
+          with_check?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          backup_label?: string
+          cmd?: string | null
+          id?: string
+          permissive?: string | null
+          policyname?: string | null
+          qual?: string | null
+          roles?: string[] | null
+          schemaname?: string | null
+          tablename?: string | null
+          with_check?: string | null
+        }
+        Relationships: []
+      }
       sharepoint_document_cache: {
         Row: {
           category_counts: Json
