@@ -379,6 +379,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canWriteHarmonogram: permissions.canWriteHarmonogram,
     canAccessForecast: permissions.canAccessForecast,
     canAccessQC: permissions.canAccessQC,
+    canWriteDaylog: permissions.canWriteDaylog,
+    canWriteQC: permissions.canWriteQC,
     canViewTpvPrehlad: permissions.canViewTpvPrehlad,
     canWriteTpvPrehlad: permissions.canWriteTpvPrehlad,
     canViewTpvMaterial: permissions.canViewTpvMaterial,
