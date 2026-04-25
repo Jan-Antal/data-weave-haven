@@ -494,8 +494,8 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
       .from("user_roles")
       .update({ permissions: draftPerms as any })
       .eq("role", selectedRole);
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast({
         title: "Chyba pri ukladaní",
         description: error.message,
@@ -503,7 +503,23 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
       });
       return;
     }
-    toast({ title: `Uložené pre ${ROLE_LABELS[selectedRole]}` });
+    // Also upsert the role default so newly assigned users inherit the same preset
+    const { error: defErr } = await supabase
+      .from("role_permission_defaults")
+      .upsert(
+        { role: selectedRole, permissions: draftPerms as any },
+        { onConflict: "role" },
+      );
+    setSaving(false);
+    if (defErr) {
+      toast({
+        title: "Uložené pre používateľov, ale default role sa neaktualizoval",
+        description: defErr.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: `Uložené pre ${ROLE_LABELS[selectedRole]}` });
+    }
     fetchAll();
   };
 
