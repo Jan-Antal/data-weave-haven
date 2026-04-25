@@ -154,12 +154,6 @@ const GROUPS: Group[] = [
         desc: "Generovanie a potvrdenie forecastu",
         flags: ["canWritePlanVyroby"],
       },
-      {
-        kind: "bin",
-        label: "Daylog",
-        desc: "Denný záznam progressu",
-        flags: ["canAccessDaylog"],
-      },
     ],
   },
   {
@@ -171,6 +165,12 @@ const GROUPS: Group[] = [
         label: "Modul výroba",
         desc: "Bundles, QC tracking",
         flags: ["canManageProduction"],
+      },
+      {
+        kind: "bin",
+        label: "Daylog",
+        desc: "Denný záznam progressu",
+        flags: ["canAccessDaylog"],
       },
       {
         kind: "bin",
