@@ -310,7 +310,7 @@ const MODULE_CASCADE: Array<{ master: PermissionFlag; subs: PermissionFlag[] }> 
 /**
  * Aplikuje cascade: ak master je false, sub-flagy sa vynulujú.
  */
-function applyCascade(p: Permissions): Permissions {
+export function applyCascade(p: Permissions): Permissions {
   const out = { ...p };
   for (const { master, subs } of MODULE_CASCADE) {
     if (!out[master]) {
@@ -407,6 +407,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canAccessPlanVyroby",
     "canWritePlanVyroby",
     "canAccessForecast",
+    "canManageProduction",
     "canAccessDaylog",
     "canManageOverheadProjects",
   ),
@@ -423,6 +424,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canManagePeople",
     "canManageExternisti",
     "canAccessPlanVyroby",
+    "canManageProduction",
     "canAccessDaylog",
   ),
   vedouci_konstrukter: preset(
