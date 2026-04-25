@@ -105,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           prevUserRef.current = session.user.id;
 
           setTimeout(async () => {
-            const [{ data: profileData }, { data: roleData }] = await Promise.all([
+            const [{ data: profileData }, { data: roleData }, { data: defaultsData }] = await Promise.all([
               supabase
                 .from("profiles")
                 .select("full_name, email, is_active, person_id, password_set")
@@ -116,6 +116,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .select("role, permissions")
                 .eq("user_id", session.user.id)
                 .single(),
+              supabase
+                .from("role_permission_defaults")
+                .select("role, permissions"),
             ]);
             setProfile(
               profileData
@@ -129,6 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
             setRealRole((roleData?.role as AppRole) ?? null);
             setDbPermissions(((roleData as any)?.permissions as Partial<Permissions>) ?? null);
+            const defaultsMap: Record<string, Partial<Permissions>> = {};
+            ((defaultsData ?? []) as any[]).forEach((row) => {
+              defaultsMap[row.role] = (row.permissions as Partial<Permissions>) ?? {};
+            });
+            setRoleDefaults(defaultsMap);
 
             const personId = (profileData as any)?.person_id;
             if (personId) {
