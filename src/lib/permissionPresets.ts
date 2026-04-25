@@ -104,7 +104,7 @@ function preset(...flags: PermissionFlag[]): Permissions {
 
 export const ROLE_PRESETS: Record<AppRole, Permissions> = {
   owner: { ...ALL_TRUE },
-  admin: { ...ALL_TRUE, canQCOnly: false },
+  admin: { ...ALL_TRUE, canQCOnly: false, canAccessTpv: false, canWriteTpv: false },
   vedouci_pm: preset(
     "canEdit",
     "canCreateProject",
