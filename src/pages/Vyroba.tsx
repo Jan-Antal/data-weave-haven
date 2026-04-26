@@ -937,8 +937,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return priorAny ? priorAny.percent : 0;
   }
 
-  function getLatestPhase(pid: string): string | null {
-    const logs = getLogsForProject(pid);
+  function getLatestPhase(arg: VyrobaProject | string): string | null {
+    const pid = projectIdOf(arg);
+    const logs = getLogsForProject(arg);
     if (logs.length > 0) {
       const sorted = [...logs].sort((a, b) => b.day_index - a.day_index);
       return sorted[0].phase;
