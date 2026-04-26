@@ -1115,7 +1115,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
     // Past weeks must NOT be overwritten by live completion %. If no log exists
     // for a past week (and no carry-forward applies), keep it at 0.
-    const todayWeekKey = weekKeyStr(getMonday(new Date()));
+    const todayWeekKey = weekKeyStr(getWorkWeekMonday());
     if (weekKey < todayWeekKey) {
       return { totalHours, completedHours, bundleProgress: 0 };
     }
@@ -1296,7 +1296,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const goal = getWeeklyGoal(statusProject ?? pid);
     if (bundleProgress >= goal) return "on-track";
     if (todayDayIndex < 0) {
-      const realWeekKey = weekKeyStr(getMonday(new Date()));
+      const realWeekKey = weekKeyStr(getWorkWeekMonday());
       let hasDelayed = false;
       if (scheduleData) {
         for (const [wk, silo] of scheduleData) {
@@ -2181,7 +2181,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               }}
             >
               {PAGER_OFFSETS.map(offset => {
-                const slideMonday = addWeeks(getMonday(new Date()), weekOffset + offset);
+                const slideMonday = addWeeks(getWorkWeekMonday(), weekOffset + offset);
                 const slideWeekKey = weekKeyStr(slideMonday);
                 const slideWeekNum = getISOWeekNumber(slideMonday);
                 // Compute projects for this specific slide's week
@@ -6247,7 +6247,7 @@ function WeekPickerPopup({
 
   // Generate weeks: -4 to +12 from today
   const weeks = useMemo(() => {
-    const todayMonday = getMonday(new Date());
+    const todayMonday = getWorkWeekMonday();
     const result: {
       offset: number;
       monday: Date;
