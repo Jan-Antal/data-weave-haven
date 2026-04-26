@@ -316,14 +316,39 @@ function useDilnaData(weekOffset: number) {
       // daylog data is built so we can skip bundles that already met their weekly target.
       const spilledOnlyProjects = new Set<string>();
 
-      // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`.
-      // Logs are pre-sorted by week_key ASC, day_index ASC, so the last write per project
-      // wins → cumulative "last known percent up to displayed week".
+      // Latest daily-log percent per project per week — keyed `${projectId}::${weekKey}`.
+      // Logs are stored as `${projectId}::${weekKey}` bundle_ids (one percent per project per
+      // week), so we collapse to (pid, weekKey) → last-known percent in that week.
+      const pctByProjectWeek = new Map<string, number>();
+      // Also keep cumulative last-known percent per project (any week ≤ displayed) as fallback
+      // for project-level cards (no bundle context).
       const latestPctByProject = new Map<string, number>();
       for (const log of dailyLogs) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
-        if (log.percent != null) latestPctByProject.set(pid, Number(log.percent));
+        if (log.percent == null) continue;
+        const pct = Number(log.percent);
+        pctByProjectWeek.set(`${pid}::${log.week_key}`, pct);
+        latestPctByProject.set(pid, pct);
+      }
+
+      // Build per-(project, week) bundle-identity sets from allSched. Identity key matches
+      // the UI grouping: `${stage_id}::${bundle_label}::${split_part|"full"}`.
+      // Used to attribute a project-week log to the correct bundle when only one identity
+      // existed in that historical week.
+      const bundleIdentitiesByProjectWeek = new Map<string, Set<string>>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled") continue;
+        // allSched select doesn't include stage_id/split_part — we match by (project_id,
+        // scheduled_week, split_group_id, bundle_label). Build a coarse identity using
+        // the columns available; fine-grained matching uses the schedule data below.
+      }
+      // Fine-grained identity map: query directly from `schedule` (current week) and
+      // `prevSchedule` we already have, plus we'll re-query on demand. To avoid an extra
+      // round-trip we build identities only for prior weeks that actually have a log.
+      const priorWeekKeysWithLogs = new Set<string>();
+      for (const log of dailyLogs) {
+        if (log.week_key < weekInfo.weekKey) priorWeekKeysWithLogs.add(log.week_key);
       }
 
       // Latest daily-log percent per project for the PREVIOUS week (used by spillover guard).
