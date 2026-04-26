@@ -285,6 +285,7 @@ interface VyrobaProject {
   expedice?: string | null;
   deadline?: Date | null;
   isSpilled?: boolean;
+  hasSpilledItems?: boolean;
   isPaused?: boolean;
   pauseReason?: string | null;
   pauseExpectedDate?: string | null;
