@@ -487,7 +487,8 @@ function useDilnaData(weekOffset: number) {
             // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
             const bCompletion = completionPct;
             // Slip color porovnává completion proti dennímu targetu (bExpected) — pohyblivý cíl podle aktuálního dne v týdnu
-            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled);
+            // Spilled bundles inherit isSpilled treatment in computeSlip.
+            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled || b.isSpilled);
             bundleRows.push({
               bundleId: b.bundleId,
               displayLabel,
@@ -495,6 +496,8 @@ function useDilnaData(weekOffset: number) {
               expectedPct: bExpected,
               completionPct: bCompletion,
               slipStatus: bSlip,
+              isSpilled: b.isSpilled,
+              spilledFromWeekNum: b.isSpilled ? prevWeekInfo.week : undefined,
             });
           }
         }
