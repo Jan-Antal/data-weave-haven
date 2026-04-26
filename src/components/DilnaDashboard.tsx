@@ -768,8 +768,9 @@ function useDilnaData(weekOffset: number) {
           const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
           // Resolve per-bundle pct via identity. For spilled bundles, stage_id comes from prevSchedule.
           const stageIdForBundle = prevSchedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
-          const bIdentityWithStage = identityKey(stageIdForBundle, b.bundle_label, b.split_part);
-          const bCompletion = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+          const bCompletion = isUnmatched
+            ? null
+            : resolveBundlePct(pid, b.split_group_id, stageIdForBundle, b.bundle_label, b.split_part);
           const bSlip: SlipStatus = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, true);
           return {
             bundleId: b.bundleId,
