@@ -20,7 +20,7 @@ async function getHolidayDateSet(year: number): Promise<Set<string>> {
         .select("start_date, end_date")
         .lte("start_date", `${year}-12-31`)
         .gte("end_date", `${year}-01-01`);
-      for (const h of (data ?? []) as Array<{ start_date: string; end_date: string }>) {
+      for (const h of ((data ?? []) as unknown) as Array<{ start_date: string; end_date: string }>) {
         const s = new Date(h.start_date + "T00:00:00");
         const e = new Date(h.end_date + "T00:00:00");
         for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
