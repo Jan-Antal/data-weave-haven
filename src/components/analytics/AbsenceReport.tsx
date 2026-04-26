@@ -502,30 +502,7 @@ export function AbsenceReport() {
     return { total, planned, unplanned, peopleCount: people.size, days };
   }, [filteredAbsences, empMap, from, to]);
 
-  // ── Holidays ───────────────────────────────────────────────────
-  const fromYear = useMemo(() => new Date(from + "T00:00:00").getFullYear(), [from]);
-  const toYear = useMemo(() => new Date(to + "T00:00:00").getFullYear(), [to]);
-  const { data: holidaysY1 } = useCzechHolidays(fromYear);
-  const { data: holidaysY2 } = useCzechHolidays(toYear);
-  const { data: companyHolidays } = useCompanyHolidays();
-
-  const holidayMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const h of holidaysY1 || []) m.set(h.date, h.localName);
-    if (toYear !== fromYear) for (const h of holidaysY2 || []) m.set(h.date, h.localName);
-    return m;
-  }, [holidaysY1, holidaysY2, fromYear, toYear]);
-
-  const findCompanyHoliday = useCallback(
-    (dateStr: string): string | null => {
-      if (!companyHolidays) return null;
-      for (const ch of companyHolidays) {
-        if (dateStr >= ch.start_date && dateStr <= ch.end_date) return ch.name;
-      }
-      return null;
-    },
-    [companyHolidays],
-  );
+  // (Holidays computed earlier — see top of component.)
 
   // ── Chart data ─────────────────────────────────────────────────
   const { chartData, effectiveBucket } = useMemo(() => {
