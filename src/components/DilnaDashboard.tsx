@@ -129,12 +129,15 @@ function useDilnaData(weekOffset: number) {
           .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
           .eq("scheduled_week", weekInfo.weekKey)
           .not("status", "eq", "cancelled"),
-        // Spilled rows: T-1 schedule rows still active (mirrors Vyroba spill logic)
-        supabase
-          .from("production_schedule")
-          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
-          .eq("scheduled_week", prevWeekInfo.weekKey)
-          .in("status", ["scheduled", "in_progress", "paused"]),
+        // Spilled rows: ONLY meaningful when displayed week == real T+1.
+        // Source = real current week's still-active rows. Otherwise return [] cheaply.
+        weekOffset === 1
+          ? supabase
+              .from("production_schedule")
+              .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at, is_midflight")
+              .eq("scheduled_week", prevWeekInfo.weekKey)
+              .in("status", ["scheduled", "in_progress", "paused"])
+          : Promise.resolve({ data: [] as any[] }),
         supabase
           .from("production_settings")
           .select("weekly_capacity_hours")
@@ -296,12 +299,13 @@ function useDilnaData(weekOffset: number) {
         }
       }
 
-      // Second pass: spilled bundles from T-1.
-      // Skip rows that are already done (expediced/completed). Skip duplicates if the same
+      // Second pass: spilled bundles. Source = real current week (only when weekOffset === 1).
+      // Excludes done rows AND legacy midflight rows. Skip duplicates if the same
       // stage+label+split_part already exists in current week (already replanned to T).
       const spilledOnlyProjects = new Set<string>();
       for (const s of prevSchedule) {
         if (isRowDone(s)) continue;
+        if ((s as any).is_midflight) continue;
         const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
         if (!bundlesByProject.has(s.project_id)) {
           bundlesByProject.set(s.project_id, new Map());

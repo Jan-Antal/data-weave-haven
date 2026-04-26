@@ -426,32 +426,32 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
 
   const currentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
 
-  // Compute spilled bundles for the current week T — mirrors logic from src/pages/Vyroba.tsx:
-  // ONLY look at the immediately preceding week (T-1), skip projects already re-planned in T,
-  // and exclude items that are effectively done (including legacy midflight items).
+  // Spilled bundles attach to T+1 (one week AFTER the real current week). Source = real current
+  // week's unfinished bundles, excluding midflight legacy rows. Never spill into T or beyond T+1.
+  const spilloverDestKey = useMemo(() => {
+    const m = getMonday(new Date());
+    m.setDate(m.getDate() + 7);
+    return toLocalDateStr(m);
+  }, []);
   const spilledBundlesForCurrent = useMemo(() => {
     if (!scheduleData) return [] as Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
 
     const isItemDoneLocal = (item: ScheduleItem) => {
-      if (item.is_midflight) return true;
       return item.status === "completed" || item.status === "expedice";
     };
 
-    const prevMonday = new Date(currentWeekKey + "T00:00:00");
-    prevMonday.setDate(prevMonday.getDate() - 7);
-    const prevWeekKey = toLocalDateStr(prevMonday);
-    const prevSilo = scheduleData.get(prevWeekKey);
-    if (!prevSilo) return [];
+    const realSilo = scheduleData.get(currentWeekKey);
+    if (!realSilo) return [];
 
-    const currentSilo = scheduleData.get(currentWeekKey);
-    const currentProjectIds = new Set<string>(currentSilo?.bundles.map((b) => b.project_id) || []);
+    const destSilo = scheduleData.get(spilloverDestKey);
+    const destProjectIds = new Set<string>(destSilo?.bundles.map((b) => b.project_id) || []);
     const result: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }> = [];
 
-    for (const b of prevSilo.bundles) {
-      if (currentProjectIds.has(b.project_id)) continue;
+    for (const b of realSilo.bundles) {
+      if (destProjectIds.has(b.project_id)) continue;
 
       const activeItems = b.items.filter(
-        (i) => (i.status === "scheduled" || i.status === "in_progress") && !isItemDoneLocal(i),
+        (i) => (i.status === "scheduled" || i.status === "in_progress") && !i.is_midflight && !isItemDoneLocal(i),
       );
 
       if (activeItems.length === 0) continue;
@@ -467,13 +467,13 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
         split_total: b.split_total,
         items: activeItems,
         total_hours: activeHours,
-        __spilledFromWeekKey: prevWeekKey,
-        __spilledFromWeekNum: prevSilo.week_number,
+        __spilledFromWeekKey: currentWeekKey,
+        __spilledFromWeekNum: realSilo.week_number,
       });
     }
 
     return result;
-  }, [scheduleData, currentWeekKey]);
+  }, [scheduleData, currentWeekKey, spilloverDestKey]);
 
   const weekOptions = useMemo(() => {
     return weeks.map(w => {
@@ -1081,7 +1081,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
                   isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
                   onToggleLock={() => toggleWeekLock(week.key)}
                   activeDrag={activeDrag}
-                  spilledBundles={week.key === currentWeekKey ? spilledBundlesForCurrent : undefined}
+                  spilledBundles={week.key === spilloverDestKey ? spilledBundlesForCurrent : undefined}
                 />
               </div>
             );
@@ -1383,7 +1383,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               </>
             )}
           </div>
-          {isCurrent && spilledHours > 0 && (
+          {spilledHours > 0 && (
             <div className="mt-[3px] text-[9px] font-medium text-center" style={{ color: "#d97706" }}>
               + {Math.round(spilledHours)}h přelité (mimo plán)
             </div>
