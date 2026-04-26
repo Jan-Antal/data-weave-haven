@@ -1,70 +1,130 @@
-# Nová karta "Absence" v module Analytics
+# Oprava progress barov v Dílne (Analytics → Dílna)
 
-Pridáme do `PageTabsShell` v `src/pages/Analytics.tsx` novú záložku **"Absence"** hneď za **"Výkaz"**. Bude mať podobnú štruktúru ako Výkaz: dashboard karty hore + tabuľka s detailmi po jednotlivých ľuďoch.
+## Diagnóza (potvrdená cez DB)
 
-## 1. Dátový zdroj
-Tabuľka `ami_absences` (1 riadok = 1 deň absencie) napojená na `ami_employees`:
-- **Kódy v DB:** `DOV` (dovolenka), `DOV/2` (½ deň dovolenky), `NEM` (nemoc), `RD` (rodičovská)
-- **Zdroje:** `manual` (dlhodobé plánované) vs `alveno_xlsx` (krátkodobé / neplánované nemoci z dochádzky)
-- 1 deň = `uvazok_hodiny` zamestnanca (typicky 8 h), `DOV/2` = polovica
+**RD Skalice (Z-2604-002, A-3 v T19) → zobrazuje `100 % / 12 %`**
+- DB `production_daily_logs` obsahuje pre Z-2604-002 záznam `bundle_id = "Z-2604-002::MF_2026-04-13"`, `percent = 100`. Toto je technický **midflight-import marker** (prefix `MF_`), nie reálny log.
+- `resolveBundlePct()` (riadok ~420) skenuje všetky kľúče `${pid}::*` v `pctByProjectWeek` a vracia najnovší. Marker `MF_…` je do mapy nasypaný v rovnakej slučke (riadok 324–331), pretože `log.bundle_id.split("::")[0]` z neho urobí čistý `pid`. → carry-forward vráti **100 %**.
+- Target `12 %` je `chain-window start` slice A-3 (správna hodnota pre **začiatok** T19, lebo predchádzajúce slices A-1 (8.8 h) + A-2 (6 h) = 12 % zo 121.3 h).
+- Pre **future weeks** (`weekOffset > 0`) je `dayFraction = 0` → `bundleExpectedPctScaled` vracia *začiatok* chain-window slice. Používateľ ale chce: **stav = carry z minulosti, cieľ = koniec aktuálneho slice na konci T19**.
 
-## 2. Nový komponent `src/components/analytics/AbsenceReport.tsx`
-Štruktúra zhodná s `VykazReport`:
+**Allianz D (Z-2617-001, full bundle v T19) → zobrazuje `40 % / 100 %`**
+- DB má `Z-2617-001::2026-05-04 = 40 %` (log z 23. 4., week_key T19).
+- Logy sú **per-projekt-per-týždeň**, nie per-bundle. Carry pre A-6 split chain dáva zmysel (40 % postupu projektu na splite). Pre **úplne nový full bundle D** (žiadne predošlé hodiny v split chain, samostatná entita) je 40 % nezmyselné — D má začať od 0 %.
 
-### Filter bar (hore)
-- **Date range picker** — Týden / Měsíc / Předchozí měsíc / 3 měsíce / Rok / Vlastní (rovnaký pattern ako Výkaz)
-- **Multi-select** typ absencie (DOV, RD, NEM, …)
-- **Multi-select** stredisko / úsek
-- **Search** podľa mena zamestnanca
+---
 
-### Dashboard karty (5 kariet, grid)
-Sumáre v hodinách za zvolený rozsah:
-1. **Celkom absencie** (h)
-2. **🏖️ Dovolená** (DOV + DOV/2)
-3. **👶 Rodičovská** (RD)
-4. **🤒 Nemoc** (NEM)
-5. **📊 Plánované vs neplánované** — `manual` h vs `alveno_xlsx` h (s percentom)
+## Oprava
 
-### Bar chart (časová os)
-- Stacked bar po týždňoch / dňoch (podľa zvoleného rozsahu) farebne podľa typu absencie
-- Rovnaký renderer ako vo `VykazReport` (Recharts)
+### 1. Vylúčiť `MF_*` markery z `pctByProjectWeek` a `latestPctByProject`
 
-### Tabuľka (rozkliknuteľná po zamestnancoch)
-Hlavičky: **Zaměstnanec | Středisko | Úsek | Dovolená (h) | Rodič. (h) | Nemoc (h) | Celkem (h) | Posledná absencia**
+V `DilnaDashboard.tsx` cca riadok 324:
 
-Po rozkliknutí riadku → zoznam jednotlivých absenčných období (group consecutive days, použijeme rovnakú logiku ako `groupPeriods` v `useEmployeeAbsences.ts`):
-- Typ | Od | Do | Počet dní | Hodiny | Zdroj (manuál / Alveno)
-
-### Export CSV
-Tlačidlo **Stáhnout CSV** rovnako ako vo Výkaze.
-
-## 3. Registrácia tabu v `src/pages/Analytics.tsx`
-- Pridať do `tabs` array hneď za `vykaz`:
-  ```ts
-  { key: "absence", label: "Absence", visible: canAccessAnalyticsVykaz }
-  ```
-  (znovupoužijeme existujúcu permission `canAccessAnalyticsVykaz` — kto vidí Výkaz, vidí aj Absence; ak budete chcieť oddelený permission, vieme ho pridať neskôr)
-- Pridať `const absenceMode = activeTab === "absence";`
-- Skryť toolbar pre absence mode rovnako ako pre vykaz
-- Render: `{absenceMode ? <AbsenceReport /> : vykazMode ? ... }`
-
-## 4. Query (React Query)
 ```ts
-useQuery({
-  queryKey: ["absence-report", from, to],
-  queryFn: () => supabase
-    .from("ami_absences")
-    .select("id, employee_id, datum, absencia_kod, source")
-    .gte("datum", from).lte("datum", to)
-    .order("datum")
-})
+for (const log of dailyLogs) {
+  const pid = log.bundle_id.split("::")[0];
+  if (!pid) continue;
+  if (log.percent == null) continue;
+  // NEW: skip midflight-import markers (week_key like "MF_…" or bundle_id contains "::MF_")
+  if (log.week_key?.startsWith("MF_") || log.bundle_id.includes("::MF_")) continue;
+  // …
+}
 ```
-+ paralelne `ami_employees` (meno, stredisko, usek_nazov, uvazok_hodiny, deactivated_date) cez existujúci `useVyrobniEmployees` alebo nový `useAllEmployeesForAbsence`.
+Rovnako pre `prevDailyLogs` cyklus (riadok 335).
 
-Hodiny počítame klientsky: `DOV/2 → uvazok/2`, ostatné `→ uvazok` (default 8 ak null).
+**Effect:** Z-2604-002 v T19 už nezdedí 100 %. Resolve vráti najnovší skutočný log = `Z-2604-002::2026-04-13 = 12 %`. ✅
 
-## Súbory ktoré sa zmenia
-- **Nový:** `src/components/analytics/AbsenceReport.tsx`
-- **Upravený:** `src/pages/Analytics.tsx` (tab + render switch)
+### 2. Target pre future weeks = koniec chain-window slice (nie scaled)
 
-Žiadne DB migrácie nie sú potrebné — všetky dáta už existujú.
+V `bundleExpectedPctScaled` (riadok ~433):
+
+```ts
+function bundleExpectedPctScaled(splitGroupId: string | null): number {
+  if (!splitGroupId) return 100; // full bundle target stays 100
+  const weeks = [...(splitGroupWeeks.get(splitGroupId) ?? [])].sort(...);
+  const total = weeks.reduce((s, w) => s + w.hours, 0);
+  if (total <= 0) return 100;
+  let cum = 0, start = 0, end = 100, found = false;
+  for (const w of weeks) {
+    const share = (w.hours / total) * 100;
+    if (w.week === weekInfo.weekKey) { start = cum; end = cum + share; found = true; break; }
+    cum += share;
+  }
+  if (!found) return 100;
+  // NEW: future weeks → show END of slice (week's full goal); current → ramp by dayFraction;
+  // past → already at end (dayFraction=1).
+  if (!isCurrentWeek && !isPastWeek) return Math.round(end);
+  return Math.round(start + (end - start) * dayFraction);
+}
+```
+Premenné `isCurrentWeek`/`isPastWeek` sú už definované na riadku 487-488.
+
+**Effect:** RD Skalice A-3 v T19 → target = chain-window end = 100 % (lebo A-3 je posledná slice). Stav 12 % / target 100 %. ✅
+
+### 3. Nové full bundles nededia per-projekt log z carry-forward
+
+Carry-forward `resolveBundlePct` aktuálne nerozlišuje, či bundle existoval v predošlom týždni. Riešenie — využiť už existujúcu `identitiesByProjectWeek` mapu (riadok 395):
+
+```ts
+function resolveBundlePct(pid: string, identity: string): number | null {
+  // 1) Same-week log → use it (covers most cases including split chains).
+  const displayedKey = `${pid}::${weekInfo.weekKey}`;
+  const sameWeekIdentities = identitiesByProjectWeek.get(displayedKey) ?? new Set();
+
+  if (pctByProjectWeek.has(displayedKey)) {
+    // Project-level log applies to bundles that share the active chain (split or
+    // continuation). For a NEW full bundle that has no prior history in this
+    // project's split chain, return null instead — D should start at 0%.
+    if (sameWeekIdentities.has(identity)) {
+      // Decide: is this identity a continuation (existed previously) or net-new?
+      const priorWeeks = Array.from(identitiesByProjectWeek.keys())
+        .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
+        .sort((a, b) => b.localeCompare(a));
+      const existedBefore = priorWeeks.some(k => identitiesByProjectWeek.get(k)!.has(identity));
+      if (existedBefore) return pctByProjectWeek.get(displayedKey)!;
+      // Net-new bundle this week → don't inherit project-level percent.
+      return null;
+    }
+    return pctByProjectWeek.get(displayedKey)!;
+  }
+
+  // 2) Carry from prior weeks ONLY for identities that existed previously
+  //    (preserves split-chain continuity, blocks leakage to net-new bundles).
+  const priorWeeks = Array.from(pctByProjectWeek.keys())
+    .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
+    .map(k => k.split("::")[1])
+    .sort((a, b) => b.localeCompare(a));
+
+  for (const wk of priorWeeks) {
+    const idsInWk = identitiesByProjectWeek.get(`${pid}::${wk}`);
+    if (idsInWk?.has(identity)) return pctByProjectWeek.get(`${pid}::${wk}`) ?? null;
+  }
+  // Fallback for legacy bundles without identity history — keep current behaviour.
+  return priorWeeks.length > 0 ? pctByProjectWeek.get(`${pid}::${priorWeeks[0]}`) ?? null : null;
+}
+```
+
+Volanie už posiela `bIdentityWithStage` ako 2. argument (riadok 616, 699), takže netreba meniť call-sites.
+
+**Effect:**
+- Allianz **A-6** (split, identity existovala v T17 a T18) → carry 40 %, stav `40 % / 100 %` ✅
+- Allianz **D** (full, brand-new identity v T19, nie v T17/T18) → vráti `null` → bar 0 %, stav `— / 100 %` ✅
+
+---
+
+## Zmeny
+
+**Súbor:** `src/components/DilnaDashboard.tsx`
+- Pridať MF_ filter v dvoch slučkách logov (~riadky 324, 335).
+- Upraviť `bundleExpectedPctScaled` o vetvu pre future weeks (~riadok 433).
+- Prepísať `resolveBundlePct` na identity-aware (~riadok 410).
+
+Žiadne DB migrácie. Žiadne ďalšie súbory.
+
+## Očakávaný výsledok pre T19 (po opravách)
+
+| Karta | Pred | Po |
+|---|---|---|
+| RD Skalice A-3 | `100 % / 12 %` (zelený full bar) | `12 % / 100 %` |
+| Allianz D | `40 % / 100 %` | `— / 100 %` (bar prázdny) |
+| Allianz A-6 (split) | `40 % / xx %` | `40 % / 100 %` (správne, beze zmeny logiky pre split) |

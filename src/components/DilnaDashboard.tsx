@@ -325,6 +325,8 @@ function useDilnaData(weekOffset: number) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
         if (log.percent == null) continue;
+        // Skip midflight-import markers (synthetic 100% rows; not real progress logs)
+        if (log.week_key?.startsWith("MF_") || log.bundle_id.includes("::MF_")) continue;
         const pct = Number(log.percent);
         pctByProjectWeek.set(`${pid}::${log.week_key}`, pct);
         latestPctByProject.set(pid, pct);
@@ -335,7 +337,11 @@ function useDilnaData(weekOffset: number) {
       for (const log of prevDailyLogs) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
-        if (log.percent != null) prevLatestPctByProject.set(pid, Number(log.percent));
+        if (log.percent == null) continue;
+        // prev select is filtered by exact week_key, so MF_ markers cannot match here;
+        // still defensively skip bundle_ids that include the MF_ marker prefix.
+        if (log.bundle_id.includes("::MF_")) continue;
+        prevLatestPctByProject.set(pid, Number(log.percent));
       }
 
       const projMap = new Map(projects.map(p => [p.project_id, p]));
@@ -407,20 +413,52 @@ function useDilnaData(weekOffset: number) {
       // The carry-forward only applies if the SAME bundle identity actually existed in
       // that prior week — preventing a percent from week N from leaking into a brand-new
       // bundle that did not exist back then.
-      function resolveBundlePct(pid: string, _identity: string): number | null {
-        // 1) Displayed week has its own log → use it.
+      function resolveBundlePct(pid: string, identity: string): number | null {
         const displayedKey = `${pid}::${weekInfo.weekKey}`;
+
+        // Helper: did this identity exist in any week strictly before the displayed week?
+        const existedBefore = (() => {
+          for (const [k, ids] of identitiesByProjectWeek) {
+            if (!k.startsWith(`${pid}::`)) continue;
+            const wk = k.split("::")[1];
+            if (wk < weekInfo.weekKey && ids.has(identity)) return true;
+          }
+          return false;
+        })();
+
+        // 1) Displayed week has its own project-level log.
         if (pctByProjectWeek.has(displayedKey)) {
-          return pctByProjectWeek.get(displayedKey)!;
+          // For a brand-NEW full bundle (no prior identity history) the project-level
+          // percent represents the OTHER (continuation) bundle — don't apply it here.
+          // Allow same-week log only when this identity is a continuation OR when there's
+          // no other identity that could "own" the log this week.
+          const sameWeekIds = identitiesByProjectWeek.get(displayedKey) ?? new Set<string>();
+          const otherIds = Array.from(sameWeekIds).filter(i => i !== identity);
+          if (existedBefore || otherIds.length === 0) {
+            return pctByProjectWeek.get(displayedKey)!;
+          }
+          // Brand-new identity AND there are other (continuation) bundles this week → start at 0/null.
+          return null;
         }
-        // 2) Carry the most recent project-level log from any prior week ≤ displayed week.
-        //    Daily logs are project-level (one percent per project per week) and the project's
-        //    completion represents progress on the active bundle chain — a new bundle in the
-        //    next week is the continuation of that chain, so it inherits the percent.
+
+        // 2) Carry from the most recent prior week — but ONLY if this identity existed there.
         const priorWeeks = Array.from(pctByProjectWeek.keys())
           .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
           .map(k => k.split("::")[1])
           .sort((a, b) => b.localeCompare(a));
+
+        for (const wk of priorWeeks) {
+          const ids = identitiesByProjectWeek.get(`${pid}::${wk}`);
+          if (ids?.has(identity)) {
+            return pctByProjectWeek.get(`${pid}::${wk}`) ?? null;
+          }
+        }
+        // Fallback: if identity history is unavailable (e.g. legacy data without
+        // identitiesByProjectWeek for that week), keep prior behaviour.
+        if (priorWeeks.length > 0 && !existedBefore) {
+          // Strict: brand-new identity should NOT inherit anything → null.
+          return null;
+        }
         if (priorWeeks.length > 0) {
           return pctByProjectWeek.get(`${pid}::${priorWeeks[0]}`) ?? null;
         }
@@ -442,6 +480,9 @@ function useDilnaData(weekOffset: number) {
           cum += share;
         }
         if (!found) return 100;
+        // Future weeks: target = END of slice (full weekly goal — bar shouldn't pre-shrink to start).
+        // Current week: ramp from start → end by dayFraction. Past week: dayFraction=1 → end.
+        if (!isCurrentWeek && !isPastWeek) return Math.round(end);
         return Math.round(start + (end - start) * dayFraction);
       }
 
