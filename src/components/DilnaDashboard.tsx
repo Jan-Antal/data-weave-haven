@@ -309,34 +309,9 @@ function useDilnaData(weekOffset: number) {
         }
       }
 
-      // Second pass: spilled bundles. Source = real current week (only when weekOffset === 1).
-      // Excludes done rows AND legacy midflight rows. Skip duplicates if the same
-      // stage+label+split_part already exists in current week (already replanned to T).
+      // Second pass: spilled bundles is deferred — applied AFTER chain-window + prev-week
+      // daylog data is built so we can skip bundles that already met their weekly target.
       const spilledOnlyProjects = new Set<string>();
-      for (const s of prevSchedule) {
-        if (isRowDone(s)) continue;
-        if ((s as any).is_midflight) continue;
-        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
-        if (!bundlesByProject.has(s.project_id)) {
-          bundlesByProject.set(s.project_id, new Map());
-          spilledOnlyProjects.add(s.project_id);
-        } else if (!scheduledProjects.has(s.project_id)) {
-          spilledOnlyProjects.add(s.project_id);
-        }
-        const bMap = bundlesByProject.get(s.project_id)!;
-        if (bMap.has(key)) continue; // current-week bundle wins
-        bMap.set(key, {
-          bundleId: s.id,
-          bundle_label: s.bundle_label,
-          bundle_type: s.bundle_type,
-          split_group_id: s.split_group_id,
-          split_part: s.split_part,
-          split_total: s.split_total,
-          scheduled_hours: Number(s.scheduled_hours),
-          position: s.position,
-          isSpilled: true,
-        });
-      }
 
       // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
       const latestPctByProject = new Map<string, number>();
