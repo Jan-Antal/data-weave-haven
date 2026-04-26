@@ -7,8 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { useCreateAbsencePeriod } from "@/hooks/useEmployeeAbsences";
+import { useCreateAbsencePeriod, useDeleteAbsencePeriod, useManualAbsences } from "@/hooks/useEmployeeAbsences";
 import { toast } from "@/hooks/use-toast";
+import { Trash2 } from "lucide-react";
+import { cs } from "date-fns/locale";
 
 export const ABSENCE_KODY: Array<{ value: string; label: string }> = [
   { value: "DOV", label: "DOV — Dovolená" },
