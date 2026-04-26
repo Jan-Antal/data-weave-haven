@@ -632,8 +632,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       const realWeekKey = weekKeyStr(realMonday);
       const realSilo = scheduleData.get(realWeekKey);
       if (realSilo) {
+        const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_part: number | null }) =>
+          `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}::${b.split_part ?? "full"}`;
+        // Collect bundle keys already present in the displayed (T+1) week so we don't duplicate
+        // a spilled bundle that has already been replanned to T+1.
+        const destSilo = scheduleData.get(weekKey);
+        const destBundleKeys = new Set<string>((destSilo?.bundles || []).map(bundleKey));
+
         for (const b of realSilo.bundles) {
-          if (result.some((r) => r.projectId === b.project_id)) continue;
+          if (destBundleKeys.has(bundleKey(b))) continue;
           const activeItems = b.items.filter(
             (i) =>
               (i.status === "scheduled" || i.status === "in_progress") &&
@@ -641,14 +648,24 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               !isItemDone(i),
           );
           if (activeItems.length === 0) continue;
-          result.push({
-            projectId: b.project_id,
-            projectName: b.project_name,
-            totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
-            scheduleItems: activeItems,
-            color: getProjectColor(b.project_id),
-            isSpilled: true,
-          });
+
+          // If the project already exists in result (because it has a planned bundle in T+1),
+          // merge spilled items into the same project card. Otherwise create a spilled-only card.
+          const existing = result.find((r) => r.projectId === b.project_id);
+          if (existing) {
+            existing.scheduleItems = [...existing.scheduleItems, ...activeItems];
+            existing.totalHours += activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
+            existing.hasSpilledItems = true;
+          } else {
+            result.push({
+              projectId: b.project_id,
+              projectName: b.project_name,
+              totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
+              scheduleItems: activeItems,
+              color: getProjectColor(b.project_id),
+              isSpilled: true,
+            });
+          }
         }
       }
     }
