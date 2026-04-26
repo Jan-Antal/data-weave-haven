@@ -952,6 +952,28 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return items;
   }
 
+  // Get ALL items belonging to a SPECIFIC BUNDLE across all weeks (non-cancelled).
+  // Bundle identity: split chains use split_group_id (spans weeks); full bundles
+  // use (stage_id, bundle_label). Mirrors how Plán Výroby renders bundle.items.
+  function getAllItemsForBundle(p: VyrobaProject): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
+    const all = getAllItemsForProject(p.projectId);
+    const splitGroups = new Set(
+      p.scheduleItems.map((i) => i.split_group_id).filter((g): g is string => !!g),
+    );
+    if (splitGroups.size > 0) {
+      return all.filter((e) => e.item.split_group_id && splitGroups.has(e.item.split_group_id));
+    }
+    const sample = p.scheduleItems[0];
+    const sampleStage = sample?.stage_id ?? null;
+    const sampleLabel = sample?.bundle_label ?? null;
+    return all.filter(
+      (e) =>
+        !e.item.split_group_id &&
+        (e.item.stage_id ?? null) === sampleStage &&
+        (e.item.bundle_label ?? null) === sampleLabel,
+    );
+  }
+
   // ── BUNDLE PROGRESS: tied to the latest daily log of the viewed week ──
   // The week % must always reflect the most recent daylog entry for that week.
   // Completion-based progress is only used as a fallback when no logs exist for
