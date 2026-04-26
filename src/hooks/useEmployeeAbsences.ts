@@ -106,6 +106,48 @@ interface CreatePeriodArgs {
   date_to: string | null; // null = open-ended → fills 6 months
 }
 
+/** Fetch all holiday dates (Czech public + company) that overlap [from, to] as a Set of YYYY-MM-DD. */
+async function fetchHolidayDates(fromYear: number, toYear: number): Promise<Set<string>> {
+  const dates = new Set<string>();
+
+  // Czech public holidays from nager.at (with hardcoded fallback for fixed dates).
+  const FIXED: Array<[number, number]> = [
+    [1, 1], [5, 1], [5, 8], [7, 5], [7, 6],
+    [9, 28], [10, 28], [11, 17], [12, 24], [12, 25], [12, 26],
+  ];
+  for (let y = fromYear; y <= toYear; y++) {
+    try {
+      const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/CZ`);
+      if (res.ok) {
+        const arr: Array<{ date: string }> = await res.json();
+        for (const h of arr) dates.add(h.date);
+        continue;
+      }
+    } catch { /* fall through */ }
+    for (const [m, d] of FIXED) {
+      dates.add(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+    }
+  }
+
+  // Company holidays from DB.
+  const { data } = await supabase
+    .from("company_holidays")
+    .select("start_date, end_date");
+  for (const h of (data ?? []) as Array<{ start_date: string; end_date: string }>) {
+    const s = new Date(h.start_date + "T00:00:00");
+    const e = new Date(h.end_date + "T00:00:00");
+    for (let d = new Date(s); d <= e; d = addDays(d, 1)) {
+      dates.add(toLocalDateStr(d));
+    }
+  }
+  return dates;
+}
+
+function isWeekend(d: Date): boolean {
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
 export function useCreateAbsencePeriod() {
   const qc = useQueryClient();
   return useMutation({
@@ -116,9 +158,13 @@ export function useCreateAbsencePeriod() {
         : addDays(start, 6 * 30); // ~6 months
       if (end < start) throw new Error("Datum do nemůže být před datumem od");
 
+      const holidayDates = await fetchHolidayDates(start.getFullYear(), end.getFullYear());
+
       const rows: Array<{ employee_id: string; datum: string; absencia_kod: string; source: string; mesiac: string }> = [];
       for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+        if (isWeekend(d)) continue;
         const datum = toLocalDateStr(d);
+        if (holidayDates.has(datum)) continue;
         rows.push({
           employee_id,
           datum,
@@ -133,6 +179,49 @@ export function useCreateAbsencePeriod() {
         const { error } = await supabase.from("ami_absences").insert(rows.slice(i, i + CHUNK));
         if (error) throw error;
       }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manual-absences"] });
+      qc.invalidateQueries({ queryKey: ["absences-year"] });
+      qc.invalidateQueries({ queryKey: ["weekly-capacity"] });
+    },
+  });
+}
+
+/** One-shot backfill: remove existing manual absence rows that fall on weekends or holidays. */
+export function useCleanupNonWorkdayAbsences() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from("ami_absences")
+        .select("id, datum")
+        .eq("source", "manual");
+      if (error) throw error;
+
+      const rows = (data ?? []) as Array<{ id: string; datum: string }>;
+      if (rows.length === 0) return { removed: 0 };
+
+      const years = Array.from(new Set(rows.map(r => Number(r.datum.slice(0, 4)))));
+      const minY = Math.min(...years);
+      const maxY = Math.max(...years);
+      const holidayDates = await fetchHolidayDates(minY, maxY);
+
+      const idsToDelete: string[] = [];
+      for (const r of rows) {
+        const d = new Date(r.datum + "T00:00:00");
+        if (isWeekend(d) || holidayDates.has(r.datum)) idsToDelete.push(r.id);
+      }
+
+      const CHUNK = 500;
+      for (let i = 0; i < idsToDelete.length; i += CHUNK) {
+        const { error: delErr } = await supabase
+          .from("ami_absences")
+          .delete()
+          .in("id", idsToDelete.slice(i, i + CHUNK));
+        if (delErr) throw delErr;
+      }
+      return { removed: idsToDelete.length };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["manual-absences"] });

@@ -3798,14 +3798,6 @@ function DetailPanel({
         current.push(entry);
       }
     }
-    const sortFn = (a: { item: ScheduleItem }, b: { item: ScheduleItem }) => {
-      const ak = (a.item.item_code || a.item.item_name || "").toString();
-      const bk = (b.item.item_code || b.item.item_name || "").toString();
-      return ak.localeCompare(bk, "cs", { numeric: true, sensitivity: "base" });
-    };
-    current.sort(sortFn);
-    future.sort(sortFn);
-    completed.sort(sortFn);
     return { currentItems: current, futureItems: future, completedItems: completed };
   }, [allItems, weekKey]);
 
