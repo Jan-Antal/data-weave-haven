@@ -426,78 +426,73 @@ function useDilnaData(weekOffset: number) {
 
       // ── Per-(project, week) bundle identities ──
       // Identity key = `${stage_id}::${bundle_label}::${split_part|"full"}` (matches UI grouping).
-      // Used to attribute project-level daily logs (`pid::weekKey` rows) to a specific bundle:
-      //   - if a historical week has only ONE bundle identity for the project, that log
-      //     unambiguously belongs to that identity → carries forward into displayed week
-      //     only if the same identity exists in the displayed week.
-      //   - if multiple identities existed in that week, log is ambiguous → fall back to
-      //     project-level mapping (legacy behaviour).
+      // Used as a fallback when a bundle has no bundle-scoped daily-log row in DB
+      // (e.g. legacy data written before the bundle-scoped storage migration).
       const identityKey = (stage_id: string | null, bundle_label: string | null, split_part: number | null): string =>
         `${stage_id ?? "none"}::${bundle_label ?? "A"}::${split_part ?? "full"}`;
       const identitiesByProjectWeek = new Map<string, Set<string>>();
+      const splitGroupsByProjectWeek = new Map<string, Set<string>>();
       for (const row of allSched) {
         if (row.status === "historical" || row.status === "cancelled") continue;
         const key = `${row.project_id}::${row.scheduled_week}`;
         if (!identitiesByProjectWeek.has(key)) identitiesByProjectWeek.set(key, new Set());
         identitiesByProjectWeek.get(key)!.add(identityKey(row.stage_id, row.bundle_label, row.split_part));
+        if (row.split_group_id) {
+          if (!splitGroupsByProjectWeek.has(key)) splitGroupsByProjectWeek.set(key, new Set());
+          splitGroupsByProjectWeek.get(key)!.add(row.split_group_id);
+        }
       }
 
-      // Resolve the last-known percent for a SPECIFIC bundle identity in a project,
-      // walking back from the displayed week. Daily logs are stored per (project, week)
-      // with one percent value (project-level signal). When that week had multiple
-      // bundle identities active, the same percent applies to each (best signal we have).
-      // The carry-forward only applies if the SAME bundle identity actually existed in
-      // that prior week — preventing a percent from week N from leaking into a brand-new
-      // bundle that did not exist back then.
-      function resolveBundlePct(pid: string, identity: string): number | null {
-        const displayedKey = `${pid}::${weekInfo.weekKey}`;
+      // Resolve the last-known percent for a SPECIFIC bundle, walking back from the
+      // displayed week. Strategy:
+      //   1) Direct bundle-scoped lookup using the same storage ID Vyroba.tsx writes.
+      //   2) Walk back through prior weeks; match by split_group_id (split bundles)
+      //      or by stage::label::part identity (full bundles) using the bundle-scoped ID.
+      //   3) Legacy fallback: only if the project had EXACTLY ONE bundle in that prior
+      //      week, attribute the bare `pid::weekKey` log to this bundle.
+      function resolveBundlePct(
+        pid: string,
+        splitGroupId: string | null,
+        stageId: string | null,
+        bundleLabel: string | null,
+        splitPart: number | null
+      ): number | null {
+        const identity = identityKey(stageId, bundleLabel, splitPart);
 
-        // Helper: did this identity exist in any week strictly before the displayed week?
-        const existedBefore = (() => {
-          for (const [k, ids] of identitiesByProjectWeek) {
-            if (!k.startsWith(`${pid}::`)) continue;
-            const wk = k.split("::")[1];
-            if (wk < weekInfo.weekKey && ids.has(identity)) return true;
-          }
-          return false;
-        })();
+        // 1) Direct bundle-scoped lookup for the displayed week.
+        const directId = buildBundleStorageId(pid, weekInfo.weekKey, splitGroupId, stageId, bundleLabel, splitPart);
+        if (pctByBundleId.has(directId)) return pctByBundleId.get(directId)!;
 
-        // 1) Displayed week has its own project-level log.
-        if (pctByProjectWeek.has(displayedKey)) {
-          // For a brand-NEW full bundle (no prior identity history) the project-level
-          // percent represents the OTHER (continuation) bundle — don't apply it here.
-          // Allow same-week log only when this identity is a continuation OR when there's
-          // no other identity that could "own" the log this week.
-          const sameWeekIds = identitiesByProjectWeek.get(displayedKey) ?? new Set<string>();
-          const otherIds = Array.from(sameWeekIds).filter(i => i !== identity);
-          if (existedBefore || otherIds.length === 0) {
-            return pctByProjectWeek.get(displayedKey)!;
-          }
-          // Brand-new identity AND there are other (continuation) bundles this week → start at 0/null.
-          return null;
+        // Collect prior weeks that have ANY log for this project.
+        const priorWeeks = new Set<string>();
+        for (const id of pctByBundleId.keys()) {
+          if (!id.startsWith(`${pid}::`)) continue;
+          const wk = id.split("::")[1];
+          if (wk && wk < weekInfo.weekKey) priorWeeks.add(wk);
         }
+        for (const k of pctByProjectWeek.keys()) {
+          if (!k.startsWith(`${pid}::`)) continue;
+          const wk = k.split("::")[1];
+          if (wk && wk < weekInfo.weekKey) priorWeeks.add(wk);
+        }
+        const priorWeeksSorted = Array.from(priorWeeks).sort((a, b) => b.localeCompare(a));
 
-        // 2) Carry from the most recent prior week — but ONLY if this identity existed there.
-        const priorWeeks = Array.from(pctByProjectWeek.keys())
-          .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
-          .map(k => k.split("::")[1])
-          .sort((a, b) => b.localeCompare(a));
+        // 2) Walk back, prefer bundle-scoped match.
+        for (const wk of priorWeeksSorted) {
+          const priorBundleId = buildBundleStorageId(pid, wk, splitGroupId, stageId, bundleLabel, splitPart);
+          if (pctByBundleId.has(priorBundleId)) return pctByBundleId.get(priorBundleId)!;
 
-        for (const wk of priorWeeks) {
+          // 3) Legacy fallback — only if unambiguous (single bundle in that week).
           const ids = identitiesByProjectWeek.get(`${pid}::${wk}`);
-          if (ids?.has(identity)) {
-            return pctByProjectWeek.get(`${pid}::${wk}`) ?? null;
+          const sgs = splitGroupsByProjectWeek.get(`${pid}::${wk}`);
+          const totalBundles = ids?.size ?? 0;
+          const wasPresent = !!(ids?.has(identity) || (splitGroupId && sgs?.has(splitGroupId)));
+          if (totalBundles === 1 && wasPresent) {
+            const bare = pctByProjectWeek.get(`${pid}::${wk}`);
+            if (bare != null) return bare;
           }
         }
-        // Fallback: if identity history is unavailable (e.g. legacy data without
-        // identitiesByProjectWeek for that week), keep prior behaviour.
-        if (priorWeeks.length > 0 && !existedBefore) {
-          // Strict: brand-new identity should NOT inherit anything → null.
-          return null;
-        }
-        if (priorWeeks.length > 0) {
-          return pctByProjectWeek.get(`${pid}::${priorWeeks[0]}`) ?? null;
-        }
+
         return null;
       }
 
