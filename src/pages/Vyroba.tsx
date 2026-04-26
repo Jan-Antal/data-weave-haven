@@ -511,9 +511,8 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return new Set(expedicedMap.keys());
   }, [expedicedMap]);
 
-  /** Check if a schedule item is "done" — either via production_expedice or legacy midflight */
+  /** Check if a schedule item is "done" — via status or production_expedice. */
   const isItemDone = useCallback((item: ScheduleItem): boolean => {
-    if (item.is_midflight) return true;
     return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
   // Prefetch daily logs for all 5 pager weeks to avoid blink on swipe
@@ -3508,7 +3507,6 @@ function DetailPanel({
 }) {
   const isMobile = useIsMobile();
   const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
-    if (item.is_midflight) return true;
     return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
   const expectedPct = todayDayIndex >= 0 ? getExpectedPct(todayDayIndex, weeklyGoal, project.projectId) : 0;
@@ -4062,7 +4060,6 @@ function UnifiedItemList({
   expedicedScheduleIds: Set<string>;
 }) {
   const isItemDoneLocal = useCallback((item: ScheduleItem): boolean => {
-    if (item.is_midflight) return true;
     return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
   }, [expedicedScheduleIds]);
   const { checks, checkItem, uncheckItem } = useQualityChecks(projectId);
