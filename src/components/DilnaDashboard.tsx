@@ -116,7 +116,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, prevSchedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
+      const [hoursRes, schedRes, prevSchedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, prevDailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -159,6 +159,15 @@ function useDilnaData(weekOffset: number) {
           .select("bundle_id, day_index, percent, logged_at")
           .eq("week_key", weekInfo.weekKey)
           .order("day_index", { ascending: true }),
+        // Latest daily-log percent for the PREVIOUS week (used by goal-aware spillover guard).
+        // Only meaningful when displayed week == real T+1.
+        weekOffset === 1
+          ? supabase
+              .from("production_daily_logs" as any)
+              .select("bundle_id, day_index, percent")
+              .eq("week_key", prevWeekInfo.weekKey)
+              .order("day_index", { ascending: true })
+          : Promise.resolve({ data: [] as any[] }),
         // Overhead project codes — to exclude režije/ENG/PM/etc. from production hours
         supabase
           .from("overhead_projects" as any)
