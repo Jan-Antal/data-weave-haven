@@ -444,11 +444,15 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
     if (!realSilo) return [];
 
     const destSilo = scheduleData.get(spilloverDestKey);
-    const destProjectIds = new Set<string>(destSilo?.bundles.map((b) => b.project_id) || []);
+    const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_part: number | null }) =>
+      `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}::${b.split_part ?? "full"}`;
+    const destBundleKeys = new Set<string>((destSilo?.bundles || []).map(bundleKey));
     const result: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }> = [];
 
     for (const b of realSilo.bundles) {
-      if (destProjectIds.has(b.project_id)) continue;
+      // Skip only if the SAME bundle (same stage+label+split_part) already exists in dest week.
+      // A different bundle of the same project must still be allowed to spill independently.
+      if (destBundleKeys.has(bundleKey(b))) continue;
 
       const activeItems = b.items.filter(
         (i) => (i.status === "scheduled" || i.status === "in_progress") && !i.is_midflight && !isItemDoneLocal(i),
