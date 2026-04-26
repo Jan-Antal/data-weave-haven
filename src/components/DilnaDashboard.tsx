@@ -401,30 +401,30 @@ function useDilnaData(weekOffset: number) {
       }
 
       // Resolve the last-known percent for a SPECIFIC bundle identity in a project,
-      // walking back from the displayed week. Returns null when no log applies.
+      // walking back from the displayed week. Daily logs are stored per (project, week)
+      // with one percent value (project-level signal). When that week had multiple
+      // bundle identities active, the same percent applies to each (best signal we have).
+      // The carry-forward only applies if the SAME bundle identity actually existed in
+      // that prior week — preventing a percent from week N from leaking into a brand-new
+      // bundle that did not exist back then.
       function resolveBundlePct(pid: string, identity: string): number | null {
-        // 1) If the displayed week has its own log AND only this identity exists in the
-        //    displayed week → use it directly. Multiple identities in displayed week
-        //    means the log is project-level → still apply (best signal we have).
+        // 1) Displayed week has its own log → use it.
         const displayedKey = `${pid}::${weekInfo.weekKey}`;
         if (pctByProjectWeek.has(displayedKey)) {
           return pctByProjectWeek.get(displayedKey)!;
         }
-        // 2) Walk prior weeks (newest first) — find the latest week with a log where the
-        //    SAME identity existed and was the only identity (unambiguous attribution).
+        // 2) Walk prior weeks (newest first) — apply the latest log from a week that
+        //    contained this bundle identity (so we don't bleed into newly-created bundles).
         const priorWeeks = Array.from(pctByProjectWeek.keys())
           .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
           .map(k => k.split("::")[1])
           .sort((a, b) => b.localeCompare(a));
         for (const wk of priorWeeks) {
           const ids = identitiesByProjectWeek.get(`${pid}::${wk}`);
-          if (!ids) continue;
-          if (ids.has(identity) && ids.size === 1) {
-            // Unambiguous: that week had only this bundle identity → log belongs to it.
+          if (ids?.has(identity)) {
             return pctByProjectWeek.get(`${pid}::${wk}`)!;
           }
         }
-        // 3) No unambiguous prior log → no carry-forward to avoid cross-bundle bleed.
         return null;
       }
 
