@@ -1,76 +1,40 @@
-# Oprava bundle-isolated daylogu (Insia A-4 vs Insia B)
+## Problém
 
-## Diagnóza
+`DilnaDashboard` používa **legacy aggregator** `pctByProjectWeek` postavený nad kľúčom `${pid}::${weekKey}`. To znamená:
 
-DB schéma a migrácia sú v poriadku — v `production_daily_logs` reálne existujú **tri samostatné sady** záznamov pre Z-2605-001 / týždeň 2026-04-20:
+1. Pre projekt s **dvomi bundlami v rovnakom týždni** (Allianz A-5 + B, Insia A-4 + B) sa všetky daylog záznamy mapujú na ten istý kľúč, posledný zápis prepíše ostatné, a per-bundle identita sa stratí.
+2. Funkcia `resolveBundlePct` má guard "brand-new full bundle → null", ktorý spôsobí, že **úplne nový bundle v týždni dostane `null`** namiesto svojho skutočného daylogu — preto sa zobrazí pomlčka `—/60%` a `—/100%`.
+3. V DB pritom **bundle-scoped záznamy reálne existujú** vo formátoch `pid::week::SG:<group>` a `pid::week::<stage>::<label>::<part>` — sú zapisované z `Vyroba.tsx`, ale `DilnaDashboard` ich vôbec nečíta.
 
-- `Z-2605-001::2026-04-20` (legacy)
-- `Z-2605-001::2026-04-20::none::B::full` (Insia B)
-- `Z-2605-001::2026-04-20::SG:2e7ac40e-…` (Insia A-4)
+## Riešenie
 
-Helper `bundleStorageIdForProject(p)` vyrobí správny kľúč, **ale dostáva nesprávny `VyrobaProject`**. Všetky volajúce miesta (`getLogsForProject`, `getLatestPercent`, `getLatestPhase`, `bundleId`, `handleSaveLog`) prijímajú iba `projectId: string` a dohľadávajú projekt cez:
+Refaktorovať `DilnaDashboard` aby čítal **bundle-scoped daylogy priamo** rovnakou logikou ako `Vyroba.tsx` (`bundleStorageIdForProject`).
 
-```ts
-enrichedProjects.find(p => p.projectId === pid)
-```
+### Zmeny v `src/components/DilnaDashboard.tsx`
 
-Pre projekt s viacerými bundlami v rovnakom týždni (Insia A-4 + Insia B majú zhodné `projectId = Z-2605-001`) `find` vždy vráti **prvý** bundle, takže oba ProjectRow uložia/načítajú rovnaký kľúč → druhý bundle prepíše prvý.
+1. **Nový aggregator `pctByBundleId`**: namiesto `pctByProjectWeek` (kľúč `pid::week`) postaviť `Map<bundleStorageId, number>` — najnovší `percent` per *bundle-scoped* `bundle_id` (max `day_index`, najnovší `logged_at` ako tie-breaker).
 
-Identita bundle je dostupná cez `VyrobaProject.cardKey` (resp. `selectedProject` má vždy správny bundle, lebo sa hľadá podľa `cardKey`). Stačí helpery prepísať tak, aby pracovali priamo s `VyrobaProject` namiesto s `projectId` stringom.
+2. **Helper `bundleStorageId(pid, weekKey, splitGroupId, stageId, bundleLabel, splitPart)`** — replikovať logiku z `Vyroba.tsx`:
+   - Ak `split_group_id` existuje → `${pid}::${weekKey}::SG:${splitGroupId}`
+   - Inak → `${pid}::${weekKey}::${stageId ?? "none"}::${bundleLabel ?? "A"}::${splitPart ?? "full"}`
 
-## Zmeny v `src/pages/Vyroba.tsx`
+3. **Prepísať `resolveBundlePct`**: 
+   - Najprv vyskúšať priamy lookup `pctByBundleId.get(bundleStorageId(...))` pre zobrazený týždeň.
+   - Ak chýba, walk-back cez predošlé týždne pre **rovnaký** `split_group_id` (pre split bundles) alebo rovnakú `stage::label` identitu (pre full bundles), pričom kľúč konštruujeme s `weekKey` daného predošlého týždňa.
+   - Legacy fallback (čítanie `pid::weekKey` bez bundle suffixu) ponechať len ak projekt má v danom týždni **práve jeden bundle** — pre staré dáta pred migráciou.
+   - **Odstrániť guard "brand-new full bundle → null"** — ten bol iba workaround chýbajúcej bundle identity; po prechode na bundle-scoped IDs je nepotrebný a škodlivý.
 
-### 1. Helpery prijímajú `VyrobaProject`
+4. **Sekundárne použitie `latestPctByProject`** (riadky 627, 721): tento map sa stále používa pre fallback `completionPct` na úrovni projektu. Po refaktore by mal byť odvodený z `pctByBundleId` cez agregáciu (napr. max naprieč bundle storage IDs daného projektu) namiesto z legacy `pid::week` kľúča.
 
-Refaktor signatúr, aby používali plný objekt (a fallback na `enrichedProjects.find` len ako last-resort pre legacy call-sites):
+5. **Spilled bundles** (riadok 578) a **prevLatestPctByProject** (riadok 337) — analogická úprava: spilover guard porovnávať per-bundle, nie per-projekt, použitím rovnakého `bundleStorageId` voči `prevWeekInfo.weekKey`.
 
-```ts
-function bundleId(project: VyrobaProject): string {
-  return bundleStorageIdForProject(project);
-}
+### Žiadne DB zmeny
 
-function getLogsForProject(project: VyrobaProject): DailyLog[] {
-  const key = bundleStorageIdForProject(project);
-  return dailyLogsMap?.get(key) || [];
-}
+Migrácia zo session 1 už zabezpečila bundle-scoped záznamy v DB; teraz ich len začneme správne čítať aj v Dílňa pohľade.
 
-function getLatestPercent(project: VyrobaProject): number { … }
-function getLatestPhase(project: VyrobaProject): string | null { … }
-```
+### Outcome
 
-Odstrániť variant `(pid: string)` všade tam, kde volajúci má `VyrobaProject` po ruke (čo je 95 % miest — `selectedProject`, `ProjectRow.project`, mapovanie cez `enrichedProjects.map(p => …)`).
-
-### 2. Aktualizovať call-sites
-
-Prejsť všetky výskyty `getLogsForProject(`, `getLatestPercent(`, `getLatestPhase(`, `bundleId(` (riadky 893–1001, 1085, 1312, 1327, 1346, 1358, 1360–1362, 1428, 1451, 1473, 2556, 2664 atď.) a posielať `VyrobaProject` namiesto `projectId`. Konkrétne:
-
-- `selectedProject` má `cardKey` → posielať `selectedProject`.
-- V `ProjectRow` posielať `project` (ten už drží správnu bundle identitu).
-- V agregačných miestach iterujúcich `enrichedProjects.filter(...).some(p => …)` posielať priamo `p`.
-
-### 3. `handleSaveLog` — uložiť pod správny kľúč
-
-Riadok 1362: `const bId = bundleId(selectedProject.projectId)` → `const bId = bundleId(selectedProject)`. Tým `saveDailyLog(bId, …)` zapíše Insia B pod `…::none::B::full`, nie do kľúča Insia A-4. Undo/redo používajú zachytený `bId`, takže sa automaticky správajú per-bundle.
-
-### 4. Stats / dashboard
-
-V agregátoch ako `activeProjects.filter(p => getLogsForProject(p.projectId)…)` (riadok 1312) prejsť na `getLogsForProject(p)` — počty dnešných „logged“ bundlov budú správne (každý bundle sa počíta zvlášť).
-
-### 5. Bez DB migrácie
-
-Existujúce kľúče v DB sú už korektné (bundle-scoped). Žiadny ďalší backfill netreba; len čisté front-end smerovanie čítania/zápisu.
-
-## Overovacia matica (po zmene)
-
-| Akcia | Očakávaný kľúč zápisu/čítania |
-| --- | --- |
-| Otvorím **Insia A-4** → uložím log T20 / piatok | `Z-2605-001::2026-04-20::SG:2e7ac40e…` |
-| Otvorím **Insia B** → uložím log T20 / piatok | `Z-2605-001::2026-04-20::none::B::full` |
-| Editácia v jednom bundle | Druhý bundle ostáva nedotknutý |
-| Ctrl+Z | Vráti len bundle, ktorý bol upravovaný (lebo `bId` je zachytený do closure) |
-
-## Čo NEROBÍM
-
-- Nemením `useProductionDailyLogs.ts` (kontrakt zostáva — kľúč je `bundle_id` string).
-- Nemením DB schému ani RPC `get_daily_report` (tá pracuje na úrovni `split_part(bundle_id, '::', 1)` = projektu, čo je v poriadku pre denný report).
-- Nepridávam fallback na legacy kľúč `pid::week` — bol odstránený zámerne, aby sa bundles nedelili o zápisy.
+- Allianz Z-2617-001 v T17: A-5 ukáže svoje skutočné `60%`, B ukáže svojich `100%`.
+- Insia Z-2605-001 v T17: A-4 a B každý nezávisle podľa svojho daylog kľúča.
+- Žiadny bundle nedostane pomlčku, ak preňho existuje záznam v `production_daily_logs`.
+- Konzistencia s `Vyroba.tsx` a `useProductionDailyLogs` — všetky 3 modely čítajú rovnaké bundle-scoped IDs.
