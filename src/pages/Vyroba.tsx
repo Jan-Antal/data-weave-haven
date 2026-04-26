@@ -1004,6 +1004,63 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return getAllItemsForProject(project.projectId).filter(({ item }) => allowedIds.has(item.id));
   }
 
+  /**
+   * Bundle identity match: does `bundle` (with its `items`) belong to the same
+   * "bundle identity" as `project`? Mirrors the rules in `makeCardKey` /
+   * `bundleStorageIdForProject`:
+   *   - If project bundle is part of a split chain → match any item that shares
+   *     a split_group_id with it (this covers prior/future parts of the chain).
+   *   - Otherwise match by stage_id + bundle_label.
+   */
+  function bundleMatchesProject(
+    bundle: { stage_id: string | null; bundle_label: string | null; items: ScheduleItem[] },
+    project: VyrobaProject,
+  ): boolean {
+    const projectSplitGroups = new Set(
+      project.scheduleItems
+        .map((i) => i.split_group_id)
+        .filter((sg): sg is string => !!sg),
+    );
+    if (projectSplitGroups.size > 0) {
+      return bundle.items.some((it) => it.split_group_id && projectSplitGroups.has(it.split_group_id));
+    }
+    const projStage = project.scheduleItems[0]?.stage_id ?? null;
+    const projLabel = project.scheduleItems[0]?.bundle_label ?? null;
+    return (
+      (bundle.stage_id ?? null) === projStage &&
+      (bundle.bundle_label ?? null) === projLabel
+    );
+  }
+
+  /** Like getAllItemsForProject but scoped to a single bundle identity across all weeks. */
+  function getAllItemsForBundle(project: VyrobaProject): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
+    if (!scheduleData) return [];
+    const items: { item: ScheduleItem; weekKey: string; weekNum: number }[] = [];
+    const seen = new Set<string>();
+    for (const [wk, silo] of scheduleData) {
+      for (const bundle of silo.bundles) {
+        if (bundle.project_id !== project.projectId) continue;
+        if (!bundleMatchesProject(bundle, project)) continue;
+        for (const item of bundle.items) {
+          if (item.status === "cancelled") continue;
+          if ((item as any).is_historical) continue;
+          if ((item as any).is_midflight) continue;
+          const dedupeKey = `${wk}::${item.id}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
+          items.push({ item, weekKey: wk, weekNum: silo.week_number });
+        }
+      }
+    }
+    return items;
+  }
+
+  /** Resolve a `VyrobaProject` from the enriched list when callers only have an id. */
+  function resolveProject(pidOrProject: string | VyrobaProject): VyrobaProject | null {
+    if (typeof pidOrProject !== "string") return pidOrProject;
+    return enrichedProjects.find((p) => p.projectId === pidOrProject) ?? null;
+  }
+
   // ── BUNDLE PROGRESS: tied to the latest daily log of the viewed week ──
   // The week % must always reflect the most recent daylog entry for that week.
   // Completion-based progress is only used as a fallback when no logs exist for
