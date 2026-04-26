@@ -315,7 +315,7 @@ export default function Analytics() {
       {() => (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Per-tab toolbar */}
-      {!vykazMode && (
+      {!vykazMode && !absenceMode && (
       <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b bg-card">
 
         {!dilnaMode && (
@@ -436,7 +436,9 @@ export default function Analytics() {
       </div>
       )}
 
-      {vykazMode ? (
+      {absenceMode ? (
+        <AbsenceReport />
+      ) : vykazMode ? (
         <VykazReport />
       ) : dilnaMode ? (
         <DilnaDashboard weekOffset={dilnaWeekOffset} onOpenProjectDetail={setDetailProjectId} />
