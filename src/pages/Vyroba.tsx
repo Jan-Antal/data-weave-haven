@@ -294,13 +294,6 @@ interface VyrobaProject {
   totalHours: number;
   scheduleItems: ScheduleItem[];
   color: string;
-  // Bundle identity (one VyrobaProject = one bundle of one project in one week)
-  bundleKey: string;          // `${projectId}::${stage}::${label}::${splitPart|full}`
-  stageId: string | null;
-  bundleLabel: string;        // raw label e.g. "A"
-  bundleType: "full" | "split";
-  splitPart: number | null;
-  splitGroupId: string | null; // any split_group_id from items (for chain lookups)
   pm?: string | null;
   expedice?: string | null;
   deadline?: Date | null;
