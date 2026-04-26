@@ -218,7 +218,7 @@ function getProjectsForWeek(
 
   // Spilled: only when the displayed week is exactly T+1 from the real current week.
   // Source = real current week's unfinished, non-midflight items.
-  const realMondayForHelper = (() => { const d = new Date(); const day = d.getDay(); const diff = (day === 0 ? -6 : 1) - day; d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d; })();
+  const realMondayForHelper = getWorkWeekMonday();
   const spilloverDest = new Date(realMondayForHelper); spilloverDest.setDate(spilloverDest.getDate() + 7);
   if (weekKeyStr(spilloverDest) === slideWeekKey) {
     const realWeekKey = weekKeyStr(realMondayForHelper);
