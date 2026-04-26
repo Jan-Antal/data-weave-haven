@@ -1081,7 +1081,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
                   isWeekLocked={week.isPast && !unlockedWeeks.has(week.key)}
                   onToggleLock={() => toggleWeekLock(week.key)}
                   activeDrag={activeDrag}
-                  spilledBundles={week.key === currentWeekKey ? spilledBundlesForCurrent : undefined}
+                  spilledBundles={week.key === spilloverDestKey ? spilledBundlesForCurrent : undefined}
                 />
               </div>
             );
