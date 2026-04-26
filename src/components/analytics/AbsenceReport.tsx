@@ -290,9 +290,51 @@ export function AbsenceReport() {
 
   const isLoading = empLoading || absLoading;
 
+  // ── Holidays (computed early so we can filter non-working days) ──
+  const fromYear = useMemo(() => new Date(from + "T00:00:00").getFullYear(), [from]);
+  const toYear = useMemo(() => new Date(to + "T00:00:00").getFullYear(), [to]);
+  const { data: holidaysY1 } = useCzechHolidays(fromYear);
+  const { data: holidaysY2 } = useCzechHolidays(toYear);
+  const { data: companyHolidays } = useCompanyHolidays();
+
+  const holidayMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const h of holidaysY1 || []) m.set(h.date, h.localName);
+    if (toYear !== fromYear) for (const h of holidaysY2 || []) m.set(h.date, h.localName);
+    return m;
+  }, [holidaysY1, holidaysY2, fromYear, toYear]);
+
+  const findCompanyHoliday = useCallback(
+    (dateStr: string): string | null => {
+      if (!companyHolidays) return null;
+      for (const ch of companyHolidays) {
+        if (dateStr >= ch.start_date && dateStr <= ch.end_date) return ch.name;
+      }
+      return null;
+    },
+    [companyHolidays],
+  );
+
+  /** Returns true for Sat/Sun, CZ public holidays and company holidays. */
+  const isNonWorkingDay = useCallback(
+    (dateStr: string): boolean => {
+      const d = new Date(dateStr + "T00:00:00");
+      const dow = d.getDay();
+      if (dow === 0 || dow === 6) return true;
+      if (holidayMap.has(dateStr)) return true;
+      if (findCompanyHoliday(dateStr)) return true;
+      return false;
+    },
+    [holidayMap, findCompanyHoliday],
+  );
+
   // ── Filtered rows ──────────────────────────────────────────────
+  // Skip non-working days entirely — manual periods now write rows for
+  // weekends/holidays to keep the period continuous in the DB, but those
+  // rows must NOT contribute to reported absence hours/days.
   const filteredAbsences = useMemo(() => {
     return absences.filter((r) => {
+      if (isNonWorkingDay(r.datum)) return false;
       if (kindFilter && !kindFilter.has(categorize(r.absencia_kod))) return false;
       const emp = r.employee_id ? empMap.get(r.employee_id) : undefined;
       if (usekFilter && !usekFilter.has(emp?.usek_nazov ?? emp?.usek ?? "—")) return false;
@@ -300,7 +342,7 @@ export function AbsenceReport() {
       if (employeeFilter && !employeeFilter.has(r.employee_id ?? "—")) return false;
       return true;
     });
-  }, [absences, kindFilter, usekFilter, strediskoFilter, employeeFilter, empMap]);
+  }, [absences, kindFilter, usekFilter, strediskoFilter, employeeFilter, empMap, isNonWorkingDay]);
 
   // ── Filter options (always from raw, sorted by hours desc) ─────
   const availableKinds = useMemo(() => {
