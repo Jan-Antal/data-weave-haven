@@ -316,31 +316,67 @@ function useDilnaData(weekOffset: number) {
       // daylog data is built so we can skip bundles that already met their weekly target.
       const spilledOnlyProjects = new Set<string>();
 
-      // Latest daily-log percent per project per week — keyed `${pid}::${weekKey}`.
-      // Logs are stored as `${projectId}::${weekKey}` bundle_ids (one percent per project per week).
+      // ── BUNDLE-SCOPED daily-log aggregator ──
+      // Daily logs are written by Vyroba.tsx with bundle-precise IDs:
+      //   - split bundles → `${pid}::${weekKey}::SG:${split_group_id}`
+      //   - full bundles  → `${pid}::${weekKey}::${stage_id ?? "none"}::${label ?? "A"}::${split_part ?? "full"}`
+      //   - legacy        → `${pid}::${weekKey}` (pre-migration data, single-bundle weeks)
+      // We keep the LATEST percent per bundle_id (highest day_index, latest logged_at).
+      const pctByBundleId = new Map<string, number>();
+      const seenMeta = new Map<string, { day: number; ts: string }>();
+      // Helper for weekKey → latest project-level fallback (legacy single-bundle key only).
       const pctByProjectWeek = new Map<string, number>();
       // Cumulative last-known percent per project (any week ≤ displayed) — fallback only.
       const latestPctByProject = new Map<string, number>();
       for (const log of dailyLogs) {
+        if (log.percent == null) continue;
+        if (log.week_key?.startsWith("MF_") || log.bundle_id.includes("::MF_")) continue;
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
-        if (log.percent == null) continue;
-        // Skip midflight-import markers (synthetic 100% rows; not real progress logs)
-        if (log.week_key?.startsWith("MF_") || log.bundle_id.includes("::MF_")) continue;
         const pct = Number(log.percent);
-        pctByProjectWeek.set(`${pid}::${log.week_key}`, pct);
+        const meta = seenMeta.get(log.bundle_id);
+        const isNewer =
+          !meta ||
+          log.day_index > meta.day ||
+          (log.day_index === meta.day && log.logged_at > meta.ts);
+        if (isNewer) {
+          pctByBundleId.set(log.bundle_id, pct);
+          seenMeta.set(log.bundle_id, { day: log.day_index, ts: log.logged_at });
+        }
+        // Legacy bare key: only `pid::week` (no extra `::` suffix)
+        const isBareKey = log.bundle_id === `${pid}::${log.week_key}`;
+        if (isBareKey) pctByProjectWeek.set(`${pid}::${log.week_key}`, pct);
         latestPctByProject.set(pid, pct);
       }
 
-      // Latest daily-log percent per project for the PREVIOUS week (used by spillover guard).
+      // Build the bundle storage ID exactly like Vyroba.tsx does for a given bundle.
+      function buildBundleStorageId(
+        pid: string,
+        weekKey: string,
+        splitGroupId: string | null,
+        stageId: string | null,
+        bundleLabel: string | null,
+        splitPart: number | null
+      ): string {
+        if (splitGroupId) return `${pid}::${weekKey}::SG:${splitGroupId}`;
+        return `${pid}::${weekKey}::${stageId ?? "none"}::${bundleLabel ?? "A"}::${splitPart ?? "full"}`;
+      }
+
+      // Latest daily-log percent for the PREVIOUS week (used by spillover guard).
+      // Index by bundle_id so we can ask per-bundle, not just per-project.
+      const prevPctByBundleId = new Map<string, number>();
+      const prevSeenMeta = new Map<string, number>();
       const prevLatestPctByProject = new Map<string, number>();
       for (const log of prevDailyLogs) {
+        if (log.percent == null) continue;
+        if (log.bundle_id.includes("::MF_")) continue;
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
-        if (log.percent == null) continue;
-        // prev select is filtered by exact week_key, so MF_ markers cannot match here;
-        // still defensively skip bundle_ids that include the MF_ marker prefix.
-        if (log.bundle_id.includes("::MF_")) continue;
+        const seenDay = prevSeenMeta.get(log.bundle_id) ?? -1;
+        if (log.day_index >= seenDay) {
+          prevPctByBundleId.set(log.bundle_id, Number(log.percent));
+          prevSeenMeta.set(log.bundle_id, log.day_index);
+        }
         prevLatestPctByProject.set(pid, Number(log.percent));
       }
 
