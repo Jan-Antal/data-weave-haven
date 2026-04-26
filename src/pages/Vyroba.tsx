@@ -10,6 +10,7 @@ import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/use
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { deriveBundleSplitMeta, formatBundleDisplayLabel } from "@/lib/productionBundles";
+import { getWorkWeekMonday } from "@/lib/workWeek";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
