@@ -1043,8 +1043,14 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
                                     />
                                   )}
                                 </div>
-                                <div className="w-9 text-right tabular-nums text-muted-foreground shrink-0">
-                                  {b.completionPct != null ? `${Math.round(b.completionPct)}%` : "—"}
+                                <div className="w-[72px] text-right tabular-nums text-muted-foreground shrink-0">
+                                  <span className="font-medium text-foreground">
+                                    {b.completionPct != null ? `${Math.round(b.completionPct)}%` : "—"}
+                                  </span>
+                                  <span className="mx-0.5 opacity-60">/</span>
+                                  <span>
+                                    {b.expectedPct != null ? `${Math.round(b.expectedPct)}%` : "—"}
+                                  </span>
                                 </div>
                               </div>
                             );
