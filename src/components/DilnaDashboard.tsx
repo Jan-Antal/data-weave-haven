@@ -222,7 +222,7 @@ function useDilnaData(weekOffset: number) {
       }>;
       const prevSchedule = (prevSchedRes.data || []) as typeof schedule;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
-      const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
+      const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; week_key: string; day_index: number; percent: number; logged_at: string }>;
       const prevDailyLogs = ((prevDailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number }>;
       const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
       const exchangeRates = (exchangeRes.data || []) as Array<{ year: number; eur_czk: number }>;
