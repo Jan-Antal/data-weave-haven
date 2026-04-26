@@ -1859,16 +1859,10 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
 
   return (
     <div ref={setBundleNodeRef} data-bundle-key={bundleKey} className="rounded-[6px] overflow-hidden relative shrink-0" style={{
-      borderTop: forecastDarkMode
-        ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
-      borderRight: forecastDarkMode
-        ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
-      borderBottom: forecastDarkMode
-        ? (isHighlighted ? "2px solid #d97706" : "1px solid #3d4558")
-        : (shouldHighlightOverdue ? "1px solid hsl(0 60% 82%)" : isHighlighted ? "2px solid #d97706" : "1px solid #ece8e2"),
-      borderLeft: isHighlighted ? "4px solid #d97706" : isSpilled ? "4px solid #d97706" : `4px solid ${borderLeftColor}`,
+      borderTop: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
+      borderRight: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
+      borderBottom: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
+      borderLeft: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
       backgroundColor: forecastDarkMode
         ? (isHighlighted ? "rgba(217,119,6,0.08)" : "#252a35")
         : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isHighlighted ? "rgba(217,119,6,0.05)" : "#ffffff"),
