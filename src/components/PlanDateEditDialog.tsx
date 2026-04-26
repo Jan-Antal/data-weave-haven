@@ -51,7 +51,8 @@ interface PlanDateEditDialogProps {
 
 export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEditDialogProps) {
   const updateProject = useUpdateProject();
-  const { isViewer, isFieldReadOnly } = useAuth();
+  const { isViewer, isFieldReadOnly, canWriteHarmonogram } = useAuth();
+  const isReadOnly = isViewer || !canWriteHarmonogram;
   const [values, setValues] = useState<Record<FieldKey, string | null>>({
     datum_objednavky: null,
     datum_smluvni: null,
@@ -153,7 +154,7 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
           {DATE_FIELDS.map((f) => {
             const raw = values[f.key];
             const parsed = raw ? parseAppDate(raw) : undefined;
-            const readOnly = isFieldReadOnly(f.key, (project as any)[f.key] ?? null);
+            const readOnly = isReadOnly || isFieldReadOnly(f.key, (project as any)[f.key] ?? null);
             const hasWarning = fieldsWithWarning.has(f.key);
 
             return (
@@ -224,9 +225,9 @@ export function PlanDateEditDialog({ project, open, onOpenChange }: PlanDateEdit
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            {isViewer ? "Zavřít" : "Zrušit"}
+            {isReadOnly ? "Zavřít" : "Zrušit"}
           </Button>
-          {!isViewer && (
+          {!isReadOnly && (
             <Button size="sm" onClick={handleSave} disabled={!hasChanges}>
               Uložit
             </Button>

@@ -34,7 +34,8 @@ interface StageDateEditDialogProps {
 
 export function StageDateEditDialog({ stage, project, open, onOpenChange }: StageDateEditDialogProps) {
   const updateStage = useUpdateStage();
-  const { isViewer, isFieldReadOnly } = useAuth();
+  const { isViewer, isFieldReadOnly, canWriteHarmonogram } = useAuth();
+  const isReadOnly = isViewer || !canWriteHarmonogram;
   const [values, setValues] = useState<Record<FieldKey, string | null>>({
     start_date: null,
     datum_smluvni: null,
@@ -154,7 +155,7 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
             const raw = values[f.key];
             const parsed = raw ? parseAppDate(raw) : undefined;
             const mappedField = fieldPermissionMap[f.key] ?? f.key;
-            const readOnly = isFieldReadOnly(mappedField, (stage as any)[f.key] ?? null);
+            const readOnly = isReadOnly || isFieldReadOnly(mappedField, (stage as any)[f.key] ?? null);
             const hasWarning = fieldsWithWarning.has(f.key);
 
             return (
@@ -247,9 +248,9 @@ export function StageDateEditDialog({ stage, project, open, onOpenChange }: Stag
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            {isViewer ? "Zavřít" : "Zrušit"}
+            {isReadOnly ? "Zavřít" : "Zrušit"}
           </Button>
-          {!isViewer && (
+          {!isReadOnly && (
             <Button size="sm" onClick={handleSave} disabled={!hasChanges}>
               Uložit
             </Button>
