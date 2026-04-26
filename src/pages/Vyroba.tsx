@@ -2082,7 +2082,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                             <ProjectRow
                               key={p.projectId}
                               project={p}
-                              isSelected={selectedProjectId === p.projectId}
+                              isSelected={selectedCardKey === p.cardKey}
                               onSelect={handleSelectProject}
                               onContextMenu={handleContextMenu}
                               getProjectStatus={getProjectStatus}
@@ -2110,7 +2110,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                           <ProjectRow
                             key={p.projectId}
                             project={p}
-                            isSelected={selectedProjectId === p.projectId}
+                            isSelected={selectedCardKey === p.cardKey}
                             onSelect={handleSelectProject}
                             onContextMenu={handleContextMenu}
                             getProjectStatus={getProjectStatus}
@@ -2130,7 +2130,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               ⏸ Pozastavené ({slidePaused.length})
                             </div>
                             {slidePaused.map((p) => {
-                              const isSelected = selectedProjectId === p.projectId;
+                              const isSelected = selectedCardKey === p.cardKey;
                               const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
                               const now = new Date();
                               const daysUntil = expectedDate
@@ -2147,7 +2147,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               return (
                                 <button
                                   key={p.projectId}
-                                  onClick={() => handleSelectProject(p.projectId)}
+                                  onClick={() => handleSelectProject(p.cardKey)}
                                   onContextMenu={(e) => handleContextMenu(e, p.projectId)}
                                   className="w-full text-left flex items-stretch transition-colors"
                                   style={{
@@ -2274,7 +2274,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       <ProjectRow
                         key={p.projectId}
                         project={p}
-                        isSelected={selectedProjectId === p.projectId}
+                        isSelected={selectedCardKey === p.cardKey}
                         onSelect={handleSelectProject}
                         onContextMenu={handleContextMenu}
                         getProjectStatus={getProjectStatus}
@@ -2302,7 +2302,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     <ProjectRow
                       key={p.projectId}
                       project={p}
-                      isSelected={selectedProjectId === p.projectId}
+                      isSelected={selectedCardKey === p.cardKey}
                       onSelect={handleSelectProject}
                       onContextMenu={handleContextMenu}
                       getProjectStatus={getProjectStatus}
@@ -2322,7 +2322,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                         ⏸ Pozastavené ({pausedProjects.length})
                       </div>
                       {pausedProjects.map((p) => {
-                        const isSelected = selectedProjectId === p.projectId;
+                        const isSelected = selectedCardKey === p.cardKey;
                         const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
                         const now = new Date();
                         const daysUntil = expectedDate
@@ -2339,7 +2339,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                         return (
                           <button
                             key={p.projectId}
-                            onClick={() => handleSelectProject(p.projectId)}
+                            onClick={() => handleSelectProject(p.cardKey)}
                             onContextMenu={(e) => handleContextMenu(e, p.projectId)}
                             className="w-full text-left flex items-stretch transition-colors"
                             style={{
