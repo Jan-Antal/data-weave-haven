@@ -342,7 +342,7 @@ function useDilnaData(weekOffset: number) {
       const knownProjectIds = new Set(projMap.keys());
 
       // ── Chain windows for split projects (chain-window-aware expected progress) ──
-      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string; split_group_id: string | null; bundle_label: string | null }>);
+      const allSched = ((allSchedRes.data || []) as Array<{ project_id: string; scheduled_week: string; scheduled_hours: number; status: string; split_group_id: string | null; split_part: number | null; stage_id: string | null; bundle_label: string | null; bundle_type: string | null }>);
       const chainByProject = new Map<string, Array<{ week: string; hours: number }>>();
       for (const row of allSched) {
         if (row.status === "historical" || row.status === "cancelled") continue;
