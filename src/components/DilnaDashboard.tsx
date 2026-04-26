@@ -486,6 +486,8 @@ function useDilnaData(weekOffset: number) {
           isSpilled: true,
         });
       }
+
+      // ── Calculate prodej value (mirrors WeeklySilos.calcProdejValue) ──
       function calcDilnaValue(weekHours: number, projectId: string): number {
         const proj = projMap.get(projectId);
         let prodejniCena = proj?.prodejni_cena ?? 0;
