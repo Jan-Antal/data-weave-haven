@@ -2572,7 +2572,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   expandedMap={expandedMap}
                   setExpandedMap={setExpandedMap}
                   bundleId={bundleId(selectedProject)}
-                  allItems={getItemsForBundle(selectedProject)}
+                  allItems={getAllItemsForBundle(selectedProject)}
                   scheduleData={scheduleData}
                   pushUndo={pushUndo}
                   onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
@@ -2680,7 +2680,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     expandedMap={expandedMap}
                     setExpandedMap={setExpandedMap}
                     bundleId={bundleId(selectedProject)}
-                    allItems={getItemsForBundle(selectedProject)}
+                    allItems={getAllItemsForBundle(selectedProject)}
                     scheduleData={scheduleData}
                     pushUndo={pushUndo}
                     onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
