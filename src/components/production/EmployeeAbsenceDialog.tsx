@@ -35,6 +35,21 @@ export function EmployeeAbsenceDialog({ open, onOpenChange, employeeId, employee
   const [openEnded, setOpenEnded] = useState(false);
   const [activePicker, setActivePicker] = useState<"from" | "to">("from");
   const create = useCreateAbsencePeriod();
+  const del = useDeleteAbsencePeriod();
+  const { data: allPeriods = [] } = useManualAbsences();
+  const employeePeriods = allPeriods
+    .filter(p => p.employee_id === employeeId)
+    .sort((a, b) => b.date_from.localeCompare(a.date_from));
+
+  const handleDelete = async (ids: string[], label: string) => {
+    if (!confirm(`Smazat absenci ${label}?`)) return;
+    try {
+      await del.mutateAsync(ids);
+      toast({ title: "Absence smazána" });
+    } catch (e: any) {
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+    }
+  };
 
   const handleSave = async () => {
     if (!dateFrom) {
