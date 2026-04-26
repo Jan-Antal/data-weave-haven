@@ -32,6 +32,7 @@ import { resolveDeadline } from "@/lib/deadlineWarning";
 import { ForecastWeekContent, ForecastSplitDialog } from "./ForecastOverlay";
 import { type SafetyNetProject } from "./ForecastSafetyNet";
 import { buildBundleKey, canAcceptBundleDrop, deriveBundleSplitMeta, formatBundleDisplayLabel } from "@/lib/productionBundles";
+import { getWorkWeekMonday, getSpillSourceWeekMonday, getSpillDestinationWeekMonday } from "@/lib/workWeek";
 
 function formatCompactCzk(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -232,7 +233,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
   });
 
   // Latest daily-log percent per project for the REAL current week (used by spillover goal-aware filter).
-  const realCurrentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
+  const realCurrentWeekKey = useMemo(() => toLocalDateStr(getSpillSourceWeekMonday()), []);
   const { data: realWeekLatestPct } = useQuery({
     queryKey: ["real-week-latest-pct", realCurrentWeekKey],
     staleTime: 30_000,
@@ -372,7 +373,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
   }, [allProjects]);
 
   const weeks = useMemo(() => {
-    const monday = getMonday(new Date());
+    const monday = getWorkWeekMonday();
     const result: { start: Date; end: Date; weekNum: number; key: string; isPast: boolean }[] = [];
     for (let i = -pastWeeksLoaded; i < futureWeekCount; i++) {
       const start = new Date(monday);
@@ -448,15 +449,11 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
     }
   }, [searchMatchWeekKey, focusedMatchKey]);
 
-  const currentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
+  const currentWeekKey = useMemo(() => toLocalDateStr(getWorkWeekMonday()), []);
 
-  // Spilled bundles attach to T+1 (one week AFTER the real current week). Source = real current
-  // week's unfinished bundles, excluding midflight legacy rows. Never spill into T or beyond T+1.
-  const spilloverDestKey = useMemo(() => {
-    const m = getMonday(new Date());
-    m.setDate(m.getDate() + 7);
-    return toLocalDateStr(m);
-  }, []);
+  // Spilled bundles attach to T+1 (= aktuálny pracovný týždeň). Source = predchádzajúci
+  // pracovný týždeň. Cez víkend tak prelité bundly z piatka uvidíme hneď v sobotu.
+  const spilloverDestKey = useMemo(() => toLocalDateStr(getSpillDestinationWeekMonday()), []);
   const spilledBundlesForCurrent = useMemo(() => {
     if (!scheduleData) return [] as Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }>;
 
