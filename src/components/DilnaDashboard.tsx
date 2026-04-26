@@ -153,11 +153,14 @@ function useDilnaData(weekOffset: number) {
           .eq("week_year", weekInfo.year)
           .eq("week_number", weekInfo.week)
           .maybeSingle(),
-        // Latest daily-log percent per bundle for THIS week
+        // Latest daily-log percent per bundle UP TO and INCLUDING the displayed week.
+        // Fallback chain: if displayed week has no log, the bar shows the last known
+        // percent from a prior week (so a 25% bundle in T17 stays at 25% in T18).
         supabase
           .from("production_daily_logs" as any)
-          .select("bundle_id, day_index, percent, logged_at")
-          .eq("week_key", weekInfo.weekKey)
+          .select("bundle_id, week_key, day_index, percent, logged_at")
+          .lte("week_key", weekInfo.weekKey)
+          .order("week_key", { ascending: true })
           .order("day_index", { ascending: true }),
         // Latest daily-log percent for the PREVIOUS week (used by goal-aware spillover guard).
         // Only meaningful when displayed week == real T+1.
@@ -219,7 +222,7 @@ function useDilnaData(weekOffset: number) {
       }>;
       const prevSchedule = (prevSchedRes.data || []) as typeof schedule;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
-      const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
+      const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; week_key: string; day_index: number; percent: number; logged_at: string }>;
       const prevDailyLogs = ((prevDailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number }>;
       const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
       const exchangeRates = (exchangeRes.data || []) as Array<{ year: number; eur_czk: number }>;
@@ -313,14 +316,14 @@ function useDilnaData(weekOffset: number) {
       // daylog data is built so we can skip bundles that already met their weekly target.
       const spilledOnlyProjects = new Set<string>();
 
-      // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
+      // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`.
+      // Logs are pre-sorted by week_key ASC, day_index ASC, so the last write per project
+      // wins → cumulative "last known percent up to displayed week".
       const latestPctByProject = new Map<string, number>();
       for (const log of dailyLogs) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
-        const cur = latestPctByProject.get(pid);
-        // Take max day_index (most recent). Logs already ordered ascending → simple overwrite works.
-        if (cur == null || log.percent != null) latestPctByProject.set(pid, Number(log.percent));
+        if (log.percent != null) latestPctByProject.set(pid, Number(log.percent));
       }
 
       // Latest daily-log percent per project for the PREVIOUS week (used by spillover guard).
