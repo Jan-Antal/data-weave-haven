@@ -694,6 +694,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       if (!a.isPaused && b.isPaused) return -1;
       return (b.isSpilled ? 1 : 0) - (a.isSpilled ? 1 : 0);
     });
+    // DEBUG: log composition for current week
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.log('[VYROBA debug] week=', weekKey, 'result=', result.map(r => ({ pid: r.projectId, isSpilled: r.isSpilled, hasSpilled: r.hasSpilledItems, items: r.scheduleItems.length })));
+    }
     return result;
   }, [scheduleData, weekKey, currentMonday, isItemDone]);
 
