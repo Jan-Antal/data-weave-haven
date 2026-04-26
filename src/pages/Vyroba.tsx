@@ -217,8 +217,13 @@ function getProjectsForWeek(
     const realWeekKey = weekKeyStr(realMondayForHelper);
     const realSilo = scheduleData.get(realWeekKey);
     if (realSilo) {
+      const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_part: number | null }) =>
+        `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}::${b.split_part ?? "full"}`;
+      const destSilo = scheduleData.get(slideWeekKey);
+      const destBundleKeys = new Set<string>((destSilo?.bundles || []).map(bundleKey));
+
       for (const b of realSilo.bundles) {
-        if (result.some((r) => r.projectId === b.project_id)) continue;
+        if (destBundleKeys.has(bundleKey(b))) continue;
         const activeItems = b.items.filter(
           (i: ScheduleItem) =>
             (i.status === "scheduled" || i.status === "in_progress") &&
@@ -226,14 +231,22 @@ function getProjectsForWeek(
             !itemDone(i),
         );
         if (activeItems.length === 0) continue;
-        result.push({
-          projectId: b.project_id,
-          projectName: b.project_name,
-          totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
-          scheduleItems: activeItems,
-          color: getProjectColor(b.project_id),
-          isSpilled: true,
-        });
+
+        const existing = result.find((r) => r.projectId === b.project_id);
+        if (existing) {
+          existing.scheduleItems = [...existing.scheduleItems, ...activeItems];
+          existing.totalHours += activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
+          existing.hasSpilledItems = true;
+        } else {
+          result.push({
+            projectId: b.project_id,
+            projectName: b.project_name,
+            totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
+            scheduleItems: activeItems,
+            color: getProjectColor(b.project_id),
+            isSpilled: true,
+          });
+        }
       }
     }
   }
