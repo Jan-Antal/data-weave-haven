@@ -1401,7 +1401,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       qc.invalidateQueries({ queryKey: ["production-daily-logs", weekKey] });
 
       // Log "Nad plán" activity if over weekly goal
-      const wGoal = getWeeklyGoal(selectedProject.projectId);
+      const wGoal = getWeeklyGoal(selectedProject);
       if (logPercent > wGoal) {
         const {
           data: { user: logUser },
@@ -2215,10 +2215,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               onSelect={handleSelectProject}
                               onContextMenu={handleContextMenu}
                               getProjectStatus={getProjectStatus}
-                              getBundleProgress={() => getBundleProgress(p.projectId)}
+                              getBundleProgress={() => getBundleProgress(p)}
                               getLatestPhase={getLatestPhase}
                               statusColors={statusColors}
-                              weeklyGoal={getWeeklyGoal(p.projectId)}
+                              weeklyGoal={getWeeklyGoal(p)}
                               isMobile={isMobile}
                             />
                           ))}
@@ -2243,10 +2243,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                             onSelect={handleSelectProject}
                             onContextMenu={handleContextMenu}
                             getProjectStatus={getProjectStatus}
-                            getBundleProgress={() => getBundleProgress(p.projectId)}
+                            getBundleProgress={() => getBundleProgress(p)}
                             getLatestPhase={getLatestPhase}
                             statusColors={statusColors}
-                            weeklyGoal={getWeeklyGoal(p.projectId)}
+                            weeklyGoal={getWeeklyGoal(p)}
                             isMobile={isMobile}
                           />
                         ))}
@@ -2407,10 +2407,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                         onSelect={handleSelectProject}
                         onContextMenu={handleContextMenu}
                         getProjectStatus={getProjectStatus}
-                        getBundleProgress={() => getBundleProgress(p.projectId)}
+                        getBundleProgress={() => getBundleProgress(p)}
                         getLatestPhase={getLatestPhase}
                         statusColors={statusColors}
-                        weeklyGoal={getWeeklyGoal(p.projectId)}
+                        weeklyGoal={getWeeklyGoal(p)}
                         isMobile={isMobile}
                       />
                     ))}
@@ -2435,10 +2435,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       onSelect={handleSelectProject}
                       onContextMenu={handleContextMenu}
                       getProjectStatus={getProjectStatus}
-                      getBundleProgress={() => getBundleProgress(p.projectId)}
+                      getBundleProgress={() => getBundleProgress(p)}
                       getLatestPhase={getLatestPhase}
                       statusColors={statusColors}
-                      weeklyGoal={getWeeklyGoal(p.projectId)}
+                      weeklyGoal={getWeeklyGoal(p)}
                       isMobile={isMobile}
                     />
                   ))}
@@ -2550,7 +2550,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
                   getExpectedPct={getExpectedPct}
                   chainWindow={getChainWindow(selectedProject.projectId)}
-                  status={getProjectStatus(selectedProject.projectId)}
+                  status={getProjectStatus(selectedProject)}
                   latestPct={getLatestPercent(selectedProject.projectId)}
                   latestPhase={getLatestPhase(selectedProject.projectId)}
                   logs={getLogsForProject(selectedProject.projectId)}
@@ -2563,9 +2563,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                   dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                   onDismissDyha={() => setDyhaDismissed((prev) => new Set(prev).add(selectedProject.projectId))}
-                  weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
-                  bundleProgress={getBundleProgress(selectedProject.projectId)}
-                  isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
+                  weeklyGoal={getWeeklyGoal(selectedProject)}
+                  bundleProgress={getBundleProgress(selectedProject)}
+                  isWeeklyGoalMet={isWeeklyGoalMet(selectedProject)}
                   areAllPartsCompleted={(itemCode, itemName) =>
                     areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)
                   }
@@ -2658,7 +2658,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
                     getExpectedPct={getExpectedPct}
                     chainWindow={getChainWindow(selectedProject.projectId)}
-                    status={getProjectStatus(selectedProject.projectId)}
+                    status={getProjectStatus(selectedProject)}
                     latestPct={getLatestPercent(selectedProject.projectId)}
                     latestPhase={getLatestPhase(selectedProject.projectId)}
                     logs={getLogsForProject(selectedProject.projectId)}
@@ -2671,9 +2671,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     onOpenProjectDetail={() => openProjectDetail(selectedProject.projectId)}
                     dyhaDismissed={dyhaDismissed.has(selectedProject.projectId)}
                     onDismissDyha={() => setDyhaDismissed((prev) => new Set(prev).add(selectedProject.projectId))}
-                    weeklyGoal={getWeeklyGoal(selectedProject.projectId)}
-                    bundleProgress={getBundleProgress(selectedProject.projectId)}
-                    isWeeklyGoalMet={isWeeklyGoalMet(selectedProject.projectId)}
+                    weeklyGoal={getWeeklyGoal(selectedProject)}
+                    bundleProgress={getBundleProgress(selectedProject)}
+                    isWeeklyGoalMet={isWeeklyGoalMet(selectedProject)}
                     areAllPartsCompleted={(itemCode, itemName) =>
                       areAllPartsCompleted(selectedProject.projectId, itemCode, itemName)
                     }
@@ -2756,7 +2756,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     )}
                   </div>
                   {(() => {
-                    const logWeeklyGoal = selectedProject ? getWeeklyGoal(selectedProject.projectId) : 100;
+                    const logWeeklyGoal = selectedProject ? getWeeklyGoal(selectedProject) : 100;
                     return (
                       <div>
                         <div className="text-xs font-semibold mb-2 text-muted-foreground">Celková hotovost</div>
