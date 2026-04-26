@@ -1,104 +1,96 @@
+# Vyroba T18 nesedí s Dílňou — opravy
 
-## Tri bugy, jeden koreň: pracujeme na úrovni projektu, máme pracovať na úrovni **bundle**
+Po vizuálnom porovnaní vidím tri rozpory medzi modulom **Výroba** a **Dílňou** v T18:
 
-Súčasná logika všade agreguje na `project_id` (sidebar karta, target, spillover, items v paneli). Ale Allianz/Insia majú v jednom týždni dva bundles (split A-4 + full B), Multisport má len full A. Každý bundle má vlastný plán a vlastné prvky a má sa hodnotiť samostatne.
-
----
-
-### Bug 1 — Spillover nesmie obsahovať bundles, ktoré splnili svoj týždenný cieľ
-
-Multisport T17: cieľ 20 %, daylog 25 % → splnené → nesmie sa preliať.
-Allianz bundle A T17: cieľ 60 %, daylog 60 % → splnené → nesmie sa preliať.
-
-Aktuálne (`Vyroba.tsx` riadok 658, `WeeklySilos.tsx` riadok 457, `DilnaDashboard.tsx` riadok 306) sa pýtame iba: má bundle aspoň jednu položku v statuse `scheduled`/`in_progress`? Ak áno, prelej. Status sa pri daylog-u nemení (status sa mení len pri completion/expedice), takže projekt s 25 % daylogom má stále `scheduled` status → falošne sa prelieva.
-
-**Fix:** doplniť kontrolu „bundle splnil svoj weekly target podľa daylogu z reálneho T týždňa". Bundle sa **nepreleje** ak `latestDaylogPct(project, T) >= bundleWeeklyTarget`.
-
-`bundleWeeklyTarget` per bundle:
-- **full bundle** (bundle_type = "full" alebo žiadne split_group_id) → `100`
-- **split bundle** → koniec chain window (`chainWindowBySplitGroup.end` resp. v `Vyroba.tsx` `getChainWindow` per split_group_id, nie per project)
-
-Pre `Vyroba.tsx` a `WeeklySilos.tsx`: načítať najnovšie `production_daily_logs` pre realny T týždeň (`bundle_id = projectId::weekKey`, max `day_index`) a skontrolovať per bundle. Pre `DilnaDashboard.tsx`: pridať `prevDailyLogsRes` query (analogicky `prevSchedRes`, gated `weekOffset === 1`) a počítať per bundle.
+| | Dílňa T18 (správne) | Výroba T18 (teraz) |
+|---|---|---|
+| Přelité | Insia A-4, Příluky A-5 | Insia A-4, Příluky A-5 ✅ |
+| Plán | RD Cigánkovi A-13, Multisport A-3, Reklamace Bar terasa A, Allianz A-6 (4 karty) | RD Cigánkovi, Multisport, **Insia A-4 (duplikát)**, **Allianz 5.patro A-5 (CNC, 60%)**, Reklamace Bar terasa, Allianz A-6 (6 kariet) |
+| Header | „PLÁN T18 (4)" | hovorí (4), zobrazuje 6 ❌ |
 
 ---
 
-### Bug 2 — `getWeeklyGoal` musí byť per bundle (split aj full samostatne)
+## Bug 1 — Duplikát Insia A-4 (v Prelitých aj v Pláne)
 
-Allianz T17 obsahuje:
-- bundle A-4 (split, len časť hodín v T17) → cieľ napr. 20 %
-- bundle B (full, dva prvky, oba v T17) → cieľ **100 %**
+**Príčina:** `bundleKey` v dedup logike (`Vyroba.tsx` r. 649-650) zahŕňa `split_part`. Insia A-4 má v T17 jeden split_part a v T18 iný split_part (split chain pokračuje). `bundleKey` v T17 ≠ `bundleKey` v T18, takže `destBundleKeys.has(...)` (r. 657) vráti `false` → spilled entry sa pridá do T18 napriek tomu, že tam už **iný part toho istého split_group** existuje v pláne.
 
-Aktuálny `getChainWindow(pid)` (`Vyroba.tsx` r. 1075) berie všetky split_group_ids projektu a počíta okno proti **všetkým hodinám projektu naprieč všetkými týždňami** → bundle B dostáva to isté okno ako A-4 (úplne nesprávne). To isté `chainWindowByProject` v `DilnaDashboard.tsx` (r. 432).
+**Fix:** Dedup kľúč pre spillover má byť **per split_group_id** (ak existuje), nie per `split_part`. Ak `split_group_id` existuje, použiť ho; inak fallback na `stage_id + bundle_label`.
 
-**Fix:**
-- `Vyroba.tsx`: prepísať `getChainWindow` / `getWeeklyGoal` / `getBundleProgress` / `getProjectStatus` / `isWeeklyGoalMet` tak, aby brali **bundle key** (`stage_id + bundle_label + split_part`) namiesto len `pid`. Karta v sidebari, ktorá reprezentuje bundle, si pýta target podľa svojho bundleKey.
-  - full bundle → `target = 100`, okno = `{ start: 0, end: 100 }`
-  - split bundle → použiť `splitGroupsByBundle` (už existuje, r. 597) a počítať okno cez **chain rovnakého `split_group_id`** (cez všetky týždne), nie cez projekt.
-- `DilnaDashboard.tsx`: `expectedForBundle` (r. 436) už berie `splitGroupId` — len treba zaistiť, že full bundle (žiadne `split_group_id`) dostáva `{ start: 0, end: 100 }` (target 100 %), nie projektové chainWindow. Aj „weekly target" v karte (`expectedPctVal` r. 470) sa musí počítať per bundle, nie per project.
+```ts
+// nový bundleKey pre dedup (riadky 649-650 a obdobne 220-223)
+const bundleKey = (b) => 
+  b.split_group_id 
+    ? `${b.project_id}::SPLIT::${b.split_group_id}` 
+    : `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}`;
+```
 
----
+To zabezpečí, že akýkoľvek part split chainu v T+1 zablokuje spillover ostatných parts toho istého chainu z T.
 
-### Bug 3 — Karta bundlu zobrazuje prvky len svojho bundlu
+## Bug 2 — Allianz 5.patro A-5 (60% CNC) v pláne T18
 
-Aktuálne `selectedProject` (r. 755) reprezentuje celý projekt; `DetailPanel` dostáva `allItems = getAllItemsForProject(selectedProject.projectId)` (r. 2403) → vidí všetky prvky všetkých bundlov projektu naprieč všetkými týždňami.
+V Dílni nie je. To znamená, že buď v `production_schedule` reálne existuje riadok pre Allianz Z-2617-001 v T18 s bundle_label A-5 (a Dílňa ho z nejakého dôvodu odfiltruje), alebo v T18 nie je a Vyroba ho falošne pridáva.
 
-**Fix v dvoch krokoch:**
+**Akcia pred fixom:** Spustiť `supabase--read_query`:
+```sql
+SELECT id, item_code, item_name, scheduled_week, bundle_label, split_part, split_group_id, status, scheduled_hours, is_midflight
+FROM production_schedule 
+WHERE project_id = 'Z-2617-001' 
+ORDER BY scheduled_week, bundle_label;
+```
 
-**A) Sidebar zobrazuje jeden riadok per bundle (nie per projekt).** V `projects` memo (r. 603) namiesto skladania jedného `VyrobaProject` per `project_id` zo všetkých bundles vytvoriť **jeden `VyrobaProject` per bundle** (`projectId + stageId + bundleLabel + splitPart` ako unikátny `bundleKey`). Spillover loop (r. 656) tiež produkuje per-bundle entries (už beží per-bundle, len sa merguje do existujúceho project entry — toto mergovanie zrušiť).
-  - `VyrobaProject` rozšíriť o: `bundleKey: string`, `bundleLabel: string` (display, napr. „A-4" / „B"), `stageId: string | null`, `splitGroupId: string | null`, `splitPart: number | null`, `splitTotal: number | null`, `bundleType: "full" | "split"`.
-  - `selectedProjectId` premenovať na `selectedBundleKey` (alebo držať dvojicu) a `selectedProject` lookup robiť cez `bundleKey`.
-  - Triedenie a header sekcie „Přelité / Plán" funguje rovnako, len granularita je bundle.
+Hypotéza A: existuje midflight legacy riadok v T18 → fix: vylúčiť `is_midflight=true` aj z **current-week silo** loop (r. 611-634), nielen zo spillover loopu. Aktuálne current-week silo neignoruje midflight riadky.
 
-**B) Per-bundle items / progress / target pre `DetailPanel`.**
-  - Nový helper `getAllItemsForBundle(bundleKey)`: vráti len `scheduleItems` daného bundlu (z `selectedProject.scheduleItems` + ak je split, ostatné parts naprieč týždňami matchované cez `split_group_id`). Použiť namiesto `getAllItemsForProject`.
-  - `getBundleProgress`, `getWeeklyGoal`, `getChainWindow`, `getProjectStatus`, `isWeeklyGoalMet`, `getExpectedPct`, `getCumulativeForDay`, `getLatestPercent` — všetky volania v r. 2393–2417 prepojiť na `selectedProject` (bundle), nie len `pid`. Per-bundle daylog momentálne neexistuje (daylog je per project+week), takže `getLatestPercent` zostáva per project — to si necháme, ale `weeklyGoal` a `chainWindow` budú per bundle (čo opraví Bug 2).
-  - V `DetailPanel` (r. 3607) zoskupenie do `currentItems / futureItems / completedItems` zostáva, ale ide len cez `allItems` daného bundlu.
+Hypotéza B: existuje reálny scheduled riadok v T18 ale je `cancelled`/`completed`/`expedice` → fix: filter v r. 612-621 už pokrýva `scheduled`/`in_progress`/`paused`/`isItemDone`. Ak Allianz 5.patro je `completed`, mal by sa zobraziť ako done (nie ako 60% Pozadu). Treba over.
 
-**C) DilnaDashboard karta projektu.** Tu user nepýtal zmenu granularity karty; karta zostáva per projekt, len **bundle riadky** (`bundleRows`) majú správny `expectedPct` (Bug 2) a `isSpilled` riadky majú správny goal-aware filter (Bug 1).
+Hypotéza C: Vyrobu pridáva projekt 2× pretože A-5 má dva bundle_labels rovnakého stage_id (napr. CNC pre dve etapy). Vtedy current-week loop emituje dva entries pre rovnaký project_id (jeden správny A-6, jeden „starý" A-5).
 
----
+Po dotaze na DB sa rozhodneme medzi A/B/C — riešenie je jeden riadkový filter v `silo.bundles` loope.
 
-### Konkrétne zmeny po súboroch
+## Bug 3 — Header count „(4)" ale 6 kariet v sekcii Plán
 
-**`src/pages/Vyroba.tsx`**
-- Typ `VyrobaProject` (r. 290) → pridať `bundleKey`, `bundleLabel`, `stageId`, `splitGroupId`, `splitPart`, `splitTotal`, `bundleType`.
-- `projects` memo (r. 603) a slide builder (r. 200–260) → emitovať jeden entry per bundle, nie per projekt; v sortingu dať completed úplne dole.
-- Spillover loop (r. 645–684) → použije nové bundle-level entries; doplniť kontrolu `latestDaylog(realT, project) >= bundleTarget` (target per bundle, full=100, split=window.end). Daylogy načítať novým hookom alebo rozšíriť `useDailyLogs`/použiť existujúce `allLatestLogs` (r. ~890) pre realny T week.
-- `getChainWindow` (r. 1075), `getWeeklyGoal` (r. 990), `getBundleProgress` (r. 954), `getProjectStatus` (r. 1123), `isWeeklyGoalMet` (r. 1027), `getExpectedPct` (r. 1110) → akceptujú `bundleKey`/`splitGroupId|null` namiesto len `pid`. Pre full bundle vrátiť `target=100`, `chainWindow={start:0,end:100}`.
-- `selectedProjectId` → `selectedBundleKey`; všetky lookupy v `DetailPanel` props (r. 2383–2420 a mobil 2491–2528) prepnúť na bundle granularity.
-- Nový `getAllItemsForBundle(bundleKey)` (filtruje split chain pre split bundles, alebo len bundle items pre full).
-- Stats (r. 1151) a iné agregácie nech iterujú nad bundles, alebo sa prepoja jasne.
+`spilledProjects` (r. 1832) = `isSpilled === true`. `normalProjects` = `isSpilled === false`. Project s mergeovaným spilled bundle (Insia A-4) má `isSpilled=false, hasSpilledItems=true` → padne do `normalProjects` → zobrazí sa v sekcii Plán **navyše** k Prelitým.
 
-**`src/components/production/WeeklySilos.tsx`**
-- `spilledBundlesForCurrent` (r. 436–479) → načítať `production_daily_logs` pre `currentWeekKey` (per project, max day_index), per bundle skip ak `latestPct >= bundleTarget` (full=100, split=`chainWindowBySplitGroup.end` — pridať helper podobný DilnaDashboard).
+**Fix:** Project s `hasSpilledItems === true` a **bez vlastných current-week items** (čo môže nastať len ak je čisto spillover-only — to ale potom má `isSpilled=true`) … Vlastne Insia A-4 má v T18 aj vlastné current-week items (pôvodný plán A-4 split chain pokračovanie), preto je v `silo.bundles` zaradený ako normal. To vlastne potvrdzuje **Bug 1**: ide o split chain pokračovanie, ktoré sa správne objaví v Pláne, a spillover ho nemá ešte raz pridávať. Po fixe Bug 1 zmizne aj duplikát z Plánu? Nie — v Pláne je legitímne (chain pokračuje), v Prelitých zmizne. To by výsledne dalo Plán = 5 kariet (RD, Multisport, **Insia A-4 = legit chain pokračovanie**, Reklamace, Allianz A-6) a Přelité = 1 (len Příluky).
 
-**`src/components/DilnaDashboard.tsx`**
-- Pridať `prevDailyLogsRes` query (gated `weekOffset === 1`, `week_key = prevWeekInfo.weekKey`).
-- Druhý pass spilled (r. 306–329) → per bundle skip ak `prevLatestPct(project) >= prevBundleTarget` (full=100, split=window.end z `chainWindowBySplitGroup` rátaného aj pre prevWeek slice).
-  - `chainWindowBySplitGroup` momentálne počíta slice pre aktuálny `weekInfo.weekKey`. Pre spillover potrebujeme aj slice pre `prevWeekInfo.weekKey` → buď spočítať druhú mapu, alebo refaktorovať helper aby brala week key.
-- `expectedForBundle` (r. 436) → ak `splitGroupId == null` (full bundle) → vrátiť `100` (alebo `100*dayFraction`?), nie projektové chainWindow. To bude treba pre obe vetvy (current bundles aj spilled-only).
-- `expectedPctVal` (r. 470, karta-level) → má zostať „project level" pre header karty, alebo ho odvodiť z najťažšieho bundlu — radšej **ponechať project-level** (header je sumár), ale **per-bundle riadky** v karte musia mať vlastný `bExpected` (Bug 2 fix).
+**Ale Dílňa hovorí Prelité = 2 (Insia A-4, Příluky), Plán = 4 (bez Insia A-4).** To znamená že Dílňa Insia A-4 v T18 **nepovažuje za nový plán**, len za pokračovanie spilled chainu z T17. Vyroba s tým nesúhlasí, lebo pre ňu je každý scheduled row v T18 = T18 plan.
 
----
+**Rozhodnutie potrebné od usera (otázka v pláne):** ktorá interpretácia je správna pre Insia A-4?
+- (a) **Dílňa má pravdu** → ak split chain pokračuje a predchádzajúci part nie je dokončený, celý chain sa „spája" do Prelitých (t.j. T18 part Insia A-4 prejde do sekcie Přelité spolu s T17 časťou). Vtedy v Pláne T18 = 4 karty, v Prelitých sa Insia A-4 ukáže ako jeden bundle so súčtom hodín T17+T18.
+- (b) **Vyroba má pravdu** → T18 part Insia A-4 je legit Plán T18 (chain pokračuje podľa plánu), T17 part sa nepreleje (lebo je súčasťou plánovaného chainu). Vtedy Dílňa zobrazuje zle.
 
-### Edge cases a explicit decisions
+Z predošlých interakcií („Insia A-4 ma byť v Prelitých v T18") je správny variant **(a)**.
 
-1. **„Splnené" pre full bundle s logom < 100 ale všetky items completed**: ak `bundle.items.every(isItemDone)` → tiež nie spill (už dnes funguje cez status, zachovať OR).
-2. **Bundle bez daylogu**: ak nie je žiaden log v T → spravať sa ako predtým (spilluje sa, ak nie sú statusovo done).
-3. **Daily-log granularita**: log je per `${projectId}::${weekKey}`, nie per bundle → všetky bundles toho istého projektu v jednom týždni zdielajú ten istý % completion. To je **akceptovaný kompromis** (target sa rozlíši, completion je zdieľaný). Ak Allianz A-4 má cieľ 20 % a B má cieľ 100 %, a daylog je 25 %, tak A-4 je „on track" (25≥20) a B je „behind" (25<100). To je správne z pohľadu projektu — nemáme presnejšie dáta.
-4. **Sidebar v Vyroba — koľko kariet?** Predtým: 1 karta = 1 projekt. Teraz: 1 karta = 1 bundle. Ak Allianz má v T17 dva bundles, bude tam ako dva riadky („Allianz - 5.patro · A-4" a „Allianz - 5.patro · B"). Header sekcie a triedenie ostávajú.
-5. **Mobile**: rovnaká granularita — riadky sú per bundle.
+**Fix pre variant (a):**
+1. Spillover loop musí pridávať do Přelité aj split chain parts, ktoré v T+1 majú vlastný plánovaný riadok — ale **odstrániť ich z current-week silo zoznamu** (zmergovať T17 hodiny + T18 hodiny do jednej spilled karty).
+2. Dedup logikou per `split_group_id` (Bug 1) odfiltrovať T18 plánovanú časť z `result` ak existuje T17 spilled časť toho istého chainu.
+
+## Bug 4 — Goal-aware filter v Vyrobe (kontrola)
+
+WeeklySilos a Dílňa už majú: skip spillover ak `realWeekLatestPct >= bundleTarget`. Vyroba (r. 656-664) **nie**. Ak Insia A-4 daylog T17 = 98% a chain window T17 končí napr. 95%, mal by sa nepreliať. Predošlé fixy v Dílne pridali tento filter, vo Vyrobe chýba.
+
+**Fix:** Načítať daylog pre real T (už je dostupný cez `pagerWk0…wk4`, alebo `allLatestLogs`) a doplniť rovnakú podmienku. Pre full bundle target=100, pre split bundle = `chainWindowBySplitGroup.end`.
+
+Logicky to ale Insia A-4 nezachráni (98% ≥ 95%? áno → nepreleje sa) — to by však bolo v rozpore s Dílňou (kde Insia A-4 v Prelitých JE). Možno chain window pre Insia A-4 v T17 končí na 100% (lebo to je posledný/predposledný kus chainu cez celý projekt) → 98 < 100 → preleje. Treba spočítať konkrétne `chainWindow` pre Insia split_group_id pri T17.
 
 ---
 
-### Žiadne DB zmeny
+## Plán implementácie
 
-Iba aplikačná logika a query rozšírenie (v Dílne pribudne jedna `production_daily_logs` query pre prev týždeň, gated na `weekOffset === 1`).
+1. **Diagnostika dát** (read_query):
+   - Allianz Z-2617-001 schedule rows naprieč týždňami (Bug 2, hypotézy A/B/C).
+   - Insia Z-2605-001 schedule rows + split_group_ids + statuses (overiť Bug 1 a chain window).
+   - Daylog T17 pre Insia + Allianz (overiť goal-aware výpočet).
+
+2. **`src/pages/Vyroba.tsx`** opravy:
+   - Riadok 649-650 (a duplikát ~220): zmeniť `bundleKey` dedup na **per split_group_id** ak existuje (Bug 1).
+   - Riadok 656-664: pridať goal-aware filter (Bug 4) — porovnať `latestPct(realWeek, project)` s `bundleTarget` (full=100, split=chain window end pre konkrétny split_group_id).
+   - Riadok 611-634: vylúčiť T+1 plánovaný riadok zo `silo.bundles` zoznamu, ak ten istý `split_group_id` ide do Prelitých (Bug 3, variant a). Reálne: po vybudovaní spilled-result kolekcie urobiť druhý prechod a zo `result` odstrániť normal entries, ktorých split_group_id je už pokrytý spilled entry — alebo už pri current-week loope skip ak `splitGroupExistsInSpilled`.
+   - Riadok 611 (current-week silo loop): vylúčiť `is_midflight=true` items aj tu (Bug 2, hypotéza A).
+
+3. **Vizuálne over po fixe** (browser): Vyroba T18 musí zobraziť presne to, čo Dílňa T18 — Přelité (2: Insia A-4, Příluky), Plán (4: RD Cigánkovi, Multisport, Reklamace, Allianz A-6).
 
 ---
 
-### Plán overenia
+## Otvorená otázka pre teba
 
-- **/plan-vyroby T18 spillover sila**: Multisport (cieľ 20 %, daylog 25 %) **NIE je**; Allianz A (cieľ 60 %, daylog 60 %) **NIE je**; Allianz B (full, cieľ 100 %, daylog 60 %) **JE**; Insia (split, splnený svoj target) → zmizne ak splnené, ostane ak nie. Iba bundle, čo nesplnil svoj target, sa prelieva.
-- **/vyroba T17 sidebar**: Allianz - 5.patro je dva riadky (A-4 a B), každý so svojim bundleProgress, weeklyGoal, statusom; po kliknutí na B detail panel ukazuje **iba dve položky bundle B**, nie všetky položky Allianz.
-- **/analytics?tab=dilna T17**: karta Allianz - 5.patro ukazuje dva bundle riadky s rôznymi `expected %` (A-4 ~20 %, B 100 %); karta Multisport sa neoznačuje ako spilled v T18.
+Pre **Bug 3 / Insia A-4 split chain pokračovanie** — Dílňa Insia A-4 zobrazuje len v Prelitých (jedna karta, sumárne hodiny). Vyroba má robiť rovnako (variant a)? Alebo má každý split part v každom týždni zostať samostatnou kartou (variant b)? Z toho čo si písal predtým = **variant a**, idem s tým, ak nepovieš inak.
