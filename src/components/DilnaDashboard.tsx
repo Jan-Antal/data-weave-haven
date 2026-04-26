@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ChevronDown, AlertCircle } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
+import { getWorkWeekMonday } from "@/lib/workWeek";
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
@@ -25,10 +26,9 @@ function toLocalDateStr(d: Date): string {
 }
 
 export function getISOWeekForOffset(offset: number): { year: number; week: number; monday: Date; friday: Date; weekKey: string } {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff + offset * 7);
+  // Pracovný týždeň končí piatkom: cez víkend sa už zobrazuje nasledujúci týždeň.
+  const base = getWorkWeekMonday();
+  const monday = new Date(base.getFullYear(), base.getMonth(), base.getDate() + offset * 7);
   const friday = new Date(monday);
   friday.setDate(monday.getDate() + 4);
   const thu = new Date(monday);

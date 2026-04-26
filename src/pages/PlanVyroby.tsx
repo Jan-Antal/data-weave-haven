@@ -37,6 +37,7 @@ import {
 } from "@dnd-kit/core";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProductionSchedule, getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { getWorkWeekMonday } from "@/lib/workWeek";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { PlanVyrobyTableView } from "@/components/production/PlanVyrobyTableView";
@@ -350,10 +351,7 @@ export default function PlanVyroby() {
   }, []);
 
   const findSpillWeek = useCallback((afterWeekKey: string): { key: string; weekNum: number } => {
-    const monday = new Date();
-    const day = monday.getDay();
-    monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
-    monday.setHours(0, 0, 0, 0);
+    const monday = getWorkWeekMonday();
 
     for (let i = 0; i < 16; i++) {
       const d = new Date(monday);
@@ -1224,11 +1222,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
 
   // Current week key
   const currentWeekKey = useMemo(() => {
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-    d.setHours(0, 0, 0, 0);
-    return toLocalDateKey(d);
+    return toLocalDateKey(getWorkWeekMonday());
   }, [toLocalDateKey]);
 
   const visibleMonthWeeks = useMemo(() => {

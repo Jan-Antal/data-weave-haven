@@ -10,6 +10,7 @@ import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/use
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { deriveBundleSplitMeta, formatBundleDisplayLabel } from "@/lib/productionBundles";
+import { getWorkWeekMonday } from "@/lib/workWeek";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -218,7 +219,7 @@ function getProjectsForWeek(
 
   // Spilled: only when the displayed week is exactly T+1 from the real current week.
   // Source = real current week's unfinished, non-midflight items.
-  const realMondayForHelper = (() => { const d = new Date(); const day = d.getDay(); const diff = (day === 0 ? -6 : 1) - day; d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d; })();
+  const realMondayForHelper = getWorkWeekMonday();
   const spilloverDest = new Date(realMondayForHelper); spilloverDest.setDate(spilloverDest.getDate() + 7);
   if (weekKeyStr(spilloverDest) === slideWeekKey) {
     const realWeekKey = weekKeyStr(realMondayForHelper);
@@ -491,7 +492,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   const pagerRef = useRef<HTMLDivElement>(null);
   const pagerCenteringRef = useRef(false);
   const PAGER_OFFSETS = [-2, -1, 0, 1, 2] as const;
-  const currentMonday = useMemo(() => addWeeks(getMonday(new Date()), weekOffset), [weekOffset]);
+  const currentMonday = useMemo(() => addWeeks(getWorkWeekMonday(), weekOffset), [weekOffset]);
   const weekKey = weekKeyStr(currentMonday);
   const weekNum = getISOWeekNumber(currentMonday);
   const friday = useMemo(() => {
@@ -663,7 +664,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     // current week). Items in the real T that are still unfinished spill into T+1. They never
     // spill further (T+2, T+3, …) and they never appear in T or in past weeks. Midflight legacy
     // rows are explicitly excluded — they are historical and must not appear as preliate.
-    const realMonday = getMonday(new Date());
+    const realMonday = getWorkWeekMonday();
     const spilloverDestMonday = new Date(realMonday);
     spilloverDestMonday.setDate(spilloverDestMonday.getDate() + 7);
     const isSpilloverWeek = weekKeyStr(currentMonday) === weekKeyStr(spilloverDestMonday);
@@ -1114,7 +1115,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
     // Past weeks must NOT be overwritten by live completion %. If no log exists
     // for a past week (and no carry-forward applies), keep it at 0.
-    const todayWeekKey = weekKeyStr(getMonday(new Date()));
+    const todayWeekKey = weekKeyStr(getWorkWeekMonday());
     if (weekKey < todayWeekKey) {
       return { totalHours, completedHours, bundleProgress: 0 };
     }
@@ -1295,7 +1296,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const goal = getWeeklyGoal(statusProject ?? pid);
     if (bundleProgress >= goal) return "on-track";
     if (todayDayIndex < 0) {
-      const realWeekKey = weekKeyStr(getMonday(new Date()));
+      const realWeekKey = weekKeyStr(getWorkWeekMonday());
       let hasDelayed = false;
       if (scheduleData) {
         for (const [wk, silo] of scheduleData) {
@@ -2180,7 +2181,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
               }}
             >
               {PAGER_OFFSETS.map(offset => {
-                const slideMonday = addWeeks(getMonday(new Date()), weekOffset + offset);
+                const slideMonday = addWeeks(getWorkWeekMonday(), weekOffset + offset);
                 const slideWeekKey = weekKeyStr(slideMonday);
                 const slideWeekNum = getISOWeekNumber(slideMonday);
                 // Compute projects for this specific slide's week
@@ -6246,7 +6247,7 @@ function WeekPickerPopup({
 
   // Generate weeks: -4 to +12 from today
   const weeks = useMemo(() => {
-    const todayMonday = getMonday(new Date());
+    const todayMonday = getWorkWeekMonday();
     const result: {
       offset: number;
       monday: Date;
