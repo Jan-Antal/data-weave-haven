@@ -223,7 +223,7 @@ function useDilnaData(weekOffset: number) {
       const prevSchedule = (prevSchedRes.data || []) as typeof schedule;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
       const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; week_key: string; day_index: number; percent: number; logged_at: string }>;
-      const prevDailyLogs = ((prevDailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number }>;
+      const prevDailyLogs = ((prevDailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; week_key?: string }>;
       const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
       const exchangeRates = (exchangeRes.data || []) as Array<{ year: number; eur_czk: number }>;
       const realHoursRows = (realHoursRes.data || []) as Array<{ ami_project_id: string; total_hodiny: number }>;
@@ -325,6 +325,9 @@ function useDilnaData(weekOffset: number) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
         if (log.percent == null) continue;
+        // Skip midflight-import / historical synthetic markers.
+        if (log.week_key?.startsWith("MF_") || log.week_key?.startsWith("HIST_")) continue;
+        if (log.bundle_id.includes("::MF_") || log.bundle_id.includes("::HIST_")) continue;
         const pct = Number(log.percent);
         pctByProjectWeek.set(`${pid}::${log.week_key}`, pct);
         latestPctByProject.set(pid, pct);
@@ -335,6 +338,8 @@ function useDilnaData(weekOffset: number) {
       for (const log of prevDailyLogs) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
+        if (log.week_key?.startsWith("MF_") || log.week_key?.startsWith("HIST_")) continue;
+        if (log.bundle_id.includes("::MF_") || log.bundle_id.includes("::HIST_")) continue;
         if (log.percent != null) prevLatestPctByProject.set(pid, Number(log.percent));
       }
 
@@ -407,23 +412,27 @@ function useDilnaData(weekOffset: number) {
       // The carry-forward only applies if the SAME bundle identity actually existed in
       // that prior week — preventing a percent from week N from leaking into a brand-new
       // bundle that did not exist back then.
-      function resolveBundlePct(pid: string, _identity: string): number | null {
-        // 1) Displayed week has its own log → use it.
+      function resolveBundlePct(pid: string, identity: string): number | null {
+        // 1) Displayed week má vlastný log → použiť ho len ak táto identita v ňom existuje.
         const displayedKey = `${pid}::${weekInfo.weekKey}`;
         if (pctByProjectWeek.has(displayedKey)) {
-          return pctByProjectWeek.get(displayedKey)!;
+          const idsHere = identitiesByProjectWeek.get(displayedKey);
+          if (!idsHere || idsHere.has(identity)) {
+            return pctByProjectWeek.get(displayedKey)!;
+          }
         }
-        // 2) Carry the most recent project-level log from any prior week ≤ displayed week.
-        //    Daily logs are project-level (one percent per project per week) and the project's
-        //    completion represents progress on the active bundle chain — a new bundle in the
-        //    next week is the continuation of that chain, so it inherits the percent.
+        // 2) Carry-forward: hľadaj najnovší skorší týždeň, kde TÁTO IDENTITA existovala.
         const priorWeeks = Array.from(pctByProjectWeek.keys())
           .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
           .map(k => k.split("::")[1])
           .sort((a, b) => b.localeCompare(a));
-        if (priorWeeks.length > 0) {
-          return pctByProjectWeek.get(`${pid}::${priorWeeks[0]}`) ?? null;
+        for (const w of priorWeeks) {
+          const ids = identitiesByProjectWeek.get(`${pid}::${w}`);
+          if (ids && ids.has(identity)) {
+            return pctByProjectWeek.get(`${pid}::${w}`) ?? null;
+          }
         }
+        // 3) Brand-new identita → žiadny carry-forward.
         return null;
       }
 
@@ -442,7 +451,23 @@ function useDilnaData(weekOffset: number) {
           cum += share;
         }
         if (!found) return 100;
+        if (isPastWeek) return Math.round(end);
+        if (!isCurrentWeek) return Math.round(end);
         return Math.round(start + (end - start) * dayFraction);
+      }
+
+      // Start (cum) of this week's slice within the chain — used as fallback for split bundles
+      // that have no own daily log yet (carries forward chain position from prior slices).
+      function sliceStartPct(splitGroupId: string): number {
+        const weeks = [...(splitGroupWeeks.get(splitGroupId) ?? [])].sort((a, b) => a.week.localeCompare(b.week));
+        const total = weeks.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) return 0;
+        let cum = 0;
+        for (const w of weeks) {
+          if (w.week === weekInfo.weekKey) return Math.round(cum);
+          cum += (w.hours / total) * 100;
+        }
+        return 0;
       }
 
       // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
@@ -613,7 +638,10 @@ function useDilnaData(weekOffset: number) {
             // Identity uses the bundle's stage_id from the first row in the entry.
             const stageIdForBundle = schedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
             const bIdentityWithStage = identityKey(stageIdForBundle, b.bundle_label, b.split_part);
-            const resolvedPct = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+            let resolvedPct = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+            if (resolvedPct == null && b.split_group_id && !isUnmatched) {
+              resolvedPct = sliceStartPct(b.split_group_id);
+            }
             const bCompletion = resolvedPct;
             // Slip color porovnává completion proti weekly targetu (bExpected).
             // Spilled bundles inherit isSpilled treatment in computeSlip.
@@ -696,7 +724,10 @@ function useDilnaData(weekOffset: number) {
           // Resolve per-bundle pct via identity. For spilled bundles, stage_id comes from prevSchedule.
           const stageIdForBundle = prevSchedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
           const bIdentityWithStage = identityKey(stageIdForBundle, b.bundle_label, b.split_part);
-          const bCompletion = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+          let bCompletion = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+          if (bCompletion == null && b.split_group_id && !isUnmatched) {
+            bCompletion = sliceStartPct(b.split_group_id);
+          }
           const bSlip: SlipStatus = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, true);
           return {
             bundleId: b.bundleId,
