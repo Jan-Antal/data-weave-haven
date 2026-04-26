@@ -4685,14 +4685,7 @@ function UnifiedItemList({
                       >
                         {item.item_name}
                       </span>
-                      {isSplit && (
-                        <span
-                          className="text-[9px] font-medium px-1 py-[1px] rounded shrink-0"
-                          style={{ background: "rgba(217,119,6,0.1)", color: "#d97706" }}
-                        >
-                          část {partsThisWeek}/{splitBadgeY}
-                        </span>
-                      )}
+                      {/* "část X/Y" odstráneno — prvok je jeden, dokončenie sa berie ako celok. */}
                       {isPaused && (
                         <span
                           className="text-[8px] font-medium px-1 py-[1px] rounded shrink-0"
