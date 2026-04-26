@@ -897,7 +897,11 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
                     <div
                       key={card.projectId}
                       className="bg-background rounded-lg border border-border/60 p-3 flex flex-col gap-2"
-                      style={{ borderLeftWidth: 3, borderLeftColor: warningBorderColor(card.warning, projectColor) }}
+                      style={{
+                        borderLeftWidth: 3,
+                        borderLeftColor: card.isSpilledOnly ? "#d97706" : warningBorderColor(card.warning, projectColor),
+                        background: card.isSpilledOnly ? "rgba(217,119,6,0.04)" : undefined,
+                      }}
                     >
                       {/* Top: name + slip badge */}
                       <div className="flex items-start justify-between gap-2">
@@ -930,7 +934,11 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
                             </>
                           )}
                         </div>
-                        {card.warning === "off_plan" ? (
+                        {card.isSpilledOnly ? (
+                          <span className="shrink-0 text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-full whitespace-nowrap bg-amber-100 text-amber-800 border border-amber-300">
+                            <AlertCircle className="w-3 h-3" /> Přelité z T{prevWeekNum}
+                          </span>
+                        ) : card.warning === "off_plan" ? (
                           <span className={cn(
                             "shrink-0 text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-full whitespace-nowrap",
                             warningPillClass(card.warning)
@@ -954,8 +962,13 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
                             const bStyles = slipBarStyles(b.slipStatus);
                             return (
                               <div key={b.bundleId} className="flex items-center gap-2 text-[11px]">
-                                <div className="w-14 font-medium tabular-nums truncate shrink-0" title={b.displayLabel}>
-                                  {b.displayLabel}
+                                <div className="w-14 font-medium tabular-nums truncate shrink-0 flex items-center gap-1" title={b.displayLabel}>
+                                  <span className="truncate">{b.displayLabel}</span>
+                                  {b.isSpilled && (
+                                    <span className="text-[8px] font-bold px-1 rounded bg-amber-200 text-amber-900 whitespace-nowrap" title={`Přelité z T${b.spilledFromWeekNum}`}>
+                                      T{b.spilledFromWeekNum}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex-1 relative h-[6px] rounded-full bg-muted overflow-visible">
                                   {b.completionPct != null && (
