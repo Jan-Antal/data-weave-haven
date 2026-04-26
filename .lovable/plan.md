@@ -1,130 +1,73 @@
-# Oprava progress barov v Dílne (Analytics → Dílna)
 
-## Diagnóza (potvrdená cez DB)
+## Problém
 
-**RD Skalice (Z-2604-002, A-3 v T19) → zobrazuje `100 % / 12 %`**
-- DB `production_daily_logs` obsahuje pre Z-2604-002 záznam `bundle_id = "Z-2604-002::MF_2026-04-13"`, `percent = 100`. Toto je technický **midflight-import marker** (prefix `MF_`), nie reálny log.
-- `resolveBundlePct()` (riadok ~420) skenuje všetky kľúče `${pid}::*` v `pctByProjectWeek` a vracia najnovší. Marker `MF_…` je do mapy nasypaný v rovnakej slučke (riadok 324–331), pretože `log.bundle_id.split("::")[0]` z neho urobí čistý `pid`. → carry-forward vráti **100 %**.
-- Target `12 %` je `chain-window start` slice A-3 (správna hodnota pre **začiatok** T19, lebo predchádzajúce slices A-1 (8.8 h) + A-2 (6 h) = 12 % zo 121.3 h).
-- Pre **future weeks** (`weekOffset > 0`) je `dayFraction = 0` → `bundleExpectedPctScaled` vracia *začiatok* chain-window slice. Používateľ ale chce: **stav = carry z minulosti, cieľ = koniec aktuálneho slice na konci T19**.
+Vo Výrobe sa daylog ukladá pod kľúč `bundleId = ${projectId}::${weekKey}` — teda **na úrovni projektu/týždňa**, nie bundlu. Preto úprava % na **Insia bundle B** zmení daylog aj pre **Insia A-4** (ten istý projekt + týždeň).
 
-**Allianz D (Z-2617-001, full bundle v T19) → zobrazuje `40 % / 100 %`**
-- DB má `Z-2617-001::2026-05-04 = 40 %` (log z 23. 4., week_key T19).
-- Logy sú **per-projekt-per-týždeň**, nie per-bundle. Carry pre A-6 split chain dáva zmysel (40 % postupu projektu na splite). Pre **úplne nový full bundle D** (žiadne predošlé hodiny v split chain, samostatná entita) je 40 % nezmyselné — D má začať od 0 %.
+Druhý bug: po `Ctrl+Z` (undo) na zmenu fázy/% sa síce % vráti, ale riadok zostane oranžový ("úprava po termíne"). Príčiny:
 
----
+1. `phase_change` undo cesta v `useVyrobaUndo.ts` rieši len vetvu s `action.logId` (zmaže log). Ale undo definované v `Vyroba.tsx` (riadok 1251–1278) je iný typ — používa `pushUndo` z `useUndoRedo` (nie `useVyrobaUndo`) a v undo callbacku volá `saveDailyLog(...)` znova s pôvodnými hodnotami → tým nastaví `logged_at = now()`, čo `isRetroactive` znovu vyhodnotí ako úpravu po termíne.
 
-## Oprava
+## Riešenie
 
-### 1. Vylúčiť `MF_*` markery z `pctByProjectWeek` a `latestPctByProject`
+### 1. Per-bundle `bundleId` kľúč
 
-V `DilnaDashboard.tsx` cca riadok 324:
+Zmeniť `bundleId` v `src/pages/Vyroba.tsx` (riadok 872), aby zahŕňal identitu bundlu (split-chain alebo stage+label):
 
 ```ts
-for (const log of dailyLogs) {
-  const pid = log.bundle_id.split("::")[0];
-  if (!pid) continue;
-  if (log.percent == null) continue;
-  // NEW: skip midflight-import markers (week_key like "MF_…" or bundle_id contains "::MF_")
-  if (log.week_key?.startsWith("MF_") || log.bundle_id.includes("::MF_")) continue;
-  // …
-}
-```
-Rovnako pre `prevDailyLogs` cyklus (riadok 335).
-
-**Effect:** Z-2604-002 v T19 už nezdedí 100 %. Resolve vráti najnovší skutočný log = `Z-2604-002::2026-04-13 = 12 %`. ✅
-
-### 2. Target pre future weeks = koniec chain-window slice (nie scaled)
-
-V `bundleExpectedPctScaled` (riadok ~433):
-
-```ts
-function bundleExpectedPctScaled(splitGroupId: string | null): number {
-  if (!splitGroupId) return 100; // full bundle target stays 100
-  const weeks = [...(splitGroupWeeks.get(splitGroupId) ?? [])].sort(...);
-  const total = weeks.reduce((s, w) => s + w.hours, 0);
-  if (total <= 0) return 100;
-  let cum = 0, start = 0, end = 100, found = false;
-  for (const w of weeks) {
-    const share = (w.hours / total) * 100;
-    if (w.week === weekInfo.weekKey) { start = cum; end = cum + share; found = true; break; }
-    cum += share;
-  }
-  if (!found) return 100;
-  // NEW: future weeks → show END of slice (week's full goal); current → ramp by dayFraction;
-  // past → already at end (dayFraction=1).
-  if (!isCurrentWeek && !isPastWeek) return Math.round(end);
-  return Math.round(start + (end - start) * dayFraction);
-}
-```
-Premenné `isCurrentWeek`/`isPastWeek` sú už definované na riadku 487-488.
-
-**Effect:** RD Skalice A-3 v T19 → target = chain-window end = 100 % (lebo A-3 je posledná slice). Stav 12 % / target 100 %. ✅
-
-### 3. Nové full bundles nededia per-projekt log z carry-forward
-
-Carry-forward `resolveBundlePct` aktuálne nerozlišuje, či bundle existoval v predošlom týždni. Riešenie — využiť už existujúcu `identitiesByProjectWeek` mapu (riadok 395):
-
-```ts
-function resolveBundlePct(pid: string, identity: string): number | null {
-  // 1) Same-week log → use it (covers most cases including split chains).
-  const displayedKey = `${pid}::${weekInfo.weekKey}`;
-  const sameWeekIdentities = identitiesByProjectWeek.get(displayedKey) ?? new Set();
-
-  if (pctByProjectWeek.has(displayedKey)) {
-    // Project-level log applies to bundles that share the active chain (split or
-    // continuation). For a NEW full bundle that has no prior history in this
-    // project's split chain, return null instead — D should start at 0%.
-    if (sameWeekIdentities.has(identity)) {
-      // Decide: is this identity a continuation (existed previously) or net-new?
-      const priorWeeks = Array.from(identitiesByProjectWeek.keys())
-        .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
-        .sort((a, b) => b.localeCompare(a));
-      const existedBefore = priorWeeks.some(k => identitiesByProjectWeek.get(k)!.has(identity));
-      if (existedBefore) return pctByProjectWeek.get(displayedKey)!;
-      // Net-new bundle this week → don't inherit project-level percent.
-      return null;
-    }
-    return pctByProjectWeek.get(displayedKey)!;
-  }
-
-  // 2) Carry from prior weeks ONLY for identities that existed previously
-  //    (preserves split-chain continuity, blocks leakage to net-new bundles).
-  const priorWeeks = Array.from(pctByProjectWeek.keys())
-    .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
-    .map(k => k.split("::")[1])
-    .sort((a, b) => b.localeCompare(a));
-
-  for (const wk of priorWeeks) {
-    const idsInWk = identitiesByProjectWeek.get(`${pid}::${wk}`);
-    if (idsInWk?.has(identity)) return pctByProjectWeek.get(`${pid}::${wk}`) ?? null;
-  }
-  // Fallback for legacy bundles without identity history — keep current behaviour.
-  return priorWeeks.length > 0 ? pctByProjectWeek.get(`${pid}::${priorWeeks[0]}`) ?? null : null;
+function makeBundleStorageId(project: VyrobaProject, weekKey: string): string {
+  const sample = project.scheduleItems[0];
+  const sg = sample?.split_group_id ?? null;
+  const stage = sample?.stage_id ?? "none";
+  const label = sample?.bundle_label ?? "A";
+  const ident = sg ? `SG:${sg}` : `${stage}::${label}`;
+  return `${project.projectId}::${weekKey}::${ident}`;
 }
 ```
 
-Volanie už posiela `bIdentityWithStage` ako 2. argument (riadok 616, 699), takže netreba meniť call-sites.
+Všetky callsity (`saveDailyLog`, delete podľa `bundle_id`, `dailyLogsMap.get(...)`) prepnúť na nový kľúč. Aktualizovať aj parsing v `byProject` mape (riadok 585–594) a `getLogsForProject` (riadok 875), aby vracal len logy pre konkrétny bundle (porovnať identitu, nielen `pid`).
 
-**Effect:**
-- Allianz **A-6** (split, identity existovala v T17 a T18) → carry 40 %, stav `40 % / 100 %` ✅
-- Allianz **D** (full, brand-new identity v T19, nie v T17/T18) → vráti `null` → bar 0 %, stav `— / 100 %` ✅
+### 2. Backward-kompatibilita pre staré logy
 
----
+Existujúce daylogy v DB sú uložené pod starým kľúčom `pid::weekKey`. Pri čítaní:
 
-## Zmeny
+- Pri zostavovaní `byProject` rozlišovať: staré (2 segmenty) → priradiť všetkým bundlom projektu vo fallbacku; nové (3+ segmenty) → priradiť len konkrétnemu bundlu.
+- `getLogsForProject(project)` najprv hľadá nové logy (per-bundle); ak žiadne, fallback na staré (per-project) — len pre čítanie. Nové zápisy idú vždy do nového kľúča.
+- Žiadna DB migrácia nie je potrebná — postupne sa nahradia samé.
 
-**Súbor:** `src/components/DilnaDashboard.tsx`
-- Pridať MF_ filter v dvoch slučkách logov (~riadky 324, 335).
-- Upraviť `bundleExpectedPctScaled` o vetvu pre future weeks (~riadok 433).
-- Prepísať `resolveBundlePct` na identity-aware (~riadok 410).
+### 3. Undo phase_change zachová `logged_at`
 
-Žiadne DB migrácie. Žiadne ďalšie súbory.
+V `src/pages/Vyroba.tsx` v `pushUndo` callbacku (riadok 1255–1273) namiesto `saveDailyLog` (ktorý nastaví `logged_at = now()`) urobiť priame Supabase update so zachovaným `logged_at` z `existingLog.logged_at`:
 
-## Očakávaný výsledok pre T19 (po opravách)
+```ts
+if (existingLog) {
+  await (supabase.from("production_daily_logs") as any)
+    .update({
+      phase: existingLog.phase,
+      percent: existingLog.percent,
+      note_text: existingLog.note_text,
+      logged_at: existingLog.logged_at, // ← zachovať pôvodný timestamp
+    })
+    .eq("bundle_id", bId)
+    .eq("week_key", weekKey)
+    .eq("day_index", capturedDay);
+} else {
+  // delete (už v poriadku)
+}
+```
 
-| Karta | Pred | Po |
-|---|---|---|
-| RD Skalice A-3 | `100 % / 12 %` (zelený full bar) | `12 % / 100 %` |
-| Allianz D | `40 % / 100 %` | `— / 100 %` (bar prázdny) |
-| Allianz A-6 (split) | `40 % / xx %` | `40 % / 100 %` (správne, beze zmeny logiky pre split) |
+Tým `isRetroactive` ostane vyhodnotený podľa pôvodného timestampu a riadok prestane svietiť oranžovo po undo.
+
+### 4. Voliteľne: rozšíriť `saveDailyLog`
+
+Pridať do `src/hooks/useProductionDailyLogs.ts` voliteľný parameter `loggedAt?: string`, aby `saveDailyLog` vedel zapisovať aj s konkrétnym timestampom (čistejšie ako duplikovať raw Supabase volanie).
+
+## Dotknuté súbory
+
+- `src/pages/Vyroba.tsx` — nový `makeBundleStorageId`, prepojenie callsitov (~6 miest), úprava `byProject` parsingu, `getLogsForProject`, undo callbacku phase_change.
+- `src/hooks/useProductionDailyLogs.ts` — voliteľne rozšíriť `saveDailyLog` o `loggedAt`.
+
+## Výsledok
+
+- Zmena daylogu na Insia B sa prejaví **len na Insia B**, A-4 ostane nedotknutý.
+- Po `Ctrl+Z` na zmenu fázy/% sa nielen vráti hodnota, ale aj farba bunky (zmizne oranžový "po termíne" indikátor).
+- Staré daylogy zostanú viditeľné cez fallback čítanie; nové sa ukladajú per-bundle.
