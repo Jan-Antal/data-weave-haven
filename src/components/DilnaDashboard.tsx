@@ -153,11 +153,14 @@ function useDilnaData(weekOffset: number) {
           .eq("week_year", weekInfo.year)
           .eq("week_number", weekInfo.week)
           .maybeSingle(),
-        // Latest daily-log percent per bundle for THIS week
+        // Latest daily-log percent per bundle UP TO and INCLUDING the displayed week.
+        // Fallback chain: if displayed week has no log, the bar shows the last known
+        // percent from a prior week (so a 25% bundle in T17 stays at 25% in T18).
         supabase
           .from("production_daily_logs" as any)
-          .select("bundle_id, day_index, percent, logged_at")
-          .eq("week_key", weekInfo.weekKey)
+          .select("bundle_id, week_key, day_index, percent, logged_at")
+          .lte("week_key", weekInfo.weekKey)
+          .order("week_key", { ascending: true })
           .order("day_index", { ascending: true }),
         // Latest daily-log percent for the PREVIOUS week (used by goal-aware spillover guard).
         // Only meaningful when displayed week == real T+1.
