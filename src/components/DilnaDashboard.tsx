@@ -338,7 +338,9 @@ function useDilnaData(weekOffset: number) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
         if (log.percent == null) continue;
-        if (log.week_key?.startsWith("MF_") || log.bundle_id.includes("::MF_")) continue;
+        // prev select is filtered by exact week_key, so MF_ markers cannot match here;
+        // still defensively skip bundle_ids that include the MF_ marker prefix.
+        if (log.bundle_id.includes("::MF_")) continue;
         prevLatestPctByProject.set(pid, Number(log.percent));
       }
 
