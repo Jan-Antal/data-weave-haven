@@ -231,6 +231,30 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
     },
   });
 
+  // Latest daily-log percent per project for the REAL current week (used by spillover goal-aware filter).
+  const realCurrentWeekKey = useMemo(() => toLocalDateStr(getMonday(new Date())), []);
+  const { data: realWeekLatestPct } = useQuery({
+    queryKey: ["real-week-latest-pct", realCurrentWeekKey],
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("production_daily_logs")
+        .select("bundle_id, day_index, percent")
+        .eq("week_key", realCurrentWeekKey)
+        .order("day_index", { ascending: true });
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const row of (data || []) as Array<{ bundle_id: string; day_index: number; percent: number }>) {
+        const pid = String(row.bundle_id).split("::")[0];
+        if (!pid) continue;
+        // ascending order → last write wins (= highest day_index for project)
+        map.set(pid, Number(row.percent) || 0);
+      }
+      return map;
+    },
+  });
+
   const projectLookup = useMemo(() => {
     const map = new Map<string, { datum_smluvni?: string | null; expedice?: string | null; montaz?: string | null; predani?: string | null; status?: string | null; risk?: string | null; pm?: string | null; cost_production_pct?: number | null; marze?: string | null; prodejni_cena?: number | null; currency?: string | null; created_at?: string | null }>();
     for (const p of allProjects) map.set(p.project_id, p);
