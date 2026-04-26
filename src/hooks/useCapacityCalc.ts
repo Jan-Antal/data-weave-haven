@@ -245,16 +245,21 @@ export function useAbsencesForYear(year: number, employees: EmployeeRow[]) {
       }
       const employeeIds = employees.map(e => e.id);
       const empMap = new Map(employees.map(e => [e.id, e]));
-      const { data, error } = await supabase
-        .from("ami_absences")
-        .select("datum, employee_id")
-        .gte("datum", `${year}-01-01`)
-        .lte("datum", `${year}-12-31`)
-        .in("employee_id", employeeIds);
+      const [{ data, error }, holidaySet] = await Promise.all([
+        supabase
+          .from("ami_absences")
+          .select("datum, employee_id")
+          .gte("datum", `${year}-01-01`)
+          .lte("datum", `${year}-12-31`)
+          .in("employee_id", employeeIds),
+        getHolidayDateSet(year),
+      ]);
       if (error) throw error;
       const weekTotals = new Map<string, number>();
       const perEmployee = new Map<string, Map<string, number>>();
       for (const row of (data || [])) {
+        // Skip weekends + public/company holidays — they don't reduce capacity.
+        if (!isWorkdayStr(row.datum, holidaySet)) continue;
         const key = getMondayKey(row.datum);
         const emp = empMap.get(row.employee_id);
         const hours = emp?.uvazok_hodiny ?? 8;
@@ -278,15 +283,19 @@ export async function fetchAbsencesForYear(
   if (employees.length === 0) return new Map();
   const employeeIds = employees.map(e => e.id);
   const empMap = new Map(employees.map(e => [e.id, e]));
-  const { data, error } = await supabase
-    .from("ami_absences")
-    .select("datum, employee_id")
-    .gte("datum", `${year}-01-01`)
-    .lte("datum", `${year}-12-31`)
-    .in("employee_id", employeeIds);
+  const [{ data, error }, holidaySet] = await Promise.all([
+    supabase
+      .from("ami_absences")
+      .select("datum, employee_id")
+      .gte("datum", `${year}-01-01`)
+      .lte("datum", `${year}-12-31`)
+      .in("employee_id", employeeIds),
+    getHolidayDateSet(year),
+  ]);
   if (error || !data) return new Map();
   const result = new Map<string, number>();
   for (const row of data) {
+    if (!isWorkdayStr(row.datum, holidaySet)) continue;
     const key = getMondayKey(row.datum);
     const emp = empMap.get(row.employee_id);
     const hours = emp?.uvazok_hodiny ?? 8;
