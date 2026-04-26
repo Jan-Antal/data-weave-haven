@@ -382,7 +382,51 @@ function useDilnaData(weekOffset: number) {
         chainWindowByProject.set(pid, { start: Math.round(start), end: Math.round(end) });
       }
 
-      // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
+      // ── Per-(project, week) bundle identities ──
+      // Identity key = `${stage_id}::${bundle_label}::${split_part|"full"}` (matches UI grouping).
+      // Used to attribute project-level daily logs (`pid::weekKey` rows) to a specific bundle:
+      //   - if a historical week has only ONE bundle identity for the project, that log
+      //     unambiguously belongs to that identity → carries forward into displayed week
+      //     only if the same identity exists in the displayed week.
+      //   - if multiple identities existed in that week, log is ambiguous → fall back to
+      //     project-level mapping (legacy behaviour).
+      const identityKey = (stage_id: string | null, bundle_label: string | null, split_part: number | null): string =>
+        `${stage_id ?? "none"}::${bundle_label ?? "A"}::${split_part ?? "full"}`;
+      const identitiesByProjectWeek = new Map<string, Set<string>>();
+      for (const row of allSched) {
+        if (row.status === "historical" || row.status === "cancelled") continue;
+        const key = `${row.project_id}::${row.scheduled_week}`;
+        if (!identitiesByProjectWeek.has(key)) identitiesByProjectWeek.set(key, new Set());
+        identitiesByProjectWeek.get(key)!.add(identityKey(row.stage_id, row.bundle_label, row.split_part));
+      }
+
+      // Resolve the last-known percent for a SPECIFIC bundle identity in a project,
+      // walking back from the displayed week. Returns null when no log applies.
+      function resolveBundlePct(pid: string, identity: string): number | null {
+        // 1) If the displayed week has its own log AND only this identity exists in the
+        //    displayed week → use it directly. Multiple identities in displayed week
+        //    means the log is project-level → still apply (best signal we have).
+        const displayedKey = `${pid}::${weekInfo.weekKey}`;
+        if (pctByProjectWeek.has(displayedKey)) {
+          return pctByProjectWeek.get(displayedKey)!;
+        }
+        // 2) Walk prior weeks (newest first) — find the latest week with a log where the
+        //    SAME identity existed and was the only identity (unambiguous attribution).
+        const priorWeeks = Array.from(pctByProjectWeek.keys())
+          .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
+          .map(k => k.split("::")[1])
+          .sort((a, b) => b.localeCompare(a));
+        for (const wk of priorWeeks) {
+          const ids = identitiesByProjectWeek.get(`${pid}::${wk}`);
+          if (!ids) continue;
+          if (ids.has(identity) && ids.size === 1) {
+            // Unambiguous: that week had only this bundle identity → log belongs to it.
+            return pctByProjectWeek.get(`${pid}::${wk}`)!;
+          }
+        }
+        // 3) No unambiguous prior log → no carry-forward to avoid cross-bundle bleed.
+        return null;
+      }
       // For split bundles: chain across weeks of the same split_group_id, displayed week's window is its slice.
       const chainWindowBySplitGroup = new Map<string, { start: number; end: number }>();
       const splitGroupWeeks = new Map<string, Array<{ week: string; hours: number }>>();
