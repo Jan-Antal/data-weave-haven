@@ -81,6 +81,8 @@ interface BundleRow {
   expectedPct: number | null;
   completionPct: number | null;
   slipStatus: SlipStatus;
+  isSpilled?: boolean;         // bundle spilled over from T-1
+  spilledFromWeekNum?: number; // ISO week number of the previous week (display only)
 }
 
 interface ProjectCard {
@@ -97,6 +99,7 @@ interface ProjectCard {
   valueTargetCzk: number;       // cíl (planned) value
   bundles: BundleRow[];
   usekBreakdown: UsekRow[];
+  isSpilledOnly?: boolean;      // project is here ONLY because of spilled bundles (no T plan)
 }
 
 /* ── data hook ───────────────────────────────────────────────────── */
