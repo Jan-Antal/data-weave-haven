@@ -606,12 +606,9 @@ function useDilnaData(weekOffset: number) {
             const displayLabel = b.bundle_type === "split" && b.split_part
               ? `${label}-${b.split_part}`
               : label;
-            // Per-bundle weekly target: full → 100%, split → chain-end at this week (e.g. 60%).
-            const bExpected = isUnmatched
-              ? null
-              : (b.split_group_id
-                  ? bundleTargetForWeek(b.split_group_id, weekInfo.weekKey)
-                  : 100);
+            // Per-bundle weekly target: full → stable 100%, split → chain-window ramped by dayFraction
+            // (Sunday = window start = end of prev week's chain slice; Friday = window end at this week).
+            const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
             // Per-bundle completion: resolved by bundle identity (no cross-bundle bleed).
             // Identity uses the bundle's stage_id from the first row in the entry.
             const stageIdForBundle = schedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
