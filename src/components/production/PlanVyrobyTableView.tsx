@@ -34,6 +34,7 @@ import { DndContext, closestCenter, useDraggable, useDroppable, type DragEndEven
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { getWorkWeekMonday, toLocalDateKey } from "@/lib/workWeek";
 
 type DisplayMode = "hours" | "czk" | "percent";
 type SortMode = "project" | "deadline" | "hours";
@@ -233,8 +234,8 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   };
 
   const weeks = useMemo<WeekColumn[]>(() => {
-    const monday = getMonday(new Date());
-    const currentWeekKey = monday.toISOString().split("T")[0];
+    const monday = getWorkWeekMonday();
+    const currentWeekKey = toLocalDateKey(monday);
     // Start from currentWeek - 1 - (historyOffset * 4 weeks)
     const startMonday = new Date(monday);
     startMonday.setDate(startMonday.getDate() - 7 - historyOffset * 4 * 7);
@@ -248,12 +249,12 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
     // Ensure at least 12 weeks from current monday
     const minEnd = new Date(monday);
     minEnd.setDate(minEnd.getDate() + 12 * 7);
-    const minEndKey = minEnd.toISOString().split("T")[0];
+    const minEndKey = toLocalDateKey(minEnd);
     const endKey = latestDataWeek > minEndKey ? latestDataWeek : minEndKey;
     const result: WeekColumn[] = [];
     const cursor = new Date(startMonday);
     while (true) {
-      const key = cursor.toISOString().split("T")[0];
+      const key = toLocalDateKey(cursor);
       if (key > endKey) break;
       const end = new Date(cursor);
       end.setDate(cursor.getDate() + 6);
