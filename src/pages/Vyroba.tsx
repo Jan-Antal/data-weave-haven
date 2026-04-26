@@ -4201,14 +4201,7 @@ function DetailPanel({
                         <span className="text-[13px] flex-1 truncate" style={{ color: "#5a9a58" }}>
                           {item.item_name}
                         </span>
-                        {isSplit && (
-                          <span
-                            className="text-[9px] font-medium px-1.5 py-[1px] rounded shrink-0"
-                            style={{ background: "rgba(58,138,54,0.1)", color: "#3a8a36" }}
-                          >
-                            {completedParts}/{splitTotal || completedParts} částí hotovo
-                          </span>
-                        )}
+                        {/* "X/Y částí hotovo" odstráneno — prvok je jeden, dokončenie sa berie ako celok. */}
                         {qcCheck && <QualityCheckFullDisplay check={qcCheck} />}
                         <span className="font-sans text-[11px] shrink-0" style={{ color: "#99a5a3" }}>
                           {formatHours(item.scheduled_hours)}h
