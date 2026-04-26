@@ -323,6 +323,14 @@ function useDilnaData(weekOffset: number) {
         if (cur == null || log.percent != null) latestPctByProject.set(pid, Number(log.percent));
       }
 
+      // Latest daily-log percent per project for the PREVIOUS week (used by spillover guard).
+      const prevLatestPctByProject = new Map<string, number>();
+      for (const log of prevDailyLogs) {
+        const pid = log.bundle_id.split("::")[0];
+        if (!pid) continue;
+        if (log.percent != null) prevLatestPctByProject.set(pid, Number(log.percent));
+      }
+
       const projMap = new Map(projects.map(p => [p.project_id, p]));
       const knownProjectIds = new Set(projMap.keys());
 
