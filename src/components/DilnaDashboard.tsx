@@ -316,14 +316,14 @@ function useDilnaData(weekOffset: number) {
       // daylog data is built so we can skip bundles that already met their weekly target.
       const spilledOnlyProjects = new Set<string>();
 
-      // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
+      // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`.
+      // Logs are pre-sorted by week_key ASC, day_index ASC, so the last write per project
+      // wins → cumulative "last known percent up to displayed week".
       const latestPctByProject = new Map<string, number>();
       for (const log of dailyLogs) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
-        const cur = latestPctByProject.get(pid);
-        // Take max day_index (most recent). Logs already ordered ascending → simple overwrite works.
-        if (cur == null || log.percent != null) latestPctByProject.set(pid, Number(log.percent));
+        if (log.percent != null) latestPctByProject.set(pid, Number(log.percent));
       }
 
       // Latest daily-log percent per project for the PREVIOUS week (used by spillover guard).
