@@ -247,6 +247,7 @@ function getProjectsForWeek(
         // Spilled bundle = its own card (mirrors Dílňa). Never merge into a project card.
         result.push({
           projectId: b.project_id,
+          cardKey: makeCardKey(b.project_id, { stage_id: b.stage_id, bundle_label: b.bundle_label, split_part: (activeItems[0] as any)?.split_part, split_group_id: (activeItems[0] as any)?.split_group_id }, true),
           projectName: b.project_name,
           totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
           scheduleItems: activeItems,
