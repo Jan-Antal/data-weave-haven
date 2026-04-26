@@ -471,6 +471,37 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
     const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_part: number | null }) =>
       `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}::${b.split_part ?? "full"}`;
     const destBundleKeys = new Set<string>((destSilo?.bundles || []).map(bundleKey));
+
+    // Per-split-group chain window slice for currentWeekKey (across all weeks).
+    // For full bundles (no split_group_id) the target is always 100%.
+    const splitGroupWeeks = new Map<string, Array<{ week: string; hours: number }>>();
+    for (const [wk, silo] of scheduleData) {
+      for (const b of silo.bundles) {
+        for (const i of b.items) {
+          if (i.status === "cancelled") continue;
+          if (!i.split_group_id) continue;
+          if (!splitGroupWeeks.has(i.split_group_id)) splitGroupWeeks.set(i.split_group_id, []);
+          const arr = splitGroupWeeks.get(i.split_group_id)!;
+          const existing = arr.find(w => w.week === wk);
+          if (existing) existing.hours += Number(i.scheduled_hours) || 0;
+          else arr.push({ week: wk, hours: Number(i.scheduled_hours) || 0 });
+        }
+      }
+    }
+    const chainEndForGroupAtWeek = (sg: string, wkKey: string): number => {
+      const weeks = splitGroupWeeks.get(sg);
+      if (!weeks) return 100;
+      const sorted = [...weeks].sort((a, b) => a.week.localeCompare(b.week));
+      const total = sorted.reduce((s, w) => s + w.hours, 0);
+      if (total <= 0) return 100;
+      let cum = 0;
+      for (const w of sorted) {
+        cum += w.hours;
+        if (w.week === wkKey) return Math.round((cum / total) * 100);
+      }
+      return 100;
+    };
+
     const result: Array<ScheduleBundle & { __spilledFromWeekKey: string; __spilledFromWeekNum: number }> = [];
 
     for (const b of realSilo.bundles) {
@@ -483,6 +514,14 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
       );
 
       if (activeItems.length === 0) continue;
+
+      // Goal-aware spillover guard: if the latest daylog for this project's real-T week
+      // already meets/exceeds this bundle's weekly target, the bundle is considered done
+      // for the week and must NOT be spilled.
+      const splitGroupId = b.items.find(i => i.split_group_id)?.split_group_id ?? null;
+      const bundleTarget = splitGroupId ? chainEndForGroupAtWeek(splitGroupId, currentWeekKey) : 100;
+      const latestPct = realWeekLatestPct?.get(b.project_id) ?? null;
+      if (latestPct != null && latestPct >= bundleTarget) continue;
 
       const activeHours = activeItems.reduce((s, i) => s + (Number(i.scheduled_hours) || 0), 0);
       result.push({
@@ -501,7 +540,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
     }
 
     return result;
-  }, [scheduleData, currentWeekKey, spilloverDestKey]);
+  }, [scheduleData, currentWeekKey, spilloverDestKey, realWeekLatestPct]);
 
   const weekOptions = useMemo(() => {
     return weeks.map(w => {
