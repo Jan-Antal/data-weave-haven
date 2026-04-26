@@ -452,7 +452,40 @@ function useDilnaData(weekOffset: number) {
         return 100;
       }
 
-      // ── Calculate prodej value (mirrors WeeklySilos.calcProdejValue) ──
+      // ── DEFERRED: spilled bundles. Source = real previous week's still-active rows.
+      // Skip a bundle if (a) the same bundle already exists in displayed week (already
+      // replanned) or (b) the latest daylog of the prev week already met the bundle's
+      // weekly target (full=100, split=chain window end at prev week).
+      for (const s of prevSchedule) {
+        if (isRowDone(s)) continue;
+        if ((s as any).is_midflight) continue;
+        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
+        const bMap = bundlesByProject.get(s.project_id);
+        if (bMap?.has(key)) continue; // current-week bundle wins
+
+        const bundleTarget = bundleTargetForWeek(s.split_group_id, prevWeekInfo.weekKey);
+        const prevPct = prevLatestPctByProject.get(s.project_id);
+        if (prevPct != null && prevPct >= bundleTarget) continue; // goal met → no spill
+
+        if (!bundlesByProject.has(s.project_id)) {
+          bundlesByProject.set(s.project_id, new Map());
+          spilledOnlyProjects.add(s.project_id);
+        } else if (!scheduledProjects.has(s.project_id)) {
+          spilledOnlyProjects.add(s.project_id);
+        }
+        const targetMap = bundlesByProject.get(s.project_id)!;
+        targetMap.set(key, {
+          bundleId: s.id,
+          bundle_label: s.bundle_label,
+          bundle_type: s.bundle_type,
+          split_group_id: s.split_group_id,
+          split_part: s.split_part,
+          split_total: s.split_total,
+          scheduled_hours: Number(s.scheduled_hours),
+          position: s.position,
+          isSpilled: true,
+        });
+      }
       function calcDilnaValue(weekHours: number, projectId: string): number {
         const proj = projMap.get(projectId);
         let prodejniCena = proj?.prodejni_cena ?? 0;
