@@ -1,73 +1,63 @@
+## Audit: čo už funguje a čo nie
 
-## Problém
+Po prejdení `src/pages/Vyroba.tsx`:
 
-Vo Výrobe sa daylog ukladá pod kľúč `bundleId = ${projectId}::${weekKey}` — teda **na úrovni projektu/týždňa**, nie bundlu. Preto úprava % na **Insia bundle B** zmení daylog aj pre **Insia A-4** (ten istý projekt + týždeň).
+### ✅ Per-bundle (funguje správne)
+- **Výber karty** (`cardKey`) — Allianz A/B/C/D, Insia A-4 vs B sa vyberajú samostatne.
+- **Zoznam prvkov v detaile** (`getItemsForBundle`) — filtrované cez `scheduleItems[*].id` vybraného bundlu.
+- **Daylog úložisko** (`bundleStorageIdForProject`) — nový kľúč `${pid}::${weekKey}::SG:<group>` alebo `${pid}::${weekKey}::<stage>::<label>::<part>`. Insia B už nezasahuje do A-4.
+- **Čítanie daylogu** s legacy fallbackom (`getLogsForProject`).
+- **Undo zachová `logged_at`** — oranžový "po termíne" zmizne.
 
-Druhý bug: po `Ctrl+Z` (undo) na zmenu fázy/% sa síce % vráti, ale riadok zostane oranžový ("úprava po termíne"). Príčiny:
+### ⚠️ Stále project-wide (treba opraviť)
 
-1. `phase_change` undo cesta v `useVyrobaUndo.ts` rieši len vetvu s `action.logId` (zmaže log). Ale undo definované v `Vyroba.tsx` (riadok 1251–1278) je iný typ — používa `pushUndo` z `useUndoRedo` (nie `useVyrobaUndo`) a v undo callbacku volá `saveDailyLog(...)` znova s pôvodnými hodnotami → tým nastaví `logged_at = now()`, čo `isRetroactive` znovu vyhodnotí ako úpravu po termíne.
+1. **`getWeeklyGoal(pid)`** (riadok 1048) — pre non-split bundle sčítava **všetky bundle projektu** v aktuálnom + minulých týždňoch (riadky 1069–1078, filter iba `bundle.project_id === pid`, žiadny stage/label). Allianz D (malý bundle) tak dostane cieľ odvodený zo súčtu hodín A+B+C+D.
+
+2. **`getBundleProgress(pid)`** (riadok 1012) volá **`getAllItemsForProject(pid)`** (riadky 979–999) — iteruje všetky bundle projektu naprieč všetkými týždňami. `totalHours`, `completedHours` aj fallback `bundleProgress = completedHours/totalHours` sú project-wide. Ovplyvňuje progress bar, „completed hours“ badge, aj `getProjectStatus`.
+
+3. **Volania v UI** (riadky 2129, 2157, 2321, 2349, 2474, 2582) odovzdávajú `weeklyGoal={getWeeklyGoal(p.projectId)}` — čisto cez `projectId`, takže dve karty toho istého projektu majú identický cieľ.
+
+4. **`isWeeklyGoalMet(pid)`** (riadok 1085) — to isté: berie celý `silo.bundles.find((b) => b.project_id === pid)` a porovnáva, ale projekt môže mať v silo viac bundlov; vyberie iba prvý nájdený.
 
 ## Riešenie
 
-### 1. Per-bundle `bundleId` kľúč
+Prerobiť tieto helpery tak, aby prijímali **`VyrobaProject`** (ktorý už nesie identitu cez `scheduleItems` a `cardKey`) namiesto holého `pid`. Filtrovať loopy v `scheduleData` podľa rovnakej identity, akú používa `cardKey` a `bundleStorageIdForProject` (`stage_id` + `bundle_label` + voliteľne `split_group_id`/`split_part`).
 
-Zmeniť `bundleId` v `src/pages/Vyroba.tsx` (riadok 872), aby zahŕňal identitu bundlu (split-chain alebo stage+label):
+### 1) Nový helper `bundleMatchesProject(bundle, items, project)`
+Pomocná funkcia, ktorá rozhodne či daný `silo.bundles[i]` (s jeho `items`) patrí k tej istej "identite" ako `project`:
+- ak `project` má `split_group_id` v `scheduleItems[0]` → matchuj cez `item.split_group_id ∈ {projectSplitGroups}`,
+- inak matchuj cez `bundle.stage_id === project.scheduleItems[0].stage_id && bundle.bundle_label === project.scheduleItems[0].bundle_label`.
 
-```ts
-function makeBundleStorageId(project: VyrobaProject, weekKey: string): string {
-  const sample = project.scheduleItems[0];
-  const sg = sample?.split_group_id ?? null;
-  const stage = sample?.stage_id ?? "none";
-  const label = sample?.bundle_label ?? "A";
-  const ident = sg ? `SG:${sg}` : `${stage}::${label}`;
-  return `${project.projectId}::${weekKey}::${ident}`;
-}
-```
+### 2) `getWeeklyGoal(project: VyrobaProject)` — bundle-scoped
+- `currentWeekHours`/`completedWeeksHours` zbierať len z bundlov, ktoré matchujú identitu (cez nový helper).
+- `hPlan` denominator: namiesto `planHoursMap.get(pid)` (ktorý je celoprojektový) použiť **súčet hodín všetkých týždňov pre tento bundle** (chain). Tým sa goal počíta voči vlastnému plánu bundlu, nie voči celému projektu.
+- Split-chain vetva (`getChainWindow`) je už správne filtrovaná cez `splitGroupIds` — nemení sa.
 
-Všetky callsity (`saveDailyLog`, delete podľa `bundle_id`, `dailyLogsMap.get(...)`) prepnúť na nový kľúč. Aktualizovať aj parsing v `byProject` mape (riadok 585–594) a `getLogsForProject` (riadok 875), aby vracal len logy pre konkrétny bundle (porovnať identitu, nielen `pid`).
+### 3) `getAllItemsForProject` → rozdvojiť
+- Ponechať existujúce (používa sa v `areAllPartsCompleted`, `getIncompletePartsInfo` — tam je správne, lebo riešia "naprieč všetkými týždňami pre item_code", čo je item-level operácia, nie bundle-level).
+- Pridať `getAllItemsForBundle(project: VyrobaProject)`: rovnaká logika, ale filter `bundleMatchesProject` + dedup.
 
-### 2. Backward-kompatibilita pre staré logy
+### 4) `getBundleProgress(project: VyrobaProject)`
+- Použiť `getAllItemsForBundle(project)` namiesto `getAllItemsForProject(pid)`.
+- Volania na `findPriorChainLog`/`findPriorAnyLog` ostávajú (sú už v poriadku — chain-aware).
 
-Existujúce daylogy v DB sú uložené pod starým kľúčom `pid::weekKey`. Pri čítaní:
+### 5) `isWeeklyGoalMet(project: VyrobaProject)`
+- Iterovať `silo.bundles` a brať len ten, ktorý matchuje identitu (môže ich byť viac s rovnakým `project_id`).
 
-- Pri zostavovaní `byProject` rozlišovať: staré (2 segmenty) → priradiť všetkým bundlom projektu vo fallbacku; nové (3+ segmenty) → priradiť len konkrétnemu bundlu.
-- `getLogsForProject(project)` najprv hľadá nové logy (per-bundle); ak žiadne, fallback na staré (per-project) — len pre čítanie. Nové zápisy idú vždy do nového kľúča.
-- Žiadna DB migrácia nie je potrebná — postupne sa nahradia samé.
+### 6) Upraviť UI volania
+- Riadky 2129, 2157, 2321, 2349, 2474, 2582 a všetky ďalšie miesta, ktoré odovzdávajú `weeklyGoal`/`bundleProgress`: zmeniť z `getWeeklyGoal(p.projectId)` → `getWeeklyGoal(p)`, podobne `getBundleProgress(p)`.
+- `getProjectStatus(pid)` → `getProjectStatus(project)` a vnútri použiť bundle-scoped helpery.
+- `getLatestPercent(pid)` zostáva keyed cez `pid` (číta z `dailyLogsMap` cez `bundleStorageIdForProject(project)` — to už je bundle-aware vďaka `enrichedProjects.find` v `bundleId`). Aby to bolo robustné aj keď `project` nie je v `enrichedProjects`, prepnúť signatúry na voliteľne prijať `VyrobaProject`.
 
-### 3. Undo phase_change zachová `logged_at`
-
-V `src/pages/Vyroba.tsx` v `pushUndo` callbacku (riadok 1255–1273) namiesto `saveDailyLog` (ktorý nastaví `logged_at = now()`) urobiť priame Supabase update so zachovaným `logged_at` z `existingLog.logged_at`:
-
-```ts
-if (existingLog) {
-  await (supabase.from("production_daily_logs") as any)
-    .update({
-      phase: existingLog.phase,
-      percent: existingLog.percent,
-      note_text: existingLog.note_text,
-      logged_at: existingLog.logged_at, // ← zachovať pôvodný timestamp
-    })
-    .eq("bundle_id", bId)
-    .eq("week_key", weekKey)
-    .eq("day_index", capturedDay);
-} else {
-  // delete (už v poriadku)
-}
-```
-
-Tým `isRetroactive` ostane vyhodnotený podľa pôvodného timestampu a riadok prestane svietiť oranžovo po undo.
-
-### 4. Voliteľne: rozšíriť `saveDailyLog`
-
-Pridať do `src/hooks/useProductionDailyLogs.ts` voliteľný parameter `loggedAt?: string`, aby `saveDailyLog` vedel zapisovať aj s konkrétnym timestampom (čistejšie ako duplikovať raw Supabase volanie).
+### 7) Header / "Mojich projektov" počítadlo (riadok 1220)
+`activeProjects.filter((p) => getLogsForProject(p.projectId).some(...))` — ostáva korektné, lebo `getLogsForProject` je už bundle-aware.
 
 ## Dotknuté súbory
-
-- `src/pages/Vyroba.tsx` — nový `makeBundleStorageId`, prepojenie callsitov (~6 miest), úprava `byProject` parsingu, `getLogsForProject`, undo callbacku phase_change.
-- `src/hooks/useProductionDailyLogs.ts` — voliteľne rozšíriť `saveDailyLog` o `loggedAt`.
+- `src/pages/Vyroba.tsx` — len tento súbor.
 
 ## Výsledok
-
-- Zmena daylogu na Insia B sa prejaví **len na Insia B**, A-4 ostane nedotknutý.
-- Po `Ctrl+Z` na zmenu fázy/% sa nielen vráti hodnota, ale aj farba bunky (zmizne oranžový "po termíne" indikátor).
-- Staré daylogy zostanú viditeľné cez fallback čítanie; nové sa ukladajú per-bundle.
+- Allianz D ukáže **vlastný weekly goal** odvodený z hodín D, nie z A+B+C+D.
+- Progress bar Allianz D ukáže **vlastný % completion** (na základe items D, nie celého projektu).
+- Insia A-4 a Insia B (tá istá Insia, ten istý týždeň) ukážu nezávislé ciele aj progress bary.
+- Dialog daylogu, undo, item list — všetko ostáva v poriadku (už opravené).
+- Žiadna DB migrácia, žiadne zmeny v ďalších moduloch.
