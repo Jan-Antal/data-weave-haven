@@ -106,6 +106,7 @@ interface ProjectCard {
 
 function useDilnaData(weekOffset: number) {
   const weekInfo = useMemo(() => getISOWeekForOffset(weekOffset), [weekOffset]);
+  const prevWeekInfo = useMemo(() => getISOWeekForOffset(weekOffset - 1), [weekOffset]);
   const sundayStr = useMemo(() => {
     const sun = new Date(weekInfo.friday);
     sun.setDate(sun.getDate() + 2);
@@ -115,7 +116,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
+      const [hoursRes, schedRes, prevSchedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -125,9 +126,15 @@ function useDilnaData(weekOffset: number) {
         // Per-bundle schedule rows for THIS week (for bundle table + planned hours)
         supabase
           .from("production_schedule")
-          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position")
+          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
           .eq("scheduled_week", weekInfo.weekKey)
           .not("status", "eq", "cancelled"),
+        // Spilled rows: T-1 schedule rows still active (mirrors Vyroba spill logic)
+        supabase
+          .from("production_schedule")
+          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
+          .eq("scheduled_week", prevWeekInfo.weekKey)
+          .in("status", ["scheduled", "in_progress", "paused"]),
         supabase
           .from("production_settings")
           .select("weekly_capacity_hours")
