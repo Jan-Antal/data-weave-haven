@@ -1,47 +1,62 @@
-# Oprava daylog izolácie — Insia bug
+## Cieľ
+Absence (`src/components/analytics/AbsenceReport.tsx`) bude vizuálne, štruktúrne a interakčne identický s Výkaz (`VykazReport.tsx`). Zachová si vlastnú dátovú logiku (typy absencií DOV/NEM/RD/Ostatní, periody, plánované vs. dochádzka), ale UI shell, paleta, ovládací bar, filtre a zoraďovanie do farebných blokov budú prevzaté z Výkazu — žiadne vlastné štýly navyše.
 
-## Diagnóza (potvrdená z DB)
+## Čo sa konkrétne mení v `AbsenceReport.tsx`
 
-V tabuľke `production_daily_logs` pre Insia / týždeň `2026-04-20` existujú **dve sady kľúčov**:
-- Legacy: `Z-2605-001::2026-04-20` — obsahuje Po–Št (0–3) + pôvodný Piatok (98%, "Chybí dokončit T03…")
-- Nový bundle-scoped: `Z-2605-001::2026-04-20::SG:2e7ac40e-…` — obsahuje LEN Piatok (4) zapísaný po dnešnom fixe
+### 1. Toolbar (zhodný s Výkazom)
+- Nahradiť aktuálny rad tlačidiel (Týden / Měsíc / Předch. měsíc / 3 měsíce / Rok + Vlastní) **jedným kompaktným kalendárovým popoverom** identickým s Výkazom:
+  - vľavo `ChevronLeft` (rangeOffset −1), v strede `Button` s ikonou kalendára a textom rozsahu (`fmtDate(from) – fmtDate(to)`), vpravo `ChevronRight`.
+  - Popover: presetová stĺpcová lišta (Týden / Měsíc / Min. týden / Min. měsíc / Posledné 3 měsíce / Rok) + `Calendar mode="range"` s 2 mesiacmi a `weekStartsOn={1}`.
+  - Footer popoveru s `Smazat` a `Hotovo`.
+- Stredná zóna toolbaru (centrované): nahradiť dvojicu jednoduchých `Popover` filtrov (Typ, Úsek) za **rovnaký `MultiSelectFilter` komponent ako vo Výkaze** (s textovým hľadaním, "Vybrať vše / Zrušiť vše", počet vybratých, zvýraznený border keď je filter aktívny).
+  - Filtre pre Absence: **Typ** (Dovolená/Nemoc/Rodičovská/Ostatní), **Úsek**, **Středisko**, **Zaměstnanec**.
+  - Reset tlačidlo `X Reset` zhodne s Výkazom.
+- Pravá zóna: `TableSearchBar` + `Export CSV` tlačidlo s rovnakými classami (`h-8 px-3 text-xs gap-1.5`).
+- Toolbar kontajner: `shrink-0 border-b bg-card px-4 py-2 flex items-center gap-3` (rovnako ako Výkaz, namiesto súčasného `flex-wrap … gap-2`).
 
-**Dôsledok pre UI:**
-1. Pre Piatok nájde nový SG kľúč → čita ho len ten konkrétny bundle (správne).
-2. Pre Po–Št pod novým kľúčom nič nie je → padá na legacy `Z-2605-001::2026-04-20` fallback → **obe bundles (A-4 aj B) čítajú tie isté legacy záznamy** = "obe sa menia naraz".
-3. Záznamy nie sú stratené — len UI ich nezobrazuje konzistentne, lebo časť dní sa číta z bundle kľúča a časť z legacy fallbacku.
-4. Undo prepísal záznam s novým `logged_at` → "úprava po termíne" zostala.
+### 2. Sumárne karty (rovnaký rad ako Výkaz)
+- Použiť **rovnaký grid** `px-4 pt-4 pb-2 grid grid-cols-2 md:grid-cols-4 gap-3` a **rovnaký štýl `Card`** (`p-4 shadow-sm`, label `text-[11px] uppercase tracking-wide text-muted-foreground`, hodnota `text-2xl font-bold mt-1 tabular-nums`).
+- Odstrániť emoji ikonky a farebné `border-l-4` pruhy. Zostávajú 4 KPI: **Celkem hodin absencí**, **Aktivní zaměstnanci**, **Plánované / Skutečné** (manual vs dochádzka — bez vlastnej palety), **Dní v období**.
 
-## Plán opráv
+### 3. Graf "Hodiny v čase" (rovnaký vizuál)
+- Prepísať blok `Časová osa absencí` na rovnakú `Card` s headerom (titulok + bucket toggle "Auto/Den/Týden" v `bg-muted rounded-lg p-0.5` segmentovanom prepínači).
+- Výška `h-[180px]`, marginy `{ top: 4, right: 4, left: -16, bottom: 0 }`, `CartesianGrid strokeDasharray="3 3" vertical={false}`.
+- Stacked bars rovnakou paletou ako Výkaz: `hsl(var(--primary))`, `hsl(var(--primary) / 0.55)`, `hsl(var(--accent))`, plus 4. tón pre "Ostatné" (`hsl(var(--primary) / 0.3)`). Tým **zrušíme vlastné amber/red/violet/slate `KIND_COLOR`**, ktoré sa rozchádzajú s brand paletou.
+- Vlastný tooltip identický s Výkazom (rounded-lg border bg-background, riadky s 2×2 farebnými indikátormi).
+- Pridať **highlight víkendov a sviatkov** cez `useCzechHolidays` + `useCompanyHolidays` + `ReferenceArea` (rovnaký kód ako vo Výkaze) — Absence to dnes vôbec neukazuje.
+- Pod grafom rovnaký legend rad `text-[11px]` s farebnými štvorčekmi.
 
-### 1. Jednorázová migrácia legacy záznamov (SQL migration)
-Pre každý existujúci `bundle_id` typu `${pid}::${week}` (bez 3. časti):
-- Zistiť, ktoré bundles existujú v `production_schedule` pre daný `(project_id, scheduled_week)`.
-- Ak existuje **len jeden bundle** v tom týždni → premenovať `bundle_id` na nový bundle-scoped formát (buď `…::SG:<split_group_id>` alebo `…::<stage_id>::<bundle_label>`).
-- Ak existuje **viac bundles** → záznam ponechať a označiť (alebo skopírovať pod každý bundle s pôvodným `logged_at`), aby UI nestratilo dáta. Pre Insiu konkrétne: skopírovať Po–Št pod oba kľúče (`SG:2e7ac…` aj druhý bundle), aby každý mal vlastnú kópiu, a ďalšie úpravy už šli iba pod jeho identitu.
-- Migráciu vytvoriť ako idempotentnú (kontrola existencie cieľového kľúča pred zápisom).
+### 4. Radenie do farebných blokov (`CollapsibleSection`)
+- Toto je hlavný požiadavok ("radenie podle typu/projektu do bloku"). V Absence budú dáta zoradené do **3 farebných sekcií podľa typu absencie** s presne rovnakým `CollapsibleSection` komponentom prevzatým z Výkazu (alebo presunutým do zdieľaného súboru — viď bod 6):
+  - **🟢 "Dovolená"** — tone `projekty` (zelená paleta `border-green-200`, header `bg-green-50/80`).
+  - **🟣 "Rodičovská"** — tone `rezie` (fialová paleta).
+  - **🟡 "Nemoc + Ostatní"** — tone `nesparovane` (jantárová paleta s `AlertTriangle` ikonou).
+- Každá sekcia: collapse hlavička s badgom (názov typu), počet zamestnancov, súčet hodín; pod hlavičkou rovnaká `Table` ako vo Výkaze s expandable detail riadkom (periody) — zachová sa súčasná logika `groupPeriods`.
+- Footer karta `Celkem` s `bg-muted/40` a hodnotou v `text-primary` (rovnako ako Výkaz).
 
-### 2. Odstrániť legacy fallback v `getLogsForProject` (`src/pages/Vyroba.tsx`)
-- Po migrácii čítať **iba** bundle-scoped kľúč. Ak nič nie je → bundle nemá log (správne).
-- Tým sa zabráni tomu, aby dva rôzne bundles "zdieľali" legacy záznam.
+### 5. Detail rows (periody)
+- Zachovať existujúcu `groupPeriods` logiku, ale prerenderovať expandovaný blok rovnakým štýlom ako vo Výkaze (`bg-muted/30 p-0`, vnorený `Table` s `h-7 text-[10px]` headerom).
+- Nahradiť farebné `Badge variant=destructive/secondary/...` za neutrálne `outline` badge s textom typu — farba sekcie už komunikuje typ.
+- Zdroj ("Plánované / Dochádzka") ostáva ako jemný `text-[10px]` chip s `bg-primary/10` (totožné s Výkazom).
 
-### 3. Opraviť undo `logged_at` u všetkých daylog akcií
-- Pre `phase_change`, `log_note` a `no_activity` undo akcie použiť priamy `supabase.update` so zachovaním pôvodného `logged_at` z `existingLog` (rovnako ako už existujúci pattern pre percent change).
-- Po update invalidate `["production-daily-logs", weekKey]` aj `["production-daily-logs-all-non-mf"]`.
+### 6. Zdieľaný komponent (voliteľné, ale odporúčané)
+- Vytvoriť `src/components/analytics/_shared.tsx` s exportmi:
+  - `MultiSelectFilter`, `CollapsibleSection`, `FlatSection`, `sectionStyle`, `formatHours`, `toLocalDateStr`, `addDays`, `getRangeBounds` (zjednotená signatúra), `RangePickerToolbar`.
+- `VykazReport.tsx` aj `AbsenceReport.tsx` import z tohto súboru. Tým sa zaručí, že akákoľvek budúca zmena v Výkaze sa automaticky prejaví v Absence (a obrátene), a odstráni sa duplikácia ~250 riadkov.
 
-### 4. Zápis logu cez `saveDailyLog` — pridať `loggedAtOverride`
-- Voliteľný parameter, ktorý umožní zachovať originálny `logged_at` (využije undo, prípadne import).
+### 7. Drobnosti / čistenie
+- Odstrániť `KIND_COLOR`, `KIND_BADGE_VARIANT` (nepoužité po unifikácii palety).
+- Odstrániť emoji v textoch (`🏖️`, `👶`, `🤒`) — Výkaz ich tiež nepoužíva.
+- Lokalizácia tlačidiel a labelov 1:1 podľa Výkazu (české názvy, `Posledné 3 měsíce`, `Smazat`, `Hotovo`, `Reset`, `Vybrat vše`, `Zrušit vše`).
 
-### 5. Verifikácia po nasadení
-- Otvoriť Insia A-4 a Insia B v týždni 20.4.: každá karta musí mať vlastný daylog (žiadne zdieľanie).
-- Zmena Piatku v B nesmie ovplyvniť A-4.
-- Undo musí vrátiť hodnotu **aj** vyčistiť oranžový "úprava po termíne" indikátor.
-- DB query `SELECT bundle_id, day_index, percent FROM production_daily_logs WHERE bundle_id LIKE 'Z-2605-001::2026-04-20%' ORDER BY day_index;` musí vrátiť pre každý bundle vlastnú sadu dní 0–4 bez kolízie.
+## Súbory dotknuté
+- **upraviť**: `src/components/analytics/AbsenceReport.tsx` (kompletný rewrite render časti, dátová vrstva ostáva).
+- **(voliteľne) vytvoriť**: `src/components/analytics/_shared.tsx` a v `VykazReport.tsx` importovať z neho `MultiSelectFilter`, `CollapsibleSection` atď.
 
-## Súbory
-- **NEW**: `supabase/migrations/<timestamp>_migrate_legacy_daylog_bundle_ids.sql`
-- **EDIT**: `src/pages/Vyroba.tsx` — odstrániť legacy fallback, opraviť undo handlery (preserve `logged_at`)
-- **EDIT**: `src/hooks/useProductionDailyLogs.ts` — pridať `loggedAtOverride` parameter do `saveDailyLog`
+## Čo sa NEmení
+- Dátová logika (queries `ami_absences`, `ami_employees`, `groupPeriods`, `categorize`, `hoursForRow`).
+- CSV export schéma.
+- URL/route `tab=absence`.
 
-## Riziko / poznámka
-Migrácia menia primárny kľúč riadkov (`bundle_id`). Pred spustením spravím SELECT preview, ktoré ukáže koľko riadkov bude premenovaných vs. duplikovaných, aby sa potvrdilo žiadne dáta sa nestratia.
+## Výsledok
+Po nasadení bude Absence vizuálne nerozlíšiteľná od Výkazu okrem obsahu (kategórie absencií namiesto projektov/režie/nespárovaných). Toolbar, kalendár, multi-select filtre, sumárne karty, graf aj farebné collapsible sekcie zdieľajú jednu paletu a komponenty.
