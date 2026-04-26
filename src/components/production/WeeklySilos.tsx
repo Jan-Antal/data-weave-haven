@@ -1383,7 +1383,7 @@ function SiloColumn({ weekKey, weekNum, startDate, endDate, isCurrent, isPast, s
               </>
             )}
           </div>
-          {isCurrent && spilledHours > 0 && (
+          {spilledHours > 0 && (
             <div className="mt-[3px] text-[9px] font-medium text-center" style={{ color: "#d97706" }}>
               + {Math.round(spilledHours)}h přelité (mimo plán)
             </div>
