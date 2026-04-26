@@ -669,11 +669,13 @@ function useDilnaData(weekOffset: number) {
       const unmatchedCount = cards.filter(c => c.warning === "unmatched").length;
       const delayCount = cards.filter(c => c.slipStatus === "delay").length;
       const slipCount = cards.filter(c => c.slipStatus === "slip").length;
+      const spilledCount = cards.filter(c => c.isSpilledOnly || c.bundles.some(b => b.isSpilled)).length;
       const totalValueCzk = cards.reduce((s, c) => s + (c.valueCzk || 0), 0);
       const totalValueTargetCzk = cards.reduce((s, c) => s + (c.valueTargetCzk || 0), 0);
 
       return {
         weekInfo,
+        prevWeekNum: prevWeekInfo.week,
         weeklyCapacity,
         totalHoursWeek,
         todayHours,
@@ -684,6 +686,7 @@ function useDilnaData(weekOffset: number) {
         unmatchedCount,
         delayCount,
         slipCount,
+        spilledCount,
         totalValueCzk,
         totalValueTargetCzk,
       };
