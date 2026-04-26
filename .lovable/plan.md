@@ -1,91 +1,71 @@
-## Problem (root cause confirmed in DB)
+## Cieľ
+Opraviť logiku „Přelité“ vo Výrobe aj Analytics → Dílna podľa správnej semantiky:
 
-I queried `production_schedule` for Allianz / Insia / Příluky / Valovi in T-1 (week `2026-04-13`) vs T (`2026-04-20`). All the rows the user expects to see as **přelité** share two characteristics:
+- V T17 nemá byť nič preliate, pretože dáta pred T17 sú midflight história a reálne dokončené.
+- V T18 sa majú ako preliate zobraziť aktuálne nedokončené balíky z týždňa T18, ktoré sú už v tomto týždni a ešte nie sú vyrobené/expedované: Příluky Valovi A-5, Insia A-4, Insia B, Allianz B a súvisiace aktuálne balíky.
+- V T19 sa nemá zobrazovať nič preliate, kým nie sme v T19.
+- Prelievanie sa vyhodnocuje len pre aktuálny reálny týždeň, nie pre ľubovoľný zobrazený historický/budúci týždeň.
 
-| project | T-1 row | flags |
-|--|--|--|
-| Allianz – 5.patro (split A 4/5) | scheduled, hours 13.6 | `is_midflight=true`, `completed_at=2026-04-20 00:46` |
-| Insia (split A 3) | scheduled, hours 212.3 | `is_midflight=true`, `completed_at=2026-04-20 00:46` |
-| Příluky Valovi (split A 5) | scheduled, hours 179.6 | `is_midflight=true`, `completed_at=2026-04-20 00:46` |
+## Zistenie
+Aktuálny problém spôsobilo, že sme „přelité“ počítali ako T-1 riadky pre každý zobrazený týždeň. To je zle pre túto dátovú situáciu:
 
-All three:
-- `status = "scheduled"` (NOT completed)
-- `expediced_at = NULL` (not shipped)
-- `is_midflight = true` (legacy carry-over from Midflight import)
-- `completed_at` was filled by the midflight reset script (junk data — it does not mean "done")
+- T17 ukazuje staré midflight T16 ako preliate, hoci sú to historicky dokončené dáta.
+- T18 hľadá T17, ale požadované balíky sú v skutočnosti v pláne T18 a niektoré ich položky ešte nie sú v `production_expedice`.
+- T19 hľadá T18, hoci reálny týždeň je stále T18, takže budúce prelievanie ešte nemá existovať.
 
-### Why both modules hide them today
+## Nové pravidlo
+Zavedie sa jednotný helper pre obidva moduly:
 
-1. **Modul Výroba** (`src/pages/Vyroba.tsx:515`) — `isItemDone(item)` returns `true` whenever `item.is_midflight` is true. Spillover loop (line 624) filters on `!isItemDone(i)`, so all midflight rows get dropped → no Příluky/Insia/Allianz appears.
-2. **Analytics → Dílna** (`src/components/DilnaDashboard.tsx:257`) — `isRowDone(r)` returns `true` whenever `!!r.completed_at`. Same midflight rows have a non-null `completed_at`, so they're filtered out → same symptom.
+```text
+shownWeek = týždeň, ktorý si používateľ pozerá
+realWeek = aktuálny týždeň podľa dnešného dátumu
 
-The "iné projekty/bundles" the user sees are unrelated T-1 rows that happen to NOT have midflight flag (legacy schedule rows that should arguably be cleaned up, but that's a separate cleanup).
+Přelité sa počíta iba ak shownWeek == realWeek.
+Zdrojom sú nedokončené aktívne riadky v shownWeek, nie T-1.
+Dokončené znamená:
+- status je completed/expedice/cancelled, alebo
+- existuje riadok v production_expedice pre source_schedule_id.
 
-## Required semantic fix
-
-`is_midflight = true` + `status = "scheduled"` + `expediced_at = NULL` means **"pending work carried over from the legacy/Excel era — still needs to be produced"**. It is the canonical spillover signal. It MUST count as "still active / přelité", not as "done".
-
-The only thing that should mean "done" for spillover purposes:
-- `status IN ("completed","expedice","cancelled")`, OR
-- a row exists in `production_expedice` for this `schedule_id`.
-
-`completed_at` alone is **not reliable** — midflight reset wrote `2026-04-20 00:46` into many rows that are still scheduled. We must stop treating it as a "done" indicator.
-
-## Fix — two files
-
-### 1. `src/pages/Vyroba.tsx` — `isItemDone` (line 515)
-Change:
-```ts
-const isItemDone = (item) => {
-  if (item.is_midflight) return true;                       // ❌ remove this
-  return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
-};
+completed_at samotné sa nepoužije.
+Midflight riadky sa vo Výrobe/Analytike nebudú používať ako prelievané v historických týždňoch.
 ```
-to:
-```ts
-const isItemDone = (item) => {
-  return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
-};
-```
-Also remove the equivalent `is_midflight` short-circuits in the two `isItemDoneLocal` callbacks (lines 3510, 4064) — search for `if (item.is_midflight) return true;` and delete those three occurrences.
 
-Similarly in the inline `itemDone` helper used by the slide-projects spillover loop (around line 220–221) — verify it does NOT short-circuit on `is_midflight`. If it does, remove that branch.
+## Úpravy
 
-### 2. `src/components/DilnaDashboard.tsx` — `isRowDone` (line 257)
-Change:
-```ts
-const isRowDone = (r) =>
-  r.status === "completed" || !!r.expediced_at || !!r.completed_at;   // ❌ completed_at is unreliable
-```
-to:
-```ts
-const isRowDone = (r) =>
-  r.status === "completed" || r.status === "expedice" || !!r.expediced_at;
-```
-Drop `completed_at` from the SELECT for the prev-week query (lines 129, 135) — no longer needed for this check (keep it on the current-week query if other code uses it; quick grep shows it isn't critical to spillover).
+### 1. `src/pages/Vyroba.tsx`
+- Odstrániť všeobecné prelievanie z predchádzajúceho zobrazeného týždňa.
+- Zobrazovať sekciu „Přelité“ len keď je zobrazený reálny aktuálny týždeň.
+- Pre aktuálny týždeň označiť ako `isSpilled` tie balíky/projekty, ktoré majú aktívne nedokončené položky v aktuálnom týždni.
+- Pri výpočte aktívnych položiek brať do úvahy `production_expedice` cez `expedicedScheduleIds`, aby napr. čiastočne vyrobené balíky nevyzerali celé ako preliate.
+- Týždne v minulosti a budúcnosti nebudú generovať žiadnu sekciu „Přelité“.
 
-### 3. T-1 query: include midflight rows that still have `status="scheduled"`
-The current prev-week query (line 137) already uses `.in("status", ["scheduled","in_progress","paused"])` — that's correct and already includes the midflight rows since their status is `scheduled`. **No query change needed once `isRowDone` stops false-positiving on `completed_at`.**
+### 2. `src/components/DilnaDashboard.tsx`
+- Zrušiť samostatnú T-1 query `prevSchedRes` pre „spilled“ logiku.
+- Balíky v aktuálnom týždni rozdeliť na:
+  - normálne naplánované,
+  - aktívne nedokončené označené amber chipom ako „Přelité / dořešit tento týden“.
+- „Přelité“ badge a `spilledCount` zobrazovať len pre reálny aktuálny týždeň.
+- Pre budúci T19 neukazovať žiadne „Přelité z T18“, kým sa reálny dátum nepresunie do T19.
+- Neplánované projekty s natrackovanými hodinami ponechať bez zmeny.
 
-### 4. Visual verification after the fix
-With the prev-week being `2026-04-13`:
+### 3. `src/components/production/WeeklySilos.tsx`
+- Opraviť rovnaký pattern v plánovacom boarde: `spilledBundlesForCurrent` nesmie vyťahovať T-1 midflight dáta ako preliate.
+- Sekciu „přelité“ ponechať iba pre aktuálny reálny týždeň a iba pre nedokončené aktuálne balíky, ak ju tam chceme zobrazovať konzistentne.
 
-**Modul Výroba (T = `2026-04-20`):**
-- Sidebar "Přelité" section should show: **Allianz – 5.patro**, **Insia**, **Příluky Valovi Dům**, plus any other projects with active T-1 rows.
+## Overenie po implementácii
+Vizuálne prejdem:
 
-**Analytics → Dílna (week `2026-04-20`):**
-- These same projects should appear with the amber "Přelité z T16" badge on the card header (and amber chip on bundle rows).
-- Already-current-week projects (Allianz 5.p has T row too) should show their T bundle PLUS the spilled bundle row from T-1 (different `split_part` so they're distinct keys).
+1. `/vyroba`
+   - T17: sekcia „Přelité“ je prázdna/skrytá.
+   - T18: viditeľné požadované aktuálne nedokončené balíky: Příluky Valovi A-5, Insia A-4, Insia B, Allianz B.
+   - T19: nič preliate.
 
-I will run a screenshot pass on `/vyroba` and `/analytics` (Dílna tab, week navigated to `2026-04-20`) and confirm the three target projects appear in both modules' přelité sections.
+2. `/analytics?tab=dilna`
+   - T17: žiadne preliate midflight dáta.
+   - T18: rovnaké balíky ako vo Výrobe, plus existujúce neplánované projekty s natrackovanými hodinami.
+   - T19: nič preliate.
 
-## Risk / scope
-- Removing `is_midflight` from `isItemDone` will also affect: completion detection in completion dialogs, weekly goal calculation (line 942), status-progression logic (line 1076). I need to grep all call sites of `isItemDone` / `isItemDoneLocal` and confirm none of them relied on midflight rows being treated as "completed". If any does (e.g., weeklyGoal denominator), I'll handle it explicitly — most likely the correct fix everywhere is "midflight = pending", and any place that wants to exclude midflight from a "to-do count" should check `is_midflight` directly.
-- Removing `completed_at` from `isRowDone` is safe — `completed_at` is only reliable when paired with `status="completed"`, and that's already covered.
-- No DB migration. No schema change. No data backfill.
+3. Skontrolujem, že `completed_at` samotné nič neoznačuje ako dokončené ani preliate a že riadky existujúce v `production_expedice` sa z „přelité“ vyradia.
 
-## Files affected
-- `src/pages/Vyroba.tsx` (3 small edits: remove midflight short-circuit from `isItemDone` and 2x `isItemDoneLocal`; verify inline `itemDone`)
-- `src/components/DilnaDashboard.tsx` (1 edit: rewrite `isRowDone`)
-
-I'll also do a `rg "is_midflight" src/` sweep before committing to confirm no other place in production code falsely equates midflight with "done".
+## Bez databázovej migrácie
+Nebude sa meniť schéma ani dáta. Ide o opravu aplikačnej logiky a zobrazenia.
