@@ -1093,17 +1093,17 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
     // Spilled projects use carried-forward log % as their starting progress
     if (project?.isSpilled) {
-      return { totalHours, completedHours: 0, bundleProgress: getLatestPercent(pid) };
+      return { totalHours, completedHours: 0, bundleProgress: getLatestPercent(project ?? pid) };
     }
 
     // Primary signal: latest daylog of the viewed week (or chain/any-prior fallback inside getLatestPercent).
-    const logsThisWeek = getLogsForProject(pid);
+    const logsThisWeek = getLogsForProject(project ?? pid);
     const hasLogThisWeekOrChain =
       logsThisWeek.length > 0 ||
       findPriorChainLog(pid, weekKey) !== null ||
       findPriorAnyLog(pid, weekKey) !== null;
     if (hasLogThisWeekOrChain) {
-      return { totalHours, completedHours, bundleProgress: getLatestPercent(pid) };
+      return { totalHours, completedHours, bundleProgress: getLatestPercent(project ?? pid) };
     }
 
     // Past weeks must NOT be overwritten by live completion %. If no log exists
