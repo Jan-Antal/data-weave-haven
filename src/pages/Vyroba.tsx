@@ -3402,7 +3402,7 @@ function ProjectRow({
       }}
     >
       <button
-        onClick={() => onSelect(project.projectId)}
+        onClick={() => onSelect(project.cardKey)}
         onContextMenu={(e) => onContextMenu(e, project.projectId)}
         className="w-full flex items-center gap-1.5 text-left transition-colors"
         style={{ padding: isMobile ? 12 : "5px 10px" }}
