@@ -589,10 +589,24 @@ function useDilnaData(weekOffset: number) {
             const displayLabel = b.bundle_type === "split" && b.split_part
               ? `${label}-${b.split_part}`
               : label;
-            const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
-            // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
-            const bCompletion = completionPct;
-            // Slip color porovnává completion proti dennímu targetu (bExpected) — pohyblivý cíl podle aktuálního dne v týdnu
+            // Per-bundle weekly target: full → 100%, split → chain-end at this week (e.g. 60%).
+            const bExpected = isUnmatched
+              ? null
+              : (b.split_group_id
+                  ? bundleTargetForWeek(b.split_group_id, weekInfo.weekKey)
+                  : 100);
+            // Per-bundle completion: resolved by bundle identity (no cross-bundle bleed).
+            const bIdentity = identityKey(null, b.bundle_label, b.split_part);
+            // Note: schedule rows here group by stage_id too; identity used here uses the
+            // first row's stage_id from the bundle entry.
+            const bIdentityWithStage = identityKey(
+              (schedule.find(s => s.id === b.bundleId)?.stage_id ?? null),
+              b.bundle_label,
+              b.split_part,
+            );
+            const resolvedPct = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+            const bCompletion = resolvedPct;
+            // Slip color porovnává completion proti weekly targetu (bExpected).
             // Spilled bundles inherit isSpilled treatment in computeSlip.
             const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled || b.isSpilled);
             bundleRows.push({
