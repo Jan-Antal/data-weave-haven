@@ -1266,12 +1266,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return Math.round(weeklyGoal);
   }
 
-  function getProjectStatus(pid: string): "on-track" | "at-risk" | "behind" {
-    // Spilled projects are always "behind" regardless of current progress
-    const statusProject = enrichedProjects.find(p => p.projectId === pid);
+  function getProjectStatus(pidOrProject: string | VyrobaProject): "on-track" | "at-risk" | "behind" {
+    const statusProject = resolveProject(pidOrProject);
+    const pid = typeof pidOrProject === "string" ? pidOrProject : pidOrProject.projectId;
     if (statusProject?.isSpilled) return "behind";
-    const { bundleProgress } = getBundleProgress(pid);
-    const goal = getWeeklyGoal(pid);
+    const { bundleProgress } = getBundleProgress(statusProject ?? pid);
+    const goal = getWeeklyGoal(statusProject ?? pid);
     if (bundleProgress >= goal) return "on-track";
     if (todayDayIndex < 0) {
       const realWeekKey = weekKeyStr(getMonday(new Date()));
@@ -1279,7 +1279,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       if (scheduleData) {
         for (const [wk, silo] of scheduleData) {
           if (wk >= realWeekKey) continue;
-          if (silo.bundles.some(b => b.project_id === pid && b.items.some(i => i.status === "scheduled" || i.status === "in_progress"))) {
+          if (silo.bundles.some(b =>
+            b.project_id === pid &&
+            (statusProject ? bundleMatchesProject(b, statusProject) : true) &&
+            b.items.some(i => i.status === "scheduled" || i.status === "in_progress")
+          )) {
             hasDelayed = true;
             break;
           }
@@ -1299,10 +1303,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const total = activeProjects.length;
     const avgPct =
       total > 0
-        ? Math.round(activeProjects.reduce((s, p) => s + getBundleProgress(p.projectId).bundleProgress, 0) / total)
+        ? Math.round(activeProjects.reduce((s, p) => s + getBundleProgress(p).bundleProgress, 0) / total)
         : 0;
-    const onTrack = activeProjects.filter((p) => getProjectStatus(p.projectId) === "on-track").length;
-    const behind = activeProjects.filter((p) => getProjectStatus(p.projectId) === "behind").length;
+    const onTrack = activeProjects.filter((p) => getProjectStatus(p) === "on-track").length;
+    const behind = activeProjects.filter((p) => getProjectStatus(p) === "behind").length;
     const todayLogged =
       todayDayIndex >= 0
         ? activeProjects.filter((p) => getLogsForProject(p.projectId).some((l) => l.day_index === todayDayIndex)).length
