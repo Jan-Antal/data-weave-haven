@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ChevronDown, AlertCircle } from "lucide-react";
 import { getProjectColor } from "@/lib/projectColors";
+import { getWorkWeekMonday } from "@/lib/workWeek";
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
