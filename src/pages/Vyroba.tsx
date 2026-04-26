@@ -217,13 +217,24 @@ function getProjectsForWeek(
     const realWeekKey = weekKeyStr(realMondayForHelper);
     const realSilo = scheduleData.get(realWeekKey);
     if (realSilo) {
-      const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_part: number | null }) =>
-        `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}::${b.split_part ?? "full"}`;
+      // Dedup key: per split_group_id when present (chain across weeks shares ID),
+      // otherwise per stage_id + bundle_label. This prevents spilling a chain part
+      // when ANY part of the same chain is already planned in T+1.
+      const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_group_id?: string | null }) =>
+        b.split_group_id
+          ? `${b.project_id}::SPLIT::${b.split_group_id}`
+          : `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}`;
       const destSilo = scheduleData.get(slideWeekKey);
-      const destBundleKeys = new Set<string>((destSilo?.bundles || []).map(bundleKey));
+      const destBundleKeys = new Set<string>(
+        (destSilo?.bundles || []).flatMap((db: any) =>
+          (db.items || []).map((it: any) => bundleKey({ project_id: db.project_id, stage_id: db.stage_id, bundle_label: db.bundle_label, split_group_id: it.split_group_id })),
+        ),
+      );
 
       for (const b of realSilo.bundles) {
-        if (destBundleKeys.has(bundleKey(b))) continue;
+        const sampleItem = b.items[0] || {};
+        const bk = bundleKey({ project_id: b.project_id, stage_id: b.stage_id, bundle_label: b.bundle_label, split_group_id: (sampleItem as any).split_group_id });
+        if (destBundleKeys.has(bk)) continue;
         const activeItems = b.items.filter(
           (i: ScheduleItem) =>
             (i.status === "scheduled" || i.status === "in_progress") &&
@@ -232,21 +243,15 @@ function getProjectsForWeek(
         );
         if (activeItems.length === 0) continue;
 
-        const existing = result.find((r) => r.projectId === b.project_id);
-        if (existing) {
-          existing.scheduleItems = [...existing.scheduleItems, ...activeItems];
-          existing.totalHours += activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
-          existing.hasSpilledItems = true;
-        } else {
-          result.push({
-            projectId: b.project_id,
-            projectName: b.project_name,
-            totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
-            scheduleItems: activeItems,
-            color: getProjectColor(b.project_id),
-            isSpilled: true,
-          });
-        }
+        // Spilled bundle = its own card (mirrors Dílňa). Never merge into a project card.
+        result.push({
+          projectId: b.project_id,
+          projectName: b.project_name,
+          totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
+          scheduleItems: activeItems,
+          color: getProjectColor(b.project_id),
+          isSpilled: true,
+        });
       }
     }
   }
@@ -646,15 +651,24 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       const realWeekKey = weekKeyStr(realMonday);
       const realSilo = scheduleData.get(realWeekKey);
       if (realSilo) {
-        const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_part: number | null }) =>
-          `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}::${b.split_part ?? "full"}`;
-        // Collect bundle keys already present in the displayed (T+1) week so we don't duplicate
-        // a spilled bundle that has already been replanned to T+1.
+        // Dedup key: per split_group_id when present (chain across weeks shares ID),
+        // otherwise per stage_id + bundle_label. This prevents spilling a chain part
+        // when ANY part of the same chain is already planned in T+1.
+        const bundleKey = (b: { project_id: string; stage_id: string | null; bundle_label: string | null; split_group_id?: string | null }) =>
+          b.split_group_id
+            ? `${b.project_id}::SPLIT::${b.split_group_id}`
+            : `${b.project_id}::${b.stage_id ?? "none"}::${b.bundle_label ?? "A"}`;
         const destSilo = scheduleData.get(weekKey);
-        const destBundleKeys = new Set<string>((destSilo?.bundles || []).map(bundleKey));
+        const destBundleKeys = new Set<string>(
+          (destSilo?.bundles || []).flatMap((db: any) =>
+            (db.items || []).map((it: any) => bundleKey({ project_id: db.project_id, stage_id: db.stage_id, bundle_label: db.bundle_label, split_group_id: it.split_group_id })),
+          ),
+        );
 
         for (const b of realSilo.bundles) {
-          if (destBundleKeys.has(bundleKey(b))) continue;
+          const sampleItem = b.items[0] || ({} as any);
+          const bk = bundleKey({ project_id: b.project_id, stage_id: b.stage_id, bundle_label: b.bundle_label, split_group_id: sampleItem.split_group_id });
+          if (destBundleKeys.has(bk)) continue;
           const activeItems = b.items.filter(
             (i) =>
               (i.status === "scheduled" || i.status === "in_progress") &&
@@ -663,23 +677,15 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           );
           if (activeItems.length === 0) continue;
 
-          // If the project already exists in result (because it has a planned bundle in T+1),
-          // merge spilled items into the same project card. Otherwise create a spilled-only card.
-          const existing = result.find((r) => r.projectId === b.project_id);
-          if (existing) {
-            existing.scheduleItems = [...existing.scheduleItems, ...activeItems];
-            existing.totalHours += activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
-            existing.hasSpilledItems = true;
-          } else {
-            result.push({
-              projectId: b.project_id,
-              projectName: b.project_name,
-              totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
-              scheduleItems: activeItems,
-              color: getProjectColor(b.project_id),
-              isSpilled: true,
-            });
-          }
+          // Spilled bundle = its own card (mirrors Dílňa). Never merge into a project card.
+          result.push({
+            projectId: b.project_id,
+            projectName: b.project_name,
+            totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
+            scheduleItems: activeItems,
+            color: getProjectColor(b.project_id),
+            isSpilled: true,
+          });
         }
       }
     }
