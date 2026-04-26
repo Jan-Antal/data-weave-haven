@@ -136,7 +136,13 @@ function stripSplitSuffix(name: string): string {
 }
 
 function getScheduleBusinessKey(item: Pick<ScheduleItem, "project_id" | "item_code" | "item_name" | "split_group_id">): string {
-  const identity = item.split_group_id || item.item_code || `name::${stripSplitSuffix(item.item_name).toLowerCase()}`;
+  // Prefer item_code so distinct elements in the same bundle (sharing split_group_id)
+  // are NOT merged into one Hotové row. Fall back to split_group_id only when no
+  // item_code is available, then to a normalised name.
+  const identity =
+    item.item_code ||
+    item.split_group_id ||
+    `name::${stripSplitSuffix(item.item_name).toLowerCase()}`;
   return `${item.project_id}::${identity}`;
 }
 
