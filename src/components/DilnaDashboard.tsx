@@ -447,6 +447,8 @@ function useDilnaData(weekOffset: number) {
           cum += share;
         }
         if (!found) return 100;
+        if (isPastWeek) return Math.round(end);
+        if (!isCurrentWeek) return Math.round(end);
         return Math.round(start + (end - start) * dayFraction);
       }
 
