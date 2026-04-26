@@ -427,6 +427,8 @@ function useDilnaData(weekOffset: number) {
         // 3) No unambiguous prior log → no carry-forward to avoid cross-bundle bleed.
         return null;
       }
+
+      // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
       // For split bundles: chain across weeks of the same split_group_id, displayed week's window is its slice.
       const chainWindowBySplitGroup = new Map<string, { start: number; end: number }>();
       const splitGroupWeeks = new Map<string, Array<{ week: string; hours: number }>>();
