@@ -179,7 +179,7 @@ function useDilnaData(weekOffset: number) {
         // All schedule rows (across weeks) for chain-window calculation (incl. split_group_id for per-bundle chain)
         supabase
           .from("production_schedule")
-          .select("project_id, scheduled_week, scheduled_hours, status, split_group_id, bundle_label")
+          .select("project_id, scheduled_week, scheduled_hours, status, split_group_id, split_part, stage_id, bundle_label, bundle_type")
           .not("status", "eq", "cancelled"),
         // Plan hours per project (for value calculation denominator)
         supabase
