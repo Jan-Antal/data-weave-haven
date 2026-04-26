@@ -1066,15 +1066,17 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   // Completion-based progress is only used as a fallback when no logs exist for
   // the current week (and no prior chain log applies), to avoid showing 0% for
   // bundles whose items are all already done via expedice/midflight.
-  function getBundleProgress(pid: string): { totalHours: number; completedHours: number; bundleProgress: number } {
-    const allItems = getAllItemsForProject(pid);
+  function getBundleProgress(pidOrProject: string | VyrobaProject): { totalHours: number; completedHours: number; bundleProgress: number } {
+    const project = resolveProject(pidOrProject);
+    const pid = typeof pidOrProject === "string" ? pidOrProject : pidOrProject.projectId;
+    // Bundle-scoped item set when we have the project; otherwise fall back to project-wide.
+    const allItems = project ? getAllItemsForBundle(project) : getAllItemsForProject(pid);
     const totalHours = allItems.reduce((s, e) => s + e.item.scheduled_hours, 0);
     const completedHours = allItems
       .filter((e) => isItemDone(e.item))
       .reduce((s, e) => s + e.item.scheduled_hours, 0);
 
     // Spilled projects use carried-forward log % as their starting progress
-    const project = enrichedProjects.find(p => p.projectId === pid);
     if (project?.isSpilled) {
       return { totalHours, completedHours: 0, bundleProgress: getLatestPercent(pid) };
     }
@@ -1101,49 +1103,78 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return { totalHours, completedHours, bundleProgress: completionPct };
   }
 
-  // ── WEEKLY GOAL: cumulative expected progress as % of hodiny_plan ──
-  function getWeeklyGoal(pid: string): number {
-    const projectForGoal = enrichedProjects.find(p => p.projectId === pid);
-    if (projectForGoal?.isSpilled) return 100;
+  // ── WEEKLY GOAL: cumulative expected progress as % of bundle's total plan hours ──
+  function getWeeklyGoal(pidOrProject: string | VyrobaProject): number {
+    const project = resolveProject(pidOrProject);
+    const pid = typeof pidOrProject === "string" ? pidOrProject : pidOrProject.projectId;
+    if (project?.isSpilled) return 100;
     if (!scheduleData) return 0;
 
     // If bundle is part of a split chain → goal = chain window end for this week
     const cw = getChainWindow(pid);
     if (cw) return Math.round(cw.end);
 
-    // hodiny_plan from project_plan_hours
-    if (!planHoursMap) return 0; // loading — avoid flashing 100%
-    const hPlan = planHoursMap.get(pid);
-    if (!hPlan || hPlan <= 0) return 100;
-
     // Day fraction: Mon=1/5, Tue=2/5, ..., Fri=5/5; weekends=5/5
     const today = new Date();
     const dow = today.getDay(); // 0=Sun..6=Sat
     const dayFraction = (dow === 0 || dow === 6) ? 1 : dow / 5;
 
+    // Bundle-scoped sums. Without a project we cannot identify the bundle, so
+    // fall back to the project-wide hodiny_plan denominator (legacy behavior).
+    if (!project) {
+      if (!planHoursMap) return 0;
+      const hPlan = planHoursMap.get(pid);
+      if (!hPlan || hPlan <= 0) return 100;
+      let completedWeeksHours = 0;
+      let currentWeekHours = 0;
+      for (const [wk, silo] of scheduleData) {
+        for (const bundle of silo.bundles) {
+          if (bundle.project_id !== pid) continue;
+          const activeHours = bundle.items
+            .filter((i: ScheduleItem) => i.status !== "cancelled")
+            .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
+          if (wk < weekKey) completedWeeksHours += activeHours;
+          else if (wk === weekKey) currentWeekHours += activeHours;
+        }
+      }
+      const expectedHours = completedWeeksHours + currentWeekHours * dayFraction;
+      return Math.min(100, Math.round((expectedHours / hPlan) * 100));
+    }
+
+    // Per-bundle: numerator AND denominator are restricted to this bundle's items
+    // (across all weeks of the chain/identity). This makes Allianz D's goal depend
+    // only on D's hours, not on A+B+C+D.
     let completedWeeksHours = 0;
     let currentWeekHours = 0;
+    let bundleTotalHours = 0;
     for (const [wk, silo] of scheduleData) {
       for (const bundle of silo.bundles) {
         if (bundle.project_id !== pid) continue;
+        if (!bundleMatchesProject(bundle, project)) continue;
         const activeHours = bundle.items
           .filter((i: ScheduleItem) => i.status !== "cancelled")
           .reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0);
+        bundleTotalHours += activeHours;
         if (wk < weekKey) completedWeeksHours += activeHours;
         else if (wk === weekKey) currentWeekHours += activeHours;
       }
     }
-
+    if (bundleTotalHours <= 0) return 100;
     const expectedHours = completedWeeksHours + currentWeekHours * dayFraction;
-    return Math.min(100, Math.round((expectedHours / hPlan) * 100));
+    return Math.min(100, Math.round((expectedHours / bundleTotalHours) * 100));
   }
 
   // ── Check if weekly goal is met (this week's completed hours >= this week's total hours) ──
-  function isWeeklyGoalMet(pid: string): boolean {
+  function isWeeklyGoalMet(pidOrProject: string | VyrobaProject): boolean {
     if (!scheduleData) return false;
     const silo = scheduleData.get(weekKey);
     if (!silo) return false;
-    const bundle = silo.bundles.find((b) => b.project_id === pid);
+    const project = resolveProject(pidOrProject);
+    const pid = typeof pidOrProject === "string" ? pidOrProject : pidOrProject.projectId;
+    // Pick bundle by identity when available; otherwise first matching by project_id (legacy).
+    const bundle = project
+      ? silo.bundles.find((b) => b.project_id === pid && bundleMatchesProject(b, project))
+      : silo.bundles.find((b) => b.project_id === pid);
     if (!bundle) return false;
     const activeItems = bundle.items.filter((i) => i.status !== "cancelled");
     const thisWeekHours = activeItems.reduce((s, i) => s + i.scheduled_hours, 0);
