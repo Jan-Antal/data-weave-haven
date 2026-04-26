@@ -684,8 +684,9 @@ function useDilnaData(weekOffset: number) {
             // Per-bundle completion: resolved by bundle identity (no cross-bundle bleed).
             // Identity uses the bundle's stage_id from the first row in the entry.
             const stageIdForBundle = schedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
-            const bIdentityWithStage = identityKey(stageIdForBundle, b.bundle_label, b.split_part);
-            const resolvedPct = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+            const resolvedPct = isUnmatched
+              ? null
+              : resolveBundlePct(pid, b.split_group_id, stageIdForBundle, b.bundle_label, b.split_part);
             const bCompletion = resolvedPct;
             // Slip color porovnává completion proti weekly targetu (bExpected).
             // Spilled bundles inherit isSpilled treatment in computeSlip.
