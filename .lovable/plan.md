@@ -1,88 +1,115 @@
-# Posun hranice týždňa: pracovný týždeň končí piatkom
+# Oprava: prelité projekty sa zobrazujú o týždeň neskôr
 
-## Problém
+## Zistenie
 
-Naprieč modulmi **Dilna (Analytics)**, **Výroba** a **Plán Výroby** sa „aktuálny týždeň" počíta podľa kalendárneho ISO pravidla pondelok–nedeľa. Cez víkend (sobota a nedeľa) tak systém stále zobrazuje predošlý týždeň ako aktuálny:
+Po poslednej úprave sa „aktuálny pracovný týždeň“ cez víkend správne posunul na nový týždeň, ale časť logiky prelievania stále robí ešte ďalší `+7 dní` posun.
 
-- **Dilna**: `getISOWeekForOffset(0)` v `DilnaDashboard.tsx` používa `day === 0 ? -6 : 1 - day` → v sobotu = T18, prelité z T17.
-- **Výroba**: `getMonday()` (riadok 94) a `realMondayForHelper` (riadok 221) — rovnaká logika, spillover do T+1 sa zobrazí až v pondelok.
-- **Plán Výroby**: `currentWeekKey` (riadok 1226) a inicializácia `monday` (riadok 353) — to isté.
+Výsledok je presne to, čo vidíš:
 
-Dôsledok: v sobotu po skončení pracovného týždňa user nevidí svoje nedokončené (prelité) projekty v novom týždni — uvidí ich až v pondelok.
-
-## Cieľ
-
-Pracovný týždeň končí v **piatok večer**. Od **soboty 00:00** sa už za aktuálny týždeň považuje nasledujúci kalendárny týždeň (od najbližšieho pondelka), takže:
-
-- Sobota T18 (kalendárne) → systém zobrazí T19 ako aktuálny.
-- V T19 sú nedokončené bundly z T18 zobrazené ako „prelité z T18".
-- Stav pretrváva celý víkend (so + ne) až do piatku ďalšieho týždňa.
-
-## Riešenie
-
-Vytvorím jeden zdieľaný helper a nahradím ním všetky lokálne kópie výpočtu „pondelok aktuálneho týždňa".
-
-### 1. Nový helper `src/lib/workWeek.ts`
-
-```ts
-/**
- * Vráti pondelok "aktuálneho pracovného týždňa".
- * Pravidlo: po-pia → aktuálny kalendárny týždeň. so/ne → nasledujúci týždeň.
- * Toto odráža, že pracovný týždeň končí piatkom; cez víkend už vidíme nový týždeň
- * a nedokončené bundly z minulého týždňa sa zobrazujú ako "prelité".
- */
-export function getWorkWeekMonday(reference: Date = new Date()): Date {
-  const d = new Date(reference);
-  const day = d.getDay(); // 0=Ne, 1=Po, ..., 6=So
-  let diff: number;
-  if (day === 0) diff = 1;        // nedeľa → +1 deň na pondelok (ďalší týždeň)
-  else if (day === 6) diff = 2;   // sobota → +2 dni na pondelok (ďalší týždeň)
-  else diff = 1 - day;            // po–pia → pondelok aktuálneho týždňa
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+```text
+Sobota po T18:
+aktuálny pracovný týždeň = T19
+starý kód pre spillover = aktuálny pracovný týždeň + 1 = T20
+=> prelité z T18 vidíš až v T20, čiže o týždeň neskôr
 ```
 
-### 2. Náhrady v existujúcich súboroch
+Správne má byť:
 
-**`src/components/DilnaDashboard.tsx`** (riadky 27–41)
-- Funkciu `getISOWeekForOffset` prepísať tak, aby používala `getWorkWeekMonday()` namiesto manuálneho výpočtu cez `day === 0 ? -6 : 1 - day`. Offsetovanie po 7 dňoch a výpočet ISO čísla týždňa zostáva nezmenené.
+```text
+Po–Pia počas T18:
+aktuálny pracovný týždeň = T18
+prelité z T18 sa majú ukázať v T19
 
-**`src/pages/Vyroba.tsx`**
-- Riadky 94–101 (`getMonday`): nechať helper, ale vytvoriť/použiť `getWorkWeekMonday()` všade, kde sa volá `getMonday(new Date())` pre účely „aktuálny týždeň". Ostatné volania `getMonday(d)` so zadaným dátumom (napr. drag/drop kalkulácie) zostávajú bez zmeny, pretože konvertujú konkrétny dátum na pondelok jeho ISO týždňa.
-- Riadok 221 `realMondayForHelper` v spill-helperi: nahradiť výpočtom `getWorkWeekMonday()`. Tým sa od soboty stane `spilloverDest` aktuálny týždeň namiesto T+1, a prelité bundly sa korektne zobrazia.
+Sobota/Nedeľa po T18:
+aktuálny pracovný týždeň = T19
+zdroj prelitia = predchádzajúci týždeň T18
+cieľ prelitia = aktuálny pracovný týždeň T19
+```
 
-**`src/pages/PlanVyroby.tsx`**
-- Riadky 353–356 (inicializácia `monday` pri prvom rendri): použiť `getWorkWeekMonday()`.
-- Riadky 1226–1228 (`currentWeekKey`): použiť `getWorkWeekMonday()`. Ovplyvní `isPastWeek` rozhodovanie na riadku 1315 a všetky následné výpočty kapacity / prelití v týždennom prehľade.
-- Riadok 1217 a riadok 1242 (`firstWeekMonday.getDay()`): tieto manipulujú s konkrétnymi dátumami (nie „dnes"), takže zostávajú bez zmeny.
+## Plán úpravy
 
-### 3. Audit ostatných miest
+### 1. Doplniť jasné helpery do `src/lib/workWeek.ts`
 
-Skontrolujem (a podľa potreby aktualizujem) ďalšie miesta, kde sa cez `new Date()` + `getDay()` počíta „dnešný" pondelok pre účely zobrazovania aktuálneho týždňa:
+Nechať existujúci `getWorkWeekMonday()`, ale doplniť odvodené funkcie, aby sa už nikde ručne nerobilo nesprávne `+7`:
 
-- `src/hooks/useProductionInbox.ts`, `useProductionExpedice.ts`, `useProductionSchedule.ts` — ak používajú „aktuálny týždeň" na kategorizáciu (Aktívne / Naplánované, Expedice atď.), zjednotia sa.
-- `src/components/production/InboxPanel.tsx`, `WeeklySilos.tsx`, `ExpedicePanel.tsx` — overiť, či vykreslujú „aktuálny týždeň" na základe lokálneho `new Date()`.
-- `src/lib/midflightImportPlanVyroby.ts` `getCurrentMonday()` — tento sa **nemení**, pretože ide o referenčnú deliacu čiaru pre historické dáta (nemá UX kontext „víkend = ďalší týždeň").
-- `supabase/functions/forecast-schedule/index.ts` `getWeekKey` — server-side forecast, ktorý plánuje od „teraz" do budúcnosti. Tu sa pravidlo cez víkend tiež posúva na ďalší týždeň, aby forecast nezačínal v už uzavretom týždni. Doplním aj tu rovnaký weekend-shift.
+- `getCalendarWeekMonday()` – skutočný ISO pondelok dnešného kalendárneho týždňa.
+- `getSpillSourceWeekMonday()` – týždeň, z ktorého sa majú brať nedokončené projekty.
+- `getSpillDestinationWeekMonday()` / `getSpillDestinationWeekKey()` – týždeň, v ktorom sa majú prelité projekty zobraziť.
 
-### 4. Memory update
+Pravidlo bude:
 
-- Aktualizovať `mem://features/production-tracking/spill-logic` (ak existuje) alebo doplniť nový záznam, že **„aktuálny týždeň" sa určuje pracovne (po–pia); od soboty je aktuálny ďalší týždeň**, a všetky moduly to musia rešpektovať cez `getWorkWeekMonday()`.
+```text
+Po–Pia: source = aktuálny kalendárny týždeň, destination = ďalší týždeň
+So–Ne: source = práve skončený kalendárny týždeň, destination = aktuálny pracovný týždeň
+```
 
-## Súbory na úpravu
+### 2. Opraviť Výrobu (`src/pages/Vyroba.tsx`)
 
-- `src/lib/workWeek.ts` (nový)
-- `src/components/DilnaDashboard.tsx`
-- `src/pages/Vyroba.tsx`
-- `src/pages/PlanVyroby.tsx`
-- `supabase/functions/forecast-schedule/index.ts`
-- prípadne `src/hooks/useProductionInbox.ts`, `useProductionExpedice.ts`, `src/components/production/WeeklySilos.tsx`, `InboxPanel.tsx`, `ExpedicePanel.tsx` — podľa nálezov pri audite
-- `.lovable/memory/index.md` + nový/aktualizovaný memory súbor o pravidle pracovného týždňa
+Nahradiť miesta, kde sa dnes robí:
+
+```ts
+const realMonday = getWorkWeekMonday();
+const spilloverDest = realMonday + 7 dní;
+```
+
+novým helperom:
+
+- zdrojové silo bude `getSpillSourceWeekKey()`
+- cieľové silo bude `getSpillDestinationWeekKey()`
+
+Týka sa oboch výpočtov:
+
+- desktop/hlavný `projects` výpočet
+- mobilný/pager `getProjectsForWeek()` helper
+
+### 3. Opraviť Plán Výroby Kanban (`src/components/production/WeeklySilos.tsx`)
+
+Tento komponent ešte používa starý kalendárny `getMonday(new Date())` a potom `+7`, takže Kanban vie ostať o týždeň posunutý.
+
+Upravím:
+
+- `currentWeekKey` na pracovný aktuálny týždeň
+- `realCurrentWeekKey` pre daylogy na zdrojový týždeň prelitia
+- `spilloverDestKey` na cieľový týždeň prelitia bez extra posunu
+- generovanie týždňových stĺpcov tak, aby aktuálny stĺpec cez víkend bol už nový pracovný týždeň
+
+### 4. Opraviť Tabuľkový pohľad Plánu Výroby (`src/components/production/PlanVyrobyTableView.tsx`)
+
+Tento pohľad si aktuálny týždeň stále počíta lokálnym ISO `getMonday(new Date())` a navyše používa `toISOString()`.
+
+Upravím ho na:
+
+- `getWorkWeekMonday()` pre aktuálny týždeň
+- lokálne formátovanie `YYYY-MM-DD` namiesto `toISOString().split("T")[0]`
+
+Tým sa zarovná Kanban aj Tabuľka.
+
+### 5. Opraviť Dílna Analytics (`src/components/DilnaDashboard.tsx`)
+
+Dílna už zobrazuje pracovný týždeň správne, ale spillover query je viazané na `weekOffset === 1`, čo po víkendovom preklopení znamená, že preliatie sa načíta až pri ďalšom týždni.
+
+Upravím:
+
+- spillover zdroj na `getSpillSourceWeekKey()`
+- spillover cieľ na `getSpillDestinationWeekKey()`
+- pre aktuálny týždeň cez víkend sa budú ťahať nedokončené bundly z predchádzajúceho týždňa
+- zachová sa guard, aby sa nezobrazili dokončené / midflight / už naplánované bundly
+
+### 6. Aktualizovať pamäť pravidla
+
+Aktualizujem memory pre `production-tracking/spill-logic`, aby bolo jasné:
+
+- „aktuálny pracovný týždeň“ sa cez víkend prepína na nový týždeň,
+- ale zdroj prelitia je vtedy predchádzajúci kalendárny týždeň,
+- nikdy sa nesmie aplikovať ešte ďalšie `+7` nad pracovný týždeň.
 
 ## Očakávaný výsledok
 
-- V piatok večer / sobotu ráno sa Dilna, Výroba aj Plán Výroby preklopia na **nový týždeň**.
-- Nedokončené bundly z minulého (právě skončeného) týždňa sa okamžite zobrazia v sekcii „⚠ Prelité z T{n−1}" a zostanú tam celý nový týždeň.
-- Pondelok ráno už nedôjde k žiadnemu „skoku" — užívateľ vidí kontinuitne to isté ako cez víkend.
+- V sobotu po skončení T18 bude aktuálny pohľad T19.
+- Nedokončené projekty z T18 sa zobrazia hneď v T19 ako „Přelité z minulého týdne“.
+- Nebudú preskočené do T20.
+- Správanie bude rovnaké v:
+  - Analytics → Dílna,
+  - Výroba,
+  - Plán Výroby Kanban,
+  - Plán Výroby Tabuľka.
