@@ -285,13 +285,7 @@ const Index = () => {
           <span>⚠ TEST MODE — Testovací prostředí — data nejsou produkční</span>
         </div>
       )}
-      {/* Role simulation banner */}
-      {simulatedRole && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 flex items-center justify-between" style={{ height: 32 }}>
-          <span className="text-amber-700 text-sm">Zobrazení jako: <strong>{ROLE_LABELS[simulatedRole] || simulatedRole}</strong></span>
-          <button onClick={() => setSimulatedRole(null)} className="text-amber-700 font-medium hover:text-amber-900 underline text-sm">Zpět na Admin</button>
-        </div>
-      )}
+      {/* Role simulation banner is rendered globally in App.tsx (SimulatedRoleBar) */}
 
       {/* Mobile Header */}
       {isMobile && (
