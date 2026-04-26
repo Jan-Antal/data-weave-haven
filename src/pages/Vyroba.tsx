@@ -3499,7 +3499,7 @@ function ProjectRow({
   onContextMenu: (e: React.MouseEvent, pid: string) => void;
   getProjectStatus: (projectOrPid: any) => "on-track" | "at-risk" | "behind";
   getBundleProgress: () => { totalHours: number; completedHours: number; bundleProgress: number };
-  getLatestPhase: (pid: string) => string | null;
+  getLatestPhase: (arg: VyrobaProject | string) => string | null;
   statusColors: Record<string, string>;
   weeklyGoal?: number;
   isMobile?: boolean;
