@@ -7,8 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { useCreateAbsencePeriod } from "@/hooks/useEmployeeAbsences";
+import { useCreateAbsencePeriod, useDeleteAbsencePeriod, useManualAbsences } from "@/hooks/useEmployeeAbsences";
 import { toast } from "@/hooks/use-toast";
+import { Trash2 } from "lucide-react";
+import { cs } from "date-fns/locale";
 
 export const ABSENCE_KODY: Array<{ value: string; label: string }> = [
   { value: "DOV", label: "DOV — Dovolená" },
@@ -33,6 +35,21 @@ export function EmployeeAbsenceDialog({ open, onOpenChange, employeeId, employee
   const [openEnded, setOpenEnded] = useState(false);
   const [activePicker, setActivePicker] = useState<"from" | "to">("from");
   const create = useCreateAbsencePeriod();
+  const del = useDeleteAbsencePeriod();
+  const { data: allPeriods = [] } = useManualAbsences();
+  const employeePeriods = allPeriods
+    .filter(p => p.employee_id === employeeId)
+    .sort((a, b) => b.date_from.localeCompare(a.date_from));
+
+  const handleDelete = async (ids: string[], label: string) => {
+    if (!confirm(`Smazat absenci ${label}?`)) return;
+    try {
+      await del.mutateAsync(ids);
+      toast({ title: "Absence smazána" });
+    } catch (e: any) {
+      toast({ title: "Chyba", description: e.message, variant: "destructive" });
+    }
+  };
 
   const handleSave = async () => {
     if (!dateFrom) {
@@ -61,12 +78,43 @@ export function EmployeeAbsenceDialog({ open, onOpenChange, employeeId, employee
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Přidat absenci — {employeeName}</DialogTitle>
+          <DialogTitle>Spravovat absence — {employeeName}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        {employeePeriods.length > 0 && (
+          <div className="space-y-2 py-2">
+            <Label className="text-xs">Existující absence</Label>
+            <div className="border rounded-md divide-y">
+              {employeePeriods.map(p => {
+                const from = format(new Date(p.date_from + "T00:00:00"), "d. M. yyyy", { locale: cs });
+                const to = format(new Date(p.date_to + "T00:00:00"), "d. M. yyyy", { locale: cs });
+                const label = `${p.absencia_kod} (${from} → ${to})`;
+                return (
+                  <div key={p.ids[0]} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <div>
+                      <span className="font-medium">{p.absencia_kod}</span>
+                      <span className="text-muted-foreground ml-2">{from} → {to}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => handleDelete(p.ids, label)}
+                      disabled={del.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4 py-2 border-t pt-4">
+          <Label className="text-xs font-semibold">Přidat novou absenci</Label>
           <div>
             <Label className="text-xs">Typ absence</Label>
             <Select value={kod} onValueChange={setKod}>
