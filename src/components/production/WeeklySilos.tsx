@@ -461,7 +461,9 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
       return item.status === "completed" || item.status === "expedice";
     };
 
-    const realSilo = scheduleData.get(currentWeekKey);
+    // Source = predchádzajúci (právě skončený) pracovný týždeň.
+    const sourceWeekKey = realCurrentWeekKey;
+    const realSilo = scheduleData.get(sourceWeekKey);
     if (!realSilo) return [];
 
     const destSilo = scheduleData.get(spilloverDestKey);
@@ -516,7 +518,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
       // already meets/exceeds this bundle's weekly target, the bundle is considered done
       // for the week and must NOT be spilled.
       const splitGroupId = b.items.find(i => i.split_group_id)?.split_group_id ?? null;
-      const bundleTarget = splitGroupId ? chainEndForGroupAtWeek(splitGroupId, currentWeekKey) : 100;
+      const bundleTarget = splitGroupId ? chainEndForGroupAtWeek(splitGroupId, realCurrentWeekKey) : 100;
       const latestPct = realWeekLatestPct?.get(b.project_id) ?? null;
       if (latestPct != null && latestPct >= bundleTarget) continue;
 
@@ -531,13 +533,13 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
         split_total: b.split_total,
         items: activeItems,
         total_hours: activeHours,
-        __spilledFromWeekKey: currentWeekKey,
+        __spilledFromWeekKey: realCurrentWeekKey,
         __spilledFromWeekNum: realSilo.week_number,
       });
     }
 
     return result;
-  }, [scheduleData, currentWeekKey, spilloverDestKey, realWeekLatestPct]);
+  }, [scheduleData, currentWeekKey, spilloverDestKey, realWeekLatestPct, realCurrentWeekKey]);
 
   const weekOptions = useMemo(() => {
     return weeks.map(w => {
