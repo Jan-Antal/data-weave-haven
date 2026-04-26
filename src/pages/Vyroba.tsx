@@ -178,7 +178,7 @@ function getProjectsForWeek(
 ): VyrobaProject[] {
   if (!scheduleData) return [];
   const result: VyrobaProject[] = [];
-  const itemDone = (i: ScheduleItem) => i.is_midflight || i.status === "completed" || i.status === "expedice" || (expedicedIds?.has(i.id) ?? false);
+  const itemDone = (i: ScheduleItem) => i.status === "completed" || i.status === "expedice" || (expedicedIds?.has(i.id) ?? false);
 
   // Current week bundles
   const silo = scheduleData.get(slideWeekKey);
