@@ -1798,8 +1798,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  function handleSelectProject(pid: string) {
-    setSelectedProjectId(pid);
+  function handleSelectProject(keyOrId: string) {
+    // Accept either a cardKey (preferred — bundle-precise) or a bare projectId (fallback).
+    const byCard = enrichedProjects.find((p) => p.cardKey === keyOrId);
+    const target = byCard ?? enrichedProjects.find((p) => p.projectId === keyOrId);
+    if (target) setSelectedCardKey(target.cardKey);
     if (isMobile) setMobileVyrobaProjektOpen(true);
   }
 
