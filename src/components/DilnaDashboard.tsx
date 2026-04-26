@@ -677,14 +677,21 @@ function useDilnaData(weekOffset: number) {
         const bundleRows: BundleRow[] = arr.map((b) => {
           const label = b.bundle_label || "A";
           const displayLabel = b.bundle_type === "split" && b.split_part ? `${label}-${b.split_part}` : label;
-          const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
-          const bSlip: SlipStatus = isUnmatched ? "none" : computeSlip(completionPct, bExpected, loggedHours, true);
+          // Per-bundle weekly target (full → 100%, split → chain-end at this week).
+          const bExpected = isUnmatched
+            ? null
+            : (b.split_group_id ? bundleTargetForWeek(b.split_group_id, weekInfo.weekKey) : 100);
+          // Resolve per-bundle pct via identity. For spilled bundles, stage_id comes from prevSchedule.
+          const stageIdForBundle = prevSchedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
+          const bIdentityWithStage = identityKey(stageIdForBundle, b.bundle_label, b.split_part);
+          const bCompletion = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+          const bSlip: SlipStatus = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, true);
           return {
             bundleId: b.bundleId,
             displayLabel,
             scheduledHours: b.scheduled_hours,
             expectedPct: bExpected,
-            completionPct,
+            completionPct: bCompletion,
             slipStatus: bSlip,
             isSpilled: true,
             spilledFromWeekNum: prevWeekInfo.week,
