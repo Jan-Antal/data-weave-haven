@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { RecalculateDialog } from "@/components/RecalculateDialog";
 import { DilnaDashboard, getISOWeekForOffset } from "@/components/DilnaDashboard";
 import { VykazReport } from "@/components/analytics/VykazReport";
+import { AbsenceReport } from "@/components/analytics/AbsenceReport";
 
 function formatHours(n: number | null): string {
   if (n == null) return "—";
@@ -87,6 +88,7 @@ export default function Analytics() {
   const dilnaMode = activeTab === "dilna";
   const rezieMode = activeTab === "rezie";
   const vykazMode = activeTab === "vykaz";
+  const absenceMode = activeTab === "absence";
   const [dilnaWeekOffset, setDilnaWeekOffset] = useState(0);
   const { canEditColumns } = useAuth();
 
@@ -304,6 +306,7 @@ export default function Analytics() {
     { key: "rezie", label: "Režije", visible: canAccessAnalyticsRezije },
     { key: "dilna", label: "Dílna", visible: canAccessAnalyticsDilna },
     { key: "vykaz", label: "Výkaz", visible: canAccessAnalyticsVykaz },
+    { key: "absence", label: "Absence", visible: canAccessAnalyticsVykaz },
   ];
   const firstVisible = tabs.find((t) => t.visible !== false)?.key ?? "dilna";
 
