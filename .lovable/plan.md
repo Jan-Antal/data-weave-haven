@@ -1,78 +1,60 @@
-# Plán: Dokončenie permission systému + simulačný info bar + vizuálne overenie
+## Problem
 
-## 1) Harmonogram – Read/Write enforcement v edit dialógoch
+The **Analytics → Dílna** dashboard shows only bundles whose `scheduled_week === currentWeekKey`. Projects that were scheduled in the previous week (T-1) but were not completed and "přelily" (spilled over) into the current week are missing — only the `spilledProjects` flag is set on projects that *also* have a current-week schedule row.
 
-Drag-and-drop v `PlanView.tsx` už `canWriteHarmonogram` rešpektuje. Edit dialógy ale stále umožňujú uloženie zmien dátumov etáp a projektových milestonov používateľovi s read-only Harmonogramom.
+The **Modul Výroba** (`src/pages/Vyroba.tsx`, lines 616–635) already implements the correct logic:
+1. Load the previous Monday's silo (T-1).
+2. For each bundle there, take items whose status is `scheduled` or `in_progress` and that are not `isItemDone`.
+3. Add the project as a card with `isSpilled: true`.
 
-**`src/components/PlanDateEditDialog.tsx`**
-- Z `useAuth()` čítať aj `canWriteHarmonogram`.
-- Tlačidlo „Uložit" skryť ak `!canWriteHarmonogram` (rovnaké správanie ako pre `isViewer` – label „Zavřít", pickery `disabled`).
-- V mape `DATE_FIELDS` poppovery deaktivovať keď `!canWriteHarmonogram`.
+Unmatched / off-plan logged hours (cards with `warning: "unmatched" | "off_plan"`) already work correctly and should stay as-is.
 
-**`src/components/StageDateEditDialog.tsx`**
-- To isté: z `useAuth()` `canWriteHarmonogram`, gate uloženia + pickerov.
+## Fix
 
-## 2) Info bar pre simuláciu role („Zobrazit jako…")
+Mirror the Výroba spillover logic inside `useDilnaData()` in `src/components/DilnaDashboard.tsx`.
 
-Owner môže cez header → Settings → „Zobrazit jako" prepnúť `simulatedRole`. Aktuálne ale chýba akákoľvek vizuálna pripomienka, že beží v simulácii – ľahko sa zabudne, prečo niečo „nejde". Pridáme top sticky bar.
+### 1. Extend the schedule query
+Change the per-week schedule fetch to also include rows from the immediately preceding week (T-1) that are still active:
 
-**Nový súbor `src/components/SimulatedRoleBar.tsx`**
-- Read-only komponent: ak `simulatedRole && realRole === "owner"`, zobrazí oranžový pruh nad obsahom:
-  - Text: `👁 Zobrazujete aplikáciu ako: <ROLE_LABEL>`
-  - Tlačidlo „Ukončit simulaci" → `setSimulatedRole(null)`
-- Vizuál: `bg-amber-500/15`, border-bottom `border-amber-500`, text `amber-700/300`, height ~32px, `position: sticky; top: 0; z-index: 250` (pod hlavičkou 300, nad zvyškom).
+- Currently: `.eq("scheduled_week", weekInfo.weekKey)`.
+- New: also fetch rows where `scheduled_week === prevWeekKey` AND `status IN ("scheduled","in_progress","paused")` AND `expediced_at IS NULL` AND `completed_at IS NULL`.
+- Compute `prevWeekKey` from `weekInfo.monday - 7 days` (using existing `toLocalDateStr` helper).
 
-**`src/App.tsx`**
-- Importovať `SimulatedRoleBar` a vyrenderovať tesne pod `PersistentDesktopHeader` (ale stále mimo `<Routes>` aby pretrvával naprieč navigáciou).
+We can either issue a second query for the previous week (cleanest) or widen the existing one with `.in("scheduled_week", [prevWeekKey, weekInfo.weekKey])` and filter in JS. Recommend the second query approach for clarity, then merge.
 
-**`src/hooks/useAuth.tsx`**
-- Pridať do návratovej hodnoty `realRole: AppRole | null` ak ešte nie je exposed (na rozhodnutie v bare).
+### 2. Tag rows with `__isSpilled` when grouping bundles
+When building `bundlesByProject`, attach an `isSpilled: boolean` flag on each bundle entry (true if `scheduled_week === prevWeekKey`). For spilled rows:
+- Skip rows whose status is `completed` or whose item is otherwise "done" (mirror `isItemDone` semantics — `expediced_at != null` or `completed_at != null` or status `completed`).
+- Skip the spilled bundle if the same project already has a current-week bundle for the same `stage_id + bundle_label + split_part` (avoid duplicates).
 
-## 3) Settings dropdown – filter položiek podľa permissions
+### 3. Add spilled-only project cards
+In the card-building loop:
+- If a project exists only via spilled bundles (no current-week scheduled hours), still create a `ProjectCard`:
+  - `plannedHours = 0` (it's not in this week's plan)
+  - `loggedHours = hoursByProject.get(pid) || 0`
+  - `bundles = [spilled bundle rows…]` with their original scheduled hours preserved
+  - Add a new field `isSpilled: true` on `ProjectCard` and a new `BundleRow.isSpilled` flag
+  - `slipStatus`: keep existing `computeSlip()` but pass `isSpilled=true` so the relaxed thresholds apply
+- If the project already exists in current-week cards, append spilled bundle rows to its `bundles` array (so user sees both current and spilled bundles together).
 
-V `ProductionHeader.tsx` (Settings ⚙) dnes každý vidí celý zoznam (Správa osob, Kurzový lístok, Statusy, Koš, Režijní projekty, Presety, Formula builder). Skryjeme položky, na ktoré chýbajú permissions:
-- „Kurzový lístek", „Výpočetní logika (Formula Builder)", „Cost-breakdown presety" → `canAccessSystem`.
-- „Správa osob" → `canAccessPeople` (alebo `canAccessOpravneni`).
-- „Statusy" → `canManageStatuses` (existujúci) alebo prelinkovať na `canAccessSystem`.
-- „Koš" → `canAccessRecycleBin`.
-- „Režijní projekty" → `canManageOverheadProjects`.
-- „Zobrazit jako" → ponechať len pre `realRole === "owner"`.
+### 4. UI — visually distinguish spilled bundles
+In the bundle table inside each project card, show a small amber chip on spilled rows (e.g., `Z T{prevWeekNum}` like in WeeklySilos `CollapsibleBundleCard`, lines 1846–1849). Use existing `getISOWeekForOffset(weekOffset - 1)` to get the previous week number.
 
-## 4) Vizuálne overenie (browser tools)
+For spilled-only project cards (no current-week plan), add a subtle amber border/badge `Přelité z T-1` on the card header to match the Výroba sidebar treatment.
 
-Po aplikovaní zmien vykonať **screenshot-driven QA** cez `browser--*`:
-1. Login ako owner → otvoriť `/`, nastaviť `setSimulatedRole("vedouci_pm")` → očakávať:
-   - Žltý info bar hore „Zobrazujete aplikáciu ako: Vedoucí PM" + „Ukončit simulaci".
-   - V hlavičke ikony: Project Info, Plán Výroby, Analytics, **Výroba (Daylog)**, **TPV**.
-   - V `/` taby: Project Info / PM Status / TPV Status / Harmonogram – všetky editovateľné.
-   - V Plán Výroby je viditeľný **Forecast** prepínač.
-2. Prepnúť na `vedouci_vyroby` → očakávať:
-   - V hlavičke: Plán Výroby + Výroba + Analytics. Project Info read-only (žiadne `Nový projekt`, žiadny inline edit).
-   - V Harmonograme drag etáp neprebieha; otvorenie StageDateEditDialog ukáže „Zavřít" namiesto „Uložit".
-3. Prepnúť na `pm` → Project Info plne editovateľný, Forecast skrytý (predpoklad: pm má Plán Výroby read), Settings dropdown obmedzený.
-4. Prepnúť na `konstrukter` → minimálne práva: žiaden Forecast, žiadny TPV List zápis, Daylog skrytý alebo read-only podľa presetu.
-5. „Ukončit simulaci" → bar zmizne, owner vidí všetko.
+### 5. Counters & summary cards
+Spilled projects should not inflate `plannedHours` totals (they're already counted in their original week), but their **logged hours** for the current week are real and already included in `totalHoursWeek`. No changes needed for the summary cards — totals come from `production_hours_log` which is week-scoped.
 
-Pre každý krok urobiť 1 screenshot + porovnať voči tabuľke v `OsobyOpravneni.tsx`. Akékoľvek nezhody zapísať do `.lovable/plan.md` ako follow-up.
+Optionally add a small badge `+N přelité` next to the projects count card for transparency.
 
-## 5) Súbory dotknuté zmenou
+### 6. Visual QA after implementation
+After saving, switch to **Analytics → Dílna**, set the week to one where you know there's an unfinished project from the prior week, and confirm:
+- Spilled bundles appear (with amber `Z T{n-1}` chip)
+- Spilled-only project cards appear with `Přelité z T-1` badge
+- Tracked hours / value calculations still match
+- No duplicate cards if a project is both planned this week AND spilled
 
-- `src/components/PlanDateEditDialog.tsx` (gating Save)
-- `src/components/StageDateEditDialog.tsx` (gating Save)
-- `src/components/SimulatedRoleBar.tsx` (nový)
-- `src/App.tsx` (mount baru pod hlavičkou)
-- `src/hooks/useAuth.tsx` (vystaviť `realRole` ak treba)
-- `src/components/production/ProductionHeader.tsx` (filter Settings dropdown)
+## Files affected
+- `src/components/DilnaDashboard.tsx` — the only file to edit. Update `useDilnaData()` query, the bundle-grouping loop, the card-building loop, and the bundle/card render JSX.
 
-## Akceptačné kritériá
-
-1. Owner v simulácii „Vedoucí PM" vidí žltý info bar a UI presne odpovedá presetu z Oprávnění (Daylog R/W, Forecast prístupný, Project Info R/W, …).
-2. Read-only role nemajú v `PlanDateEditDialog` ani `StageDateEditDialog` tlačidlo „Uložit" – len „Zavřít", pickery sú `disabled`.
-3. Settings dropdown skryje položky podľa permissions; „Zobrazit jako" len pre realného ownera.
-4. „Ukončit simulaci" v bare okamžite vráti owner pohľad bez reloadu.
-5. Žiadna regresia pre realného Admina / Ownera / Konstruktéra / Vedoucího výroby.
-
-## Mimo rozsahu
-
-- Per-feature flagy a–h (vytvořit projekt, smazat, dokumenty…) v Project Info detail dialógu – samostatný ticket, ak po vizuálnom overení vyjde najavo, že treba.
-- Mobile gating Harmonogramu (mobile drag je už zakázaný globálne).
+No DB migrations, no other components affected.

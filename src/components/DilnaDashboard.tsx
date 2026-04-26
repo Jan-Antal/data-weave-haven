@@ -81,6 +81,8 @@ interface BundleRow {
   expectedPct: number | null;
   completionPct: number | null;
   slipStatus: SlipStatus;
+  isSpilled?: boolean;         // bundle spilled over from T-1
+  spilledFromWeekNum?: number; // ISO week number of the previous week (display only)
 }
 
 interface ProjectCard {
@@ -97,12 +99,14 @@ interface ProjectCard {
   valueTargetCzk: number;       // cíl (planned) value
   bundles: BundleRow[];
   usekBreakdown: UsekRow[];
+  isSpilledOnly?: boolean;      // project is here ONLY because of spilled bundles (no T plan)
 }
 
 /* ── data hook ───────────────────────────────────────────────────── */
 
 function useDilnaData(weekOffset: number) {
   const weekInfo = useMemo(() => getISOWeekForOffset(weekOffset), [weekOffset]);
+  const prevWeekInfo = useMemo(() => getISOWeekForOffset(weekOffset - 1), [weekOffset]);
   const sundayStr = useMemo(() => {
     const sun = new Date(weekInfo.friday);
     sun.setDate(sun.getDate() + 2);
@@ -112,7 +116,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
+      const [hoursRes, schedRes, prevSchedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -122,9 +126,15 @@ function useDilnaData(weekOffset: number) {
         // Per-bundle schedule rows for THIS week (for bundle table + planned hours)
         supabase
           .from("production_schedule")
-          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position")
+          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
           .eq("scheduled_week", weekInfo.weekKey)
           .not("status", "eq", "cancelled"),
+        // Spilled rows: T-1 schedule rows still active (mirrors Vyroba spill logic)
+        supabase
+          .from("production_schedule")
+          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
+          .eq("scheduled_week", prevWeekInfo.weekKey)
+          .in("status", ["scheduled", "in_progress", "paused"]),
         supabase
           .from("production_settings")
           .select("weekly_capacity_hours")
@@ -192,7 +202,10 @@ function useDilnaData(weekOffset: number) {
         split_part: number | null;
         split_total: number | null;
         position: number;
+        expediced_at: string | null;
+        completed_at: string | null;
       }>;
+      const prevSchedule = (prevSchedRes.data || []) as typeof schedule;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
       const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
       const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
@@ -240,8 +253,13 @@ function useDilnaData(weekOffset: number) {
         projectAllDoneThisWeek.set(pid, prev && s.status === "completed");
       }
 
-      // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part)
-      const bundlesByProject = new Map<string, Map<string, {
+      // Helper: is a schedule row "done" (item finished)? Mirrors Vyroba isItemDone semantics.
+      const isRowDone = (r: typeof schedule[number]): boolean =>
+        r.status === "completed" || !!r.expediced_at || !!r.completed_at;
+
+      // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part).
+      // First pass: current week (T) bundles.
+      type BundleEntry = {
         bundleId: string;
         bundle_label: string | null;
         bundle_type: string | null;
@@ -250,7 +268,9 @@ function useDilnaData(weekOffset: number) {
         split_total: number | null;
         scheduled_hours: number;
         position: number;
-      }>>();
+        isSpilled: boolean;
+      };
+      const bundlesByProject = new Map<string, Map<string, BundleEntry>>();
       for (const s of schedule) {
         if (s.status === "historical") continue;
         const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
@@ -269,8 +289,37 @@ function useDilnaData(weekOffset: number) {
             split_total: s.split_total,
             scheduled_hours: Number(s.scheduled_hours),
             position: s.position,
+            isSpilled: false,
           });
         }
+      }
+
+      // Second pass: spilled bundles from T-1.
+      // Skip rows that are already done (expediced/completed). Skip duplicates if the same
+      // stage+label+split_part already exists in current week (already replanned to T).
+      const spilledOnlyProjects = new Set<string>();
+      for (const s of prevSchedule) {
+        if (isRowDone(s)) continue;
+        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
+        if (!bundlesByProject.has(s.project_id)) {
+          bundlesByProject.set(s.project_id, new Map());
+          spilledOnlyProjects.add(s.project_id);
+        } else if (!scheduledProjects.has(s.project_id)) {
+          spilledOnlyProjects.add(s.project_id);
+        }
+        const bMap = bundlesByProject.get(s.project_id)!;
+        if (bMap.has(key)) continue; // current-week bundle wins
+        bMap.set(key, {
+          bundleId: s.id,
+          bundle_label: s.bundle_label,
+          bundle_type: s.bundle_type,
+          split_group_id: s.split_group_id,
+          split_part: s.split_part,
+          split_total: s.split_total,
+          scheduled_hours: Number(s.scheduled_hours),
+          position: s.position,
+          isSpilled: true,
+        });
       }
 
       // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
@@ -438,7 +487,8 @@ function useDilnaData(weekOffset: number) {
             // Per-bundle completion currently shares project-level daily log (single bundle_id per project per week)
             const bCompletion = completionPct;
             // Slip color porovnává completion proti dennímu targetu (bExpected) — pohyblivý cíl podle aktuálního dne v týdnu
-            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled);
+            // Spilled bundles inherit isSpilled treatment in computeSlip.
+            const bSlip = isUnmatched ? "none" : computeSlip(bCompletion, bExpected, loggedHours, isSpilled || b.isSpilled);
             bundleRows.push({
               bundleId: b.bundleId,
               displayLabel,
@@ -446,6 +496,8 @@ function useDilnaData(weekOffset: number) {
               expectedPct: bExpected,
               completionPct: bCompletion,
               slipStatus: bSlip,
+              isSpilled: b.isSpilled,
+              spilledFromWeekNum: b.isSpilled ? prevWeekInfo.week : undefined,
             });
           }
         }
@@ -483,6 +535,69 @@ function useDilnaData(weekOffset: number) {
           valueTargetCzk,
           bundles: bundleRows,
           usekBreakdown,
+        });
+      }
+
+      // 1.5) Spilled-only projects: have unfinished T-1 bundles but NO current-week schedule.
+      // Mirrors Vyroba "Spilled" sidebar logic. Each card shows the spilled bundles with
+      // their original scheduled hours preserved; planned hours for THIS week stay 0.
+      for (const pid of spilledOnlyProjects) {
+        if (scheduledProjects.has(pid)) continue; // would duplicate the card from loop 1
+        const bMap = bundlesByProject.get(pid);
+        if (!bMap || bMap.size === 0) continue;
+        const proj = projMap.get(pid);
+        const isUnmatched = !proj;
+        const loggedHours = hoursByProject.get(pid) || 0;
+        const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
+
+        const arr = Array.from(bMap.values()).sort((a, b) => {
+          const la = a.bundle_label || "Z";
+          const lb = b.bundle_label || "Z";
+          if (la !== lb) return la.localeCompare(lb);
+          const sa = a.split_part ?? 0;
+          const sb = b.split_part ?? 0;
+          if (sa !== sb) return sa - sb;
+          return a.position - b.position;
+        });
+        const bundleRows: BundleRow[] = arr.map((b) => {
+          const label = b.bundle_label || "A";
+          const displayLabel = b.bundle_type === "split" && b.split_part ? `${label}-${b.split_part}` : label;
+          const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
+          const bSlip: SlipStatus = isUnmatched ? "none" : computeSlip(completionPct, bExpected, loggedHours, true);
+          return {
+            bundleId: b.bundleId,
+            displayLabel,
+            scheduledHours: b.scheduled_hours,
+            expectedPct: bExpected,
+            completionPct,
+            slipStatus: bSlip,
+            isSpilled: true,
+            spilledFromWeekNum: prevWeekInfo.week,
+          };
+        });
+
+        const valueCzk = isUnmatched ? 0 : calcDilnaValue(loggedHours, pid);
+
+        const usekMap = usekByProject.get(pid);
+        const usekBreakdown = usekMap
+          ? Array.from(usekMap.values()).sort((a, b) => usekSortKey(a.kod) - usekSortKey(b.kod))
+          : [];
+
+        cards.push({
+          projectId: pid,
+          projectName: isUnmatched ? "Nespárované" : (proj?.project_name || pid),
+          warning: isUnmatched ? "unmatched" : "none",
+          plannedHours: 0,
+          loggedHours,
+          trackedPct: 0,
+          completionPct,
+          expectedPct: null,
+          slipStatus: "delay",
+          valueCzk,
+          valueTargetCzk: 0,
+          bundles: bundleRows,
+          usekBreakdown,
+          isSpilledOnly: true,
         });
       }
 
@@ -554,11 +669,13 @@ function useDilnaData(weekOffset: number) {
       const unmatchedCount = cards.filter(c => c.warning === "unmatched").length;
       const delayCount = cards.filter(c => c.slipStatus === "delay").length;
       const slipCount = cards.filter(c => c.slipStatus === "slip").length;
+      const spilledCount = cards.filter(c => c.isSpilledOnly || c.bundles.some(b => b.isSpilled)).length;
       const totalValueCzk = cards.reduce((s, c) => s + (c.valueCzk || 0), 0);
       const totalValueTargetCzk = cards.reduce((s, c) => s + (c.valueTargetCzk || 0), 0);
 
       return {
         weekInfo,
+        prevWeekNum: prevWeekInfo.week,
         weeklyCapacity,
         totalHoursWeek,
         todayHours,
@@ -569,6 +686,7 @@ function useDilnaData(weekOffset: number) {
         unmatchedCount,
         delayCount,
         slipCount,
+        spilledCount,
         totalValueCzk,
         totalValueTargetCzk,
       };
@@ -689,7 +807,7 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
     );
   }
 
-  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount, totalValueCzk, totalValueTargetCzk } = data;
+  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount, spilledCount, totalValueCzk, totalValueTargetCzk, prevWeekNum } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
   const todayPct = dailyTarget > 0 ? Math.min(100, Math.round((todayHours / dailyTarget) * 100)) : 0;
 
@@ -779,7 +897,11 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
                     <div
                       key={card.projectId}
                       className="bg-background rounded-lg border border-border/60 p-3 flex flex-col gap-2"
-                      style={{ borderLeftWidth: 3, borderLeftColor: warningBorderColor(card.warning, projectColor) }}
+                      style={{
+                        borderLeftWidth: 3,
+                        borderLeftColor: card.isSpilledOnly ? "#d97706" : warningBorderColor(card.warning, projectColor),
+                        background: card.isSpilledOnly ? "rgba(217,119,6,0.04)" : undefined,
+                      }}
                     >
                       {/* Top: name + slip badge */}
                       <div className="flex items-start justify-between gap-2">
@@ -812,7 +934,11 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
                             </>
                           )}
                         </div>
-                        {card.warning === "off_plan" ? (
+                        {card.isSpilledOnly ? (
+                          <span className="shrink-0 text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-full whitespace-nowrap bg-amber-100 text-amber-800 border border-amber-300">
+                            <AlertCircle className="w-3 h-3" /> Přelité z T{prevWeekNum}
+                          </span>
+                        ) : card.warning === "off_plan" ? (
                           <span className={cn(
                             "shrink-0 text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-full whitespace-nowrap",
                             warningPillClass(card.warning)
@@ -836,8 +962,13 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
                             const bStyles = slipBarStyles(b.slipStatus);
                             return (
                               <div key={b.bundleId} className="flex items-center gap-2 text-[11px]">
-                                <div className="w-14 font-medium tabular-nums truncate shrink-0" title={b.displayLabel}>
-                                  {b.displayLabel}
+                                <div className="w-14 font-medium tabular-nums truncate shrink-0 flex items-center gap-1" title={b.displayLabel}>
+                                  <span className="truncate">{b.displayLabel}</span>
+                                  {b.isSpilled && (
+                                    <span className="text-[8px] font-bold px-1 rounded bg-amber-200 text-amber-900 whitespace-nowrap" title={`Přelité z T${b.spilledFromWeekNum}`}>
+                                      T{b.spilledFromWeekNum}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex-1 relative h-[6px] rounded-full bg-muted overflow-visible">
                                   {b.completionPct != null && (
