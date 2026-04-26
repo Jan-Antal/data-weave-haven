@@ -961,6 +961,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         if (bundle.project_id !== pid) continue;
         for (const item of bundle.items) {
           if (item.status === "cancelled") continue;
+          // Skip synthetic / historical / midflight markers — these are not real production items
+          if ((item as any).is_historical) continue;
+          if ((item as any).is_midflight) continue;
           const dedupeKey = `${wk}::${item.id}`;
           if (seen.has(dedupeKey)) continue;
           seen.add(dedupeKey);
@@ -969,6 +972,12 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       }
     }
     return items;
+  }
+
+  /** Returns only items belonging to a specific bundle (matched via VyrobaProject.scheduleItems IDs). */
+  function getItemsForBundle(project: VyrobaProject): { item: ScheduleItem; weekKey: string; weekNum: number }[] {
+    const allowedIds = new Set(project.scheduleItems.map((i) => i.id));
+    return getAllItemsForProject(project.projectId).filter(({ item }) => allowedIds.has(item.id));
   }
 
   // ── BUNDLE PROGRESS: tied to the latest daily log of the viewed week ──
