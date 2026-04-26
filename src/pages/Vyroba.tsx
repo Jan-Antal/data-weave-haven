@@ -1757,7 +1757,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         label: "Zobrazit TPV List",
         icon: "📦",
         onClick: () => {
-          setSelectedProjectId(pid);
+          handleSelectProject(pid);
           setTpvProjectId(pid);
         },
       },
