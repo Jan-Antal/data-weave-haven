@@ -885,8 +885,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return `${pid}::${weekKey}::${ident}`;
   }
   // Legacy/back-compat: keyed only by project+week (matches old logs in DB).
-  const bundleId = (pid: string) => {
-    const proj = enrichedProjects.find((p) => p.projectId === pid);
+  const bundleId = (arg: VyrobaProject | string) => {
+    if (typeof arg !== "string") return bundleStorageIdForProject(arg);
+    const proj = enrichedProjects.find((p) => p.projectId === arg);
     return bundleStorageIdForProject(proj);
   };
 
