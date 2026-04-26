@@ -295,6 +295,8 @@ const PHASES = [
 
 interface VyrobaProject {
   projectId: string;
+  /** Unique per-bundle key. Distinguishes multiple bundles of the same project (A, B, C, A-5, …). */
+  cardKey: string;
   projectName: string;
   totalHours: number;
   scheduleItems: ScheduleItem[];
@@ -308,6 +310,15 @@ interface VyrobaProject {
   pauseReason?: string | null;
   pauseExpectedDate?: string | null;
   projectStatus?: string | null;
+}
+
+function makeCardKey(projectId: string, sample: { stage_id?: string | null; bundle_label?: string | null; split_part?: number | null; split_group_id?: string | null } | undefined, isSpilled = false): string {
+  const sg = sample?.split_group_id ?? null;
+  const stage = sample?.stage_id ?? "none";
+  const label = sample?.bundle_label ?? "A";
+  const part = sample?.split_part ?? "full";
+  const base = sg ? `SG:${sg}` : `${stage}::${label}::${part}`;
+  return `${projectId}::${base}${isSpilled ? "::spilled" : ""}`;
 }
 
 interface CumulativeInfo {
