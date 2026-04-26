@@ -664,7 +664,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     // current week). Items in the real T that are still unfinished spill into T+1. They never
     // spill further (T+2, T+3, …) and they never appear in T or in past weeks. Midflight legacy
     // rows are explicitly excluded — they are historical and must not appear as preliate.
-    const realMonday = getMonday(new Date());
+    const realMonday = getWorkWeekMonday();
     const spilloverDestMonday = new Date(realMonday);
     spilloverDestMonday.setDate(spilloverDestMonday.getDate() + 7);
     const isSpilloverWeek = weekKeyStr(currentMonday) === weekKeyStr(spilloverDestMonday);
