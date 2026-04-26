@@ -1222,11 +1222,7 @@ function ToolbarRow2({ visibleMonth, viewTab, setViewTab, displayMode, onDisplay
 
   // Current week key
   const currentWeekKey = useMemo(() => {
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-    d.setHours(0, 0, 0, 0);
-    return toLocalDateKey(d);
+    return toLocalDateKey(getWorkWeekMonday());
   }, [toLocalDateKey]);
 
   const visibleMonthWeeks = useMemo(() => {
