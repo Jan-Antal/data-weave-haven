@@ -443,11 +443,30 @@ function useDilnaData(weekOffset: number) {
         return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
       }
 
-      function expectedForBundle(splitGroupId: string | null, projectId: string): number | null {
-        const cw = (splitGroupId && chainWindowBySplitGroup.get(splitGroupId))
-          || chainWindowByProject.get(projectId)
-          || { start: 0, end: 100 };
+      function expectedForBundle(splitGroupId: string | null, _projectId: string): number | null {
+        // Full bundle (no split chain) → all hours due THIS week → window 0–100%.
+        // Split bundle → use the chain-window slice for THIS week of that split group.
+        const cw = splitGroupId
+          ? (chainWindowBySplitGroup.get(splitGroupId) ?? { start: 0, end: 100 })
+          : { start: 0, end: 100 };
         return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
+      }
+
+      // Same as expectedForBundle, but evaluated for a SPECIFIC week key (used when
+      // computing the previous-week target for the goal-aware spillover guard).
+      function bundleTargetForWeek(splitGroupId: string | null, wkKey: string): number {
+        if (!splitGroupId) return 100;
+        const weeks = splitGroupWeeks.get(splitGroupId);
+        if (!weeks) return 100;
+        const sorted = [...weeks].sort((a, b) => a.week.localeCompare(b.week));
+        const total = sorted.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) return 100;
+        let cum = 0;
+        for (const w of sorted) {
+          cum += w.hours;
+          if (w.week === wkKey) return Math.round((cum / total) * 100);
+        }
+        return 100;
       }
 
       // ── Calculate prodej value (mirrors WeeklySilos.calcProdejValue) ──
