@@ -893,10 +893,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   function getLogsForProject(pid: string): DailyLog[] {
     const proj = enrichedProjects.find((p) => p.projectId === pid);
     const newKey = bundleStorageIdForProject(proj);
-    const newLogs = dailyLogsMap?.get(newKey);
-    if (newLogs && newLogs.length > 0) return newLogs;
-    // Fallback to legacy logs stored under `${pid}::${weekKey}`
-    return dailyLogsMap?.get(`${pid}::${weekKey}`) || [];
+    // Bundle-scoped only — legacy `${pid}::${weekKey}` records were migrated
+    // into per-bundle copies, so reading the legacy key would cause two bundles
+    // of the same project/week (e.g. Insia A-4 and Insia B) to share state.
+    return dailyLogsMap?.get(newKey) || [];
   }
 
   function getLatestPercent(pid: string): number {
