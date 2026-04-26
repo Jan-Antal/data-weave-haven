@@ -129,12 +129,15 @@ function useDilnaData(weekOffset: number) {
           .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
           .eq("scheduled_week", weekInfo.weekKey)
           .not("status", "eq", "cancelled"),
-        // Spilled rows: T-1 schedule rows still active (mirrors Vyroba spill logic)
-        supabase
-          .from("production_schedule")
-          .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
-          .eq("scheduled_week", prevWeekInfo.weekKey)
-          .in("status", ["scheduled", "in_progress", "paused"]),
+        // Spilled rows: ONLY meaningful when displayed week == real T+1.
+        // Source = real current week's still-active rows. Otherwise return [] cheaply.
+        weekOffset === 1
+          ? supabase
+              .from("production_schedule")
+              .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at, is_midflight")
+              .eq("scheduled_week", prevWeekInfo.weekKey)
+              .in("status", ["scheduled", "in_progress", "paused"])
+          : Promise.resolve({ data: [] as any[] }),
         supabase
           .from("production_settings")
           .select("weekly_capacity_hours")
