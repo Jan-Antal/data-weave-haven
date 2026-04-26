@@ -612,24 +612,36 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       }
     }
 
-    // Spilled: only show projects from the immediately preceding week (T-1)
-    const prevMonday = new Date(currentMonday);
-    prevMonday.setDate(prevMonday.getDate() - 7);
-    const prevWeekKey = weekKeyStr(prevMonday);
-    const prevSilo = scheduleData.get(prevWeekKey);
-    if (prevSilo) {
-      for (const b of prevSilo.bundles) {
-        if (result.some((r) => r.projectId === b.project_id)) continue;
-        const activeItems = b.items.filter((i) => (i.status === "scheduled" || i.status === "in_progress") && !isItemDone(i));
-        if (activeItems.length === 0) continue;
-        result.push({
-          projectId: b.project_id,
-          projectName: b.project_name,
-          totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
-          scheduleItems: activeItems,
-          color: getProjectColor(b.project_id),
-          isSpilled: true,
-        });
+    // Spilled: ONLY when the displayed week is exactly T+1 (the week immediately after the real
+    // current week). Items in the real T that are still unfinished spill into T+1. They never
+    // spill further (T+2, T+3, …) and they never appear in T or in past weeks. Midflight legacy
+    // rows are explicitly excluded — they are historical and must not appear as preliate.
+    const realMonday = getMonday(new Date());
+    const spilloverDestMonday = new Date(realMonday);
+    spilloverDestMonday.setDate(spilloverDestMonday.getDate() + 7);
+    const isSpilloverWeek = weekKeyStr(currentMonday) === weekKeyStr(spilloverDestMonday);
+    if (isSpilloverWeek) {
+      const realWeekKey = weekKeyStr(realMonday);
+      const realSilo = scheduleData.get(realWeekKey);
+      if (realSilo) {
+        for (const b of realSilo.bundles) {
+          if (result.some((r) => r.projectId === b.project_id)) continue;
+          const activeItems = b.items.filter(
+            (i) =>
+              (i.status === "scheduled" || i.status === "in_progress") &&
+              !i.is_midflight &&
+              !isItemDone(i),
+          );
+          if (activeItems.length === 0) continue;
+          result.push({
+            projectId: b.project_id,
+            projectName: b.project_name,
+            totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
+            scheduleItems: activeItems,
+            color: getProjectColor(b.project_id),
+            isSpilled: true,
+          });
+        }
       }
     }
 
