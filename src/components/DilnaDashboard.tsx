@@ -116,7 +116,7 @@ function useDilnaData(weekOffset: number) {
   return useQuery({
     queryKey: ["dilna-dashboard-v2", weekInfo.weekKey],
     queryFn: async () => {
-      const [hoursRes, schedRes, prevSchedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
+      const [hoursRes, schedRes, prevSchedRes, settingsRes, projectsRes, capacityRes, dailyLogsRes, prevDailyLogsRes, overheadRes, allSchedRes, planHoursRes, exchangeRes, realHoursRes] = await Promise.all([
         supabase
           .from("production_hours_log")
           .select("ami_project_id, hodiny, created_at, datum_sync, cinnost_kod, cinnost_nazov")
@@ -159,6 +159,15 @@ function useDilnaData(weekOffset: number) {
           .select("bundle_id, day_index, percent, logged_at")
           .eq("week_key", weekInfo.weekKey)
           .order("day_index", { ascending: true }),
+        // Latest daily-log percent for the PREVIOUS week (used by goal-aware spillover guard).
+        // Only meaningful when displayed week == real T+1.
+        weekOffset === 1
+          ? supabase
+              .from("production_daily_logs" as any)
+              .select("bundle_id, day_index, percent")
+              .eq("week_key", prevWeekInfo.weekKey)
+              .order("day_index", { ascending: true })
+          : Promise.resolve({ data: [] as any[] }),
         // Overhead project codes — to exclude režije/ENG/PM/etc. from production hours
         supabase
           .from("overhead_projects" as any)
@@ -211,6 +220,7 @@ function useDilnaData(weekOffset: number) {
       const prevSchedule = (prevSchedRes.data || []) as typeof schedule;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
       const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
+      const prevDailyLogs = ((prevDailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number }>;
       const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
       const exchangeRates = (exchangeRes.data || []) as Array<{ year: number; eur_czk: number }>;
       const realHoursRows = (realHoursRes.data || []) as Array<{ ami_project_id: string; total_hodiny: number }>;
@@ -299,34 +309,9 @@ function useDilnaData(weekOffset: number) {
         }
       }
 
-      // Second pass: spilled bundles. Source = real current week (only when weekOffset === 1).
-      // Excludes done rows AND legacy midflight rows. Skip duplicates if the same
-      // stage+label+split_part already exists in current week (already replanned to T).
+      // Second pass: spilled bundles is deferred — applied AFTER chain-window + prev-week
+      // daylog data is built so we can skip bundles that already met their weekly target.
       const spilledOnlyProjects = new Set<string>();
-      for (const s of prevSchedule) {
-        if (isRowDone(s)) continue;
-        if ((s as any).is_midflight) continue;
-        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
-        if (!bundlesByProject.has(s.project_id)) {
-          bundlesByProject.set(s.project_id, new Map());
-          spilledOnlyProjects.add(s.project_id);
-        } else if (!scheduledProjects.has(s.project_id)) {
-          spilledOnlyProjects.add(s.project_id);
-        }
-        const bMap = bundlesByProject.get(s.project_id)!;
-        if (bMap.has(key)) continue; // current-week bundle wins
-        bMap.set(key, {
-          bundleId: s.id,
-          bundle_label: s.bundle_label,
-          bundle_type: s.bundle_type,
-          split_group_id: s.split_group_id,
-          split_part: s.split_part,
-          split_total: s.split_total,
-          scheduled_hours: Number(s.scheduled_hours),
-          position: s.position,
-          isSpilled: true,
-        });
-      }
 
       // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
       const latestPctByProject = new Map<string, number>();
@@ -336,6 +321,14 @@ function useDilnaData(weekOffset: number) {
         const cur = latestPctByProject.get(pid);
         // Take max day_index (most recent). Logs already ordered ascending → simple overwrite works.
         if (cur == null || log.percent != null) latestPctByProject.set(pid, Number(log.percent));
+      }
+
+      // Latest daily-log percent per project for the PREVIOUS week (used by spillover guard).
+      const prevLatestPctByProject = new Map<string, number>();
+      for (const log of prevDailyLogs) {
+        const pid = log.bundle_id.split("::")[0];
+        if (!pid) continue;
+        if (log.percent != null) prevLatestPctByProject.set(pid, Number(log.percent));
       }
 
       const projMap = new Map(projects.map(p => [p.project_id, p]));
@@ -433,11 +426,65 @@ function useDilnaData(weekOffset: number) {
         return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
       }
 
-      function expectedForBundle(splitGroupId: string | null, projectId: string): number | null {
-        const cw = (splitGroupId && chainWindowBySplitGroup.get(splitGroupId))
-          || chainWindowByProject.get(projectId)
-          || { start: 0, end: 100 };
+      function expectedForBundle(splitGroupId: string | null, _projectId: string): number | null {
+        // Full bundle (no split chain) → all hours due THIS week → window 0–100%.
+        // Split bundle → use the chain-window slice for THIS week of that split group.
+        const cw = splitGroupId
+          ? (chainWindowBySplitGroup.get(splitGroupId) ?? { start: 0, end: 100 })
+          : { start: 0, end: 100 };
         return Math.round(cw.start + (cw.end - cw.start) * dayFraction);
+      }
+
+      // Same as expectedForBundle, but evaluated for a SPECIFIC week key (used when
+      // computing the previous-week target for the goal-aware spillover guard).
+      function bundleTargetForWeek(splitGroupId: string | null, wkKey: string): number {
+        if (!splitGroupId) return 100;
+        const weeks = splitGroupWeeks.get(splitGroupId);
+        if (!weeks) return 100;
+        const sorted = [...weeks].sort((a, b) => a.week.localeCompare(b.week));
+        const total = sorted.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) return 100;
+        let cum = 0;
+        for (const w of sorted) {
+          cum += w.hours;
+          if (w.week === wkKey) return Math.round((cum / total) * 100);
+        }
+        return 100;
+      }
+
+      // ── DEFERRED: spilled bundles. Source = real previous week's still-active rows.
+      // Skip a bundle if (a) the same bundle already exists in displayed week (already
+      // replanned) or (b) the latest daylog of the prev week already met the bundle's
+      // weekly target (full=100, split=chain window end at prev week).
+      for (const s of prevSchedule) {
+        if (isRowDone(s)) continue;
+        if ((s as any).is_midflight) continue;
+        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
+        const bMap = bundlesByProject.get(s.project_id);
+        if (bMap?.has(key)) continue; // current-week bundle wins
+
+        const bundleTarget = bundleTargetForWeek(s.split_group_id, prevWeekInfo.weekKey);
+        const prevPct = prevLatestPctByProject.get(s.project_id);
+        if (prevPct != null && prevPct >= bundleTarget) continue; // goal met → no spill
+
+        if (!bundlesByProject.has(s.project_id)) {
+          bundlesByProject.set(s.project_id, new Map());
+          spilledOnlyProjects.add(s.project_id);
+        } else if (!scheduledProjects.has(s.project_id)) {
+          spilledOnlyProjects.add(s.project_id);
+        }
+        const targetMap = bundlesByProject.get(s.project_id)!;
+        targetMap.set(key, {
+          bundleId: s.id,
+          bundle_label: s.bundle_label,
+          bundle_type: s.bundle_type,
+          split_group_id: s.split_group_id,
+          split_part: s.split_part,
+          split_total: s.split_total,
+          scheduled_hours: Number(s.scheduled_hours),
+          position: s.position,
+          isSpilled: true,
+        });
       }
 
       // ── Calculate prodej value (mirrors WeeklySilos.calcProdejValue) ──
