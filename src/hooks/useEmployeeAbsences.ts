@@ -5,8 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
  * Manual long-term absence helpers built on top of the existing `ami_absences` table.
  *
  * Strategy: every absence period (date_from → date_to) is stored as one row per day
- * with `source='manual'` and `absencia_kod` (DOV / NEM / RD / PN / OTHER).
- * Open-ended absences are filled 6 months ahead and can be extended.
+ * (including weekends and public holidays so the period stays continuous in the DB),
+ * with `source='manual'` and a shared `period_id` that ties the rows together.
+ *
+ * Non-working days are filtered out at calculation time (capacity, analytics) — see
+ * `src/hooks/useCapacityCalc.ts` and `src/components/analytics/AbsenceReport.tsx`.
  */
 
 export interface AbsenceRow {
@@ -16,6 +19,7 @@ export interface AbsenceRow {
   absencia_kod: string | null;
   source: string | null;
   mesiac: string;
+  period_id?: string | null;
 }
 
 export interface AbsencePeriod {
@@ -25,6 +29,7 @@ export interface AbsencePeriod {
   date_to: string;   // YYYY-MM-DD (inclusive)
   ids: string[];
   is_open_ended: boolean;
+  period_id: string | null;
 }
 
 function toLocalDateStr(d: Date): string {
@@ -46,28 +51,52 @@ function monthFirstDayStr(dateStr: string): string {
 }
 
 /**
- * Group rows for the same (employee, kod) into a period.
- * Allows gaps of up to 4 days between consecutive rows so that weekends
- * (Sat+Sun) and short public-holiday stretches don't split a single period.
+ * Group rows into periods.
+ * Primary key: `period_id` (rows sharing it are always one continuous period).
+ * Fallback for legacy rows without period_id: same (employee, kod) with gaps ≤4 days.
  */
 function groupPeriods(rows: AbsenceRow[]): AbsencePeriod[] {
-  const sorted = [...rows].sort((a, b) =>
+  const periods: AbsencePeriod[] = [];
+
+  // 1) Group rows that have a period_id — these are always one continuous period.
+  const byPeriodId = new Map<string, AbsenceRow[]>();
+  const legacy: AbsenceRow[] = [];
+  for (const r of rows) {
+    if (!r.employee_id || !r.absencia_kod) continue;
+    if (r.period_id) {
+      const arr = byPeriodId.get(r.period_id) ?? [];
+      arr.push(r);
+      byPeriodId.set(r.period_id, arr);
+    } else {
+      legacy.push(r);
+    }
+  }
+
+  for (const [pid, arr] of byPeriodId) {
+    arr.sort((a, b) => a.datum.localeCompare(b.datum));
+    periods.push({
+      employee_id: arr[0].employee_id!,
+      absencia_kod: arr[0].absencia_kod!,
+      date_from: arr[0].datum,
+      date_to: arr[arr.length - 1].datum,
+      ids: arr.map(r => r.id),
+      is_open_ended: false,
+      period_id: pid,
+    });
+  }
+
+  // 2) Legacy rows (no period_id): use the old gap-tolerant grouping (≤4 days).
+  const sorted = legacy.sort((a, b) =>
     (a.employee_id ?? "").localeCompare(b.employee_id ?? "") ||
     (a.absencia_kod ?? "").localeCompare(b.absencia_kod ?? "") ||
     a.datum.localeCompare(b.datum)
   );
-
-  const MAX_GAP_DAYS = 4; // tolerate weekend + 1-2 holiday days
-
-  const periods: AbsencePeriod[] = [];
+  const MAX_GAP_DAYS = 4;
   let current: AbsencePeriod | null = null;
-
   for (const r of sorted) {
-    if (!r.employee_id || !r.absencia_kod) continue;
     const sameKey = current
       && current.employee_id === r.employee_id
       && current.absencia_kod === r.absencia_kod;
-
     let withinGap = false;
     if (sameKey) {
       const prev = new Date(current!.date_to + "T00:00:00").getTime();
@@ -75,24 +104,28 @@ function groupPeriods(rows: AbsenceRow[]): AbsencePeriod[] {
       const gapDays = Math.round((next - prev) / 86400000);
       withinGap = gapDays >= 0 && gapDays <= MAX_GAP_DAYS;
     }
-
     if (sameKey && withinGap) {
       if (r.datum > current!.date_to) current!.date_to = r.datum;
       current!.ids.push(r.id);
     } else {
       if (current) periods.push(current);
       current = {
-        employee_id: r.employee_id,
-        absencia_kod: r.absencia_kod,
+        employee_id: r.employee_id!,
+        absencia_kod: r.absencia_kod!,
         date_from: r.datum,
         date_to: r.datum,
         ids: [r.id],
         is_open_ended: false,
+        period_id: null,
       };
     }
   }
   if (current) periods.push(current);
-  return periods;
+
+  return periods.sort((a, b) =>
+    a.employee_id.localeCompare(b.employee_id) ||
+    a.date_from.localeCompare(b.date_from)
+  );
 }
 
 export function useManualAbsences() {
@@ -101,7 +134,7 @@ export function useManualAbsences() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ami_absences")
-        .select("id, employee_id, datum, absencia_kod, source, mesiac")
+        .select("id, employee_id, datum, absencia_kod, source, mesiac, period_id")
         .eq("source", "manual")
         .order("datum", { ascending: true });
       if (error) throw error;
@@ -128,7 +161,22 @@ export function useCreateAbsencePeriod() {
         : addDays(start, 6 * 30); // ~6 months
       if (end < start) throw new Error("Datum do nemůže být před datumem od");
 
-      const rows: Array<{ employee_id: string; datum: string; absencia_kod: string; source: string; mesiac: string }> = [];
+      // One UUID for the whole period — keeps it together in the UI even though
+      // the rows include weekends/holidays. Generated client-side so all rows
+      // share the same value before the insert call.
+      const period_id =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const rows: Array<{
+        employee_id: string;
+        datum: string;
+        absencia_kod: string;
+        source: string;
+        mesiac: string;
+        period_id: string;
+      }> = [];
       for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
         const datum = toLocalDateStr(d);
         rows.push({
@@ -137,12 +185,15 @@ export function useCreateAbsencePeriod() {
           absencia_kod,
           source: "manual",
           mesiac: monthFirstDayStr(datum),
+          period_id,
         });
       }
 
       const CHUNK = 500;
       for (let i = 0; i < rows.length; i += CHUNK) {
-        const { error } = await supabase.from("ami_absences").insert(rows.slice(i, i + CHUNK));
+        const { error } = await supabase
+          .from("ami_absences")
+          .insert(rows.slice(i, i + CHUNK) as any);
         if (error) throw error;
       }
     },
@@ -199,6 +250,5 @@ export function activePeriodForEmployee(periods: AbsencePeriod[], employeeId: st
     p.date_to >= today
   );
   if (matches.length === 0) return null;
-  // Return the one with latest end
   return matches.sort((a, b) => b.date_to.localeCompare(a.date_to))[0];
 }

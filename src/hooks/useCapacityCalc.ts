@@ -1,5 +1,50 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchCzechHolidays } from "./useWeeklyCapacity";
+
+/** Cache of holiday-date sets per year (CZ public + company). */
+const _holidaySetCache = new Map<number, Promise<Set<string>>>();
+
+async function getHolidayDateSet(year: number): Promise<Set<string>> {
+  const cached = _holidaySetCache.get(year);
+  if (cached) return cached;
+  const p = (async () => {
+    const set = new Set<string>();
+    try {
+      const cz = await fetchCzechHolidays(year);
+      for (const h of cz) set.add(h.date);
+    } catch { /* ignore */ }
+    try {
+      const { data } = await supabase
+        .from("company_holidays" as any)
+        .select("start_date, end_date")
+        .lte("start_date", `${year}-12-31`)
+        .gte("end_date", `${year}-01-01`);
+      for (const h of ((data ?? []) as unknown) as Array<{ start_date: string; end_date: string }>) {
+        const s = new Date(h.start_date + "T00:00:00");
+        const e = new Date(h.end_date + "T00:00:00");
+        for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
+          if (d.getFullYear() !== year) continue;
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          set.add(`${y}-${m}-${day}`);
+        }
+      }
+    } catch { /* ignore */ }
+    return set;
+  })();
+  _holidaySetCache.set(year, p);
+  return p;
+}
+
+function isWorkdayStr(dateStr: string, holidaySet: Set<string>): boolean {
+  const d = new Date(dateStr + "T00:00:00");
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return false;
+  if (holidaySet.has(dateStr)) return false;
+  return true;
+}
 
 /**
  * ISO week number for a given date.
@@ -200,16 +245,21 @@ export function useAbsencesForYear(year: number, employees: EmployeeRow[]) {
       }
       const employeeIds = employees.map(e => e.id);
       const empMap = new Map(employees.map(e => [e.id, e]));
-      const { data, error } = await supabase
-        .from("ami_absences")
-        .select("datum, employee_id")
-        .gte("datum", `${year}-01-01`)
-        .lte("datum", `${year}-12-31`)
-        .in("employee_id", employeeIds);
+      const [{ data, error }, holidaySet] = await Promise.all([
+        supabase
+          .from("ami_absences")
+          .select("datum, employee_id")
+          .gte("datum", `${year}-01-01`)
+          .lte("datum", `${year}-12-31`)
+          .in("employee_id", employeeIds),
+        getHolidayDateSet(year),
+      ]);
       if (error) throw error;
       const weekTotals = new Map<string, number>();
       const perEmployee = new Map<string, Map<string, number>>();
       for (const row of (data || [])) {
+        // Skip weekends + public/company holidays — they don't reduce capacity.
+        if (!isWorkdayStr(row.datum, holidaySet)) continue;
         const key = getMondayKey(row.datum);
         const emp = empMap.get(row.employee_id);
         const hours = emp?.uvazok_hodiny ?? 8;
@@ -233,15 +283,19 @@ export async function fetchAbsencesForYear(
   if (employees.length === 0) return new Map();
   const employeeIds = employees.map(e => e.id);
   const empMap = new Map(employees.map(e => [e.id, e]));
-  const { data, error } = await supabase
-    .from("ami_absences")
-    .select("datum, employee_id")
-    .gte("datum", `${year}-01-01`)
-    .lte("datum", `${year}-12-31`)
-    .in("employee_id", employeeIds);
+  const [{ data, error }, holidaySet] = await Promise.all([
+    supabase
+      .from("ami_absences")
+      .select("datum, employee_id")
+      .gte("datum", `${year}-01-01`)
+      .lte("datum", `${year}-12-31`)
+      .in("employee_id", employeeIds),
+    getHolidayDateSet(year),
+  ]);
   if (error || !data) return new Map();
   const result = new Map<string, number>();
   for (const row of data) {
+    if (!isWorkdayStr(row.datum, holidaySet)) continue;
     const key = getMondayKey(row.datum);
     const emp = empMap.get(row.employee_id);
     const hours = emp?.uvazok_hodiny ?? 8;

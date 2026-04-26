@@ -66,7 +66,7 @@ function isWeekday(date: Date): boolean {
 }
 
 // Fetch Czech holidays with 24h localStorage cache
-async function fetchCzechHolidays(year: number): Promise<CzechHoliday[]> {
+export async function fetchCzechHolidays(year: number): Promise<CzechHoliday[]> {
   const cacheKey = `czech_holidays_${year}`;
   const cached = localStorage.getItem(cacheKey);
   if (cached) {
