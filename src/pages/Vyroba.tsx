@@ -209,24 +209,32 @@ function getProjectsForWeek(
     }
   }
 
-  // Spilled: preceding week
-  const prevMonday = new Date(slideMonday);
-  prevMonday.setDate(prevMonday.getDate() - 7);
-  const prevWeekKey = weekKeyStr(prevMonday);
-  const prevSilo = scheduleData.get(prevWeekKey);
-  if (prevSilo) {
-    for (const b of prevSilo.bundles) {
-      if (result.some((r) => r.projectId === b.project_id)) continue;
-      const activeItems = b.items.filter((i: ScheduleItem) => i.status === "scheduled" || i.status === "in_progress");
-      if (activeItems.length === 0 || activeItems.every((i: ScheduleItem) => itemDone(i))) continue;
-      result.push({
-        projectId: b.project_id,
-        projectName: b.project_name,
-        totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
-        scheduleItems: activeItems,
-        color: getProjectColor(b.project_id),
-        isSpilled: true,
-      });
+  // Spilled: only when the displayed week is exactly T+1 from the real current week.
+  // Source = real current week's unfinished, non-midflight items.
+  const realMondayForHelper = (() => { const d = new Date(); const day = d.getDay(); const diff = (day === 0 ? -6 : 1) - day; d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d; })();
+  const spilloverDest = new Date(realMondayForHelper); spilloverDest.setDate(spilloverDest.getDate() + 7);
+  if (weekKeyStr(spilloverDest) === slideWeekKey) {
+    const realWeekKey = weekKeyStr(realMondayForHelper);
+    const realSilo = scheduleData.get(realWeekKey);
+    if (realSilo) {
+      for (const b of realSilo.bundles) {
+        if (result.some((r) => r.projectId === b.project_id)) continue;
+        const activeItems = b.items.filter(
+          (i: ScheduleItem) =>
+            (i.status === "scheduled" || i.status === "in_progress") &&
+            !i.is_midflight &&
+            !itemDone(i),
+        );
+        if (activeItems.length === 0) continue;
+        result.push({
+          projectId: b.project_id,
+          projectName: b.project_name,
+          totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
+          scheduleItems: activeItems,
+          color: getProjectColor(b.project_id),
+          isSpilled: true,
+        });
+      }
     }
   }
 
