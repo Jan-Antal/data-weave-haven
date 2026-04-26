@@ -1324,7 +1324,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     const behind = activeProjects.filter((p) => getProjectStatus(p) === "behind").length;
     const todayLogged =
       todayDayIndex >= 0
-        ? activeProjects.filter((p) => getLogsForProject(p.projectId).some((l) => l.day_index === todayDayIndex)).length
+        ? activeProjects.filter((p) => getLogsForProject(p).some((l) => l.day_index === todayDayIndex)).length
         : 0;
     return { total, avgPct, onTrack, behind, todayLogged };
   }, [enrichedProjects, dailyLogsMap, todayDayIndex, scheduleData]);
@@ -1339,7 +1339,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     logNotesUndoStack.current = [];
 
     // Load log data specifically for the clicked day
-    const logs = getLogsForProject(selectedProject.projectId);
+    const logs = getLogsForProject(selectedProject);
     const existingLog = logs.find((l) => l.day_index === di);
 
     if (existingLog) {
@@ -1358,7 +1358,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       } else {
         // No previous logs at all — use current bundle progress
         setLogPhase("Řezání");
-        setLogPercent(getLatestPercent(selectedProject.projectId));
+        setLogPercent(getLatestPercent(selectedProject));
       }
       setLogNotes("");
     }
@@ -1370,11 +1370,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     if (!selectedProject || logDayIndex < 0) return;
     try {
       // Push undo for log note + phase change
-      const existingLogs = getLogsForProject(selectedProject.projectId);
+      const existingLogs = getLogsForProject(selectedProject);
       const existingLog = existingLogs.find((l) => l.day_index === logDayIndex);
-      const prevPhase = getLatestPhase(selectedProject.projectId) || "Řezání";
-      const prevPercent = getLatestPercent(selectedProject.projectId);
-      const bId = bundleId(selectedProject.projectId);
+      const prevPhase = getLatestPhase(selectedProject) || "Řezání";
+      const prevPercent = getLatestPercent(selectedProject);
+      const bId = bundleId(selectedProject);
       const capturedDay = logDayIndex;
       const capturedPhase = logPhase;
       const capturedPct = logPercent;
@@ -1440,7 +1440,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       });
 
       // Log phase_changed if phase changed
-      const prevPhaseVal = getLatestPhase(selectedProject.projectId) || "Řezání";
+      const prevPhaseVal = getLatestPhase(selectedProject) || "Řezání";
       if (logPhase !== prevPhaseVal) {
         logActivity({
           projectId: selectedProject.projectId,
@@ -1463,7 +1463,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   function openSpillDialog() {
     if (!selectedProject) return;
-    const pct = getLatestPercent(selectedProject.projectId);
+    const pct = getLatestPercent(selectedProject);
     const doneIds = new Set(selectedProject.scheduleItems.filter((i) => isItemDone(i)).map((i) => i.id));
     const selected = new Set(
       selectedProject.scheduleItems
@@ -1485,7 +1485,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
       return;
     }
     const ids = Array.from(spillSelected);
-    const pct = getLatestPercent(selectedProject.projectId);
+    const pct = getLatestPercent(selectedProject);
 
     const itemsToMove = selectedProject.scheduleItems.filter((i) => ids.includes(i.id));
     const prevWeeks = itemsToMove.map((i) => ({ id: i.id, prevWeek: i.scheduled_week }));
@@ -1954,10 +1954,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   async function handleNoProduction() {
     if (!selectedProject || logDayIndex < 0) return;
     try {
-      const bId = bundleId(selectedProject.projectId);
+      const bId = bundleId(selectedProject);
       const capturedDay = logDayIndex;
       const capturedReason = noProductionReason;
-      const capturedPct = getLatestPercent(selectedProject.projectId);
+      const capturedPct = getLatestPercent(selectedProject);
       pushUndo({
         page: "vyroba",
         actionType: "no_activity",
@@ -2562,16 +2562,16 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                   onSpillAll={openSpillDialog}
                   onOpenExpedice={openExpediceDialog}
                   onToggleItem={toggleItemComplete}
-                  getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
+                  getCumulativeForDay={(di) => getCumulativeForDay(selectedProject, di)}
                   getExpectedPct={getExpectedPct}
                   chainWindow={getChainWindow(selectedProject.projectId)}
                   status={getProjectStatus(selectedProject)}
-                  latestPct={getLatestPercent(selectedProject.projectId)}
-                  latestPhase={getLatestPhase(selectedProject.projectId)}
-                  logs={getLogsForProject(selectedProject.projectId)}
+                  latestPct={getLatestPercent(selectedProject)}
+                  latestPhase={getLatestPhase(selectedProject)}
+                  logs={getLogsForProject(selectedProject)}
                   expandedMap={expandedMap}
                   setExpandedMap={setExpandedMap}
-                  bundleId={bundleId(selectedProject.projectId)}
+                  bundleId={bundleId(selectedProject)}
                   allItems={getItemsForBundle(selectedProject)}
                   scheduleData={scheduleData}
                   pushUndo={pushUndo}
@@ -2670,16 +2670,16 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     onSpillAll={openSpillDialog}
                     onOpenExpedice={openExpediceDialog}
                     onToggleItem={toggleItemComplete}
-                    getCumulativeForDay={(di) => getCumulativeForDay(selectedProject.projectId, di)}
+                    getCumulativeForDay={(di) => getCumulativeForDay(selectedProject, di)}
                     getExpectedPct={getExpectedPct}
                     chainWindow={getChainWindow(selectedProject.projectId)}
                     status={getProjectStatus(selectedProject)}
-                    latestPct={getLatestPercent(selectedProject.projectId)}
-                    latestPhase={getLatestPhase(selectedProject.projectId)}
-                    logs={getLogsForProject(selectedProject.projectId)}
+                    latestPct={getLatestPercent(selectedProject)}
+                    latestPhase={getLatestPhase(selectedProject)}
+                    logs={getLogsForProject(selectedProject)}
                     expandedMap={expandedMap}
                     setExpandedMap={setExpandedMap}
-                    bundleId={bundleId(selectedProject.projectId)}
+                    bundleId={bundleId(selectedProject)}
                     allItems={getItemsForBundle(selectedProject)}
                     scheduleData={scheduleData}
                     pushUndo={pushUndo}
@@ -3103,7 +3103,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             {selectedProject &&
               (() => {
                 const rawItems = selectedProject.scheduleItems.filter((i) => i.status !== "cancelled");
-                const pct = getLatestPercent(selectedProject.projectId);
+                const pct = getLatestPercent(selectedProject);
 
                 // Deduplicate spill items by item_code
                 const spillMergeKey = (i: ScheduleItem) =>
@@ -3506,7 +3506,7 @@ function ProjectRow({
 }) {
   const status = getProjectStatus(project);
   const { bundleProgress: pct } = getBP();
-  const phase = getLatestPhase(project.projectId);
+  const phase = getLatestPhase(project);
   const borderColor = project.color;
   const splitMeta = deriveBundleSplitMeta(project.scheduleItems);
   const firstItem = project.scheduleItems[0];
