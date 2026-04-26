@@ -202,7 +202,10 @@ function useDilnaData(weekOffset: number) {
         split_part: number | null;
         split_total: number | null;
         position: number;
+        expediced_at: string | null;
+        completed_at: string | null;
       }>;
+      const prevSchedule = (prevSchedRes.data || []) as typeof schedule;
       const projects = (projectsRes.data || []) as Array<{ project_id: string; project_name: string; prodejni_cena: number | null; cost_production_pct: number | null; currency: string | null; created_at: string | null }>;
       const dailyLogs = ((dailyLogsRes.data || []) as unknown) as Array<{ bundle_id: string; day_index: number; percent: number; logged_at: string }>;
       const planHoursRows = (planHoursRes.data || []) as Array<{ project_id: string; hodiny_plan: number }>;
@@ -250,8 +253,13 @@ function useDilnaData(weekOffset: number) {
         projectAllDoneThisWeek.set(pid, prev && s.status === "completed");
       }
 
-      // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part)
-      const bundlesByProject = new Map<string, Map<string, {
+      // Helper: is a schedule row "done" (item finished)? Mirrors Vyroba isItemDone semantics.
+      const isRowDone = (r: typeof schedule[number]): boolean =>
+        r.status === "completed" || !!r.expediced_at || !!r.completed_at;
+
+      // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part).
+      // First pass: current week (T) bundles.
+      type BundleEntry = {
         bundleId: string;
         bundle_label: string | null;
         bundle_type: string | null;
@@ -260,7 +268,9 @@ function useDilnaData(weekOffset: number) {
         split_total: number | null;
         scheduled_hours: number;
         position: number;
-      }>>();
+        isSpilled: boolean;
+      };
+      const bundlesByProject = new Map<string, Map<string, BundleEntry>>();
       for (const s of schedule) {
         if (s.status === "historical") continue;
         const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
@@ -279,8 +289,37 @@ function useDilnaData(weekOffset: number) {
             split_total: s.split_total,
             scheduled_hours: Number(s.scheduled_hours),
             position: s.position,
+            isSpilled: false,
           });
         }
+      }
+
+      // Second pass: spilled bundles from T-1.
+      // Skip rows that are already done (expediced/completed). Skip duplicates if the same
+      // stage+label+split_part already exists in current week (already replanned to T).
+      const spilledOnlyProjects = new Set<string>();
+      for (const s of prevSchedule) {
+        if (isRowDone(s)) continue;
+        const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
+        if (!bundlesByProject.has(s.project_id)) {
+          bundlesByProject.set(s.project_id, new Map());
+          spilledOnlyProjects.add(s.project_id);
+        } else if (!scheduledProjects.has(s.project_id)) {
+          spilledOnlyProjects.add(s.project_id);
+        }
+        const bMap = bundlesByProject.get(s.project_id)!;
+        if (bMap.has(key)) continue; // current-week bundle wins
+        bMap.set(key, {
+          bundleId: s.id,
+          bundle_label: s.bundle_label,
+          bundle_type: s.bundle_type,
+          split_group_id: s.split_group_id,
+          split_part: s.split_part,
+          split_total: s.split_total,
+          scheduled_hours: Number(s.scheduled_hours),
+          position: s.position,
+          isSpilled: true,
+        });
       }
 
       // Latest daily-log percent per project — bundle_id = `${projectId}::${weekKey}`
