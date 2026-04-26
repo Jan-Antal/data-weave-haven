@@ -196,6 +196,7 @@ function getProjectsForWeek(
       ) {
         result.push({
           projectId: b.project_id,
+          cardKey: makeCardKey(b.project_id, { stage_id: b.stage_id, bundle_label: b.bundle_label, split_part: b.items[0]?.split_part, split_group_id: b.items[0]?.split_group_id }, false),
           projectName: b.project_name,
           totalHours: b.total_hours,
           scheduleItems: b.items,
@@ -246,6 +247,7 @@ function getProjectsForWeek(
         // Spilled bundle = its own card (mirrors Dílňa). Never merge into a project card.
         result.push({
           projectId: b.project_id,
+          cardKey: makeCardKey(b.project_id, { stage_id: b.stage_id, bundle_label: b.bundle_label, split_part: (activeItems[0] as any)?.split_part, split_group_id: (activeItems[0] as any)?.split_group_id }, true),
           projectName: b.project_name,
           totalHours: activeItems.reduce((s: number, i: ScheduleItem) => s + i.scheduled_hours, 0),
           scheduleItems: activeItems,
@@ -295,6 +297,8 @@ const PHASES = [
 
 interface VyrobaProject {
   projectId: string;
+  /** Unique per-bundle key. Distinguishes multiple bundles of the same project (A, B, C, A-5, …). */
+  cardKey: string;
   projectName: string;
   totalHours: number;
   scheduleItems: ScheduleItem[];
@@ -308,6 +312,15 @@ interface VyrobaProject {
   pauseReason?: string | null;
   pauseExpectedDate?: string | null;
   projectStatus?: string | null;
+}
+
+function makeCardKey(projectId: string, sample: { stage_id?: string | null; bundle_label?: string | null; split_part?: number | null; split_group_id?: string | null } | undefined, isSpilled = false): string {
+  const sg = sample?.split_group_id ?? null;
+  const stage = sample?.stage_id ?? "none";
+  const label = sample?.bundle_label ?? "A";
+  const part = sample?.split_part ?? "full";
+  const base = sg ? `SG:${sg}` : `${stage}::${label}::${part}`;
+  return `${projectId}::${base}${isSpilled ? "::spilled" : ""}`;
 }
 
 interface CumulativeInfo {
@@ -626,6 +639,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         ) {
           result.push({
             projectId: b.project_id,
+            cardKey: makeCardKey(b.project_id, { stage_id: b.stage_id, bundle_label: b.bundle_label, split_part: b.items[0]?.split_part, split_group_id: b.items[0]?.split_group_id }, false),
             projectName: b.project_name,
             totalHours: b.total_hours,
             scheduleItems: b.items,
@@ -680,6 +694,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
           // Spilled bundle = its own card (mirrors Dílňa). Never merge into a project card.
           result.push({
             projectId: b.project_id,
+            cardKey: makeCardKey(b.project_id, { stage_id: b.stage_id, bundle_label: b.bundle_label, split_part: (activeItems[0] as any)?.split_part, split_group_id: (activeItems[0] as any)?.split_group_id }, true),
             projectName: b.project_name,
             totalHours: activeItems.reduce((s, i) => s + i.scheduled_hours, 0),
             scheduleItems: activeItems,
@@ -755,10 +770,13 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return (now.getDay() + 6) % 7;
   }, [weekKey]);
 
-  // Selection
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  // Selection — keyed per BUNDLE (cardKey) so projects with multiple bundles in the same week
+  // (Insia A-4 vs Insia B, Allianz A/B/C/D, …) each select independently.
+  const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
   const [mobileVyrobaProjektOpen, setMobileVyrobaProjektOpen] = useState(false);
-  const selectedProject = enrichedProjects.find((p) => p.projectId === selectedProjectId) || null;
+  const selectedProject = enrichedProjects.find((p) => p.cardKey === selectedCardKey) || null;
+  // Back-compat alias for any reads of the previous name.
+  const selectedProjectId = selectedProject?.projectId ?? null;
 
   // Document counts for Výkresy section
   const projectIdsList = useMemo(() => enrichedProjects.map((p) => p.projectId), [enrichedProjects]);
@@ -808,17 +826,18 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Auto-select first
   useEffect(() => {
-    if (enrichedProjects.length > 0 && !enrichedProjects.find((p) => p.projectId === selectedProjectId)) {
-      setSelectedProjectId(enrichedProjects[0].projectId);
+    if (enrichedProjects.length > 0 && !enrichedProjects.find((p) => p.cardKey === selectedCardKey)) {
+      setSelectedCardKey(enrichedProjects[0].cardKey);
     }
-  }, [enrichedProjects, selectedProjectId]);
+  }, [enrichedProjects, selectedCardKey]);
 
   // Handle openProjectId from DataLog navigation
   const openProjectIdHandled = useRef(false);
   useEffect(() => {
     if (openProjectIdFromState && !openProjectIdHandled.current && enrichedProjects.length > 0) {
       openProjectIdHandled.current = true;
-      setSelectedProjectId(openProjectIdFromState);
+      const match = enrichedProjects.find((p) => p.projectId === openProjectIdFromState);
+      if (match) setSelectedCardKey(match.cardKey);
       if (isMobile) {
         setMobileVyrobaProjektOpen(true);
       }
@@ -1738,7 +1757,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         label: "Zobrazit TPV List",
         icon: "📦",
         onClick: () => {
-          setSelectedProjectId(pid);
+          handleSelectProject(pid);
           setTpvProjectId(pid);
         },
       },
@@ -1779,8 +1798,11 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     }
   }
 
-  function handleSelectProject(pid: string) {
-    setSelectedProjectId(pid);
+  function handleSelectProject(keyOrId: string) {
+    // Accept either a cardKey (preferred — bundle-precise) or a bare projectId (fallback).
+    const byCard = enrichedProjects.find((p) => p.cardKey === keyOrId);
+    const target = byCard ?? enrichedProjects.find((p) => p.projectId === keyOrId);
+    if (target) setSelectedCardKey(target.cardKey);
     if (isMobile) setMobileVyrobaProjektOpen(true);
   }
 
@@ -2060,7 +2082,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                             <ProjectRow
                               key={p.projectId}
                               project={p}
-                              isSelected={selectedProjectId === p.projectId}
+                              isSelected={selectedCardKey === p.cardKey}
                               onSelect={handleSelectProject}
                               onContextMenu={handleContextMenu}
                               getProjectStatus={getProjectStatus}
@@ -2088,7 +2110,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                           <ProjectRow
                             key={p.projectId}
                             project={p}
-                            isSelected={selectedProjectId === p.projectId}
+                            isSelected={selectedCardKey === p.cardKey}
                             onSelect={handleSelectProject}
                             onContextMenu={handleContextMenu}
                             getProjectStatus={getProjectStatus}
@@ -2108,7 +2130,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               ⏸ Pozastavené ({slidePaused.length})
                             </div>
                             {slidePaused.map((p) => {
-                              const isSelected = selectedProjectId === p.projectId;
+                              const isSelected = selectedCardKey === p.cardKey;
                               const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
                               const now = new Date();
                               const daysUntil = expectedDate
@@ -2125,7 +2147,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                               return (
                                 <button
                                   key={p.projectId}
-                                  onClick={() => handleSelectProject(p.projectId)}
+                                  onClick={() => handleSelectProject(p.cardKey)}
                                   onContextMenu={(e) => handleContextMenu(e, p.projectId)}
                                   className="w-full text-left flex items-stretch transition-colors"
                                   style={{
@@ -2252,7 +2274,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                       <ProjectRow
                         key={p.projectId}
                         project={p}
-                        isSelected={selectedProjectId === p.projectId}
+                        isSelected={selectedCardKey === p.cardKey}
                         onSelect={handleSelectProject}
                         onContextMenu={handleContextMenu}
                         getProjectStatus={getProjectStatus}
@@ -2280,7 +2302,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                     <ProjectRow
                       key={p.projectId}
                       project={p}
-                      isSelected={selectedProjectId === p.projectId}
+                      isSelected={selectedCardKey === p.cardKey}
                       onSelect={handleSelectProject}
                       onContextMenu={handleContextMenu}
                       getProjectStatus={getProjectStatus}
@@ -2300,7 +2322,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                         ⏸ Pozastavené ({pausedProjects.length})
                       </div>
                       {pausedProjects.map((p) => {
-                        const isSelected = selectedProjectId === p.projectId;
+                        const isSelected = selectedCardKey === p.cardKey;
                         const expectedDate = p.pauseExpectedDate ? new Date(p.pauseExpectedDate) : null;
                         const now = new Date();
                         const daysUntil = expectedDate
@@ -2317,7 +2339,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
                         return (
                           <button
                             key={p.projectId}
-                            onClick={() => handleSelectProject(p.projectId)}
+                            onClick={() => handleSelectProject(p.cardKey)}
                             onContextMenu={(e) => handleContextMenu(e, p.projectId)}
                             className="w-full text-left flex items-stretch transition-colors"
                             style={{
@@ -3380,7 +3402,7 @@ function ProjectRow({
       }}
     >
       <button
-        onClick={() => onSelect(project.projectId)}
+        onClick={() => onSelect(project.cardKey)}
         onContextMenu={(e) => onContextMenu(e, project.projectId)}
         className="w-full flex items-center gap-1.5 text-left transition-colors"
         style={{ padding: isMobile ? 12 : "5px 10px" }}
