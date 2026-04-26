@@ -299,12 +299,13 @@ function useDilnaData(weekOffset: number) {
         }
       }
 
-      // Second pass: spilled bundles from T-1.
-      // Skip rows that are already done (expediced/completed). Skip duplicates if the same
+      // Second pass: spilled bundles. Source = real current week (only when weekOffset === 1).
+      // Excludes done rows AND legacy midflight rows. Skip duplicates if the same
       // stage+label+split_part already exists in current week (already replanned to T).
       const spilledOnlyProjects = new Set<string>();
       for (const s of prevSchedule) {
         if (isRowDone(s)) continue;
+        if ((s as any).is_midflight) continue;
         const key = `${s.stage_id ?? "none"}::${s.bundle_label ?? "A"}::${s.split_part ?? "full"}`;
         if (!bundlesByProject.has(s.project_id)) {
           bundlesByProject.set(s.project_id, new Map());
