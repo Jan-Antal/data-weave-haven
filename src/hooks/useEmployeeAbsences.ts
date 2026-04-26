@@ -45,13 +45,19 @@ function monthFirstDayStr(dateStr: string): string {
   return toLocalDateStr(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
-/** Group consecutive daily rows for the same (employee, kod) into a period. */
+/**
+ * Group rows for the same (employee, kod) into a period.
+ * Allows gaps of up to 4 days between consecutive rows so that weekends
+ * (Sat+Sun) and short public-holiday stretches don't split a single period.
+ */
 function groupPeriods(rows: AbsenceRow[]): AbsencePeriod[] {
   const sorted = [...rows].sort((a, b) =>
     (a.employee_id ?? "").localeCompare(b.employee_id ?? "") ||
     (a.absencia_kod ?? "").localeCompare(b.absencia_kod ?? "") ||
     a.datum.localeCompare(b.datum)
   );
+
+  const MAX_GAP_DAYS = 4; // tolerate weekend + 1-2 holiday days
 
   const periods: AbsencePeriod[] = [];
   let current: AbsencePeriod | null = null;
@@ -62,10 +68,16 @@ function groupPeriods(rows: AbsenceRow[]): AbsencePeriod[] {
       && current.employee_id === r.employee_id
       && current.absencia_kod === r.absencia_kod;
 
-    const expectedNext = current ? toLocalDateStr(addDays(new Date(current.date_to + "T00:00:00"), 1)) : null;
+    let withinGap = false;
+    if (sameKey) {
+      const prev = new Date(current!.date_to + "T00:00:00").getTime();
+      const next = new Date(r.datum + "T00:00:00").getTime();
+      const gapDays = Math.round((next - prev) / 86400000);
+      withinGap = gapDays >= 0 && gapDays <= MAX_GAP_DAYS;
+    }
 
-    if (sameKey && (r.datum === current!.date_to || r.datum === expectedNext)) {
-      current!.date_to = r.datum;
+    if (sameKey && withinGap) {
+      if (r.datum > current!.date_to) current!.date_to = r.datum;
       current!.ids.push(r.id);
     } else {
       if (current) periods.push(current);
