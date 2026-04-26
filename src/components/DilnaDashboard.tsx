@@ -407,25 +407,42 @@ function useDilnaData(weekOffset: number) {
       // The carry-forward only applies if the SAME bundle identity actually existed in
       // that prior week — preventing a percent from week N from leaking into a brand-new
       // bundle that did not exist back then.
-      function resolveBundlePct(pid: string, identity: string): number | null {
+      function resolveBundlePct(pid: string, _identity: string): number | null {
         // 1) Displayed week has its own log → use it.
         const displayedKey = `${pid}::${weekInfo.weekKey}`;
         if (pctByProjectWeek.has(displayedKey)) {
           return pctByProjectWeek.get(displayedKey)!;
         }
-        // 2) Walk prior weeks (newest first) — apply the latest log from a week that
-        //    contained this bundle identity (so we don't bleed into newly-created bundles).
+        // 2) Carry the most recent project-level log from any prior week ≤ displayed week.
+        //    Daily logs are project-level (one percent per project per week) and the project's
+        //    completion represents progress on the active bundle chain — a new bundle in the
+        //    next week is the continuation of that chain, so it inherits the percent.
         const priorWeeks = Array.from(pctByProjectWeek.keys())
           .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
           .map(k => k.split("::")[1])
           .sort((a, b) => b.localeCompare(a));
-        for (const wk of priorWeeks) {
-          const ids = identitiesByProjectWeek.get(`${pid}::${wk}`);
-          if (ids?.has(identity)) {
-            return pctByProjectWeek.get(`${pid}::${wk}`)!;
-          }
+        if (priorWeeks.length > 0) {
+          return pctByProjectWeek.get(`${pid}::${priorWeeks[0]}`) ?? null;
         }
         return null;
+      }
+
+      // Day-fraction-scaled per-bundle target. Full bundles stay at a stable 100%
+      // (matches user expectation: "Bundle B target = 100%, balík mal byť dokončený").
+      // Split bundles ramp from chain-window start (Sunday) to chain-window end (Friday).
+      function bundleExpectedPctScaled(splitGroupId: string | null): number {
+        if (!splitGroupId) return 100;
+        const weeks = [...(splitGroupWeeks.get(splitGroupId) ?? [])].sort((a, b) => a.week.localeCompare(b.week));
+        const total = weeks.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) return 100;
+        let cum = 0, start = 0, end = 100, found = false;
+        for (const w of weeks) {
+          const share = (w.hours / total) * 100;
+          if (w.week === weekInfo.weekKey) { start = cum; end = cum + share; found = true; break; }
+          cum += share;
+        }
+        if (!found) return 100;
+        return Math.round(start + (end - start) * dayFraction);
       }
 
       // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
@@ -589,12 +606,9 @@ function useDilnaData(weekOffset: number) {
             const displayLabel = b.bundle_type === "split" && b.split_part
               ? `${label}-${b.split_part}`
               : label;
-            // Per-bundle weekly target: full → 100%, split → chain-end at this week (e.g. 60%).
-            const bExpected = isUnmatched
-              ? null
-              : (b.split_group_id
-                  ? bundleTargetForWeek(b.split_group_id, weekInfo.weekKey)
-                  : 100);
+            // Per-bundle weekly target: full → stable 100%, split → chain-window ramped by dayFraction
+            // (Sunday = window start = end of prev week's chain slice; Friday = window end at this week).
+            const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
             // Per-bundle completion: resolved by bundle identity (no cross-bundle bleed).
             // Identity uses the bundle's stage_id from the first row in the entry.
             const stageIdForBundle = schedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
@@ -677,10 +691,8 @@ function useDilnaData(weekOffset: number) {
         const bundleRows: BundleRow[] = arr.map((b) => {
           const label = b.bundle_label || "A";
           const displayLabel = b.bundle_type === "split" && b.split_part ? `${label}-${b.split_part}` : label;
-          // Per-bundle weekly target (full → 100%, split → chain-end at this week).
-          const bExpected = isUnmatched
-            ? null
-            : (b.split_group_id ? bundleTargetForWeek(b.split_group_id, weekInfo.weekKey) : 100);
+          // Per-bundle weekly target: full → stable 100%, split → chain-window ramped by dayFraction.
+          const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
           // Resolve per-bundle pct via identity. For spilled bundles, stage_id comes from prevSchedule.
           const stageIdForBundle = prevSchedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
           const bIdentityWithStage = identityKey(stageIdForBundle, b.bundle_label, b.split_part);
