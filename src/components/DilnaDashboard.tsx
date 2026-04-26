@@ -538,6 +538,69 @@ function useDilnaData(weekOffset: number) {
         });
       }
 
+      // 1.5) Spilled-only projects: have unfinished T-1 bundles but NO current-week schedule.
+      // Mirrors Vyroba "Spilled" sidebar logic. Each card shows the spilled bundles with
+      // their original scheduled hours preserved; planned hours for THIS week stay 0.
+      for (const pid of spilledOnlyProjects) {
+        if (scheduledProjects.has(pid)) continue; // would duplicate the card from loop 1
+        const bMap = bundlesByProject.get(pid);
+        if (!bMap || bMap.size === 0) continue;
+        const proj = projMap.get(pid);
+        const isUnmatched = !proj;
+        const loggedHours = hoursByProject.get(pid) || 0;
+        const completionPct = latestPctByProject.has(pid) ? latestPctByProject.get(pid)! : null;
+
+        const arr = Array.from(bMap.values()).sort((a, b) => {
+          const la = a.bundle_label || "Z";
+          const lb = b.bundle_label || "Z";
+          if (la !== lb) return la.localeCompare(lb);
+          const sa = a.split_part ?? 0;
+          const sb = b.split_part ?? 0;
+          if (sa !== sb) return sa - sb;
+          return a.position - b.position;
+        });
+        const bundleRows: BundleRow[] = arr.map((b) => {
+          const label = b.bundle_label || "A";
+          const displayLabel = b.bundle_type === "split" && b.split_part ? `${label}-${b.split_part}` : label;
+          const bExpected = isUnmatched ? null : expectedForBundle(b.split_group_id, pid);
+          const bSlip: SlipStatus = isUnmatched ? "none" : computeSlip(completionPct, bExpected, loggedHours, true);
+          return {
+            bundleId: b.bundleId,
+            displayLabel,
+            scheduledHours: b.scheduled_hours,
+            expectedPct: bExpected,
+            completionPct,
+            slipStatus: bSlip,
+            isSpilled: true,
+            spilledFromWeekNum: prevWeekInfo.week,
+          };
+        });
+
+        const valueCzk = isUnmatched ? 0 : calcDilnaValue(loggedHours, pid);
+
+        const usekMap = usekByProject.get(pid);
+        const usekBreakdown = usekMap
+          ? Array.from(usekMap.values()).sort((a, b) => usekSortKey(a.kod) - usekSortKey(b.kod))
+          : [];
+
+        cards.push({
+          projectId: pid,
+          projectName: isUnmatched ? "Nespárované" : (proj?.project_name || pid),
+          warning: isUnmatched ? "unmatched" : "none",
+          plannedHours: 0,
+          loggedHours,
+          trackedPct: 0,
+          completionPct,
+          expectedPct: null,
+          slipStatus: "delay",
+          valueCzk,
+          valueTargetCzk: 0,
+          bundles: bundleRows,
+          usekBreakdown,
+          isSpilledOnly: true,
+        });
+      }
+
       // 2) Unmatched: hours logged this week to a project_id with no schedule and no project record
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
