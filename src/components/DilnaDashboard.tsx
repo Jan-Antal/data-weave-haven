@@ -338,6 +338,8 @@ function useDilnaData(weekOffset: number) {
       for (const log of prevDailyLogs) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
+        if (log.week_key?.startsWith("MF_") || log.week_key?.startsWith("HIST_")) continue;
+        if (log.bundle_id.includes("::MF_") || log.bundle_id.includes("::HIST_")) continue;
         if (log.percent != null) prevLatestPctByProject.set(pid, Number(log.percent));
       }
 
