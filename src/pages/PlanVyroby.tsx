@@ -350,10 +350,7 @@ export default function PlanVyroby() {
   }, []);
 
   const findSpillWeek = useCallback((afterWeekKey: string): { key: string; weekNum: number } => {
-    const monday = new Date();
-    const day = monday.getDay();
-    monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1));
-    monday.setHours(0, 0, 0, 0);
+    const monday = getWorkWeekMonday();
 
     for (let i = 0; i < 16; i++) {
       const d = new Date(monday);
