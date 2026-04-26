@@ -10,7 +10,7 @@ import { useProductionDailyLogs, saveDailyLog, type DailyLog } from "@/hooks/use
 import { useWeekCapacityLookup } from "@/hooks/useWeeklyCapacity";
 import { getProjectColor } from "@/lib/projectColors";
 import { deriveBundleSplitMeta, formatBundleDisplayLabel } from "@/lib/productionBundles";
-import { getWorkWeekMonday } from "@/lib/workWeek";
+import { getWorkWeekMonday, getSpillSourceWeekMonday, getSpillDestinationWeekMonday } from "@/lib/workWeek";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -217,12 +217,11 @@ function getProjectsForWeek(
     }
   }
 
-  // Spilled: only when the displayed week is exactly T+1 from the real current week.
-  // Source = real current week's unfinished, non-midflight items.
-  const realMondayForHelper = getWorkWeekMonday();
-  const spilloverDest = new Date(realMondayForHelper); spilloverDest.setDate(spilloverDest.getDate() + 7);
+  // Spilled: only when the displayed week == aktuálny pracovný týždeň (T+1 voči zdroju prelitia).
+  // Source = predchádzajúci pracovný týždeň (cez víkend = práve skončený kalendárny).
+  const spilloverDest = getSpillDestinationWeekMonday();
   if (weekKeyStr(spilloverDest) === slideWeekKey) {
-    const realWeekKey = weekKeyStr(realMondayForHelper);
+    const realWeekKey = weekKeyStr(getSpillSourceWeekMonday());
     const realSilo = scheduleData.get(realWeekKey);
     if (realSilo) {
       // Dedup key: per split_group_id when present (chain across weeks shares ID),
@@ -664,12 +663,10 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     // current week). Items in the real T that are still unfinished spill into T+1. They never
     // spill further (T+2, T+3, …) and they never appear in T or in past weeks. Midflight legacy
     // rows are explicitly excluded — they are historical and must not appear as preliate.
-    const realMonday = getWorkWeekMonday();
-    const spilloverDestMonday = new Date(realMonday);
-    spilloverDestMonday.setDate(spilloverDestMonday.getDate() + 7);
+    const spilloverDestMonday = getSpillDestinationWeekMonday();
     const isSpilloverWeek = weekKeyStr(currentMonday) === weekKeyStr(spilloverDestMonday);
     if (isSpilloverWeek) {
-      const realWeekKey = weekKeyStr(realMonday);
+      const realWeekKey = weekKeyStr(getSpillSourceWeekMonday());
       const realSilo = scheduleData.get(realWeekKey);
       if (realSilo) {
         // Dedup key: per split_group_id when present (chain across weeks shares ID),
