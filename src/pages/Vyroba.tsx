@@ -3482,14 +3482,14 @@ function ProjectRow({
   isSelected: boolean;
   onSelect: (pid: string) => void;
   onContextMenu: (e: React.MouseEvent, pid: string) => void;
-  getProjectStatus: (pid: string) => "on-track" | "at-risk" | "behind";
+  getProjectStatus: (projectOrPid: any) => "on-track" | "at-risk" | "behind";
   getBundleProgress: () => { totalHours: number; completedHours: number; bundleProgress: number };
   getLatestPhase: (pid: string) => string | null;
   statusColors: Record<string, string>;
   weeklyGoal?: number;
   isMobile?: boolean;
 }) {
-  const status = getProjectStatus(project.projectId);
+  const status = getProjectStatus(project);
   const { bundleProgress: pct } = getBP();
   const phase = getLatestPhase(project.projectId);
   const borderColor = project.color;
