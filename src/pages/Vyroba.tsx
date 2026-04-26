@@ -2902,7 +2902,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
             </DialogHeader>
             {(() => {
               if (!selectedProject) return null;
-              const allItemsForProject = getAllItemsForProject(selectedProject.projectId);
+              const allItemsForProject = getAllItemsForBundle(selectedProject);
               const incompleteItems = allItemsForProject.filter((e) => e.item.status !== "completed");
               const hasIncomplete = incompleteItems.length > 0;
               const incompleteWeeks = [...new Set(incompleteItems.map((e) => e.weekNum))];
