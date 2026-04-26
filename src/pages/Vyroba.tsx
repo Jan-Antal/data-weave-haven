@@ -890,8 +890,20 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return bundleStorageIdForProject(proj);
   };
 
-  function getLogsForProject(pid: string): DailyLog[] {
-    const proj = enrichedProjects.find((p) => p.projectId === pid);
+  // Resolve a project arg (either VyrobaProject or projectId) to the most specific
+  // VyrobaProject we can find. When given a string, falls back to first-by-projectId
+  // (LEGACY — only safe for single-bundle projects).
+  function resolveProjectArg(arg: VyrobaProject | string): VyrobaProject | null {
+    if (typeof arg !== "string") return arg;
+    return enrichedProjects.find((p) => p.projectId === arg) || null;
+  }
+
+  function projectIdOf(arg: VyrobaProject | string): string {
+    return typeof arg === "string" ? arg : arg.projectId;
+  }
+
+  function getLogsForProject(arg: VyrobaProject | string): DailyLog[] {
+    const proj = resolveProjectArg(arg);
     const newKey = bundleStorageIdForProject(proj);
     // Bundle-scoped only — legacy `${pid}::${weekKey}` records were migrated
     // into per-bundle copies, so reading the legacy key would cause two bundles
@@ -899,8 +911,9 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return dailyLogsMap?.get(newKey) || [];
   }
 
-  function getLatestPercent(pid: string): number {
-    const logs = getLogsForProject(pid);
+  function getLatestPercent(arg: VyrobaProject | string): number {
+    const pid = projectIdOf(arg);
+    const logs = getLogsForProject(arg);
     if (logs.length > 0) {
       const sorted = [...logs].sort((a, b) => {
         if (a.day_index !== b.day_index) return b.day_index - a.day_index;
