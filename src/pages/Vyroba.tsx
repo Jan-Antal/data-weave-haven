@@ -869,10 +869,34 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
 
   /* ── helpers for a project ── */
-  const bundleId = (pid: string) => `${pid}::${weekKey}`;
+  // Per-bundle storage id: includes bundle identity so multiple bundles of the
+  // same project in the same week (e.g. Insia A-4 vs B) keep their own daylog.
+  // Bundle identity matches `makeCardKey` (SG:<group> or <stage>::<label>::<part>),
+  // but WITHOUT the trailing "::spilled" so spilled vs scheduled views share state.
+  function bundleStorageIdForProject(p: VyrobaProject | null | undefined): string {
+    const pid = p?.projectId ?? "";
+    if (!p) return `${pid}::${weekKey}`;
+    const sample = p.scheduleItems[0] as any;
+    const sg = sample?.split_group_id ?? null;
+    const stage = sample?.stage_id ?? "none";
+    const label = sample?.bundle_label ?? "A";
+    const part = sample?.split_part ?? "full";
+    const ident = sg ? `SG:${sg}` : `${stage}::${label}::${part}`;
+    return `${pid}::${weekKey}::${ident}`;
+  }
+  // Legacy/back-compat: keyed only by project+week (matches old logs in DB).
+  const bundleId = (pid: string) => {
+    const proj = enrichedProjects.find((p) => p.projectId === pid);
+    return bundleStorageIdForProject(proj);
+  };
 
   function getLogsForProject(pid: string): DailyLog[] {
-    return dailyLogsMap?.get(bundleId(pid)) || [];
+    const proj = enrichedProjects.find((p) => p.projectId === pid);
+    const newKey = bundleStorageIdForProject(proj);
+    const newLogs = dailyLogsMap?.get(newKey);
+    if (newLogs && newLogs.length > 0) return newLogs;
+    // Fallback to legacy logs stored under `${pid}::${weekKey}`
+    return dailyLogsMap?.get(`${pid}::${weekKey}`) || [];
   }
 
   function getLatestPercent(pid: string): number {
