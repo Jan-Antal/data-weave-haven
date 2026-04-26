@@ -1,82 +1,68 @@
-## Problem
+## Oprava zadania: progress musí byť per bundle, nie per project
 
-Pri porovnaní T17 / T18 / T19 v module **Dílna**:
+Súhlasím — pôvodná úvaha „Allianz B zdieľa project_id s A-6, preto má dostať rovnaké %“ je chybná. V Dílni sa progress a target musia vyhodnocovať na úrovni bundlu:
 
-- **T17 – Multisport A-2** → 25 % (správne, log je v `production_daily_logs` `Z-2607-008::2026-04-20` = 25 %).
-- **T18 – Multisport A-3** → bar prázdny, hoci na bundle už bolo odpracovaných 25 %.
-- **T19 – Multisport A-4** → 20 % (pre tento týždeň existuje vlastný log `Z-2607-008::2026-05-04` = 20 %, takže sa zobrazí).
+- **Allianz A-6** je split bundle v T18 a môže mať napr. `60 % / 60 %`.
+- **Allianz B** je samostatný full bundle preliaty z T17 a má vlastný cieľ `100 %`; ak bol v T17 rozpracovaný na 60 %, má v T18 ukázať `60 % / 100 %`, nie nulu a nie automaticky stav A-6.
 
-Bar je teda správny iba v týždni, v ktorom bol pridaný daily log. Akonáhle nie je log v zobrazovanom týždni, `latestPctByProject` ostane `null` a bar sa **neukáže vôbec** — namiesto toho aby pokračoval z naposledy známej úrovne (25 %).
+## Problém v aktuálnom kóde
 
-Príčina (`src/components/DilnaDashboard.tsx`):
-- `dailyLogsRes` načíta iba `production_daily_logs` pre `weekInfo.weekKey`.
-- `latestPctByProject` sa staví iba z týchto rows. Žiadny fallback na predošlý týždeň → `completionPct = null` → `b.completionPct` v UI je `null` → bar sa nerenderuje (`{b.completionPct != null && (...)}` na riadku 1027).
+V `src/components/DilnaDashboard.tsx` sa teraz daily logy agregujú len podľa `project_id`:
 
-Tá istá medzera platí aj pre `prevLatestPctByProject` (používa sa len pri `weekOffset === 1` ako spillover guard) — pre weeky `offset !== 1` (napr. T18 keď je „dnes" T19) by sme rovnako chceli najnovší známy stav.
+```ts
+const pid = log.bundle_id.split("::")[0];
+latestPctByProject.set(pid, percent);
+```
 
-## Cieľ
+To je príliš hrubé. Keď má jeden projekt v rovnakom období viac bundlov (A-6 + B), jeden projektový percentuálny stav nevie správne rozlíšiť:
 
-Bar v karte projektu/bundlu v Dílne má reflektovať **kumulatívny posledný známy `percent`** pre daný bundle k danému týždňu, nie iba log v zobrazovanom týždni:
-
-- Ak existuje log pre `weekInfo.weekKey` → použiť ho (najvyšší `day_index`).
-- Inak fallback na **najnovší log s `week_key <= weekInfo.weekKey`** pre rovnaký `bundle_id`-prefix (project_id, lebo dnes sú logy uložené per `projectId::weekKey`).
-- Logy zo **week_key > weekInfo.weekKey** (budúce týždne) sa pri prezeraní minulosti **ignorujú**, aby T18 neukazoval 20 % iba preto, že T19 už má vlastný log s 20 %.
-
-Rovnaký posun znamená:
-- Tyrkysová ryska (`expectedForBundle`) zostáva ako doteraz (per-week target).
-- `completionPct` = posledný známy stav bundle k danému týždňu.
-- Status pillu (`computeSlip`) zostáva — len dostane konzistentný `completionPct`.
+- split chain A,
+- full bundle B,
+- preliaty bundle z predchádzajúceho týždňa.
 
 ## Implementačný plán
 
-Súbor: **`src/components/DilnaDashboard.tsx`**
+Súbor: `src/components/DilnaDashboard.tsx`
 
-1. **Rozšíriť query** `dailyLogsRes` (riadky 156–161) tak, aby namiesto jediného týždňa načítala všetky logy s `week_key <= weekInfo.weekKey`, zoradené `week_key ASC, day_index ASC`. (Limitovať na rozumný horizont nie je nutné — tabuľka je malá, weekKey je indexovaný.)
+1. **Zaviesť stabilný bundle identity key**
+   - Pre každý schedule bundle používať rovnakú identitu ako UI grouping:
+     ```ts
+     project_id + stage_id + bundle_label + split_part/full
+     ```
+   - Full bundle B teda bude samostatná identita od split A-6.
 
-   ```ts
-   supabase
-     .from("production_daily_logs" as any)
-     .select("bundle_id, week_key, day_index, percent, logged_at")
-     .lte("week_key", weekInfo.weekKey)
-     .order("week_key", { ascending: true })
-     .order("day_index", { ascending: true }),
-   ```
+2. **Daily logy mapovať na bundle, nie iba na projekt**
+   - Keďže existujúce `production_daily_logs.bundle_id` sú dnes hlavne vo formáte `projectId::weekKey`, doplní sa resolver:
+     - log z konkrétneho týždňa sa spáruje so schedule bundlom v tom istom týždni,
+     - ak je v tom týždni iba jeden relevantný bundle pre projekt, priradí sa priamo,
+     - pri viacerých bundloch sa použije schedule kontext a bundle label/split metadata, kde sú dostupné,
+     - fallback na project-level sa použije len tam, kde nejde bezpečne určiť konkrétny bundle.
 
-2. **Prebudovať `latestPctByProject`** (riadky 316–324):
-   - Iterovať všetky logy v poradí (week_key ASC, day_index ASC).
-   - Pre každý `pid = bundle_id.split("::")[0]` vždy prepísať mapu poslednou nenulovou hodnotou → výsledok = posledný známy `percent` k zobrazovanému týždňu.
+3. **Pre spilled bundles držať vlastný carried percent**
+   - Pri vkladaní preliateho bundlu z `prevSchedule` sa pre tento konkrétny bundle uloží jeho posledný známy stav z predchádzajúceho týždňa.
+   - Tým sa Allianz B v T18 nebude resetovať na `null/0`, ale dostane svoj stav z T17.
 
-   ```ts
-   const latestPctByProject = new Map<string, number>();
-   for (const log of dailyLogs) {
-     const pid = log.bundle_id.split("::")[0];
-     if (!pid) continue;
-     if (log.percent != null) latestPctByProject.set(pid, Number(log.percent));
-   }
-   ```
+4. **Oddeliť target od progressu**
+   - Full bundle bez `split_group_id`: target = `100 %`.
+   - Split bundle so `split_group_id`: target = chain window pre konkrétny týždeň, napr. A-6 môže mať `60 %`.
+   - Zobrazenie ostáva vo formáte `stav / target`, napr.:
+     - `60 % / 60 %` pre A-6,
+     - `60 % / 100 %` pre preliaty full bundle B.
 
-3. **Ponechať `prevLatestPctByProject`** ako je (spillover guard pre `weekOffset === 1`). Spillover guard chce konkrétne hodnotu z **predošlého týždňa**, nie kumulatívne, takže žiadna zmena.
+5. **Upraviť slip/spill guard**
+   - Guard, ktorý rozhoduje či sa bundle má ešte ukázať ako preliaty, bude porovnávať percento konkrétneho bundlu s targetom konkrétneho bundlu.
+   - Nie projektové percento voči projektovému targetu.
 
-4. **TypeScript typing** pre nový tvar logu doplniť `week_key: string` do casted typu `dailyLogs`.
+## Validácia po úprave
 
-5. **Žiadna zmena v UI** (`b.completionPct != null && (...)`) — len teraz nebude `null` v T18 pre Multisport, lebo dostane 25 % z T17.
+Skontrolujem hlavne tieto scenáre:
 
-## Validácia
+- **Allianz A-6 v T18**: zostane správne okolo `60 % / 60 %`.
+- **Allianz B preliaty z T17 do T18**: ukáže `60 % / 100 %` a bar bude vyplnený na 60 %.
+- **Multisport T17/T18/T19**: fallback do týždňov bez vlastného logu zostane zachovaný, ale nebude prepisovať iné bundly v rovnakom projekte.
+- **Full bundle s dokončeným targetom 100 %**: nebude sa zbytočne ukazovať medzi preliatymi.
+- **Split bundle chain**: target ryska zostane podľa chain window, nie podľa full 100 %.
 
-Po nasadení v Dílne:
+## Bez zmien v databáze
 
-- **T17 – Multisport** → 25 % (z logu `2026-04-20`). ✔︎
-- **T18 – Multisport** → 25 % (fallback na T17, žiadny vlastný log). ✔︎ (bar bude červený, lebo target T18 je vyšší než 25 %.)
-- **T19 – Multisport** → 20 % (vlastný log `2026-05-04`). ✔︎ (Pozn.: log T19 má 20 %, hoci T17 mal 25 % — to je vstupné dáta a UI ich rešpektuje.)
-- **T17 – Insia A-4** = 98 %, **T18 – Insia A-4** ostáva spillnuté → bar 98 %. ✔︎
-- **T17 – Allianz A-5** = 60 %, **T18 – Allianz A-6** dostane 60 % (kým niekto nezaloguje T18). ✔︎
-
-## Mimo rámca
-
-- Nemenia sa žiadne RLS, schémy ani logika `expectedForBundle`/`computeSlip`.
-- Nemenia sa moduly **Plán Výroby** a **Výroba**, kde sa `realWeekLatestPct` číta z konkrétneho týždňa zámerne (kvôli per-week spillover guardu).
-- Migrácia DB ani nový stĺpec sa neriešia — `bundle_id` vo formáte `projectId::weekKey` zostáva.
-
-## Súbory
-
-- `src/components/DilnaDashboard.tsx` — query + budovanie `latestPctByProject`.
+Nebudem robiť migrácie ani meniť schému. Úprava bude v aplikačnej logike Dílne a bude spätne kompatibilná s aktuálnymi daily logmi.
