@@ -826,17 +826,18 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
 
   // Auto-select first
   useEffect(() => {
-    if (enrichedProjects.length > 0 && !enrichedProjects.find((p) => p.projectId === selectedProjectId)) {
-      setSelectedProjectId(enrichedProjects[0].projectId);
+    if (enrichedProjects.length > 0 && !enrichedProjects.find((p) => p.cardKey === selectedCardKey)) {
+      setSelectedCardKey(enrichedProjects[0].cardKey);
     }
-  }, [enrichedProjects, selectedProjectId]);
+  }, [enrichedProjects, selectedCardKey]);
 
   // Handle openProjectId from DataLog navigation
   const openProjectIdHandled = useRef(false);
   useEffect(() => {
     if (openProjectIdFromState && !openProjectIdHandled.current && enrichedProjects.length > 0) {
       openProjectIdHandled.current = true;
-      setSelectedProjectId(openProjectIdFromState);
+      const match = enrichedProjects.find((p) => p.projectId === openProjectIdFromState);
+      if (match) setSelectedCardKey(match.cardKey);
       if (isMobile) {
         setMobileVyrobaProjektOpen(true);
       }
