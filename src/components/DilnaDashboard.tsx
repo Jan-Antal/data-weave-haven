@@ -683,7 +683,12 @@ function useDilnaData(weekOffset: number) {
             const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
             // Per-bundle completion: resolved by bundle identity (no cross-bundle bleed).
             // Identity uses the bundle's stage_id from the first row in the entry.
-            const stageIdForBundle = schedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
+            // For spilled bundles the bundleId points at a prev-week schedule row,
+            // so look it up in prevSchedule to recover the correct stage_id (needed
+            // for the bundle-scoped daily-log key during walk-back).
+            const stageIdForBundle =
+              (schedule.find(s => s.id === b.bundleId)?.stage_id ?? null) ||
+              (b.isSpilled ? (prevSchedule.find(s => s.id === b.bundleId)?.stage_id ?? null) : null);
             const resolvedPct = isUnmatched
               ? null
               : resolveBundlePct(pid, b.split_group_id, stageIdForBundle, b.bundle_label, b.split_part);
