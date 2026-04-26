@@ -1278,14 +1278,18 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         description: "změna fáze/logu",
         undo: async () => {
           if (existingLog) {
-            await saveDailyLog(
-              bId,
-              weekKey,
-              capturedDay,
-              existingLog.phase || prevPhase,
-              existingLog.percent,
-              existingLog.note_text || null,
-            );
+            // Restore previous values WITHOUT touching logged_at — otherwise the
+            // cell would be flagged as a retroactive ("po termínu") edit forever.
+            await (supabase.from("production_daily_logs") as any)
+              .update({
+                phase: existingLog.phase,
+                percent: existingLog.percent,
+                note_text: existingLog.note_text,
+                logged_at: existingLog.logged_at,
+              })
+              .eq("bundle_id", bId)
+              .eq("week_key", weekKey)
+              .eq("day_index", capturedDay);
           } else {
             await (supabase.from("production_daily_logs") as any)
               .delete()
