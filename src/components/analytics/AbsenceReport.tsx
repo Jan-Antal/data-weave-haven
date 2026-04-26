@@ -39,6 +39,11 @@ import { cn } from "@/lib/utils";
 import { normalizeSearch, normalizedIncludes } from "@/lib/statusFilter";
 import { formatAppDate } from "@/lib/dateFormat";
 
+function fmtDate(s: string | null | undefined): string {
+  if (!s) return "—";
+  return formatAppDate(new Date(s + "T00:00:00"));
+}
+
 type DateRange = "week" | "month" | "prev_month" | "3months" | "year" | "custom";
 
 interface AbsenceRow {
