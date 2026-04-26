@@ -325,6 +325,9 @@ function useDilnaData(weekOffset: number) {
         const pid = log.bundle_id.split("::")[0];
         if (!pid) continue;
         if (log.percent == null) continue;
+        // Skip midflight-import / historical synthetic markers.
+        if (log.week_key?.startsWith("MF_") || log.week_key?.startsWith("HIST_")) continue;
+        if (log.bundle_id.includes("::MF_") || log.bundle_id.includes("::HIST_")) continue;
         const pct = Number(log.percent);
         pctByProjectWeek.set(`${pid}::${log.week_key}`, pct);
         latestPctByProject.set(pid, pct);

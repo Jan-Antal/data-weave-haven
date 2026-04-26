@@ -1,69 +1,108 @@
-# Výroba: zobrazovať len položky patriace zvolenému bundlu
+# Cieľ
 
-## Problém
-V module **Výroba** detailný panel vpravo zobrazuje všetky položky **projektu** naprieč všetkými týždňami (`getAllItemsForProject(projectId)`). Ak má projekt viacero bundlov v rovnakom týždni (napr. Allianz **A**, **B**, **C**, **D**), kliknutím na ktorýkoľvek bundle sa v sekciách *Aktuální / Budoucí / Hotové* zobrazia položky **všetkých bundlov projektu**, nie iba tie, ktoré naozaj patria do vybraného bundlu — tak ako je to v *Pláne Výroby* (kde každá karta = jeden bundle a obsahuje len `bundle.items`).
+Opraviť `src/components/DilnaDashboard.tsx` tak, aby progress bary v T19 zodpovedali realite. Moje predošlé úpravy v súbore **nie sú prítomné** (overené `rg` — žiadne MF_, žiadne `existedBefore`, `resolveBundlePct` ignoruje identitu cez `_identity`). Zostávajú dva konkrétne bugy zo screenshotu:
 
-## Príčina
-- `selectedProject` (typ `VyrobaProject`) je v skutočnosti **jeden bundle** (mapovaný 1:1 z `silo.bundles`). Jeho `scheduleItems` obsahujú správne len položky daného bundlu pre aktuálny týždeň.
-- Ale do `DetailPanel` sa cez prop `allItems` posielajú výsledky `getAllItemsForProject(pid)`, ktoré filtrujú **iba podľa `bundle.project_id === pid`** a ignorujú identitu bundlu (`stage_id`, `bundle_label`, `split_group_id`).
-- `DetailPanel` z `allItems` skladá `currentItems`/`futureItems`/`completedItems` → preto vidno položky cudzích bundlov.
-- Rovnaký problém má `getBundleProgress(pid)` (totálne/hotové hodiny počíta z celého projektu), `areAllPartsCompleted`/`getIncompletePartsInfo` a spill dialog (riadok 2883: `allItemsForProject` pre výber "incomplete items na expedíciu").
+- **RD Skalice A-3** ukazuje `100 % / 12 %` — má byť `12 % / 100 %`.
+- **Allianz – 5.patro D** ukazuje `40 % / 100 %` — má byť `0 % / 100 %`.
 
-## Riešenie
-Zaviesť **scope-by-bundle** všade tam, kde sa dnes počíta cez celý projekt:
+# Diagnóza (potvrdená v kóde)
 
-### 1) Identita bundlu odvodená zo `selectedProject`
-Vytvoriť pomocný objekt `bundleIdentity`:
-- ak `selectedProject.scheduleItems` obsahuje ≥1 položku so `split_group_id` → identita = množina `split_group_id`s (chain naprieč týždňami)
-- inak (full bundle) → identita = `(stage_id, bundle_label)` zobrané z prvej položky
+1. **`resolveBundlePct(pid, _identity)`** (r. 410–428) — parameter identity ignorovaný. Carry-forward na úrovni projektu → Allianz D dostáva 40 % z logov A/B/C.
+2. **`bundleExpectedPctScaled`** (r. 433–446) škáluje cez `dayFraction`. V `dayFraction` (r. 491) je pre budúce/víkendové stavy hodnota **0**, čiže pre split bundle, ktorého slice je práve tento týždeň, vracia `start` (≈ 12 %) namiesto `end` (100 %). Hodnoty v UI sú preto prehodené.
+3. **MF_/HIST_ markery** — daily-log loop (r. 324–331) nemá filter, takže umelé `100 %` markery z midflight importu môžu falošne nasolíť `pctByProjectWeek` aj `latestPctByProject`.
 
-### 2) Nová funkcia `getAllItemsForBundle(selectedProject)`
-Nahradí volania `getAllItemsForProject(selectedProject.projectId)` na všetkých 3 miestach, kde sa používa **pre detail vybraného bundlu**:
-- `DetailPanel` prop `allItems` (riadky 2409, 2517)
-- výpočet `incompleteItems` v Expedíciu dialógu (riadok 2883–2884)
+# Zmeny v `src/components/DilnaDashboard.tsx`
 
-Logika:
+## 1) Filter MF_/HIST_ markerov v daily-log loope
+
+V loope `for (const log of dailyLogs)` (r. 324–331) a v paralelnom `for (const log of prevDailyLogs)` (r. 335–339) preskočiť syntetické markery:
+
 ```ts
-function getAllItemsForBundle(p: VyrobaProject) {
-  const splitGroups = new Set(
-    p.scheduleItems.map(i => i.split_group_id).filter(Boolean)
-  );
-  // collect across all weeks of this project, then filter by bundle identity
-  const all = getAllItemsForProject(p.projectId);
-  if (splitGroups.size > 0) {
-    return all.filter(e => e.item.split_group_id && splitGroups.has(e.item.split_group_id));
+if (log.week_key?.startsWith("MF_") || log.week_key?.startsWith("HIST_")) continue;
+if (log.bundle_id.includes("::MF_") || log.bundle_id.includes("::HIST_")) continue;
+```
+
+## 2) `bundleExpectedPctScaled` — pre budúce týždne `end` slice
+
+Posledná vetva funkcie:
+
+```ts
+if (!found) return 100;
+if (isPastWeek) return Math.round(end);
+if (!isCurrentWeek) return Math.round(end);   // future week → cieľ konca slice
+return Math.round(start + (end - start) * dayFraction);
+```
+
+Tým **RD Skalice A-3** v T19 (víkend, `dayFraction = 0`) ukáže target `100 %`.
+
+## 3) `resolveBundlePct` — identity-aware carry-forward
+
+Prepísať telo:
+
+```ts
+function resolveBundlePct(pid: string, identity: string): number | null {
+  const displayedKey = `${pid}::${weekInfo.weekKey}`;
+  if (pctByProjectWeek.has(displayedKey)) {
+    const idsHere = identitiesByProjectWeek.get(displayedKey);
+    if (!idsHere || idsHere.has(identity)) {
+      return pctByProjectWeek.get(displayedKey)!;
+    }
   }
-  // full bundle: match same (stage_id, bundle_label)
-  const sample = p.scheduleItems[0];
-  return all.filter(e =>
-    (e.item.stage_id ?? null) === (sample?.stage_id ?? null) &&
-    (e.item.bundle_label ?? null) === (sample?.bundle_label ?? null) &&
-    !e.item.split_group_id   // exclude split rows (would belong to chain bundles)
-  );
+  const priorWeeks = Array.from(pctByProjectWeek.keys())
+    .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
+    .map(k => k.split("::")[1])
+    .sort((a, b) => b.localeCompare(a));
+  for (const w of priorWeeks) {
+    const ids = identitiesByProjectWeek.get(`${pid}::${w}`);
+    if (ids && ids.has(identity)) {
+      return pctByProjectWeek.get(`${pid}::${w}`) ?? null;
+    }
+  }
+  return null;   // identita historicky neexistovala → brand-new bundle stays 0 %
 }
 ```
 
-### 3) `getBundleProgress(pid)` → `getBundleProgress(p: VyrobaProject)`
-Aby `totalHours` a `completedHours` boli per-bundle, nie per-project. Volania (riadky 2416, 2524 + interné na 1163, 1133, 1304 atď.) upraviť podľa toho, či pracujeme s konkrétnym bundlom (vždy keď máme `selectedProject`/karta v zozname) alebo s projektovým agregátom (sumár `Týždenné %` v zozname projektov — tam sa správa ako dnes, môžeme buď ponechať alebo zaviesť bundle-aware variant; v prvom kole zmeníme len volania pre **vybraný bundle**, ostatné necháme nezmenené).
+Tým **Allianz D** (úplne nová identita) → `null` → bar 0 %.
 
-Konkrétne:
-- volania na riadkoch **2416, 2524** (`bundleProgress={getBundleProgress(selectedProject.projectId)}`) → odovzdávať `selectedProject` a počítať per-bundle
-- ostatné call-sites (`getWeeklyGoal`, mosty pre status badge atď.) ostávajú per-project (rovnaké správanie ako dnes)
+## 4) Split-chain start fallback v call-sites
 
-### 4) `areAllPartsCompleted` / `getIncompletePartsInfo`
-Tie rozhodujú o tooltipoch *„X/Y dokončeno v T..."* pre položky v rámci bundlu. Upraviť, aby filtrovali iba v rámci aktuálneho bundlu (cez novú `getAllItemsForBundle`), takže rátanie častí splitu nebude zahŕňať iné bundly projektu.
+Pre split bundle, ktorému `resolveBundlePct` vrátil `null`, treba ukázať **start slice** (= `cum` pred displayed week), aby chain niesol pozíciu reťaze. Pridať helper:
 
-## Súbory
-- `src/pages/Vyroba.tsx` (jediná zmena)
+```ts
+function sliceStartPct(splitGroupId: string): number {
+  const weeks = [...(splitGroupWeeks.get(splitGroupId) ?? [])].sort((a, b) => a.week.localeCompare(b.week));
+  const total = weeks.reduce((s, w) => s + w.hours, 0);
+  if (total <= 0) return 0;
+  let cum = 0;
+  for (const w of weeks) {
+    if (w.week === weekInfo.weekKey) return Math.round(cum);
+    cum += (w.hours / total) * 100;
+  }
+  return 0;
+}
+```
 
-## Čo sa NEmení
-- Plán Výroby — ostáva ako referencia (už dnes per-bundle).
-- Mobilný a desktopový variant `DetailPanel` zdieľajú rovnaký prop (úprava platí pre oba).
-- Logika carry-forward `findPriorChainLog`/`findPriorAnyLog` — nezasahujeme.
-- Logika výberu `selectedProject` (stále je 1 karta = 1 bundle).
+A v oboch call-sites (r. 611–617 a r. 695–699) po výpočte `resolvedPct`:
 
-## Akceptačné kritériá
-1. Allianz s bundlami **A, B, C, D** v rovnakom týždni → klik na bundle **D** ukáže v sekcii *Aktuální* iba položky bundla **D** (nie A/B/C).
-2. Split chain (napr. Allianz A-5 → A-6) → klik na **A-6** ukáže *Aktuální* položky A-6 a *Hotové*/predch. týždne s rovnakým `split_group_id` (zachovaná dnešná funkcionalita pre splity).
-3. Tlačidlo **Expedice** ponúka len nedokončené položky **vybraného bundlu**.
-4. Bar `bundleProgress` (totalHours/completedHours v hlavičke) sa počíta len z položiek vybraného bundlu — žiadny presak z iných bundlov projektu.
+```ts
+let resolvedPct = isUnmatched ? null : resolveBundlePct(pid, bIdentityWithStage);
+if (resolvedPct == null && b.split_group_id && !isUnmatched) {
+  resolvedPct = sliceStartPct(b.split_group_id);
+}
+const bCompletion = resolvedPct;
+```
+
+Tým **RD Skalice A-3** (split chain, žiadny vlastný log v T19) → bar = `12 %` (start slice).
+
+# Akceptačné kritériá (T19)
+
+- **RD Skalice A-3**: bar **12 %**, target **100 %**.
+- **Allianz – 5.patro D**: bar **0 %** (resp. "—"), target **100 %**.
+- **Multisport A-4**: zachované správanie.
+- MF_/HIST_ markery už neovplyvňujú žiadny bar.
+
+# Dotknuté súbory
+
+- `src/components/DilnaDashboard.tsx` (5 blokov: 2× daily-log loop, `bundleExpectedPctScaled`, `resolveBundlePct`, 2× call-sites + nový `sliceStartPct`).
+
+Žiadne DB ani iné komponentové zmeny.
