@@ -448,6 +448,9 @@ function useDilnaData(weekOffset: number) {
           cum += share;
         }
         if (!found) return 100;
+        // Future weeks: target = END of slice (full weekly goal — bar shouldn't pre-shrink to start).
+        // Current week: ramp from start → end by dayFraction. Past week: dayFraction=1 → end.
+        if (!isCurrentWeek && !isPastWeek) return Math.round(end);
         return Math.round(start + (end - start) * dayFraction);
       }
 
