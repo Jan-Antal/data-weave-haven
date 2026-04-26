@@ -412,23 +412,27 @@ function useDilnaData(weekOffset: number) {
       // The carry-forward only applies if the SAME bundle identity actually existed in
       // that prior week — preventing a percent from week N from leaking into a brand-new
       // bundle that did not exist back then.
-      function resolveBundlePct(pid: string, _identity: string): number | null {
-        // 1) Displayed week has its own log → use it.
+      function resolveBundlePct(pid: string, identity: string): number | null {
+        // 1) Displayed week má vlastný log → použiť ho len ak táto identita v ňom existuje.
         const displayedKey = `${pid}::${weekInfo.weekKey}`;
         if (pctByProjectWeek.has(displayedKey)) {
-          return pctByProjectWeek.get(displayedKey)!;
+          const idsHere = identitiesByProjectWeek.get(displayedKey);
+          if (!idsHere || idsHere.has(identity)) {
+            return pctByProjectWeek.get(displayedKey)!;
+          }
         }
-        // 2) Carry the most recent project-level log from any prior week ≤ displayed week.
-        //    Daily logs are project-level (one percent per project per week) and the project's
-        //    completion represents progress on the active bundle chain — a new bundle in the
-        //    next week is the continuation of that chain, so it inherits the percent.
+        // 2) Carry-forward: hľadaj najnovší skorší týždeň, kde TÁTO IDENTITA existovala.
         const priorWeeks = Array.from(pctByProjectWeek.keys())
           .filter(k => k.startsWith(`${pid}::`) && k.split("::")[1] < weekInfo.weekKey)
           .map(k => k.split("::")[1])
           .sort((a, b) => b.localeCompare(a));
-        if (priorWeeks.length > 0) {
-          return pctByProjectWeek.get(`${pid}::${priorWeeks[0]}`) ?? null;
+        for (const w of priorWeeks) {
+          const ids = identitiesByProjectWeek.get(`${pid}::${w}`);
+          if (ids && ids.has(identity)) {
+            return pctByProjectWeek.get(`${pid}::${w}`) ?? null;
+          }
         }
+        // 3) Brand-new identita → žiadny carry-forward.
         return null;
       }
 
