@@ -129,9 +129,10 @@ function useDilnaData(weekOffset: number) {
           .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at")
           .eq("scheduled_week", weekInfo.weekKey)
           .not("status", "eq", "cancelled"),
-        // Spilled rows: ONLY meaningful when displayed week == real T+1.
-        // Source = real current week's still-active rows. Otherwise return [] cheaply.
-        weekOffset === 1
+        // Spilled rows: ONLY meaningful when displayed week == real current pracovný week.
+        // Source = predchádzajúci kalendárny týždeň. Cez víkend sa tým automaticky berú
+        // nedokončené bundly z práve uzavretého týždňa.
+        weekOffset === 0
           ? supabase
               .from("production_schedule")
               .select("id, project_id, stage_id, scheduled_hours, status, item_name, bundle_label, bundle_type, split_group_id, split_part, split_total, position, expediced_at, completed_at, is_midflight")
@@ -163,8 +164,8 @@ function useDilnaData(weekOffset: number) {
           .order("week_key", { ascending: true })
           .order("day_index", { ascending: true }),
         // Latest daily-log percent for the PREVIOUS week (used by goal-aware spillover guard).
-        // Only meaningful when displayed week == real T+1.
-        weekOffset === 1
+        // Only meaningful when displayed week == real current pracovný week.
+        weekOffset === 0
           ? supabase
               .from("production_daily_logs" as any)
               .select("bundle_id, day_index, percent")
