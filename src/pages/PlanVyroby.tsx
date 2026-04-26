@@ -37,6 +37,7 @@ import {
 } from "@dnd-kit/core";
 import { useProductionDragDrop } from "@/hooks/useProductionDragDrop";
 import { useProductionSchedule, getISOWeekNumber } from "@/hooks/useProductionSchedule";
+import { getWorkWeekMonday } from "@/lib/workWeek";
 import { useProductionInbox } from "@/hooks/useProductionInbox";
 import { useProductionSettings } from "@/hooks/useProductionSettings";
 import { PlanVyrobyTableView } from "@/components/production/PlanVyrobyTableView";
