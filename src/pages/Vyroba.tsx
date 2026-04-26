@@ -770,10 +770,13 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
     return (now.getDay() + 6) % 7;
   }, [weekKey]);
 
-  // Selection
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  // Selection — keyed per BUNDLE (cardKey) so projects with multiple bundles in the same week
+  // (Insia A-4 vs Insia B, Allianz A/B/C/D, …) each select independently.
+  const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
   const [mobileVyrobaProjektOpen, setMobileVyrobaProjektOpen] = useState(false);
-  const selectedProject = enrichedProjects.find((p) => p.projectId === selectedProjectId) || null;
+  const selectedProject = enrichedProjects.find((p) => p.cardKey === selectedCardKey) || null;
+  // Back-compat alias for any reads of the previous name.
+  const selectedProjectId = selectedProject?.projectId ?? null;
 
   // Document counts for Výkresy section
   const projectIdsList = useMemo(() => enrichedProjects.map((p) => p.projectId), [enrichedProjects]);
