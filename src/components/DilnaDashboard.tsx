@@ -253,9 +253,11 @@ function useDilnaData(weekOffset: number) {
         projectAllDoneThisWeek.set(pid, prev && s.status === "completed");
       }
 
-      // Helper: is a schedule row "done" (item finished)? Mirrors Vyroba isItemDone semantics.
+      // Helper: is a schedule row "done" (item finished)? Aligned with Vyroba isItemDone semantics.
+      // We deliberately do NOT use `completed_at` — midflight reset filled it for many rows that
+      // are still pending. Only status/expedice are reliable.
       const isRowDone = (r: typeof schedule[number]): boolean =>
-        r.status === "completed" || !!r.expediced_at || !!r.completed_at;
+        r.status === "completed" || r.status === "expedice" || !!r.expediced_at;
 
       // Group schedule rows into bundles per project (key by stage_id + bundle_label + split_part).
       // First pass: current week (T) bundles.

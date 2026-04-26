@@ -1,60 +1,91 @@
-## Problem
+## Problem (root cause confirmed in DB)
 
-The **Analytics → Dílna** dashboard shows only bundles whose `scheduled_week === currentWeekKey`. Projects that were scheduled in the previous week (T-1) but were not completed and "přelily" (spilled over) into the current week are missing — only the `spilledProjects` flag is set on projects that *also* have a current-week schedule row.
+I queried `production_schedule` for Allianz / Insia / Příluky / Valovi in T-1 (week `2026-04-13`) vs T (`2026-04-20`). All the rows the user expects to see as **přelité** share two characteristics:
 
-The **Modul Výroba** (`src/pages/Vyroba.tsx`, lines 616–635) already implements the correct logic:
-1. Load the previous Monday's silo (T-1).
-2. For each bundle there, take items whose status is `scheduled` or `in_progress` and that are not `isItemDone`.
-3. Add the project as a card with `isSpilled: true`.
+| project | T-1 row | flags |
+|--|--|--|
+| Allianz – 5.patro (split A 4/5) | scheduled, hours 13.6 | `is_midflight=true`, `completed_at=2026-04-20 00:46` |
+| Insia (split A 3) | scheduled, hours 212.3 | `is_midflight=true`, `completed_at=2026-04-20 00:46` |
+| Příluky Valovi (split A 5) | scheduled, hours 179.6 | `is_midflight=true`, `completed_at=2026-04-20 00:46` |
 
-Unmatched / off-plan logged hours (cards with `warning: "unmatched" | "off_plan"`) already work correctly and should stay as-is.
+All three:
+- `status = "scheduled"` (NOT completed)
+- `expediced_at = NULL` (not shipped)
+- `is_midflight = true` (legacy carry-over from Midflight import)
+- `completed_at` was filled by the midflight reset script (junk data — it does not mean "done")
 
-## Fix
+### Why both modules hide them today
 
-Mirror the Výroba spillover logic inside `useDilnaData()` in `src/components/DilnaDashboard.tsx`.
+1. **Modul Výroba** (`src/pages/Vyroba.tsx:515`) — `isItemDone(item)` returns `true` whenever `item.is_midflight` is true. Spillover loop (line 624) filters on `!isItemDone(i)`, so all midflight rows get dropped → no Příluky/Insia/Allianz appears.
+2. **Analytics → Dílna** (`src/components/DilnaDashboard.tsx:257`) — `isRowDone(r)` returns `true` whenever `!!r.completed_at`. Same midflight rows have a non-null `completed_at`, so they're filtered out → same symptom.
 
-### 1. Extend the schedule query
-Change the per-week schedule fetch to also include rows from the immediately preceding week (T-1) that are still active:
+The "iné projekty/bundles" the user sees are unrelated T-1 rows that happen to NOT have midflight flag (legacy schedule rows that should arguably be cleaned up, but that's a separate cleanup).
 
-- Currently: `.eq("scheduled_week", weekInfo.weekKey)`.
-- New: also fetch rows where `scheduled_week === prevWeekKey` AND `status IN ("scheduled","in_progress","paused")` AND `expediced_at IS NULL` AND `completed_at IS NULL`.
-- Compute `prevWeekKey` from `weekInfo.monday - 7 days` (using existing `toLocalDateStr` helper).
+## Required semantic fix
 
-We can either issue a second query for the previous week (cleanest) or widen the existing one with `.in("scheduled_week", [prevWeekKey, weekInfo.weekKey])` and filter in JS. Recommend the second query approach for clarity, then merge.
+`is_midflight = true` + `status = "scheduled"` + `expediced_at = NULL` means **"pending work carried over from the legacy/Excel era — still needs to be produced"**. It is the canonical spillover signal. It MUST count as "still active / přelité", not as "done".
 
-### 2. Tag rows with `__isSpilled` when grouping bundles
-When building `bundlesByProject`, attach an `isSpilled: boolean` flag on each bundle entry (true if `scheduled_week === prevWeekKey`). For spilled rows:
-- Skip rows whose status is `completed` or whose item is otherwise "done" (mirror `isItemDone` semantics — `expediced_at != null` or `completed_at != null` or status `completed`).
-- Skip the spilled bundle if the same project already has a current-week bundle for the same `stage_id + bundle_label + split_part` (avoid duplicates).
+The only thing that should mean "done" for spillover purposes:
+- `status IN ("completed","expedice","cancelled")`, OR
+- a row exists in `production_expedice` for this `schedule_id`.
 
-### 3. Add spilled-only project cards
-In the card-building loop:
-- If a project exists only via spilled bundles (no current-week scheduled hours), still create a `ProjectCard`:
-  - `plannedHours = 0` (it's not in this week's plan)
-  - `loggedHours = hoursByProject.get(pid) || 0`
-  - `bundles = [spilled bundle rows…]` with their original scheduled hours preserved
-  - Add a new field `isSpilled: true` on `ProjectCard` and a new `BundleRow.isSpilled` flag
-  - `slipStatus`: keep existing `computeSlip()` but pass `isSpilled=true` so the relaxed thresholds apply
-- If the project already exists in current-week cards, append spilled bundle rows to its `bundles` array (so user sees both current and spilled bundles together).
+`completed_at` alone is **not reliable** — midflight reset wrote `2026-04-20 00:46` into many rows that are still scheduled. We must stop treating it as a "done" indicator.
 
-### 4. UI — visually distinguish spilled bundles
-In the bundle table inside each project card, show a small amber chip on spilled rows (e.g., `Z T{prevWeekNum}` like in WeeklySilos `CollapsibleBundleCard`, lines 1846–1849). Use existing `getISOWeekForOffset(weekOffset - 1)` to get the previous week number.
+## Fix — two files
 
-For spilled-only project cards (no current-week plan), add a subtle amber border/badge `Přelité z T-1` on the card header to match the Výroba sidebar treatment.
+### 1. `src/pages/Vyroba.tsx` — `isItemDone` (line 515)
+Change:
+```ts
+const isItemDone = (item) => {
+  if (item.is_midflight) return true;                       // ❌ remove this
+  return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
+};
+```
+to:
+```ts
+const isItemDone = (item) => {
+  return item.status === "completed" || item.status === "expedice" || expedicedScheduleIds.has(item.id);
+};
+```
+Also remove the equivalent `is_midflight` short-circuits in the two `isItemDoneLocal` callbacks (lines 3510, 4064) — search for `if (item.is_midflight) return true;` and delete those three occurrences.
 
-### 5. Counters & summary cards
-Spilled projects should not inflate `plannedHours` totals (they're already counted in their original week), but their **logged hours** for the current week are real and already included in `totalHoursWeek`. No changes needed for the summary cards — totals come from `production_hours_log` which is week-scoped.
+Similarly in the inline `itemDone` helper used by the slide-projects spillover loop (around line 220–221) — verify it does NOT short-circuit on `is_midflight`. If it does, remove that branch.
 
-Optionally add a small badge `+N přelité` next to the projects count card for transparency.
+### 2. `src/components/DilnaDashboard.tsx` — `isRowDone` (line 257)
+Change:
+```ts
+const isRowDone = (r) =>
+  r.status === "completed" || !!r.expediced_at || !!r.completed_at;   // ❌ completed_at is unreliable
+```
+to:
+```ts
+const isRowDone = (r) =>
+  r.status === "completed" || r.status === "expedice" || !!r.expediced_at;
+```
+Drop `completed_at` from the SELECT for the prev-week query (lines 129, 135) — no longer needed for this check (keep it on the current-week query if other code uses it; quick grep shows it isn't critical to spillover).
 
-### 6. Visual QA after implementation
-After saving, switch to **Analytics → Dílna**, set the week to one where you know there's an unfinished project from the prior week, and confirm:
-- Spilled bundles appear (with amber `Z T{n-1}` chip)
-- Spilled-only project cards appear with `Přelité z T-1` badge
-- Tracked hours / value calculations still match
-- No duplicate cards if a project is both planned this week AND spilled
+### 3. T-1 query: include midflight rows that still have `status="scheduled"`
+The current prev-week query (line 137) already uses `.in("status", ["scheduled","in_progress","paused"])` — that's correct and already includes the midflight rows since their status is `scheduled`. **No query change needed once `isRowDone` stops false-positiving on `completed_at`.**
+
+### 4. Visual verification after the fix
+With the prev-week being `2026-04-13`:
+
+**Modul Výroba (T = `2026-04-20`):**
+- Sidebar "Přelité" section should show: **Allianz – 5.patro**, **Insia**, **Příluky Valovi Dům**, plus any other projects with active T-1 rows.
+
+**Analytics → Dílna (week `2026-04-20`):**
+- These same projects should appear with the amber "Přelité z T16" badge on the card header (and amber chip on bundle rows).
+- Already-current-week projects (Allianz 5.p has T row too) should show their T bundle PLUS the spilled bundle row from T-1 (different `split_part` so they're distinct keys).
+
+I will run a screenshot pass on `/vyroba` and `/analytics` (Dílna tab, week navigated to `2026-04-20`) and confirm the three target projects appear in both modules' přelité sections.
+
+## Risk / scope
+- Removing `is_midflight` from `isItemDone` will also affect: completion detection in completion dialogs, weekly goal calculation (line 942), status-progression logic (line 1076). I need to grep all call sites of `isItemDone` / `isItemDoneLocal` and confirm none of them relied on midflight rows being treated as "completed". If any does (e.g., weeklyGoal denominator), I'll handle it explicitly — most likely the correct fix everywhere is "midflight = pending", and any place that wants to exclude midflight from a "to-do count" should check `is_midflight` directly.
+- Removing `completed_at` from `isRowDone` is safe — `completed_at` is only reliable when paired with `status="completed"`, and that's already covered.
+- No DB migration. No schema change. No data backfill.
 
 ## Files affected
-- `src/components/DilnaDashboard.tsx` — the only file to edit. Update `useDilnaData()` query, the bundle-grouping loop, the card-building loop, and the bundle/card render JSX.
+- `src/pages/Vyroba.tsx` (3 small edits: remove midflight short-circuit from `isItemDone` and 2x `isItemDoneLocal`; verify inline `itemDone`)
+- `src/components/DilnaDashboard.tsx` (1 edit: rewrite `isRowDone`)
 
-No DB migrations, no other components affected.
+I'll also do a `rg "is_midflight" src/` sweep before committing to confirm no other place in production code falsely equates midflight with "done".
