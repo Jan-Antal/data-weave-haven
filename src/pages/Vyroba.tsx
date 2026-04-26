@@ -639,6 +639,7 @@ export default function Vyroba({ embedded = false }: { embedded?: boolean } = {}
         ) {
           result.push({
             projectId: b.project_id,
+            cardKey: makeCardKey(b.project_id, { stage_id: b.stage_id, bundle_label: b.bundle_label, split_part: b.items[0]?.split_part, split_group_id: b.items[0]?.split_group_id }, false),
             projectName: b.project_name,
             totalHours: b.total_hours,
             scheduleItems: b.items,
