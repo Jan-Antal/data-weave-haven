@@ -291,9 +291,7 @@ export function AbsenceReport() {
   const isLoading = empLoading || absLoading;
 
   // ── Filtered rows ──────────────────────────────────────────────
-  // NOTE: non-working days (weekends + state/company holidays) are filtered out
-  //       further down, after `holidayMap` is computed (see filteredAbsences below).
-  const filteredAbsencesRaw = useMemo(() => {
+  const filteredAbsences = useMemo(() => {
     return absences.filter((r) => {
       if (kindFilter && !kindFilter.has(categorize(r.absencia_kod))) return false;
       const emp = r.employee_id ? empMap.get(r.employee_id) : undefined;
