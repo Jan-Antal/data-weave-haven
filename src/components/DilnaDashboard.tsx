@@ -456,6 +456,20 @@ function useDilnaData(weekOffset: number) {
         return Math.round(start + (end - start) * dayFraction);
       }
 
+      // Start (cum) of this week's slice within the chain — used as fallback for split bundles
+      // that have no own daily log yet (carries forward chain position from prior slices).
+      function sliceStartPct(splitGroupId: string): number {
+        const weeks = [...(splitGroupWeeks.get(splitGroupId) ?? [])].sort((a, b) => a.week.localeCompare(b.week));
+        const total = weeks.reduce((s, w) => s + w.hours, 0);
+        if (total <= 0) return 0;
+        let cum = 0;
+        for (const w of weeks) {
+          if (w.week === weekInfo.weekKey) return Math.round(cum);
+          cum += (w.hours / total) * 100;
+        }
+        return 0;
+      }
+
       // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
       // For split bundles: chain across weeks of the same split_group_id, displayed week's window is its slice.
       const chainWindowBySplitGroup = new Map<string, { start: number; end: number }>();
