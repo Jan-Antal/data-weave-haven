@@ -563,8 +563,8 @@ export function AbsenceReport() {
   }, [filteredAbsences, empMap, from, to]);
 
   const rangeLabel = useMemo(() => {
-    if (dateRange === "custom") return `${formatAppDate(from)} – ${formatAppDate(to)}`;
-    return `${formatAppDate(from)} – ${formatAppDate(to)}`;
+    if (dateRange === "custom") return `${fmtDate(from)} – ${fmtDate(to)}`;
+    return `${fmtDate(from)} – ${fmtDate(to)}`;
   }, [dateRange, from, to]);
 
   return (
@@ -949,7 +949,7 @@ export function AbsenceReport() {
                           <TableCell className="text-right tabular-nums font-bold">
                             {formatHours(g.totalH)}
                           </TableCell>
-                          <TableCell className="text-xs">{formatAppDate(g.lastDate)}</TableCell>
+                          <TableCell className="text-xs">{fmtDate(g.lastDate)}</TableCell>
                         </TableRow>
                         {isOpen && (
                           <TableRow>
@@ -984,10 +984,10 @@ export function AbsenceReport() {
                                             {p.kod}
                                           </TableCell>
                                           <TableCell className="py-1 text-xs">
-                                            {formatAppDate(p.date_from)}
+                                            {fmtDate(p.date_from)}
                                           </TableCell>
                                           <TableCell className="py-1 text-xs">
-                                            {formatAppDate(p.date_to)}
+                                            {fmtDate(p.date_to)}
                                           </TableCell>
                                           <TableCell className="py-1 text-xs text-right tabular-nums">
                                             {p.days}
