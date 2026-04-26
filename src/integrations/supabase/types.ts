@@ -22,6 +22,7 @@ export type Database = {
           employee_id: string | null
           id: string
           mesiac: string
+          period_id: string | null
           source: string | null
         }
         Insert: {
@@ -31,6 +32,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           mesiac: string
+          period_id?: string | null
           source?: string | null
         }
         Update: {
@@ -40,6 +42,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           mesiac?: string
+          period_id?: string | null
           source?: string | null
         }
         Relationships: [
