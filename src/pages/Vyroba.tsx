@@ -4125,6 +4125,7 @@ function DetailPanel({
                   const bLabel = formatBundleDisplayLabel({
                     bundle_label: item.bundle_label ?? null,
                     split_part: item.split_part ?? null,
+                    split_total: item.split_total ?? null,
                     bundle_type: (item.bundle_type as any) ?? (item.split_group_id ? "split" : "full"),
                   });
                   return (
