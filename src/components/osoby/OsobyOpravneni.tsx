@@ -374,15 +374,7 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     return counts;
   }, [roles]);
 
-  // Count users in selected role that have custom (non-null, non-empty) overrides
-  const customOverrideCount = useMemo(() => {
-    return roles.filter(
-      (r) =>
-        r.role === selectedRole &&
-        r.permissions &&
-        Object.keys(r.permissions).length > 0,
-    ).length;
-  }, [roles, selectedRole]);
+  // (custom override badge removed — each role's settings are authoritative)
 
   const roleByUserId = useMemo(() => {
     const m = new Map<string, AppRole>();
