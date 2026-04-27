@@ -259,6 +259,7 @@ const MemoSortableStageRow = memo(SortableStageRow);
 // ── Stages section ──────────────────────────────────────────────────
 function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, saveCurrency, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; saveCurrency?: (id: string, amount: string, currency: string, oldAmount: string, oldCurrency: string) => void; parentMatchesSearch?: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
+  const { canManageStages } = useAuth();
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
   const [deleteId, setDeleteId] = useState<string | null>(null);
