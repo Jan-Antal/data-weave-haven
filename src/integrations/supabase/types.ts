@@ -2519,6 +2519,7 @@ export type Database = {
           phase: string
           project_id: string
           project_name: string
+          row_kind: string
           scheduled_hours: number
           scheduled_week: string
           stage_id: string
