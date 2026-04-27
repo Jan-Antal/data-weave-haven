@@ -312,7 +312,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     });
   }, [stages, projectId, reorderStages]);
 
-  const handleDelete = useCallback((id: string) => setDeleteId(id), []);
+  const handleDelete = useCallback((id: string) => { if (canManageStages) setDeleteId(id); }, [canManageStages]);
 
   return (
     <>
