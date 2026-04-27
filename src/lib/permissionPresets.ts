@@ -27,6 +27,7 @@ export type PermissionFlag =
   | "canAccessRecycleBin"
   | "canAccessTpv"
   | "canWriteTpv"
+  | "canManageStages"
   // ===== NOVÉ master flagy modulov =====
   | "canAccessSystem"
   | "canAccessOsoby"
@@ -98,6 +99,7 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canAccessRecycleBin",
   "canAccessTpv",
   "canWriteTpv",
+  "canManageStages",
   "canAccessSystem",
   "canAccessOsoby",
   "canAccessProjectInfo",
@@ -162,6 +164,7 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canAccessRecycleBin: "Prístup do Koša",
   canAccessTpv: "Prístup do TPV modulu",
   canWriteTpv: "Upravovať dáta v TPV module",
+  canManageStages: "Spravovať etapy (pridať / mazať)",
   canAccessSystem: "Modul Systém",
   canAccessOsoby: "Modul Správa osob",
   canAccessProjectInfo: "Modul Project Info",
