@@ -79,7 +79,19 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
       toast.error("Nepodařilo se změnit status");
       return;
     }
+    // Propagate to single active stage
+    const { data: stages } = await supabase
+      .from("project_stages")
+      .select("id")
+      .eq("project_id", project.project_id)
+      .is("deleted_at", null);
+    if (stages && stages.length === 1) {
+      await supabase.from("project_stages").update({ status: newStatus }).eq("id", stages[0].id);
+    }
     queryClient.invalidateQueries({ queryKey: ["projects"] });
+    queryClient.invalidateQueries({ queryKey: ["project_stages"] });
+    queryClient.invalidateQueries({ queryKey: ["all_project_stages"] });
+    toast.success("Status změněn");
   };
 
   // Reset tab when project changes
