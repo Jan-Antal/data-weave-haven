@@ -313,7 +313,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     reorderStages.mutate({ stages: reordered.map((s, i) => ({ id: s.id, stage_order: i })), projectId });
   }, [stages, projectId, reorderStages]);
 
-  const handleDelete = useCallback((id: string) => setDeleteId(id), []);
+  const handleDelete = useCallback((id: string) => { if (canManageStages) setDeleteId(id); }, [canManageStages]);
 
   return (
     <>
@@ -340,7 +340,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
           ))}
         </SortableContext>
       </DndContext>
-      {showAddButton && (
+      {showAddButton && canManageStages && (
         <TableRow className="bg-muted/20 h-9">
           <TableCell colSpan={20}>
             <Button variant="ghost" size="sm" className="text-xs h-5 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 font-normal" onClick={handleInlineAdd}>
