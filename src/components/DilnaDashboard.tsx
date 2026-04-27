@@ -847,6 +847,7 @@ function useDilnaData(weekOffset: number) {
       // 3) Off-plan: project IS in DB (matched), has hours this week, but is not in production_schedule
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
+        if (spilledOnlyRenderedProjects.has(pid)) continue; // already shown as spilled card → don't duplicate
         if (!knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const proj = projMap.get(pid)!;
