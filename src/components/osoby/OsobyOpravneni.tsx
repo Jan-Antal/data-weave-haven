@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Plus, X, Search, Copy, Check, Lock } from "lucide-react";
+import { Plus, X, Search, Check, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -50,12 +50,14 @@ const ROLE_ORDER: AppRole[] = [
   "admin",
   "vedouci_pm",
   "pm",
+  "nakupci",
   "vedouci_konstrukter",
   "konstrukter",
   "vedouci_vyroby",
   "mistr",
   "quality",
   "kalkulant",
+  "finance",
   "viewer",
 ];
 
@@ -560,13 +562,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     fetchAll();
   };
 
-  const handleDuplicate = () => {
-    toast({
-      title: "Duplikovať",
-      description:
-        "Nové role je možné pridať len cez DB migráciu (enum app_role).",
-    });
-  };
 
   const handleAddUser = async (p: ProfileLite) => {
     if (guardOwnerRole()) return;
@@ -613,13 +608,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     fetchAll();
   };
 
-  const handleNewRole = () => {
-    toast({
-      title: "Nová rola",
-      description:
-        "Nové role je možné pridať len cez DB migráciu (enum app_role).",
-    });
-  };
 
   return (
     <div className="h-full flex bg-card">
@@ -714,13 +702,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
             );
           })}
         </div>
-        <button
-          onClick={handleNewRole}
-          className="m-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center gap-1.5 transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nová rola
-        </button>
       </aside>
 
       {/* RIGHT PANEL */}
@@ -746,15 +727,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={handleDuplicate}
-            >
-              <Copy className="h-3.5 w-3.5 mr-1.5" />
-              Duplikovať
-            </Button>
             {customOverrideCount > 0 && (
               <Button
                 variant="outline"
