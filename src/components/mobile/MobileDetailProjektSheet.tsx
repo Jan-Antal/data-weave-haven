@@ -79,7 +79,19 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
       toast.error("Nepodařilo se změnit status");
       return;
     }
+    // Propagate to single active stage
+    const { data: stages } = await supabase
+      .from("project_stages")
+      .select("id")
+      .eq("project_id", project.project_id)
+      .is("deleted_at", null);
+    if (stages && stages.length === 1) {
+      await supabase.from("project_stages").update({ status: newStatus }).eq("id", stages[0].id);
+    }
     queryClient.invalidateQueries({ queryKey: ["projects"] });
+    queryClient.invalidateQueries({ queryKey: ["project_stages"] });
+    queryClient.invalidateQueries({ queryKey: ["all_project_stages"] });
+    toast.success("Status změněn");
   };
 
   // Reset tab when project changes
@@ -284,7 +296,7 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                 <span>{s.label}</span>
               </div>
-              {project.status === s.label && <Check className="h-4 w-4 text-primary" />}
+              {localStatus === s.label && <Check className="h-4 w-4 text-primary" />}
             </button>
           ))}
         </div>

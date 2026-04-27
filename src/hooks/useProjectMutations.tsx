@@ -31,6 +31,21 @@ export function useUpdateProject() {
         .single();
       if (error) throw error;
 
+      // Propagate status to single active stage (avoid stale stage status overriding project status in UI)
+      if (field === "status" && projectId) {
+        const { data: stages } = await supabase
+          .from("project_stages")
+          .select("id")
+          .eq("project_id", projectId)
+          .is("deleted_at", null);
+        if (stages && stages.length === 1) {
+          await supabase
+            .from("project_stages")
+            .update({ status: parsed as string } as any)
+            .eq("id", stages[0].id);
+        }
+      }
+
       // Log activity
       if (field === "status" && value !== oldValue && projectId) {
         logActivity({ projectId, actionType: "status_change", oldValue: oldValue || "—", newValue: value || "—" });
@@ -63,6 +78,11 @@ export function useUpdateProject() {
           return old.map((p) => (p.id === id ? { ...p, ...updatedProject } : p));
         });
       });
+
+      if (field === "status") {
+        qc.invalidateQueries({ queryKey: ["project_stages"] });
+        qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+      }
 
       // Push to undo stack
       const parsedOld = parseField(field, oldValue);
