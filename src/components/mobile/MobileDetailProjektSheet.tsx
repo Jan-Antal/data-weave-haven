@@ -296,7 +296,7 @@ export function MobileDetailProjektSheet({ project, open, onOpenChange, onOpenTP
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                 <span>{s.label}</span>
               </div>
-              {project.status === s.label && <Check className="h-4 w-4 text-primary" />}
+              {localStatus === s.label && <Check className="h-4 w-4 text-primary" />}
             </button>
           ))}
         </div>
