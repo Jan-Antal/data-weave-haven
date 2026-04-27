@@ -374,6 +374,7 @@ const analyticsFull: PermissionFlag[] = [
   "canAccessAnalyticsRezije",
   "canAccessAnalyticsDilna",
   "canAccessAnalyticsVykaz",
+  "canAccessAnalyticsAbsence",
 ];
 
 const osobyFull: PermissionFlag[] = [
