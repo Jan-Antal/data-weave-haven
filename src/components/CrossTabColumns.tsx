@@ -171,6 +171,20 @@ function renderCell(
     case "datum_objednavky":
       return <TableCell key={key}><InlineEditableCell value={p.datum_objednavky} type="date" onSave={(x) => s("datum_objednavky", x, v("datum_objednavky"))} readOnly={ro("datum_objednavky")} /></TableCell>;
     case "prodejni_cena":
+      if (isSummaryRow && onOpenStageEditor) {
+        return (
+          <TableCell key={key} className="text-right">
+            <button
+              type="button"
+              className={`text-xs font-sans ${summaryClass} cursor-pointer hover:underline decoration-dotted underline-offset-2 hover:text-primary transition-colors`}
+              onClick={(e) => { e.stopPropagation(); onOpenStageEditor(p.project_id); }}
+              title="Upravit ceny etap"
+            >
+              {p.prodejni_cena ? "Σ " : ""}{formatCurrency(p.prodejni_cena, p.currency || "CZK")}
+            </button>
+          </TableCell>
+        );
+      }
       if (saveCurrency && !ro("prodejni_cena")) {
         return <TableCell key={key} className="text-right"><CurrencyEditCell value={p.prodejni_cena} currency={p.currency || "CZK"} onSave={(a, c) => saveCurrency(p.id, a, c, String(p.prodejni_cena ?? ""), p.currency || "CZK")} /></TableCell>;
       }
@@ -183,6 +197,20 @@ function renderCell(
       );
     case "marze":
       if (isSummaryRow) {
+        if (onOpenStageEditor) {
+          return (
+            <TableCell key={key} className="text-right">
+              <button
+                type="button"
+                className={`text-xs font-sans ${summaryClass} cursor-pointer hover:underline decoration-dotted underline-offset-2 hover:text-primary transition-colors`}
+                onClick={(e) => { e.stopPropagation(); onOpenStageEditor(p.project_id); }}
+                title="Upravit marže etap"
+              >
+                {formatMarze(p.marze)}
+              </button>
+            </TableCell>
+          );
+        }
         return (
           <TableCell key={key} className="text-right">
             <span className={`text-xs font-sans ${summaryClass}`}>{formatMarze(p.marze)}</span>
