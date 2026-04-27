@@ -299,9 +299,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addUserSearch, setAddUserSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
-  const [confirmOverwrite, setConfirmOverwrite] = useState<{
-    count: number;
-  } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ProfileLite | null>(null);
 
   const fetchAll = async () => {
