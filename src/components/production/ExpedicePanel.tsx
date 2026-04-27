@@ -117,6 +117,11 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // Natural sort comparator: 0 before 1, T.01 before T.1, T.07 before T.1
+    const naturalSort = (a: string, b: string) => {
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    };
+
     for (const group of projects) {
       const activeItems = aggregateExpediceItems(group.items.filter(i => !i.expediced_at));
       // FIX 3: Archive shows only items expediced in last 30 days
@@ -125,6 +130,12 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
         const d = parseDate(i.expediced_at);
         return d ? d >= thirtyDaysAgo : false;
       });
+      
+      // Sort items alphabetically by item_code or item_name (natural sort: 0 before 1)
+      const sortKey = (item: ExpediceItem) => item.item_code || item.item_name;
+      activeItems.sort((a, b) => naturalSort(sortKey(a), sortKey(b)));
+      archivedItems.sort((a, b) => naturalSort(sortKey(a), sortKey(b)));
+
       if (activeItems.length > 0) {
         active.push({ ...group, items: activeItems, count: activeItems.length });
       }
