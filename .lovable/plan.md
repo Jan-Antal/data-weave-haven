@@ -1,83 +1,41 @@
-# Oprava: split bundlu generuje náhodné písmeno (Q-2, D-4)
+# Oprava marže etap a Σ v náhľade projektu
 
-## Príčina
+## Problém
 
-V `SplitBundleDialog.handleSplitBundle()` sa pri splite vytvoria nové riadky v `production_schedule`, ale **nikde sa nenastaví `bundle_label`**:
+1. **Marža projektu = 0 %**, aj keď každá etapa má default 15 %.
+   V `getProjectDisplayOverrides` sa vážený priemer marže ráta ako `Σ(price × margin) / Σ(price)`. Ak etapa nemá vyplnenú `prodejni_cena` (čo je prípad zo screenshotu — RD Skalice má prázdne polia), váha = 0 → vážený súčet = 0 → priemer = 0. Navyše ak `marže` v DB je null, dosadí sa `0` (nie default 15 %).
 
-- **Update** existujúcich riadkov nastavuje len `split_group_id` (nový UUID), `scheduled_hours`, `scheduled_czk`, `item_name`. Pôvodný `bundle_label = "D"` zostane.
-- **Insert** spillnutých riadkov vôbec nepošle `bundle_label` → v DB je `NULL`.
-
-Potom v `useProductionSchedule.ts:131`:
-
-```ts
-const bundleLabel = row.bundle_label ?? fallbackBundleLabel(row.split_group_id ?? `${pid}:...`);
-```
-
-`fallbackBundleLabel` je **deterministický hash UUID-ka na písmeno A–Z**. Pretože pri splite vznikol **nový** `split_group_id` (UUID), hash padne náhodne na "Q", "D" atď. — odtiaľ "Q-2" namiesto "D-2", "D-4" namiesto "A-4".
-
-Druhý dôsledok: pôvodný `D` riadok má `bundle_label = "D"` (z DB), nový spill riadok má `bundle_label = NULL` → fallback "Q". V tej istej split chain teda existujú dva rôzne labely → bundle sa rozpadne na dve karty bez väzby.
+2. **„Σ" sa zobrazuje aj po vypnutí Auto-sumy v náhľade projektu (Project Info tabuľka)**, polia sú uzamknuté (read-only) — prepísať sa dá len v Detaile projektu.
+   `ProjectInfoTable` rozhoduje o summary režime len podľa `stageCount > 1` a vždy aplikuje agregáciu z etáp. Ignoruje toggle `plan_use_project_price` (true = manuálna cena projektu, false = auto-sum).
 
 ## Plán úpravy
 
-### 1. `src/components/production/SplitBundleDialog.tsx`
+### 1. `src/lib/projectStageDisplay.ts` — vážený priemer marže s defaultom
 
-**a) Rozšíriť typ `BundleSplitItem`** o `bundle_label: string | null`, aby sa dal zachovať pôvodný label.
+V bloku, ktorý počíta `weightedMarze` (riadky 98–112):
+- Pre každú etapu rozparzovať maržu; ak je `null`/prázdna/NaN, použiť **default 0.15** (15 %).
+- Ak `Σ(price) > 0` → vážený priemer (ako doteraz, ale s default-om).
+- Ak `Σ(price) = 0` (žiadna etapa nemá cenu) → fallback na **obyčajný priemer** marží etáp (aby projekt s 2 etapami × 15 % zobrazil 15 %, nie 0 %).
 
-**b) V `handleSplitBundle()` určiť cieľový label:**
+### 2. `src/components/ProjectInfoTable.tsx` — rešpektovať toggle Auto-sumy
 
-```ts
-const targetBundleLabel =
-  items.find((i) => i.bundle_label)?.bundle_label ?? null;
-```
+V `ProjectRow` (cca riadok 446–482) a v `isSummary` (riadok 482):
+- Ak `p.plan_use_project_price === true`, zaobchádzať s projektom ako so single-stage:
+  - `displayProject = p` (žiadne overrides z etáp).
+  - `isSummary = false` → odstráni „Σ" prefix v `CrossTabColumns` a polia (`prodejni_cena`, `marze`, `pm`, `status`, …) sa stanú editovateľnými cez `InlineEditableCell`.
+- Pri `plan_use_project_price === false` (auto-sum) ostane existujúce správanie (Σ + read-only).
 
-Ak nikto nemá label (legacy), nechať `null` a po inserte sa zavolá `getAvailableBundleLabel(projectId, stageId, [...newIds])` aby sa pridelil prvý voľný (A, B, C…) — nie hash.
+### 3. Bez DB migrácie
 
-**c) Pri `update` existujúcich riadkov** pridať:
-
-```ts
-bundle_label: targetBundleLabel,
-bundle_type: "split",
-```
-
-**d) Pri `insert` spillnutých riadkov** pridať:
-
-```ts
-bundle_label: targetBundleLabel,
-bundle_type: "split",
-```
-
-Tým majú **všetky** riadky v chain ten istý label (napr. „D"), a `split_part`/`split_total` ich očísluje 1/2, 2/2 → zobrazí sa **D-1, D-2** miesto „D, Q-2".
-
-### 2. `src/components/production/WeeklySilos.tsx`
-
-V mieste, kde sa volá `setBundleSplitState({ items: activeItems.map(...) })` (cca riadok 677), pridať do mapping objektu:
-
-```ts
-bundle_label: i.bundle_label ?? null,
-```
-
-aby sa pôvodný label dostal do dialogu.
-
-### 3. `src/hooks/useProductionSchedule.ts` (poistka)
-
-Aktuálne `fallbackBundleLabel(split_group_id ?? ...)` generuje pri NULL labeli **náhodné** písmeno z UUID. Tento fallback necháme ako záchranu pre starodávne riadky, ale po fixe vyššie sa naň pri novom splite **nikdy** nedostaneme, lebo `bundle_label` bude v DB vždy nastavený.
-
-### 4. (Voliteľné, samostatné) Migrácia pre už pokazené riadky
-
-Pre existujúce zlomené splity (Allianz D-Q, RD Skalice A→D-4) nie je potrebná SQL migrácia — stačí:
-- buď ručne otvoriť „Upraviť split" a uložiť (po fixe sa label normalizuje),
-- alebo pripraviť jednorazovú SQL migráciu, ktorá pre každý `split_group_id` v `production_schedule` zjednotí `bundle_label` na prvú nenull hodnotu zo skupiny (a kde je všetko NULL, priradí prvé voľné písmeno cez aplikačnú logiku — to nie je triviálne v SQL, takže si to vyžiada Edge Function alebo manuálny prechod).
-
-**Navrhujem:** v tomto kroku spraviť len **kódový fix** (body 1–2), aby sa nové splity správali korektne. Opravu existujúcich pokazených chainov urobíme samostatne (vieš mi povedať, či ich chceš normalizovať dávkovo, alebo si ich preklikáš ručne).
+`plan_use_project_price` sa už ukladá pri prepnutí toggle v `ProjectDetailDialog`. Žiadna ďalšia zmena schémy nie je potrebná.
 
 ## Očakávaný výsledok
 
-- Allianz: split „D" vyrobí v cieľovom týždni **D-2** (a pôvodný sa premenuje na **D-1**).
-- RD Skalice: split „A-3" vyrobí **A-4**, nie „D-4".
-- Bundle ostane jednou kartou cez týždne (rovnaký `bundle_label` + `split_group_id`).
-- Žiadne ďalšie náhodné písmená (Q, X, …) pri splitoch.
+- RD Skalice (2 etapy × default 15 %, bez vyplnenej `prodejni_cena`) → projekt zobrazí maržu **15 %** namiesto 0 %.
+- Po zapnutí toggle „Manuální cena projektu" v Detaile projektu sa v náhľade Project Info odstráni prefix „Σ" pri cene a marže, polia sa dajú editovať priamo z tabuľky (rovnako ako pri jednoetapovom projekte).
+- Po opätovnom zapnutí Auto-sumy sa náhľad vráti do summary režimu.
 
 ## Súbory, ktoré sa zmenia
 
-- `src/components/production/SplitBundleDialog.tsx` (typ + handleSplitBundle)
-- `src/components/production/WeeklySilos.tsx` (1 riadok – pridať `bundle_label` do mapovania)
+- `src/lib/projectStageDisplay.ts` (logika výpočtu váženej marže)
+- `src/components/ProjectInfoTable.tsx` (rešpektovanie `plan_use_project_price` v `ProjectRow`)
