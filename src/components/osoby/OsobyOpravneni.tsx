@@ -849,31 +849,7 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
         </div>
       </div>
 
-      {/* Confirm overwrite */}
-      <AlertDialog
-        open={!!confirmOverwrite}
-        onOpenChange={(o) => !o && setConfirmOverwrite(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Prepísať vlastné úpravy?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmOverwrite?.count} používateľ(ov) má vlastné úpravy
-              oprávnení odlišné od predvoleného presetu. Uložením prepíšete ich
-              individuálne nastavenia.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Zrušiť</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-[#0a2e28] hover:bg-[#0a2e28]/90 text-white"
-              onClick={persistSave}
-            >
-              Potvrdiť a prepísať
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
 
       {/* Confirm remove user */}
       <AlertDialog
