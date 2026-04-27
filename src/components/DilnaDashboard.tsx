@@ -791,7 +791,7 @@ function useDilnaData(weekOffset: number) {
           const label = b.bundle_label || "A";
           const displayLabel = b.bundle_type === "split" && b.split_part ? `${label}-${b.split_part}` : label;
           // Per-bundle weekly target: full → stable 100%, split → chain-window ramped by dayFraction.
-          const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
+          const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id, true);
           // Resolve per-bundle pct via identity. For spilled bundles, stage_id comes from prevSchedule.
           const stageIdForBundle = prevSchedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
           const bCompletion = isUnmatched
