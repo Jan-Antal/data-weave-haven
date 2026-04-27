@@ -727,15 +727,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={handleDuplicate}
-            >
-              <Copy className="h-3.5 w-3.5 mr-1.5" />
-              Duplikovať
-            </Button>
             {customOverrideCount > 0 && (
               <Button
                 variant="outline"
