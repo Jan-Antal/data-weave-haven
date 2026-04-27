@@ -150,7 +150,7 @@ function useDilnaData(weekOffset: number) {
           .is("deleted_at", null),
         supabase
           .from("production_capacity")
-          .select("capacity_hours")
+          .select("capacity_hours, working_days")
           .eq("week_year", weekInfo.year)
           .eq("week_number", weekInfo.week)
           .maybeSingle(),
