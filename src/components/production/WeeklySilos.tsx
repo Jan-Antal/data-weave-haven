@@ -1779,7 +1779,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
   const bundleDragDisabled = allCompleted || !!forecastDarkMode || isMidflightBundle || !!isWeekLocked;
   const bundleKey = buildBundleKey({ weekKey, project_id: bundle.project_id, stage_id: bundle.stage_id, bundle_label: bundle.bundle_label, split_part: bundle.split_part });
   const bundleItemIds = bundle.items.map((item) => item.id);
-  const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: splitMeta.splitPart ?? bundle.split_part, bundle_type: isSplitBundle ? "split" : bundle.bundle_type });
+  const bundleDisplayLabel = formatBundleDisplayLabel({ bundle_label: bundle.bundle_label, split_part: splitMeta.splitPart ?? bundle.split_part, split_total: splitMeta.splitTotal ?? bundle.split_total, bundle_type: isSplitBundle ? "split" : bundle.bundle_type });
   const canDropActiveBundle = canAcceptBundleDrop(activeDrag?.type === "silo-bundle" || activeDrag?.type === "silo-item" ? {
     project_id: activeDrag.projectId || "",
     weekKey: activeDrag.weekDate ?? null,
