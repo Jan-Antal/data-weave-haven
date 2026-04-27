@@ -86,6 +86,7 @@ interface AuthContextType {
   canAccessAnalyticsVykaz: boolean;
   canViewProjectInfoTab: boolean;
   canWriteProjectInfoTab: boolean;
+  canManageStages: boolean;
   canViewPMStatusTab: boolean;
   canWritePMStatusTab: boolean;
   canViewTPVStatusTab: boolean;
@@ -378,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canAccessAnalyticsVykaz: permissions.canAccessAnalyticsVykaz,
     canViewProjectInfoTab: permissions.canViewProjectInfoTab,
     canWriteProjectInfoTab: permissions.canWriteProjectInfoTab,
+    canManageStages: permissions.canManageStages,
     canViewPMStatusTab: permissions.canViewPMStatusTab,
     canWritePMStatusTab: permissions.canWritePMStatusTab,
     canViewTPVStatusTab: permissions.canViewTPVStatusTab,
