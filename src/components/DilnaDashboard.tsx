@@ -745,6 +745,9 @@ function useDilnaData(weekOffset: number) {
         });
       }
 
+      // Track projects rendered as spilled-only so off-plan loop doesn't duplicate them.
+      const spilledOnlyRenderedProjects = new Set<string>();
+
       // 1.5) Spilled-only projects: have unfinished T-1 bundles but NO current-week schedule.
       // Mirrors Vyroba "Spilled" sidebar logic. Each card shows the spilled bundles with
       // their original scheduled hours preserved; planned hours for THIS week stay 0.
@@ -752,6 +755,7 @@ function useDilnaData(weekOffset: number) {
         if (scheduledProjects.has(pid)) continue; // would duplicate the card from loop 1
         const bMap = bundlesByProject.get(pid);
         if (!bMap || bMap.size === 0) continue;
+        spilledOnlyRenderedProjects.add(pid);
         const proj = projMap.get(pid);
         const isUnmatched = !proj;
         const loggedHours = hoursByProject.get(pid) || 0;
@@ -843,6 +847,7 @@ function useDilnaData(weekOffset: number) {
       // 3) Off-plan: project IS in DB (matched), has hours this week, but is not in production_schedule
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
+        if (spilledOnlyRenderedProjects.has(pid)) continue; // already shown as spilled card → don't duplicate
         if (!knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const proj = projMap.get(pid)!;
