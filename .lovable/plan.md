@@ -1,51 +1,45 @@
-# Vynútiť reload cache na mobilnej PWA verzii
+## Diagnóza
 
-## Problém
+V databáze `role_permission_defaults` má rola **admin** nastavené `canManageTPV = false` (zatiaľ čo owner, pm, konstrukter majú `true`). Navyše všetci 4 admin používatelia majú v `user_roles.permissions` explicitný override `canManageTPV: false`, ktorý prebíja aj defaulty.
 
-Na nainštalovanej mobilnej PWA (home-screen ikona) sa stále zobrazuje stará verzia modulu **Výroba** (zoradené po projektoch) namiesto novej (po balíkoch). V Lovable preview to funguje správne, lebo prehliadač nemá registrovaný service worker pre `lovableproject.com`.
+Dôsledok v TPV List:
+- Per-row checkboxy (gated cez `canManageTPV`) sa nezobrazujú
+- Status prvku, počet, cena, etapa, poznámky — všetky inputy sú `readOnly={!canManageTPV}` → admin nemôže nič meniť
+- Bulk akcie a delete tlačidlá sú skryté
 
-Príčina: aplikácia používa **vite-plugin-pwa** s Workbox service workerom (`registerType: "autoUpdate"`, `skipWaiting: true`). Starý SW si predcacheoval staré JS bundles a `index.html`. Aj po reštarte appky iOS/Android servíruje cached shell skôr, než sa nový SW stihne nainštalovať a prevziať klientov. `useVersionCheck` síce invaliduje React Query, ale **neprinúti SW skipWaiting/reload stránky**.
+Toast „Uloženo" sa pri zmene statusu nemusí ani objaviť — RLS update beží, ale `canManageTPV` blokuje UI ešte pred odoslaním.
 
-## Plán riešenia
+## Riešenie
 
-### 1. Pridať tvrdý one-time cache buster (`src/main.tsx`)
-Pri štarte appky:
-- Spočítať `localStorage` verziu vs. `__BUILD_HASH__` (už definovaný vo vite.config).
-- Ak sa nezhodujú → `caches.keys()` + `caches.delete(...)` pre všetky CacheStorage entries, `navigator.serviceWorker.getRegistrations()` + `registration.unregister()`, uložiť nový hash a `location.reload(true)` jedenkrát (chránené flagom aby nevznikla slučka).
+### 1. DB migrácia — opraviť admin defaulty
+```sql
+UPDATE public.role_permission_defaults
+SET permissions = jsonb_set(COALESCE(permissions, '{}'::jsonb), '{canManageTPV}', 'true'::jsonb)
+WHERE role = 'admin';
+```
 
-Toto zabezpečí, že každý existujúci používateľ pri prvom otvorení po deployi dostane čistú inštanciu — vrátane mobilov, kde si predtým SW držal starý shell.
+### 2. DB migrácia — vyčistiť overrides u všetkých admin používateľov
+Odstránime kľúč `canManageTPV` z `user_roles.permissions` pre všetkých admin používateľov, aby sa použil opravený default (true). Tým sa zachovajú ostatné individuálne overrides.
 
-### 2. Upgradnúť `useVersionCheck` (`src/hooks/useVersionCheck.ts`)
-Keď deteguje nový build hash:
-- Zavolať `navigator.serviceWorker.getRegistration()?.update()`.
-- Po `controllerchange` evente urobiť `window.location.reload()`.
-- Súčasne invalidovať React Query (existujúce správanie zostáva).
+```sql
+UPDATE public.user_roles
+SET permissions = permissions - 'canManageTPV'
+WHERE role = 'admin';
+```
 
-### 3. Pridať manuálny "Force refresh" v menu (`src/components/mobile/MobileHeader.tsx` hamburger)
-Položka **"Obnoviť aplikáciu"** ktorá:
-- vyčistí všetky `caches`,
-- odregistruje SW,
-- vyčistí React Query cache,
-- spraví `location.reload()`.
+### 3. Žiadne zmeny v kóde
+Statický preset v `permissionPresets.ts` už dáva adminovi `canManageTPV = true` cez `ALL_TRUE`, takže fallback je v poriadku. Komponent `TPVList.tsx` používa `canManageTPV` správne.
 
-Použiteľné keď v budúcnosti niečo zasekne — užívateľ má samoobslužné riešenie bez nutnosti odinštalovať PWA.
+## Overenie po nasadení
 
-### 4. Okamžitá inštrukcia pre teba (bez čakania na deploy)
-Kým sa fix nenasadí, na iPhone/Androide:
-- **iOS Safari PWA**: dlho podrž ikonu na home screen → *Odstrániť aplikáciu* → znovu otvor `projekty.am-interior.cz` v Safari → *Zdieľať → Pridať na plochu*.
-- **Android Chrome PWA**: Nastavenia → Aplikácie → AMI → Úložisko → *Vymazať údaje a cache* → otvor znovu.
+- Admin obnoví stránku (kvôli novému user_roles fetchu v `useAuth`)
+- V TPV List sa zobrazia per-row checkboxy
+- Status, počet, cena, etapa a poznámky sa dajú editovať
+- Bulk delete a hromadné akcie (selected.size > 0) fungujú
 
-Po nasadení fixu (kroky 1–3) toto už nikdy nebudeš musieť robiť — nový build sa pretlačí automaticky pri prvom otvorení.
+## Dotknuté tabuľky
 
-## Technické detaily
+- `role_permission_defaults` (1 riadok: admin)
+- `user_roles` (4 riadky: existujúci admin používatelia)
 
-**Súbory:**
-- `src/main.tsx` — pridať `bootstrapCacheCheck()` pred `createRoot()`.
-- `src/hooks/useVersionCheck.ts` — pridať SW update + reload logiku.
-- `src/components/mobile/MobileHeader.tsx` — pridať MenuItem "Obnoviť aplikáciu".
-
-**Build hash zdroj:** `__BUILD_HASH__` global definovaný vo `vite.config.ts` (`Date.now().toString(36)` pri builde).
-
-**LocalStorage kľúč:** `app_build_hash` (porovnanie). Flag `app_cache_busted_at` zabráni reload-loopu (max raz za 60s).
-
-**Žiadne DB zmeny, žiadne nové dependencies.**
+Žiadne zmeny v zdrojovom kóde — len dáta.
