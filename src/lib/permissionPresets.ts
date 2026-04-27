@@ -117,6 +117,7 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canAccessAnalyticsRezije",
   "canAccessAnalyticsDilna",
   "canAccessAnalyticsVykaz",
+  "canAccessAnalyticsAbsence",
   "canViewProjectInfoTab",
   "canWriteProjectInfoTab",
   "canViewPMStatusTab",
