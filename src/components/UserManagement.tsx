@@ -40,6 +40,7 @@ const ASSIGNABLE_ROLES: AppRole[] = [
   "admin",
   "vedouci_pm",
   "pm",
+  "nakupci",
   "vedouci_konstrukter",
   "konstrukter",
   "vedouci_vyroby",
@@ -47,6 +48,7 @@ const ASSIGNABLE_ROLES: AppRole[] = [
   "quality",
   "kalkulant",
   "vyroba",
+  "finance",
   "viewer",
   "tester",
 ];
