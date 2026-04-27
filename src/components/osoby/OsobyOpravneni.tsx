@@ -562,13 +562,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     fetchAll();
   };
 
-  const handleDuplicate = () => {
-    toast({
-      title: "Duplikovať",
-      description:
-        "Nové role je možné pridať len cez DB migráciu (enum app_role).",
-    });
-  };
 
   const handleAddUser = async (p: ProfileLite) => {
     if (guardOwnerRole()) return;
