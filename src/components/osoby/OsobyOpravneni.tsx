@@ -608,13 +608,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     fetchAll();
   };
 
-  const handleNewRole = () => {
-    toast({
-      title: "Nová rola",
-      description:
-        "Nové role je možné pridať len cez DB migráciu (enum app_role).",
-    });
-  };
 
   return (
     <div className="h-full flex bg-card">
