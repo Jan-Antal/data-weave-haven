@@ -50,12 +50,14 @@ const ROLE_ORDER: AppRole[] = [
   "admin",
   "vedouci_pm",
   "pm",
+  "nakupci",
   "vedouci_konstrukter",
   "konstrukter",
   "vedouci_vyroby",
   "mistr",
   "quality",
   "kalkulant",
+  "finance",
   "viewer",
 ];
 
