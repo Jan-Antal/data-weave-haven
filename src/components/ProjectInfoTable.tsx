@@ -367,6 +367,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
               isVisible={isVisible}
               statusLabels={statusLabels}
               canEdit={canEdit}
+              canManageStages={canManageStages}
               renderKeys={renderKeys}
 
 
@@ -380,7 +381,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
           ))}
         </SortableContext>
       </DndContext>
-      {showAddButton && (
+      {showAddButton && canManageStages && (
         <TableRow className="bg-muted/20 h-9">
           <TableCell colSpan={20}>
             <Button variant="ghost" size="sm" className="text-xs h-5 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 font-normal" onClick={handleInlineAdd}>
