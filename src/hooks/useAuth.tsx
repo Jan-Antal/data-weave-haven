@@ -84,6 +84,7 @@ interface AuthContextType {
   canAccessAnalyticsRezije: boolean;
   canAccessAnalyticsDilna: boolean;
   canAccessAnalyticsVykaz: boolean;
+  canAccessAnalyticsAbsence: boolean;
   canViewProjectInfoTab: boolean;
   canWriteProjectInfoTab: boolean;
   canManageStages: boolean;
