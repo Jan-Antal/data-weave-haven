@@ -702,7 +702,7 @@ function useDilnaData(weekOffset: number) {
               : label;
             // Per-bundle weekly target: full → stable 100%, split → chain-window ramped by dayFraction
             // (Sunday = window start = end of prev week's chain slice; Friday = window end at this week).
-            const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
+            const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id, !!b.isSpilled);
             // Per-bundle completion: resolved by bundle identity (no cross-bundle bleed).
             // Identity uses the bundle's stage_id from the first row in the entry.
             // Spilled bundles live in prevSchedule (T-1), not in current week's schedule.
