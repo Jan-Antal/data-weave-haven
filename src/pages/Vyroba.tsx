@@ -3517,6 +3517,7 @@ function ProjectRow({
   const bundleDisplayLabel = formatBundleDisplayLabel({
     bundle_label: firstItem?.bundle_label ?? null,
     split_part: splitMeta.splitPart ?? firstItem?.split_part ?? null,
+    split_total: splitMeta.splitTotal ?? firstItem?.split_total ?? null,
     bundle_type: splitMeta.isSplit ? "split" : firstItem?.bundle_type ?? null,
   });
 
