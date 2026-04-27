@@ -399,6 +399,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canEditProjectCode",
     "canEditSmluvniTermin",
     "canManageTPV",
+    "canManageStages",
     "canEdit",
     "canSeePrices",
     "canUploadDocuments",
