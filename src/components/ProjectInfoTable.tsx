@@ -1106,6 +1106,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
       </Dialog>
 
       {editProject && <ProjectDetailDialog project={editProject} open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }} onOpenTPVList={handleOpenTPVList} tpvItemCount={tpvItemsByProject.get(editProject.project_id)?.length ?? 0} />}
+
+      <StageQuickEditDialog
+        projectId={stageEditorProjectId}
+        projectName={stageEditorProject?.project_name ?? null}
+        open={!!stageEditorProjectId}
+        onOpenChange={(open) => { if (!open) setStageEditorProjectId(null); }}
+        onOpenFullDetail={stageEditorProject ? () => { setEditProject(stageEditorProject); setStageEditorProjectId(null); } : undefined}
+        readOnly={!canEdit}
+      />
     </div>
   );
 }
