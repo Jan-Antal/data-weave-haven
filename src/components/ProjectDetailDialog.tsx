@@ -1480,7 +1480,7 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 mr-10">
                 {canGoPrev && (
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewNavigate(-1)}>
                     <ChevronLeft className="h-4 w-4" />
