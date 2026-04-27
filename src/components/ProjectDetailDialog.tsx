@@ -1482,13 +1482,13 @@ export function ProjectDetailDialog({ project, open, onOpenChange, onOpenTPVList
               </div>
               <div className="flex items-center gap-1 mr-10">
                 {canGoPrev && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewNavigate(-1)}>
-                    <ChevronLeft className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 flex items-center justify-center" onClick={() => handlePreviewNavigate(-1)}>
+                    <ChevronLeft className="h-5 w-5" />
                   </Button>
                 )}
                 {canGoNext && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePreviewNavigate(1)}>
-                    <ChevronRight className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 flex items-center justify-center" onClick={() => handlePreviewNavigate(1)}>
+                    <ChevronRight className="h-5 w-5" />
                   </Button>
                 )}
               </div>
