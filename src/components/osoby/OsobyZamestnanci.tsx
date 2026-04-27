@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, MoreVertical, Plus, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";

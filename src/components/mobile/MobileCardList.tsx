@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { MobileProjectCard } from "./MobileProjectCard";
 import { MobileFilterChips } from "./MobileFilterChips";
 import { MobileStageDetailSheet } from "./MobileStageDetailSheet";

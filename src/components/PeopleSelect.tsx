@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { usePeople } from "@/hooks/usePeople";

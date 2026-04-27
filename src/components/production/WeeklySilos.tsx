@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { productionCzkToSellingPrice } from "@/lib/currency";
 import { GripVertical, ChevronRight, AlertTriangle, Lock, LockOpen } from "lucide-react";
 import type { ForecastBlock } from "@/hooks/useForecastMode";

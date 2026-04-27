@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { useActivityLog, useActivityLogUsers, type ActivityLogEntry, type DateRange } from "@/hooks/useActivityLog";
 import { useUserSessions, formatSessionDuration, formatRelativeTime, type UserSessionSummary } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
