@@ -528,29 +528,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     fetchAll();
   };
 
-  const handleResetToPreset = async () => {
-    if (guardOwnerRole()) return;
-    if (customOverrideCount === 0) {
-      toast({ title: "Nie sú žiadne vlastné nastavenia v tejto roli" });
-      return;
-    }
-    setSaving(true);
-    const { error } = await supabase
-      .from("user_roles")
-      .update({ permissions: null as any })
-      .eq("role", selectedRole);
-    setSaving(false);
-    if (error) {
-      toast({ title: "Chyba pri resete", description: error.message, variant: "destructive" });
-      return;
-    }
-    setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
-    toast({
-      title: `Predvolené obnovené pre ${ROLE_LABELS[selectedRole]}`,
-      description: "Užívatelia uvidia zmenu po obnovení stránky.",
-    });
-    fetchAll();
-  };
 
 
   const handleAddUser = async (p: ProfileLite) => {
