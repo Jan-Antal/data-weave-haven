@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, Menu, UserCog, LogOut, BarChart3, Home, Bell } from "lucide-react";
+import { Clock, Menu, UserCog, LogOut, BarChart3, Home, Bell, RefreshCw } from "lucide-react";
+import { forceAppRefresh } from "@/lib/cacheBuster";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
@@ -127,6 +128,14 @@ export function MobileHeader({ onDataLog, showDataLog = false, isDataLogOpen = f
             >
               <UserCog className="h-4 w-4 text-muted-foreground" />
               <span>Nastavení účtu</span>
+            </button>
+            <Separator className="my-1" />
+            <button
+              onClick={() => { setMenuOpen(false); forceAppRefresh(); }}
+              className="flex items-center gap-3 w-full px-5 py-3 text-sm hover:bg-accent min-h-[44px]"
+            >
+              <RefreshCw className="h-4 w-4 text-muted-foreground" />
+              <span>Obnoviť aplikáciu</span>
             </button>
             <button
               onClick={() => { setMenuOpen(false); signOut(); }}
