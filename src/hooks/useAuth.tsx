@@ -378,6 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canAccessAnalyticsRezije: permissions.canAccessAnalyticsRezije,
     canAccessAnalyticsDilna: permissions.canAccessAnalyticsDilna,
     canAccessAnalyticsVykaz: permissions.canAccessAnalyticsVykaz,
+    canAccessAnalyticsAbsence: permissions.canAccessAnalyticsAbsence,
     canViewProjectInfoTab: permissions.canViewProjectInfoTab,
     canWriteProjectInfoTab: permissions.canWriteProjectInfoTab,
     canManageStages: permissions.canManageStages,
