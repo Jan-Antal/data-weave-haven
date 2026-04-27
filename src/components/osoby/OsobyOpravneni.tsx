@@ -481,7 +481,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
   const persistSave = async () => {
     if (guardOwnerRole()) return;
     setSaving(true);
-    setConfirmOverwrite(null);
     // Force-apply cascade so we never persist stale sub-flags when their master is OFF.
     const sanitized = applyCascade({ ...draftPerms });
     const { error } = await supabase
