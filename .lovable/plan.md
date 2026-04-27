@@ -1,41 +1,53 @@
-# Oprava marže etap a Σ v náhľade projektu
+# Quick-edit popover pre etapy zo Σ bunky
 
 ## Problém
 
-1. **Marža projektu = 0 %**, aj keď každá etapa má default 15 %.
-   V `getProjectDisplayOverrides` sa vážený priemer marže ráta ako `Σ(price × margin) / Σ(price)`. Ak etapa nemá vyplnenú `prodejni_cena` (čo je prípad zo screenshotu — RD Skalice má prázdne polia), váha = 0 → vážený súčet = 0 → priemer = 0. Navyše ak `marže` v DB je null, dosadí sa `0` (nie default 15 %).
+PM v náhľade Project Info vidí súhrnnú maržu/cenu (Σ) z etáp, ale nie je zrejmé, že na ich úpravu musí otvoriť Detail projektu → Finance → Etapy. Treba intuitívnejší skratený workflow priamo z tabuľky.
 
-2. **„Σ" sa zobrazuje aj po vypnutí Auto-sumy v náhľade projektu (Project Info tabuľka)**, polia sú uzamknuté (read-only) — prepísať sa dá len v Detaile projektu.
-   `ProjectInfoTable` rozhoduje o summary režime len podľa `stageCount > 1` a vždy aplikuje agregáciu z etáp. Ignoruje toggle `plan_use_project_price` (true = manuálna cena projektu, false = auto-sum).
+## Riešenie
 
-## Plán úpravy
+Pri **multi-stage projekte v Σ režime** (`stageCount > 1` a `plan_use_project_price=false`) sa bunky **Marže** a **Prodejní cena** stanú klikateľnými. Klik otvorí `Popover` s kompaktným zoznamom etáp — pre každú etapu inputy **Prodejní cena** a **Marže (%)**, ukladá sa rovnakou logikou ako v `StagesCostSection` (cez `useUpdateStage`). V hlavičke popoveru **Σ Súčet** a **Ø Vážená marže** (živé prepočty). Bez krokov navyše — ulož a zatvor.
 
-### 1. `src/lib/projectStageDisplay.ts` — vážený priemer marže s defaultom
+```text
+┌─ Etapy projektu Z-2604-002 ────── ✕ ─┐
+│ Σ Cena: 678 396 Kč   Ø Marže: 15 %   │
+├──────────────────────────────────────┤
+│ A — RD Skalice                       │
+│   Cena [______] CZK   Marže [15] %   │
+│ B — RD Skalice                       │
+│   Cena [______] CZK   Marže [15] %   │
+├──────────────────────────────────────┤
+│  [Otvoriť detail projektu →]         │
+└──────────────────────────────────────┘
+```
 
-V bloku, ktorý počíta `weightedMarze` (riadky 98–112):
-- Pre každú etapu rozparzovať maržu; ak je `null`/prázdna/NaN, použiť **default 0.15** (15 %).
-- Ak `Σ(price) > 0` → vážený priemer (ako doteraz, ale s default-om).
-- Ak `Σ(price) = 0` (žiadna etapa nemá cenu) → fallback na **obyčajný priemer** marží etáp (aby projekt s 2 etapami × 15 % zobrazil 15 %, nie 0 %).
+## Implementácia
 
-### 2. `src/components/ProjectInfoTable.tsx` — rešpektovať toggle Auto-sumy
+### Nový súbor `src/components/StageQuickEditPopover.tsx`
+- Props: `projectId`, `trigger` (children = klikateľná bunka), `onOpenFullDetail?`.
+- Pomocou `useProjectStages(projectId)` načíta etapy, `useUpdateStage` ukladá zmeny on-blur.
+- Hlavička: `Σ Σuma cien` a `Ø Vážená marže` (rovnaký výpočet s default 15% ako v `projectStageDisplay.ts`).
+- Pre každú etapu jeden riadok s názvom + 2 input poliami (Cena, Marže).
+- Voliteľný footer button "Otvoriť detail projektu →" (ak je `onOpenFullDetail` zadané).
 
-V `ProjectRow` (cca riadok 446–482) a v `isSummary` (riadok 482):
-- Ak `p.plan_use_project_price === true`, zaobchádzať s projektom ako so single-stage:
-  - `displayProject = p` (žiadne overrides z etáp).
-  - `isSummary = false` → odstráni „Σ" prefix v `CrossTabColumns` a polia (`prodejni_cena`, `marze`, `pm`, `status`, …) sa stanú editovateľnými cez `InlineEditableCell`.
-- Pri `plan_use_project_price === false` (auto-sum) ostane existujúce správanie (Σ + read-only).
+### Úprava `src/components/CrossTabColumns.tsx`
+- Do `CellProps` pridať voliteľné: `onOpenStageEditor?: (projectId: string) => void` a renderovať `case "marze"` / `case "prodejni_cena"` v `isSummaryRow` ako klikateľný `<button>` s hover podčiarknutím; vlastný popover stage-quick-edit sa montuje jednorazovo na úrovni `ProjectInfoTable`.
+- Lepšie: `case "marze"` a `case "prodejni_cena"` v summary režime obalia obsah do `<button onClick={() => onOpenStageEditor?.(p.project_id)}>` so štýlom `cursor-pointer hover:underline decoration-dotted`.
 
-### 3. Bez DB migrácie
+### Úprava `src/components/ProjectInfoTable.tsx`
+- Lokálny state `quickEditProjectId: string | null`.
+- Render jedného `<StageQuickEditPopover open={!!quickEditProjectId} projectId={quickEditProjectId} onOpenChange={...} onOpenFullDetail={() => onEditProject(p)} />` na úrovni tabuľky (cez Dialog modal s anchor-less popoverom — použijem **Dialog** namiesto Popoveru, aby bolo predvídateľné triggrovanie z bunky).
+- `ProjectRow` dostane callback `onOpenStageEditor` a posunie ho do `renderColumnCell`.
 
-`plan_use_project_price` sa už ukladá pri prepnutí toggle v `ProjectDetailDialog`. Žiadna ďalšia zmena schémy nie je potrebná.
+### Bez DB zmien
+Ukladá sa do `project_stages` cez existujúci `useUpdateStage` hook — invalidácia queries spôsobí auto-refresh celej tabuľky vrátane Σ buniek.
 
-## Očakávaný výsledok
+## UX detaily
+- Rovnaké formátovanie čísel ako v Detaile projektu (lokalizácia `cs-CZ`, suffixy `%` / `CZK`/`€`).
+- Po zatvorení popoveru sa Σ riadok v tabuľke automaticky aktualizuje (React Query invalidation).
+- Žiadny toast (per Toast Policy — ide o rýchlu inline úpravu).
+- Tlačidlo "Otvoriť detail projektu →" v päte pre prípad, že PM chce ísť do plnej Finance sekcie (rozpad nákladov, atď.).
 
-- RD Skalice (2 etapy × default 15 %, bez vyplnenej `prodejni_cena`) → projekt zobrazí maržu **15 %** namiesto 0 %.
-- Po zapnutí toggle „Manuální cena projektu" v Detaile projektu sa v náhľade Project Info odstráni prefix „Σ" pri cene a marže, polia sa dajú editovať priamo z tabuľky (rovnako ako pri jednoetapovom projekte).
-- Po opätovnom zapnutí Auto-sumy sa náhľad vráti do summary režimu.
-
-## Súbory, ktoré sa zmenia
-
-- `src/lib/projectStageDisplay.ts` (logika výpočtu váženej marže)
-- `src/components/ProjectInfoTable.tsx` (rešpektovanie `plan_use_project_price` v `ProjectRow`)
+## Súbory
+- **nové**: `src/components/StageQuickEditPopover.tsx`
+- **upravené**: `src/components/CrossTabColumns.tsx`, `src/components/ProjectInfoTable.tsx`
