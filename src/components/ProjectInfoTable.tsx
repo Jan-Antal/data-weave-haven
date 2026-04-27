@@ -35,6 +35,7 @@ import { CalendarIcon, Paperclip, List, ChevronRight, ChevronDown, Plus, Trash2,
 import { cn } from "@/lib/utils";
 import { PeopleSelectDropdown } from "./PeopleSelectDropdown";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
+import { StageQuickEditDialog } from "./StageQuickEditDialog";
 import { TPVList } from "./TPVList";
 import { ColumnVisibilityToggle } from "./ColumnVisibilityToggle";
 import { useProjectIdCheck } from "@/hooks/useProjectIdCheck";
