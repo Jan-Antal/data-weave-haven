@@ -453,6 +453,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
   vedouci_konstrukter: preset(
     ...projectInfoFull,
     "canManageTPV",
+    "canManageStages",
     "canEdit",
     "canUploadDocuments",
     "canAccessRecycleBin",
