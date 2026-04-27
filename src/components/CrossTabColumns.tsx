@@ -133,11 +133,12 @@ interface CellProps {
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void;
   isFieldReadOnly?: (field: string, currentValue?: string | null) => boolean;
   isSummaryRow?: boolean;
+  onOpenStageEditor?: (projectId: string) => void;
 }
 
 export function renderColumnCell(props: CellProps) {
-  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly, isSummaryRow } = props;
-  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly, isSummaryRow);
+  const { colKey: key, project: p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly, isSummaryRow, onOpenStageEditor } = props;
+  return renderCell(key, p, save, canEdit, statusLabels, saveCurrency, customColumns, saveCustomField, isFieldReadOnly, isSummaryRow, onOpenStageEditor);
 }
 
 function renderCell(
@@ -149,6 +150,7 @@ function renderCell(
   saveCustomField?: (rowId: string, columnKey: string, value: string, oldValue: string) => void,
   isFieldReadOnly?: (field: string, currentValue?: string | null) => boolean,
   isSummaryRow?: boolean,
+  onOpenStageEditor?: (projectId: string) => void,
 ) {
   const s = (field: string, val: string, old: string) => save(p.id, field, val, old, p.project_id);
   const v = (field: keyof Project) => (p as any)[field] ?? "";
