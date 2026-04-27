@@ -51,12 +51,9 @@ export function CompletionDialog({
   }, [items]);
 
   const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return sortedItems;
-    return sortedItems.filter(i =>
-      (i.item_code || "").toLowerCase().includes(q) ||
-      (i.item_name || "").toLowerCase().includes(q)
-    );
+    return sortedItems.filter(i => fuzzyMatchAny([i.item_code, i.item_name], q));
   }, [sortedItems, search]);
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();

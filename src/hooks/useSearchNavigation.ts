@@ -2,15 +2,12 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import type { WeekSilo } from "@/hooks/useProductionSchedule";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
 import { buildBundleKey } from "@/lib/productionBundles";
+import { fuzzyMatch } from "@/lib/fuzzySearch";
 
 export interface SearchMatch {
   weekKey: string;
   projectId: string;
   matchKey: string;
-}
-
-function normalize(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 interface UseSearchNavigationOptions {
@@ -34,7 +31,6 @@ export function useSearchNavigation({
 
   const trimmed = query.trim();
   const active = trimmed.length >= 3;
-  const nq = active ? normalize(trimmed) : "";
 
   const { matches, matchedProjectIds } = useMemo(() => {
     if (!active)
@@ -57,7 +53,7 @@ export function useSearchNavigation({
               ...bundle.items.map((i) => i.item_name),
               ...bundle.items.map((i) => i.item_code ?? ""),
             ];
-            if (texts.some((t) => t && normalize(t).includes(nq))) {
+            if (texts.some((t) => t && fuzzyMatch(t, trimmed))) {
               const key = buildBundleKey({
                 weekKey,
                 project_id: bundle.project_id,
@@ -84,7 +80,7 @@ export function useSearchNavigation({
             block.project_id,
             block.bundle_description ?? "",
           ];
-          if (texts.some((t) => t && normalize(t).includes(nq))) {
+          if (texts.some((t) => t && fuzzyMatch(t, trimmed))) {
             const key = `${weekKey}::${block.project_id}`;
             if (!seen.has(key)) {
               seen.add(key);
@@ -97,12 +93,12 @@ export function useSearchNavigation({
     }
 
     return { matches: result, matchedProjectIds: matched };
-  }, [active, nq, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys]);
+  }, [active, trimmed, scheduleData, forecastBlocks, forecastActive, forecastPlanMode, weekKeys]);
 
   // Reset index when query changes
   useEffect(() => {
     setCurrentIndex(0);
-  }, [nq]);
+  }, [trimmed]);
 
   const goNext = useCallback(() => {
     if (matches.length === 0) return;

@@ -38,12 +38,10 @@ export function EmployeeManagement() {
   }, [employees]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return employees;
     return employees.filter(e =>
-      (e.meno ?? "").toLowerCase().includes(q) ||
-      (e.usek ?? "").toLowerCase().includes(q) ||
-      ((e as any).pracovni_skupina ?? "").toLowerCase().includes(q),
+      fuzzyMatchAny([e.meno, e.usek, (e as any).pracovni_skupina], q),
     );
   }, [employees, search]);
 

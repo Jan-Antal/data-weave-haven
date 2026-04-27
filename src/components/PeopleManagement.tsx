@@ -63,8 +63,7 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
 
   const filtered = useMemo(() => {
     if (!search) return grouped;
-    const s = search.toLowerCase();
-    return grouped.filter((p) => p.name.toLowerCase().includes(s));
+    return grouped.filter((p) => fuzzyMatch(p.name, search));
   }, [grouped, search]);
 
   useEffect(() => {

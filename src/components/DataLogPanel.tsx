@@ -134,9 +134,8 @@ function ProjectFilterCombobox({
 
   const filtered = useMemo(() => {
     if (!search) return projects.slice(0, 30);
-    const q = search.toLowerCase();
     return projects.filter(
-      p => p.project_id.toLowerCase().includes(q) || p.project_name.toLowerCase().includes(q)
+      p => fuzzyMatchAny([p.project_id, p.project_name], search)
     ).slice(0, 30);
   }, [projects, search]);
 

@@ -380,13 +380,10 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
   }, [roles]);
 
   const userSearchResults = useMemo(() => {
-    const s = userSearch.trim().toLowerCase();
+    const s = userSearch.trim();
     if (!s) return [];
     return profiles
-      .filter((p) =>
-        (p.full_name || "").toLowerCase().includes(s) ||
-        (p.email || "").toLowerCase().includes(s),
-      )
+      .filter((p) => fuzzyMatchAny([p.full_name, p.email], s))
       .map((p) => ({ profile: p, role: roleByUserId.get(p.id) ?? "viewer" as AppRole }))
       .filter(({ role }) => visibleRoles.includes(role))
       .sort((a, b) =>
@@ -417,15 +414,12 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     const inRole = new Set(
       roles.filter((r) => r.role === selectedRole).map((r) => r.user_id),
     );
-    const s = addUserSearch.trim().toLowerCase();
+    const s = addUserSearch.trim();
     return profiles
       .filter((p) => !inRole.has(p.id))
       .filter((p) => {
         if (!s) return true;
-        return (
-          (p.full_name || "").toLowerCase().includes(s) ||
-          (p.email || "").toLowerCase().includes(s)
-        );
+        return fuzzyMatchAny([p.full_name, p.email], s);
       })
       .slice(0, 50);
   }, [profiles, roles, selectedRole, addUserSearch]);

@@ -174,7 +174,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
       for (const row of data || []) {
         const pid = (row as any).project_id;
         const pname = (row as any).projects?.project_name || pid;
-        if (!pid.toLowerCase().includes(q) && !pname.toLowerCase().includes(q)) continue;
+        if (!fuzzyMatchAny([pid, pname], q)) continue;
         if (!grouped.has(pid)) {
           grouped.set(pid, { project_id: pid, project_name: pname, items: [], count: 0 });
         }
@@ -201,7 +201,7 @@ export function ExpedicePanel({ showCzk, onNavigateToTPV, onOpenProjectDetail, s
     if (isDeepSearch) return deepSearchResults;
     if (!archiveSearchTrimmed) return archivedProjects;
     return archivedProjects.filter(g =>
-      g.project_name.toLowerCase().includes(archiveSearchTrimmed) || g.project_id.toLowerCase().includes(archiveSearchTrimmed)
+      fuzzyMatchAny([g.project_name, g.project_id], archiveSearchTrimmed)
     );
   }, [archivedProjects, archiveSearchTrimmed, isDeepSearch, deepSearchResults]);
 

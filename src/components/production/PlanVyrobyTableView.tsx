@@ -517,19 +517,13 @@ export function PlanVyrobyTableView({ displayMode, searchQuery = "", onNavigateT
   const effectiveSearch = localSearch.length >= 3 ? localSearch : searchQuery;
 
   const filteredRows = useMemo(() => {
-    if (!effectiveSearch.trim()) return projectRows;
-    const q = effectiveSearch.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const q = effectiveSearch.trim();
+    if (!q) return projectRows;
     return projectRows.filter(p => {
-      const pName = p.projectName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const pId = p.projectId.toLowerCase();
-      if (pName.includes(q) || pId.includes(q)) return true;
+      if (fuzzyMatchAny([p.projectName, p.projectId], q)) return true;
       const proj = allProjects.find(ap => ap.project_id === p.projectId);
-      if (proj?.pm && proj.pm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q)) return true;
-      return p.items.some(i => {
-        const iName = i.itemName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const iCode = (i.itemCode || "").toLowerCase();
-        return iName.includes(q) || iCode.includes(q);
-      });
+      if (proj?.pm && fuzzyMatch(proj.pm, q)) return true;
+      return p.items.some(i => fuzzyMatchAny([i.itemName, i.itemCode], q));
     });
   }, [projectRows, effectiveSearch, allProjects]);
 

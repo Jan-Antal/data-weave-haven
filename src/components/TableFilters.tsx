@@ -75,9 +75,7 @@ function PersonFilterDropdown({ value, onChange }: { value: string | null; onCha
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = uniqueNames.filter((n) =>
-    n.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = uniqueNames.filter((n) => fuzzyMatch(n, search));
 
   useEffect(() => {
     if (open) {
@@ -138,7 +136,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
 
   const statusValues = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
   const filtered = statusValues.filter((statusValue) =>
-    getStatusFilterLabel(statusValue).toLowerCase().includes(search.toLowerCase())
+    fuzzyMatch(getStatusFilterLabel(statusValue), search)
   );
 
   useEffect(() => {
