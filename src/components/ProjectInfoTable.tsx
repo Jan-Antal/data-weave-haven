@@ -415,6 +415,7 @@ interface ProjectRowProps {
   riskHighlight: any;
   onEditProject: (p: Project) => void;
   isFieldReadOnly: (field: string) => boolean;
+  onOpenStageEditor?: (projectId: string) => void;
 }
 
 const ProjectRow = memo(function ProjectRow({
