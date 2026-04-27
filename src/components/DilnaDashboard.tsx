@@ -198,6 +198,12 @@ function useDilnaData(weekOffset: number) {
         Number((capacityRes.data as any)?.capacity_hours) ||
         Number(settingsRes.data?.weekly_capacity_hours) ||
         875;
+      // Skutočné pracovné dni v zobrazenom týždni (sviatky/firemné dni znižujú).
+      // Default 5, clamp 1..5 keď chýba kapacitný riadok.
+      const weekWorkingDays = Math.max(
+        1,
+        Math.min(5, Number((capacityRes.data as any)?.working_days) || 5),
+      );
 
       const overheadSet = new Set<string>(
         (((overheadRes.data || []) as unknown) as Array<{ project_code: string }>).map(o => o.project_code)
