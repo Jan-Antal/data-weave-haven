@@ -136,6 +136,7 @@ interface StageRowProps {
   isVisible: (key: string) => boolean;
   statusLabels: string[];
   canEdit: boolean;
+  canManageStages?: boolean;
   renderKeys: string[];
   cancelConfirm?: boolean;
   onCancelConfirm?: () => void;
@@ -145,7 +146,7 @@ interface StageRowProps {
   freshInheritedFields?: Set<string>;
 }
 
-function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, saveCurrency, freshInheritedFields }: StageRowProps) {
+function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, canManageStages, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, saveCurrency, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
   const { isFieldReadOnly } = useAuth();
