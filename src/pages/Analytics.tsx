@@ -307,7 +307,7 @@ export default function Analytics() {
     { key: "rezie", label: "Režije", visible: canAccessAnalyticsRezije },
     { key: "dilna", label: "Dílna", visible: canAccessAnalyticsDilna },
     { key: "vykaz", label: "Výkaz", visible: canAccessAnalyticsVykaz },
-    { key: "absence", label: "Absence", visible: canAccessAnalyticsVykaz },
+    { key: "absence", label: "Absence", visible: canAccessAnalyticsAbsence },
   ];
   const firstVisible = tabs.find((t) => t.visible !== false)?.key ?? "dilna";
 
