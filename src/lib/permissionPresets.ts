@@ -276,6 +276,7 @@ const MODULE_CASCADE: Array<{ master: PermissionFlag; subs: PermissionFlag[] }> 
       "canPermanentDelete",
       "canAccessRecycleBin",
       "canManageTPV",
+      "canManageStages",
       "canEdit",
     ],
   },
