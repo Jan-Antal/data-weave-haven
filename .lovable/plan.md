@@ -1,52 +1,58 @@
 ## Problém
 
-Projekt **Příluky Valovi Dům (Z-2504-019)** sa v Dílni / Projekty týdne zobrazuje **dvakrát**:
+V SQL funkcii `public.get_daily_report(report_date)` sa `weekly_goal_pct` počíta cez CTE `cumulative_goal` na úrovni **celého projektu** (sumárne hodiny všetkých bundles ÷ `project_plan_hours.hodiny_plan`). Výsledok: každý bundle toho istého projektu dostane rovnaký cieľ (napr. Allianz A-6 / B / D-1 = všetky 60 %), namiesto vlastného kumulatívneho cieľa.
 
-1. ✅ Správne: "Přelité z T17" — bundle **A** s 95% / 100% (11h)
-2. ❌ Duplikát: "Mimo Plán výroby" — bez bundle labelu (11h, plán 0h)
+## Cieľ
 
-## Príčina (z dát v DB)
+`weekly_goal_pct` musí byť **per-bundle kumulatívny cieľ pre dnešný deň** spočítaný z `production_schedule` riadkov toho konkrétneho bundlu (nie zo súčtu projektu, nie z `project_plan_hours`).
 
-Pre tento projekt existujú v `production_daily_logs` pre dnešný deň (2026-04-27) **dva paralelné zápisy** s rovnakým časom a percentom:
+## Definícia per-bundle cieľa
 
-| bundle_id | phase | percent |
-|---|---|---|
-| `Z-2504-019::2026-04-27::SG:b64b341a-…` | Kompletace | 95 |
-| `Z-2504-019::2026-04-27` | Řezání | 95 |
+Bundle = unikátna kombinácia `(project_id, stage_id, bundle_label)`. Split chain = ten istý `split_group_id`.
 
-Druhý záznam má **iba 2-časťový bundle_id** (`projectId::weekKey`) — bez stage / bundle_label / split_part. Funkcia `get_daily_report` ho považuje za log, vyparsuje z neho `p_bundle_label = ''` a `bundle_display_label = NULL`, takže ho UI nedokáže priradiť k bundlu A → vykreslí ho ako samostatný projekt "Mimo Plán výroby".
+Pre každý bundle v aktuálnom týždni:
 
-To isté sa deje historicky každý deň (vidno duplikáty pre `2026-04-20`, `2026-04-21`, …) — pre každý zápis vznikajú **dva riadky**: jeden 3-časťový (`…::SG:<group>`) a jeden 2-časťový (`…` bez SG).
+```text
+chain_total_hours   = SUM(scheduled_hours) všetkých riadkov toho bundlu naprieč všetkými týždňami
+                      (pre split: cez split_group_id; pre non-split: len v aktuálnom týždni)
+chain_prior_hours   = SUM(scheduled_hours) v týždňoch < current_week_monday
+this_week_hours     = SUM(scheduled_hours) v current_week_monday
+day_progress_ratio  = (day_idx + 1) / 5      -- už v existujúcom today_info
 
-Ten istý vzor "MF_" (Midflight) tiež zapísal duplikáty s rôznymi formátmi — to je dôvod, prečo sa SG riadky a "naked" riadky množia.
-
-## Čo treba opraviť
-
-### A) Prečistenie duplicitných logov v DB (jednorazový migration script)
-Pre každý projekt zmazať z `production_daily_logs` "naked" 2-časťové bundle_id varianty, **ak existuje paralelný 3+časťový záznam s rovnakým `logged_at` a `percent`**. Konkrétne:
-- WHERE `bundle_id` má presne 2 časti (`array_length(string_to_array(bundle_id,'::'),1) = 2`)
-- A existuje iný riadok s tým istým `project_id`, `logged_at`, `day_index`, `percent`, ktorý má 3+ časti
-
-Toto okamžite odstráni duplicitné karty.
-
-### B) Oprava zápisu logov v aplikačnom kóde
-Nájsť miesto, kde sa píše `production_daily_logs` (pravdepodobne `useDailyLog` / `CompletionDialog` / `DailyLogPanel`) a odstrániť **double-write** — momentálne sa zjavne píšu **dva inserty** pre každý log: jeden s SG suffixom a jeden bez. Má sa zapisovať **iba jeden**, vo formáte 5-časťového bundle_id:
+weekly_goal_pct     = (chain_prior_hours + this_week_hours * day_progress_ratio)
+                      / NULLIF(chain_total_hours, 0) * 100
+                      → zaokrúhlené, capped na 100
 ```
-{projectId}::{weekKey}::{stageId}::{bundleLabel}::{splitPart|full}
-```
-(podľa formátu, ktorý očakáva nová `get_daily_report`).
 
-### C) Filter v `get_daily_report` ako bezpečnostná sieť
-Do `todays_logs` CTE pridať podmienku: ignorovať logy s 2-časťovým `bundle_id` ak existuje 3+časťový log toho istého projektu s rovnakým `logged_at`. Aby sa duplikát nezobrazoval ani vtedy, ak v DB ešte nejaké zostanú.
+Pre non-split bundle (`split_group_id IS NULL`) chain = aktuálny týždeň, takže vzorec sa zjednoduší na `day_progress_ratio * 100` (napr. pondelok 20 %, piatok 100 %).
 
-## Implementácia
+## Implementácia (SQL)
 
-1. **Audit zápisu** — `rg "production_daily_logs.*insert\|from\(.production_daily_logs.\).insert"` v `src/` aby sa našli všetky miesta, ktoré píšu log. Identifikovať double-write a opraviť na 1 insert s plným 5-časťovým `bundle_id`.
-2. **Migration cleanup** — DELETE duplikátov podľa pravidla z bodu A.
-3. **Migration get_daily_report** — pridať dedup filter v CTE `todays_logs`.
-4. **Overenie** — refresh Dílna, projekt sa zobrazí len raz v sekcii "Přelité z T17".
+Nahradiť CTE `bundles_in_week`, odstrániť projektové CTE `this_week_hours`, `past_weeks_hours`, `split_prior_hours`, `split_total_hours`, `has_split`, `cumulative_goal` a doplniť per-bundle CTE:
 
-## Riziká
+1. **`bundle_keys`** — z `production_schedule` v aktuálnom týždni: distinct `(project_id, stage_id, bundle_label, split_group_id)`.
+2. **`bundle_chain_hours`** — pre každý kľúč:
+   - ak `split_group_id IS NOT NULL` → SUM hodín všetkých riadkov s tým `split_group_id` (status v aktívnych)
+   - inak → SUM hodín riadkov s tým istým `(project_id, stage_id, bundle_label)` v `current_week_monday`
+3. **`bundle_prior_hours`** — to isté, ale len pre týždne `< current_week_monday`.
+4. **`bundle_week_hours`** — SUM v `current_week_monday` pre daný kľúč (toto nahradí súčasné agregované `bundles_in_week.scheduled_hours`).
+5. **`bundle_goal`** — JOIN týchto CTE a vypočítať `goal_pct` podľa vzorca vyššie.
 
-- Cleanup je deštruktívny — najprv urobím SELECT preview a vypíšem počet riadkov na zmazanie pred samotným DELETE.
-- Ak ešte niečo iné píše naked formát (napr. starší endpoint, edge function), bude treba opraviť aj to. Audit v kroku 1 to odhalí.
+Plan-row SELECT zachová identifikáciu bundle (label + split_part). `weekly_goal_pct` sa bude joinovať z `bundle_goal` cez `(project_id, stage_id, bundle_label)`. Pre stĺpec `total_plan_hours` v plan a log riadkoch ponechať existujúci `project_plan_hours.hodiny_plan` (to je iný stĺpec, používaný UI na celkový plán projektu).
+
+Log-rowy: pripojiť `bundle_goal` cez `(p_project_id, p_bundle_label)` (stage_id v 5-časťovom bundle_id nemusí byť deterministicky odvoditeľný — ak zlyhá join, fallback na NULL → 0; UI už dnes robí matching label-only).
+
+Jediný uvedený migration súbor pridá `CREATE OR REPLACE FUNCTION public.get_daily_report(...)` s novou implementáciou. Žiadne zmeny v aplikačnom kóde ani v `types.ts` (signatúra zostáva rovnaká).
+
+## Overenie
+
+Po nasadení spustiť pre `2026-04-27`:
+
+- Allianz A (split, chain 161.8h, prior ≈ 122.7h, week ≈ 39.1h): pondelok cieľ ≈ (122.7 + 39.1·0.2)/161.8 ≈ 80 %, postupne rastie.
+- Allianz B (non-split, len v 2026-04-20): v týždni 2026-04-27 sa nezobrazí.
+- Allianz D (split, chain 60.1h, prior 0h, week 54.1h): pondelok ≈ 18 %, piatok 90 %.
+- Insia A-4 v expedici, RD Skalice, Multisport: každý bundle má vlastný cieľ podľa svojho chainu.
+
+## Súbory
+
+- nový `supabase/migrations/<timestamp>_get_daily_report_per_bundle_goal.sql`
