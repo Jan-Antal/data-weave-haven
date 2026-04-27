@@ -299,9 +299,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addUserSearch, setAddUserSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
-  const [confirmOverwrite, setConfirmOverwrite] = useState<{
-    count: number;
-  } | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ProfileLite | null>(null);
 
   const fetchAll = async () => {
@@ -374,15 +371,7 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     return counts;
   }, [roles]);
 
-  // Count users in selected role that have custom (non-null, non-empty) overrides
-  const customOverrideCount = useMemo(() => {
-    return roles.filter(
-      (r) =>
-        r.role === selectedRole &&
-        r.permissions &&
-        Object.keys(r.permissions).length > 0,
-    ).length;
-  }, [roles, selectedRole]);
+  // (custom override badge removed — each role's settings are authoritative)
 
   const roleByUserId = useMemo(() => {
     const m = new Map<string, AppRole>();
@@ -486,23 +475,12 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
       toast({ title: "Žiadni používatelia v tejto roli" });
       return;
     }
-    const customCount = targets.filter(
-      (r) =>
-        r.permissions &&
-        Object.keys(r.permissions).length > 0 &&
-        !permsEqual(ROLE_PRESETS[selectedRole], r.permissions),
-    ).length;
-    if (customCount > 0) {
-      setConfirmOverwrite({ count: customCount });
-      return;
-    }
     await persistSave();
   };
 
   const persistSave = async () => {
     if (guardOwnerRole()) return;
     setSaving(true);
-    setConfirmOverwrite(null);
     // Force-apply cascade so we never persist stale sub-flags when their master is OFF.
     const sanitized = applyCascade({ ...draftPerms });
     const { error } = await supabase
@@ -538,29 +516,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
     fetchAll();
   };
 
-  const handleResetToPreset = async () => {
-    if (guardOwnerRole()) return;
-    if (customOverrideCount === 0) {
-      toast({ title: "Nie sú žiadne vlastné nastavenia v tejto roli" });
-      return;
-    }
-    setSaving(true);
-    const { error } = await supabase
-      .from("user_roles")
-      .update({ permissions: null as any })
-      .eq("role", selectedRole);
-    setSaving(false);
-    if (error) {
-      toast({ title: "Chyba pri resete", description: error.message, variant: "destructive" });
-      return;
-    }
-    setDraftPerms({ ...(ROLE_PRESETS[selectedRole] ?? ROLE_PRESETS.admin) });
-    toast({
-      title: `Predvolené obnovené pre ${ROLE_LABELS[selectedRole]}`,
-      description: "Užívatelia uvidia zmenu po obnovení stránky.",
-    });
-    fetchAll();
-  };
 
 
   const handleAddUser = async (p: ProfileLite) => {
@@ -719,26 +674,10 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
                 : assignedUsers.length >= 2 && assignedUsers.length <= 4
                 ? "používatelia"
                 : "používateľov"}
-              {customOverrideCount > 0 && (
-                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-medium">
-                  ⚠ Vlastné nastavenie ({customOverrideCount})
-                </span>
-              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {customOverrideCount > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={handleResetToPreset}
-                disabled={saving || loading}
-                title="Vymazať vlastné nastavenia a vrátiť rolu na predvolené hodnoty z kódu"
-              >
-                Vrátiť na predvolené
-              </Button>
-            )}
+
             <Button
               size="sm"
               className="h-8 text-xs bg-[#0a2e28] hover:bg-[#0a2e28]/90 text-white"
@@ -910,31 +849,7 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
         </div>
       </div>
 
-      {/* Confirm overwrite */}
-      <AlertDialog
-        open={!!confirmOverwrite}
-        onOpenChange={(o) => !o && setConfirmOverwrite(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Prepísať vlastné úpravy?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmOverwrite?.count} používateľ(ov) má vlastné úpravy
-              oprávnení odlišné od predvoleného presetu. Uložením prepíšete ich
-              individuálne nastavenia.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Zrušiť</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-[#0a2e28] hover:bg-[#0a2e28]/90 text-white"
-              onClick={persistSave}
-            >
-              Potvrdiť a prepísať
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
 
       {/* Confirm remove user */}
       <AlertDialog
