@@ -2505,11 +2505,12 @@ export type Database = {
       cleanup_old_activity_logs: { Args: never; Returns: undefined }
       cleanup_undo_sessions: { Args: never; Returns: undefined }
       get_daily_report: {
-        Args: { report_date?: string }
+        Args: { report_date: string }
         Returns: {
           bundle_id: string
+          bundle_label: string
+          bundle_split_part: string
           is_on_track: boolean
-          item_name: string
           log_day_date: string
           logged_at: string
           logged_at_day: string
