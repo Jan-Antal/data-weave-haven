@@ -497,30 +497,10 @@ function useDilnaData(weekOffset: number) {
         return null;
       }
 
-      // Day-fraction-scaled per-bundle target. Full bundles stay at a stable 100%
-      // (matches user expectation: "Bundle B target = 100%, balík mal byť dokončený").
-      // Split bundles ramp from chain-window start (Sunday) to chain-window end (Friday).
-      function bundleExpectedPctScaled(splitGroupId: string | null): number {
-        if (!splitGroupId) return 100;
-        const weeks = [...(splitGroupWeeks.get(splitGroupId) ?? [])].sort((a, b) => a.week.localeCompare(b.week));
-        const total = weeks.reduce((s, w) => s + w.hours, 0);
-        if (total <= 0) return 100;
-        let cum = 0, start = 0, end = 100, found = false;
-        for (const w of weeks) {
-          const share = (w.hours / total) * 100;
-          if (w.week === weekInfo.weekKey) { start = cum; end = cum + share; found = true; break; }
-          cum += share;
-        }
-        if (!found) return 100;
-        // Future weeks: target = END of slice (full weekly goal — bar shouldn't pre-shrink to start).
-        // Current week: ramp from start → end by dayFraction. Past week: dayFraction=1 → end.
-        if (!isCurrentWeek && !isPastWeek) return Math.round(end);
-        return Math.round(start + (end - start) * dayFraction);
-      }
-
-      // ── Per-bundle chain windows (group by split_group_id; full bundles use project chain) ──
-      // For split bundles: chain across weeks of the same split_group_id, displayed week's window is its slice.
-      const chainWindowBySplitGroup = new Map<string, { start: number; end: number }>();
+      // ── Per-bundle chain windows (group by split_group_id) ──
+      // For split bundles: chain across weeks of the same split_group_id; displayed week's window
+      // is its proportional slice of the chain (start..end as floats, % of chain total).
+      // NOTE: must be built BEFORE bundleExpectedPctScaled, which reads from these maps.
       const splitGroupWeeks = new Map<string, Array<{ week: string; hours: number }>>();
       for (const row of allSched) {
         if (row.status === "historical" || row.status === "cancelled") continue;
@@ -532,6 +512,7 @@ function useDilnaData(weekOffset: number) {
         if (existing) existing.hours += Number(row.scheduled_hours);
         else arr.push({ week: row.scheduled_week, hours: Number(row.scheduled_hours) });
       }
+      const chainWindowBySplitGroup = new Map<string, { start: number; end: number }>();
       for (const [sg, weeks] of splitGroupWeeks) {
         weeks.sort((a, b) => a.week.localeCompare(b.week));
         const total = weeks.reduce((s, w) => s + w.hours, 0);
@@ -543,7 +524,23 @@ function useDilnaData(weekOffset: number) {
           cum += share;
         }
         if (!found) { start = 0; end = 100; }
-        chainWindowBySplitGroup.set(sg, { start: Math.round(start), end: Math.round(end) });
+        // Store as floats — round only when returning from bundleExpectedPctScaled
+        // to avoid precision loss for small slices.
+        chainWindowBySplitGroup.set(sg, { start, end });
+      }
+
+      // Day-fraction-scaled per-bundle target.
+      // Full bundle (vrátane prelitých z T-1) = balík mal byť hotový tento týždeň → cieľ 100 % po celý týždeň.
+      // Split bundle ramps from chain-window start (Sunday) to chain-window end (Friday) by dayFraction.
+      function bundleExpectedPctScaled(splitGroupId: string | null): number {
+        if (!splitGroupId) return 100;
+        const window = chainWindowBySplitGroup.get(splitGroupId);
+        if (!window) return 100;
+        const { start, end } = window;
+        // Future weeks: target = END of slice (full weekly goal — bar shouldn't pre-shrink to start).
+        // Current week: ramp from start → end by dayFraction. Past week: dayFraction=1 → end.
+        if (!isCurrentWeek && !isPastWeek) return Math.round(end);
+        return Math.round(start + (end - start) * dayFraction);
       }
 
       // ── Spilled projects: have prior weeks with active status (in_progress/paused) ──
