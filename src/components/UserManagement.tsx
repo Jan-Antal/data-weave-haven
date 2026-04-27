@@ -351,7 +351,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                 <TableRow>
                    <TableHead className="min-w-[150px]">Jméno</TableHead>
                   <TableHead className="min-w-[160px]">Email</TableHead>
-                  <TableHead className="w-[130px]">Role</TableHead>
+                  <TableHead className="w-[180px]">Role</TableHead>
                   <TableHead className="w-[160px]">Osoba</TableHead>
                   <TableHead className="w-[70px] text-center">Aktivní</TableHead>
                   <TableHead className="w-[80px]" />
@@ -411,7 +411,7 @@ export function UserManagement({ open, onOpenChange, inline = false }: Props) {
                             {ownerLocked && <span className="text-[10px] text-muted-foreground">chráněný účet</span>}
                           </div>
                         ) : (
-                          <Badge variant="secondary" className="font-normal text-[10px]">
+                          <Badge variant="secondary" className="font-normal text-[10px] whitespace-nowrap">
                             {u.role ? ROLE_LABELS[u.role] : "—"}
                           </Badge>
                         )}
