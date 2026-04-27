@@ -245,11 +245,11 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
             <button onClick={onCancelConfirm} className="text-destructive hover:underline font-medium">Zrušit</button>
             <button onClick={onCancelDismiss} className="text-muted-foreground hover:underline">Ponechat</button>
           </div>
-        ) : (
+        ) : canManageStages ? (
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
             <Trash2 className="h-3 w-3 text-destructive" />
           </Button>
-        )}
+        ) : null}
       </TableCell>
     </TableRow>
   );
