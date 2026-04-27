@@ -300,6 +300,7 @@ export default function Analytics() {
     canAccessAnalyticsRezije,
     canAccessAnalyticsDilna,
     canAccessAnalyticsVykaz,
+    canAccessAnalyticsAbsence,
   } = useAuth();
   const tabs: ShellTabDef[] = [
     { key: "projekty", label: "Projekty", visible: canAccessAnalyticsProjekty },
