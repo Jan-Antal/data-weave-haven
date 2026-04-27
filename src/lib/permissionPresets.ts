@@ -298,6 +298,7 @@ const MODULE_CASCADE: Array<{ master: PermissionFlag; subs: PermissionFlag[] }> 
       "canAccessAnalyticsRezije",
       "canAccessAnalyticsDilna",
       "canAccessAnalyticsVykaz",
+      "canAccessAnalyticsAbsence",
     ],
   },
   {
