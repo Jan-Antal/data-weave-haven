@@ -14,6 +14,7 @@ import { useProjectStages, useUpdateStage, useAddStage, useDeleteStage } from "@
 import { formatCurrency, marzeStorageToInput, marzeInputToStorage, formatMarze } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { useAuth } from "@/hooks/useAuth";
 import type { ProjectStage } from "@/hooks/useProjectStages";
 
 interface StagesCostSectionProps {
@@ -163,9 +164,11 @@ function StageCostRow({ stage, readOnly, onRequestDelete }: { stage: ProjectStag
 
 export function StagesCostSection({ projectId, readOnly = false, useProjectPrice = false, onToggleProjectPrice }: StagesCostSectionProps) {
   const { data: stages = [] } = useProjectStages(projectId);
+  const { canManageStages } = useAuth();
   const addStage = useAddStage();
   const deleteStage = useDeleteStage();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const effectiveReadOnly = readOnly || !canManageStages;
 
   const isAutoSum = !useProjectPrice;
   const stageCurrency = stages[0]?.currency || "CZK";
@@ -233,7 +236,7 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
 
       <div className="space-y-1.5">
         {stages.map((stage) => (
-          <StageCostRow key={stage.id} stage={stage} readOnly={readOnly} onRequestDelete={setDeleteId} />
+          <StageCostRow key={stage.id} stage={stage} readOnly={effectiveReadOnly} onRequestDelete={setDeleteId} />
         ))}
       </div>
 
@@ -246,7 +249,7 @@ export function StagesCostSection({ projectId, readOnly = false, useProjectPrice
         </div>
       )}
 
-      {!readOnly && (
+      {!effectiveReadOnly && (
         <Button variant="ghost" size="sm" className="text-xs h-7 text-muted-foreground hover:text-foreground w-full" onClick={handleAddStage}>
           <Plus className="h-3 w-3 mr-1" /> Přidat etapu
         </Button>

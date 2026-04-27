@@ -1,60 +1,48 @@
-## Cieľ
+## Problém
 
-1. Pridať dve nové role do systému: **Nákupčí** (kopíruje preset PM) a **Finance** (kopíruje preset Viewer + povolené `canSeePrices` všade, kde má rola prístup).
-2. Odstrániť nefunkčné UI tlačidlá pre dynamické vytváranie/duplikovanie/mazanie rolí v `OsobyOpravneni`.
+V tabuľkách **Project Info**, **PM Status** a **TPV Status** (sekcia Etapy) je tlačidlo **"Přidat etapu"** a ikona koša pri každej etape gated len cez `canEdit && canWriteProjectInfoTab` (resp. `canWritePMStatusTab`). To znamená, že každý kto môže editovať Project Info, môže aj zakladať a mazať etapy. Mazanie je síce soft-delete (ide do koša 30 dní), ale chýba špecifické oprávnenie.
 
-## Prečo nie dynamické role
+## Návrh
 
-`app_role` je Postgres ENUM používaný v RLS politikach (`has_role()`), preto každá nová rola vyžaduje DB migráciu + úpravu TypeScriptu. Plné dynamické vytváranie z UI by bola veľká refaktorizácia – preto teraz pridáme len tieto dve role natvrdo a UI tlačidlá zmiznú.
+Pridám **jeden nový permission flag** `canManageStages` ("Spravovať etapy – pridať/mazať"), ktorý kontroluje:
+- tlačidlo **"Přidat etapu"** v `ProjectInfoTable.tsx`, `PMStatusTable.tsx`, `TPVStatusTable.tsx` (a `StagesCostSection.tsx` ak má rovnaké tlačidlo)
+- ikonu **koša** v riadku etapy v týchto tabuľkách
+- prípadne v `StageQuickEditDialog` ak ponúka pridať/zmazať
 
-## Zmeny
+Dôvod jedného flagu (nie dvoch zvlášť add/delete): aby zoznam oprávnení nenarástol – tieto dve akcie patria k sebe (správa štruktúry projektu).
 
-### 1) DB migrácia – nové enum hodnoty + defaulty
+### Defaultne ZAPNUTÉ pre roly:
+- `owner`, `admin` – vždy true (ALL_TRUE / admin override)
+- `vedouci_pm` – true (vedie projekty, štandardne mení štruktúru)
+- `pm` – true (zakladajú projekty)
+- `nakupci` – true (kopíruje PM)
+- `vedouci_konstrukter` – true
+- `kalkulant` – true (často zakladá štruktúru pri kalkulácii)
 
-```sql
--- Pridať dve nové hodnoty do enum app_role
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'nakupci';
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'finance';
-```
+### Defaultne VYPNUTÉ:
+- `konstrukter` – false (môže editovať polia, ale nie meniť štruktúru etáp)
+- `vedouci_vyroby`, `mistr`, `quality`, `viewer`, `finance`, `tester` – false
 
-Potom v samostatnej migrácii (enum hodnoty nemôžu byť použité v tej istej transakcii, kde sú vytvorené):
+### Cascade
+Pridám `canManageStages` do `MODULE_CASCADE` pod `canAccessProjectInfo` (master Project Info) – ak je modul vypnutý, vypne sa aj toto.
 
-```sql
--- Nákupčí = kópia PM presetu z role_permission_defaults
-INSERT INTO public.role_permission_defaults (role, permissions)
-SELECT 'nakupci'::app_role, permissions
-FROM public.role_permission_defaults
-WHERE role = 'pm'
-ON CONFLICT (role) DO UPDATE
-  SET permissions = EXCLUDED.permissions;
+## Technické zmeny
 
--- Finance = kópia Viewer + canSeePrices = true
-INSERT INTO public.role_permission_defaults (role, permissions)
-SELECT 'finance'::app_role,
-       permissions
-         || jsonb_build_object('canSeePrices', true)
-FROM public.role_permission_defaults
-WHERE role = 'viewer'
-ON CONFLICT (role) DO UPDATE
-  SET permissions = EXCLUDED.permissions;
-```
-
-### 2) `src/hooks/useAuth.tsx`
-
-Rozšíriť typ `AppRole` o `"nakupci" | "finance"` a doplniť všetky odvodené flagy (napr. `canAccessOsoby`, `canSeePrices` atď.) tak, aby pracovali rovnako ako PM, resp. Viewer + ceny. Konkrétne pridať tieto role do tých istých vetiev kde sa už spomína `pm` / `viewer`.
-
-### 3) `src/lib/permissionPresets.ts`
-
-- Pridať `nakupci` a `finance` do `ROLE_LABELS` (`"Nákupčí"`, `"Finance"`).
-- Pridať `ROLE_PRESETS.nakupci = { ...ROLE_PRESETS.pm }` a `ROLE_PRESETS.finance = { ...ROLE_PRESETS.viewer, canSeePrices: true }`.
-
-### 4) `src/components/osoby/OsobyOpravneni.tsx`
-
-- `ROLE_ORDER` doplniť `"nakupci"` (za `pm`) a `"finance"` (pred `viewer`).
-- Odstrániť tlačidlo **Duplikovať** v hlavičke (riadky 749–757) a funkciu `handleDuplicate`.
-- Odstrániť tlačidlo **Nová rola** v sidebare (riadky 717–723) a funkciu `handleNewRole`.
-- Žiadne mazanie rolí ani premenovanie sa nezavádza.
+1. **DB migrácia** – update `role_permission_defaults` pre každú rolu (set `canManageStages` v jsonb).
+2. **`src/lib/permissionPresets.ts`**:
+   - pridať `canManageStages` do `PermissionFlag`, `PERMISSION_FLAGS`, `PERMISSION_LABELS`
+   - pridať do `MODULE_CASCADE.canAccessProjectInfo.subs`
+   - pridať do `projectInfoFull` helper (aby sa automaticky propagoval do PM/Konštruktér presetov), ale **nie** do `projectInfoReadOnly`
+   - explicitne odstrániť z `konstrukter` presetu (preset volá `projectInfoFull` – takže treba upraviť: buď `konstrukter` nedostane cez full, alebo ho dáme samostatne). Najjednoduchšie: pridať do `projectInfoFull` a v `konstrukter` preset to override-núť na false. Riešenie: rozdelím – `projectInfoFull` zostane bez `canManageStages`, a flag pridám explicitne k tým rolám, ktoré ho majú mať.
+3. **`src/hooks/useAuth.tsx`** – exportovať `canManageStages` z `usePermissions`.
+4. **`src/components/ProjectInfoTable.tsx`** – tlačidlo "Přidat etapu" a ikona koša gated cez `canManageStages` (namiesto/aj okrem `canEdit`).
+5. **`src/components/PMStatusTable.tsx`** – to isté (kôš + Přidat etapu).
+6. **`src/components/TPVStatusTable.tsx`** – to isté ak má add/delete tlačidlá.
+7. **`src/components/StagesCostSection.tsx`** – preveriť a aplikovať.
+8. **`src/components/osoby/OsobyOpravneni.tsx`** – flag sa zobrazí automaticky cez `PERMISSION_FLAGS` + `PERMISSION_LABELS`.
 
 ## Výsledok
 
-V module *Oprávnenia* sa v zozname rolí objaví `Nákupčí` (správa rovnaká ako PM) a `Finance` (rovnaká ako Viewer, ale vidí ceny). Owner môže ďalej upravovať ich oprávnenia štandardne cez UI (uložia sa do `role_permission_defaults` aj `user_roles`). Tlačidlá Duplikovať a Nová rola už nebudú zavádzať toast „len cez DB migráciu".
+Admin/Owner/PM/Vedúci PM/Nákupčí/Vedúci konštruktér/Kalkulant – môžu pridávať a mazať etapy.
+Konštruktér a všetci nižší – tlačidlo "Přidat etapu" zmizne, ikona koša zmizne. Editácia polí etapy zostáva nedotknutá.
+Owner môže kedykoľvek toto oprávnenie zmeniť per-rola alebo per-osoba v Osoby → Oprávnenia.

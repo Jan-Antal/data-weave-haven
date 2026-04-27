@@ -115,7 +115,7 @@ interface StageRowProps {
 function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
-  const { isFieldReadOnly } = useAuth();
+  const { isFieldReadOnly, canManageStages } = useAuth();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
     const tracked = ["konstrukter", "status", "datum_smluvni"];
@@ -207,11 +207,11 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
             <button onClick={onCancelConfirm} className="text-destructive hover:underline font-medium">Zrušit</button>
             <button onClick={onCancelDismiss} className="text-muted-foreground hover:underline">Ponechat</button>
           </div>
-        ) : (
+        ) : canManageStages ? (
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
             <Trash2 className="h-3 w-3 text-destructive" />
           </Button>
-        )}
+        ) : null}
       </TableCell>
     </TableRow>
   );
@@ -222,6 +222,7 @@ const MemoSortableStageRow = memo(SortableStageRow);
 // ── Stages section (same pattern as PM Status) ──────────────────────
 function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, renderKeys, personFilter, statusFilterSet, searchLower, showAddButton = true, parentMatchesSearch = false }: { projectId: string; project: Project; isVisible: (key: string) => boolean; statusLabels: string[]; canEdit: boolean; renderKeys: string[]; personFilter: string | null; statusFilterSet: Set<string> | null; searchLower: string | null; showAddButton?: boolean; parentMatchesSearch?: boolean }) {
   const { data: stages = [] } = useProjectStages(projectId);
+  const { canManageStages } = useAuth();
   const deleteStage = useDeleteStage();
   const reorderStages = useReorderStages();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -312,7 +313,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
     reorderStages.mutate({ stages: reordered.map((s, i) => ({ id: s.id, stage_order: i })), projectId });
   }, [stages, projectId, reorderStages]);
 
-  const handleDelete = useCallback((id: string) => setDeleteId(id), []);
+  const handleDelete = useCallback((id: string) => { if (canManageStages) setDeleteId(id); }, [canManageStages]);
 
   return (
     <>
@@ -339,7 +340,7 @@ function StagesSection({ projectId, project, isVisible, statusLabels, canEdit, r
           ))}
         </SortableContext>
       </DndContext>
-      {showAddButton && (
+      {showAddButton && canManageStages && (
         <TableRow className="bg-muted/20 h-9">
           <TableCell colSpan={20}>
             <Button variant="ghost" size="sm" className="text-xs h-5 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 font-normal" onClick={handleInlineAdd}>
