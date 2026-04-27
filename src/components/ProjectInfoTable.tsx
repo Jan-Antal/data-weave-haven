@@ -443,10 +443,15 @@ const ProjectRow = memo(function ProjectRow({
 }: ProjectRowProps) {
   // Merge stage data into project display for multi-stage summary
   const computedPct = useMemo(() => tpvItems ? computeTPVProgress(tpvItems) : null, [tpvItems]);
+  // When user disabled "Auto-suma z etap" (plan_use_project_price=true), the project
+  // row shows manual project values directly — no Σ aggregation, fields stay editable.
+  const useProjectOverride = (p as any).plan_use_project_price === true;
   const displayProject = useMemo(() => {
     const overrides = getProjectDisplayOverrides(stagesRaw);
     let base: Project;
-    if (overrides.isSingleStage && overrides.singleStage) {
+    if (useProjectOverride) {
+      base = p;
+    } else if (overrides.isSingleStage && overrides.singleStage) {
       const s = overrides.singleStage;
       base = {
         ...p,
@@ -477,9 +482,9 @@ const ProjectRow = memo(function ProjectRow({
       return { ...base, percent_tpv: computedPct } as Project;
     }
     return base;
-  }, [p, stagesRaw, computedPct]);
+  }, [p, stagesRaw, computedPct, useProjectOverride]);
 
-  const isSummary = stageCount > 1;
+  const isSummary = stageCount > 1 && !useProjectOverride;
 
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
