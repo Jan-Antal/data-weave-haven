@@ -48,6 +48,7 @@ export type PermissionFlag =
   | "canAccessAnalyticsRezije"
   | "canAccessAnalyticsDilna"
   | "canAccessAnalyticsVykaz"
+  | "canAccessAnalyticsAbsence"
   // ===== Sub-záložky Project Info (R/W) =====
   | "canViewProjectInfoTab"
   | "canWriteProjectInfoTab"
