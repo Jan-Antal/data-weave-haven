@@ -538,6 +538,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     ...projectInfoFull,
     "canCreateProject",
     "canManageTPV",
+    "canManageStages",
     "canEdit",
     "canSeePrices",
     "canUploadDocuments",
