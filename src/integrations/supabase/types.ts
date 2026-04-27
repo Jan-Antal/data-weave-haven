@@ -2507,18 +2507,21 @@ export type Database = {
       get_daily_report: {
         Args: { report_date: string }
         Returns: {
+          bundle_display_label: string
           bundle_id: string
           bundle_label: string
           bundle_split_part: string
           is_on_track: boolean
           log_day_date: string
           logged_at: string
-          logged_at_day: string
           note_text: string
           percent: number
           phase: string
           project_id: string
           project_name: string
+          scheduled_hours: number
+          scheduled_week: string
+          stage_id: string
           total_plan_hours: number
           weekly_goal_pct: number
         }[]
