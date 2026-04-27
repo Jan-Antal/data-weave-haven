@@ -100,7 +100,7 @@ interface StageRowProps {
 function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, canEdit, renderKeys, cancelConfirm, onCancelConfirm, onCancelDismiss, dimmed, freshInheritedFields }: StageRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: stage.id });
   const updateStage = useUpdateStage();
-  const { isFieldReadOnly } = useAuth();
+  const { isFieldReadOnly, canManageStages } = useAuth();
   const style = { transform: CSS.Transform.toString(transform), transition };
   const saveStage = useCallback((field: string, value: string) => {
     const tracked = ["konstrukter", "status", "datum_smluvni"];
@@ -187,11 +187,11 @@ function SortableStageRow({ stage, project, onDelete, isVisible, statusLabels, c
             <button onClick={onCancelConfirm} className="text-destructive hover:underline font-medium">Zrušit</button>
             <button onClick={onCancelDismiss} className="text-muted-foreground hover:underline">Ponechat</button>
           </div>
-        ) : (
+        ) : canManageStages ? (
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(stage.id)}>
             <Trash2 className="h-3 w-3 text-destructive" />
           </Button>
-        )}
+        ) : null}
       </TableCell>
     </TableRow>
   );
