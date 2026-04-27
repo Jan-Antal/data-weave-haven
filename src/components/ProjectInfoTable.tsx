@@ -770,6 +770,15 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
     setEditProject(p);
   }, []);
 
+  const [stageEditorProjectId, setStageEditorProjectId] = useState<string | null>(null);
+  const handleOpenStageEditor = useCallback((projectId: string) => {
+    setStageEditorProjectId(projectId);
+  }, []);
+  const stageEditorProject = useMemo(
+    () => stageEditorProjectId ? projects.find(p => p.project_id === stageEditorProjectId) ?? null : null,
+    [stageEditorProjectId, projects]
+  );
+
   const handleAddStage = useCallback(async (projectId: string) => {
     const project = projects.find(pr => pr.project_id === projectId);
     if (!project) return;
