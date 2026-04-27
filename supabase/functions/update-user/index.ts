@@ -9,6 +9,7 @@ const VALID_ROLES = [
   "admin",
   "vedouci_pm",
   "pm",
+  "nakupci",
   "vedouci_konstrukter",
   "konstrukter",
   "vedouci_vyroby",
@@ -16,6 +17,7 @@ const VALID_ROLES = [
   "quality",
   "kalkulant",
   "vyroba",
+  "finance",
   "viewer",
   "tester",
 ];

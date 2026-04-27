@@ -1,48 +1,32 @@
-## Problém
+# Pridanie záložky Absence do oprávnení
 
-V tabuľkách **Project Info**, **PM Status** a **TPV Status** (sekcia Etapy) je tlačidlo **"Přidat etapu"** a ikona koša pri každej etape gated len cez `canEdit && canWriteProjectInfoTab` (resp. `canWritePMStatusTab`). To znamená, že každý kto môže editovať Project Info, môže aj zakladať a mazať etapy. Mazanie je síce soft-delete (ide do koša 30 dní), ale chýba špecifické oprávnenie.
+V Analytics pribudla záložka **Absence**, ale chýba pre ňu samostatný permission flag — aktuálne sa zobrazuje pod `canAccessAnalyticsVykaz`. Pridám dedikovaný flag a doplním ho do všetkých rolí + cascade pravidla.
 
-## Návrh
+## Zmeny
 
-Pridám **jeden nový permission flag** `canManageStages` ("Spravovať etapy – pridať/mazať"), ktorý kontroluje:
-- tlačidlo **"Přidat etapu"** v `ProjectInfoTable.tsx`, `PMStatusTable.tsx`, `TPVStatusTable.tsx` (a `StagesCostSection.tsx` ak má rovnaké tlačidlo)
-- ikonu **koša** v riadku etapy v týchto tabuľkách
-- prípadne v `StageQuickEditDialog` ak ponúka pridať/zmazať
+### 1. `src/lib/permissionPresets.ts`
+- Pridať `canAccessAnalyticsAbsence` do `PermissionFlag` typu, `PERMISSION_FLAGS[]` a `PERMISSION_LABELS` (label: „Záložka: Absence").
+- Doplniť do `MODULE_CASCADE` pod master `canAccessAnalytics`.
+- Doplniť do helpera `analyticsFull[]`, aby ho dostali role s plným prístupom k Analytics.
 
-Dôvod jedného flagu (nie dvoch zvlášť add/delete): aby zoznam oprávnení nenarástol – tieto dve akcie patria k sebe (správa štruktúry projektu).
+### 2. `src/hooks/useAuth.tsx`
+- Pridať `canAccessAnalyticsAbsence: boolean` do `Permissions` interface a do návratového objektu `usePermissions`.
 
-### Defaultne ZAPNUTÉ pre roly:
-- `owner`, `admin` – vždy true (ALL_TRUE / admin override)
-- `vedouci_pm` – true (vedie projekty, štandardne mení štruktúru)
-- `pm` – true (zakladajú projekty)
-- `nakupci` – true (kopíruje PM)
-- `vedouci_konstrukter` – true
-- `kalkulant` – true (často zakladá štruktúru pri kalkulácii)
+### 3. `src/pages/Analytics.tsx`
+- V definícii tabov zmeniť `{ key: "absence", visible: canAccessAnalyticsVykaz }` na `visible: canAccessAnalyticsAbsence`.
+- Pridať guard pre `absenceMode` (presmerovanie / hide ak nemá flag).
 
-### Defaultne VYPNUTÉ:
-- `konstrukter` – false (môže editovať polia, ale nie meniť štruktúru etáp)
-- `vedouci_vyroby`, `mistr`, `quality`, `viewer`, `finance`, `tester` – false
+### 4. Migrácia: defaults v `role_permission_defaults`
+Doplniť `canAccessAnalyticsAbsence` do JSONB pre každú rolu:
+- **true:** `owner`, `admin`, `vedouci_pm`, `pm`, `nakupci`, `finance`, `vedouci_konstrukter`, `vedouci_vyroby`, `mistr`, `kalkulant`, `tester`
+- **false:** `konstrukter`, `vyroba`, `quality`, `viewer`
 
-### Cascade
-Pridám `canManageStages` do `MODULE_CASCADE` pod `canAccessProjectInfo` (master Project Info) – ak je modul vypnutý, vypne sa aj toto.
+(Absence sú HR/manažérske dáta — výrobní operátori a viewer ich nepotrebujú.)
 
-## Technické zmeny
+## Pravidlo do pamäte
 
-1. **DB migrácia** – update `role_permission_defaults` pre každú rolu (set `canManageStages` v jsonb).
-2. **`src/lib/permissionPresets.ts`**:
-   - pridať `canManageStages` do `PermissionFlag`, `PERMISSION_FLAGS`, `PERMISSION_LABELS`
-   - pridať do `MODULE_CASCADE.canAccessProjectInfo.subs`
-   - pridať do `projectInfoFull` helper (aby sa automaticky propagoval do PM/Konštruktér presetov), ale **nie** do `projectInfoReadOnly`
-   - explicitne odstrániť z `konstrukter` presetu (preset volá `projectInfoFull` – takže treba upraviť: buď `konstrukter` nedostane cez full, alebo ho dáme samostatne). Najjednoduchšie: pridať do `projectInfoFull` a v `konstrukter` preset to override-núť na false. Riešenie: rozdelím – `projectInfoFull` zostane bez `canManageStages`, a flag pridám explicitne k tým rolám, ktoré ho majú mať.
-3. **`src/hooks/useAuth.tsx`** – exportovať `canManageStages` z `usePermissions`.
-4. **`src/components/ProjectInfoTable.tsx`** – tlačidlo "Přidat etapu" a ikona koša gated cez `canManageStages` (namiesto/aj okrem `canEdit`).
-5. **`src/components/PMStatusTable.tsx`** – to isté (kôš + Přidat etapu).
-6. **`src/components/TPVStatusTable.tsx`** – to isté ak má add/delete tlačidlá.
-7. **`src/components/StagesCostSection.tsx`** – preveriť a aplikovať.
-8. **`src/components/osoby/OsobyOpravneni.tsx`** – flag sa zobrazí automaticky cez `PERMISSION_FLAGS` + `PERMISSION_LABELS`.
+Uložím nové memory pravidlo: **„Každá nová záložka v ktoromkoľvek module musí dostať vlastný `canAccess...` flag v `permissionPresets.ts`, byť pridaná do `MODULE_CASCADE` pod správny master, do `usePermissions` hooku, do migrácie `role_permission_defaults` pre všetky role, a UI musí túto záložku gateovať cez `useAuth()`."**
 
-## Výsledok
+## Otázka pred implementáciou
 
-Admin/Owner/PM/Vedúci PM/Nákupčí/Vedúci konštruktér/Kalkulant – môžu pridávať a mazať etapy.
-Konštruktér a všetci nižší – tlačidlo "Přidat etapu" zmizne, ikona koša zmizne. Editácia polí etapy zostáva nedotknutá.
-Owner môže kedykoľvek toto oprávnenie zmeniť per-rola alebo per-osoba v Osoby → Oprávnenia.
+Pre rolu **Finance** (vidí ceny, inak viewer) — má vidieť aj záložku Absence? Predpokladám **áno** (finančné/HR reporting), ale potvrď ak nie.

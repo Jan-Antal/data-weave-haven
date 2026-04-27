@@ -48,6 +48,7 @@ export type PermissionFlag =
   | "canAccessAnalyticsRezije"
   | "canAccessAnalyticsDilna"
   | "canAccessAnalyticsVykaz"
+  | "canAccessAnalyticsAbsence"
   // ===== Sub-záložky Project Info (R/W) =====
   | "canViewProjectInfoTab"
   | "canWriteProjectInfoTab"
@@ -116,6 +117,7 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canAccessAnalyticsRezije",
   "canAccessAnalyticsDilna",
   "canAccessAnalyticsVykaz",
+  "canAccessAnalyticsAbsence",
   "canViewProjectInfoTab",
   "canWriteProjectInfoTab",
   "canViewPMStatusTab",
@@ -181,6 +183,7 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canAccessAnalyticsRezije: "Záložka: Réžie",
   canAccessAnalyticsDilna: "Záložka: Dílna",
   canAccessAnalyticsVykaz: "Záložka: Výkaz",
+  canAccessAnalyticsAbsence: "Záložka: Absence",
   canViewProjectInfoTab: "View: Project Info",
   canWriteProjectInfoTab: "Write: Project Info",
   canViewPMStatusTab: "View: PM Status",
@@ -295,6 +298,7 @@ const MODULE_CASCADE: Array<{ master: PermissionFlag; subs: PermissionFlag[] }> 
       "canAccessAnalyticsRezije",
       "canAccessAnalyticsDilna",
       "canAccessAnalyticsVykaz",
+      "canAccessAnalyticsAbsence",
     ],
   },
   {
@@ -370,6 +374,7 @@ const analyticsFull: PermissionFlag[] = [
   "canAccessAnalyticsRezije",
   "canAccessAnalyticsDilna",
   "canAccessAnalyticsVykaz",
+  "canAccessAnalyticsAbsence",
 ];
 
 const osobyFull: PermissionFlag[] = [
