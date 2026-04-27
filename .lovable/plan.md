@@ -1,115 +1,83 @@
-# Oprava: prelité projekty sa zobrazujú o týždeň neskôr
+# Oprava: split bundlu generuje náhodné písmeno (Q-2, D-4)
 
-## Zistenie
+## Príčina
 
-Po poslednej úprave sa „aktuálny pracovný týždeň“ cez víkend správne posunul na nový týždeň, ale časť logiky prelievania stále robí ešte ďalší `+7 dní` posun.
+V `SplitBundleDialog.handleSplitBundle()` sa pri splite vytvoria nové riadky v `production_schedule`, ale **nikde sa nenastaví `bundle_label`**:
 
-Výsledok je presne to, čo vidíš:
+- **Update** existujúcich riadkov nastavuje len `split_group_id` (nový UUID), `scheduled_hours`, `scheduled_czk`, `item_name`. Pôvodný `bundle_label = "D"` zostane.
+- **Insert** spillnutých riadkov vôbec nepošle `bundle_label` → v DB je `NULL`.
 
-```text
-Sobota po T18:
-aktuálny pracovný týždeň = T19
-starý kód pre spillover = aktuálny pracovný týždeň + 1 = T20
-=> prelité z T18 vidíš až v T20, čiže o týždeň neskôr
+Potom v `useProductionSchedule.ts:131`:
+
+```ts
+const bundleLabel = row.bundle_label ?? fallbackBundleLabel(row.split_group_id ?? `${pid}:...`);
 ```
 
-Správne má byť:
+`fallbackBundleLabel` je **deterministický hash UUID-ka na písmeno A–Z**. Pretože pri splite vznikol **nový** `split_group_id` (UUID), hash padne náhodne na "Q", "D" atď. — odtiaľ "Q-2" namiesto "D-2", "D-4" namiesto "A-4".
 
-```text
-Po–Pia počas T18:
-aktuálny pracovný týždeň = T18
-prelité z T18 sa majú ukázať v T19
-
-Sobota/Nedeľa po T18:
-aktuálny pracovný týždeň = T19
-zdroj prelitia = predchádzajúci týždeň T18
-cieľ prelitia = aktuálny pracovný týždeň T19
-```
+Druhý dôsledok: pôvodný `D` riadok má `bundle_label = "D"` (z DB), nový spill riadok má `bundle_label = NULL` → fallback "Q". V tej istej split chain teda existujú dva rôzne labely → bundle sa rozpadne na dve karty bez väzby.
 
 ## Plán úpravy
 
-### 1. Doplniť jasné helpery do `src/lib/workWeek.ts`
+### 1. `src/components/production/SplitBundleDialog.tsx`
 
-Nechať existujúci `getWorkWeekMonday()`, ale doplniť odvodené funkcie, aby sa už nikde ručne nerobilo nesprávne `+7`:
+**a) Rozšíriť typ `BundleSplitItem`** o `bundle_label: string | null`, aby sa dal zachovať pôvodný label.
 
-- `getCalendarWeekMonday()` – skutočný ISO pondelok dnešného kalendárneho týždňa.
-- `getSpillSourceWeekMonday()` – týždeň, z ktorého sa majú brať nedokončené projekty.
-- `getSpillDestinationWeekMonday()` / `getSpillDestinationWeekKey()` – týždeň, v ktorom sa majú prelité projekty zobraziť.
-
-Pravidlo bude:
-
-```text
-Po–Pia: source = aktuálny kalendárny týždeň, destination = ďalší týždeň
-So–Ne: source = práve skončený kalendárny týždeň, destination = aktuálny pracovný týždeň
-```
-
-### 2. Opraviť Výrobu (`src/pages/Vyroba.tsx`)
-
-Nahradiť miesta, kde sa dnes robí:
+**b) V `handleSplitBundle()` určiť cieľový label:**
 
 ```ts
-const realMonday = getWorkWeekMonday();
-const spilloverDest = realMonday + 7 dní;
+const targetBundleLabel =
+  items.find((i) => i.bundle_label)?.bundle_label ?? null;
 ```
 
-novým helperom:
+Ak nikto nemá label (legacy), nechať `null` a po inserte sa zavolá `getAvailableBundleLabel(projectId, stageId, [...newIds])` aby sa pridelil prvý voľný (A, B, C…) — nie hash.
 
-- zdrojové silo bude `getSpillSourceWeekKey()`
-- cieľové silo bude `getSpillDestinationWeekKey()`
+**c) Pri `update` existujúcich riadkov** pridať:
 
-Týka sa oboch výpočtov:
+```ts
+bundle_label: targetBundleLabel,
+bundle_type: "split",
+```
 
-- desktop/hlavný `projects` výpočet
-- mobilný/pager `getProjectsForWeek()` helper
+**d) Pri `insert` spillnutých riadkov** pridať:
 
-### 3. Opraviť Plán Výroby Kanban (`src/components/production/WeeklySilos.tsx`)
+```ts
+bundle_label: targetBundleLabel,
+bundle_type: "split",
+```
 
-Tento komponent ešte používa starý kalendárny `getMonday(new Date())` a potom `+7`, takže Kanban vie ostať o týždeň posunutý.
+Tým majú **všetky** riadky v chain ten istý label (napr. „D"), a `split_part`/`split_total` ich očísluje 1/2, 2/2 → zobrazí sa **D-1, D-2** miesto „D, Q-2".
 
-Upravím:
+### 2. `src/components/production/WeeklySilos.tsx`
 
-- `currentWeekKey` na pracovný aktuálny týždeň
-- `realCurrentWeekKey` pre daylogy na zdrojový týždeň prelitia
-- `spilloverDestKey` na cieľový týždeň prelitia bez extra posunu
-- generovanie týždňových stĺpcov tak, aby aktuálny stĺpec cez víkend bol už nový pracovný týždeň
+V mieste, kde sa volá `setBundleSplitState({ items: activeItems.map(...) })` (cca riadok 677), pridať do mapping objektu:
 
-### 4. Opraviť Tabuľkový pohľad Plánu Výroby (`src/components/production/PlanVyrobyTableView.tsx`)
+```ts
+bundle_label: i.bundle_label ?? null,
+```
 
-Tento pohľad si aktuálny týždeň stále počíta lokálnym ISO `getMonday(new Date())` a navyše používa `toISOString()`.
+aby sa pôvodný label dostal do dialogu.
 
-Upravím ho na:
+### 3. `src/hooks/useProductionSchedule.ts` (poistka)
 
-- `getWorkWeekMonday()` pre aktuálny týždeň
-- lokálne formátovanie `YYYY-MM-DD` namiesto `toISOString().split("T")[0]`
+Aktuálne `fallbackBundleLabel(split_group_id ?? ...)` generuje pri NULL labeli **náhodné** písmeno z UUID. Tento fallback necháme ako záchranu pre starodávne riadky, ale po fixe vyššie sa naň pri novom splite **nikdy** nedostaneme, lebo `bundle_label` bude v DB vždy nastavený.
 
-Tým sa zarovná Kanban aj Tabuľka.
+### 4. (Voliteľné, samostatné) Migrácia pre už pokazené riadky
 
-### 5. Opraviť Dílna Analytics (`src/components/DilnaDashboard.tsx`)
+Pre existujúce zlomené splity (Allianz D-Q, RD Skalice A→D-4) nie je potrebná SQL migrácia — stačí:
+- buď ručne otvoriť „Upraviť split" a uložiť (po fixe sa label normalizuje),
+- alebo pripraviť jednorazovú SQL migráciu, ktorá pre každý `split_group_id` v `production_schedule` zjednotí `bundle_label` na prvú nenull hodnotu zo skupiny (a kde je všetko NULL, priradí prvé voľné písmeno cez aplikačnú logiku — to nie je triviálne v SQL, takže si to vyžiada Edge Function alebo manuálny prechod).
 
-Dílna už zobrazuje pracovný týždeň správne, ale spillover query je viazané na `weekOffset === 1`, čo po víkendovom preklopení znamená, že preliatie sa načíta až pri ďalšom týždni.
-
-Upravím:
-
-- spillover zdroj na `getSpillSourceWeekKey()`
-- spillover cieľ na `getSpillDestinationWeekKey()`
-- pre aktuálny týždeň cez víkend sa budú ťahať nedokončené bundly z predchádzajúceho týždňa
-- zachová sa guard, aby sa nezobrazili dokončené / midflight / už naplánované bundly
-
-### 6. Aktualizovať pamäť pravidla
-
-Aktualizujem memory pre `production-tracking/spill-logic`, aby bolo jasné:
-
-- „aktuálny pracovný týždeň“ sa cez víkend prepína na nový týždeň,
-- ale zdroj prelitia je vtedy predchádzajúci kalendárny týždeň,
-- nikdy sa nesmie aplikovať ešte ďalšie `+7` nad pracovný týždeň.
+**Navrhujem:** v tomto kroku spraviť len **kódový fix** (body 1–2), aby sa nové splity správali korektne. Opravu existujúcich pokazených chainov urobíme samostatne (vieš mi povedať, či ich chceš normalizovať dávkovo, alebo si ich preklikáš ručne).
 
 ## Očakávaný výsledok
 
-- V sobotu po skončení T18 bude aktuálny pohľad T19.
-- Nedokončené projekty z T18 sa zobrazia hneď v T19 ako „Přelité z minulého týdne“.
-- Nebudú preskočené do T20.
-- Správanie bude rovnaké v:
-  - Analytics → Dílna,
-  - Výroba,
-  - Plán Výroby Kanban,
-  - Plán Výroby Tabuľka.
+- Allianz: split „D" vyrobí v cieľovom týždni **D-2** (a pôvodný sa premenuje na **D-1**).
+- RD Skalice: split „A-3" vyrobí **A-4**, nie „D-4".
+- Bundle ostane jednou kartou cez týždne (rovnaký `bundle_label` + `split_group_id`).
+- Žiadne ďalšie náhodné písmená (Q, X, …) pri splitoch.
+
+## Súbory, ktoré sa zmenia
+
+- `src/components/production/SplitBundleDialog.tsx` (typ + handleSplitBundle)
+- `src/components/production/WeeklySilos.tsx` (1 riadok – pridať `bundle_label` do mapovania)
