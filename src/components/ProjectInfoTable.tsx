@@ -441,6 +441,7 @@ const ProjectRow = memo(function ProjectRow({
   riskHighlight,
   onEditProject,
   isFieldReadOnly,
+  onOpenStageEditor,
 }: ProjectRowProps) {
   // Merge stage data into project display for multi-stage summary
   const computedPct = useMemo(() => tpvItems ? computeTPVProgress(tpvItems) : null, [tpvItems]);
