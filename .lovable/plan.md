@@ -1,49 +1,37 @@
-## Cieľ
-Vytvoriť novú edge funkciu `daily-report`, ktorá vracia per-bundle plán + denné logy s `weekly_goal_pct` (rovnaké čísla ako Dílna: A-6=68%, D-1=15% atď.).
+## Problém
+Pre full bundle (napr. Reklamace Bar terasa Z-2604-003, etapa A) sa goal % nehýbe — drží 100% celý týždeň. Tento týždeň (27.4.–1.5.) má len 4 pracovné dni (1.5. = Svátek práce). Pondelok prešiel, takže by goal mal byť **25%** (1/4), nie 100%.
 
-## Zdroj dát
-SQL funkcia `public.get_daily_report(report_date date)` už existuje a per-bundle goal % počíta správne (overené). Edge funkcia bude tenký wrapper okolo nej + obohatenie o agregát po projektoch.
+Príčiny:
+1. **`DilnaDashboard.tsx`**: full bundles vracajú fixne 100% (`bundleExpectedPctScaled` a `expectedForBundle` skipujú ramping pre non-split bundles).
+2. **`DilnaDashboard.tsx`**: `dayFraction = workdayIdx / 5` — fixné delenie 5, ignoruje `working_days` z `production_capacity`.
+3. **SQL `get_daily_report`**: tiež delí fixne `(day_idx + 1) / 5` a používa `LEAST(ISODOW - 1, 4)` — nepozná sviatky.
 
-## Endpoint
-`GET /functions/v1/daily-report?date=YYYY-MM-DD`
-- `date` voliteľné, default = dnes (Europe/Prague, lokálny dátum, žiadne `toISOString`)
-- Auth: vyžaduje JWT (validácia v kóde cez SUPABASE_JWKS), ako ostatné interné funkcie
+## Riešenie
 
-## Response shape
-```json
-{
-  "report_date": "2026-04-27",
-  "rows": [ /* surové riadky z get_daily_report */ ],
-  "by_project": [
-    {
-      "project_id": "Z-2617-001",
-      "project_name": "Allianz",
-      "total_plan_hours": 1234,
-      "bundles": [
-        { "bundle_id": "...", "bundle_label": "A", "bundle_display_label": "A-6",
-          "split_part": "6", "scheduled_week": "2026-04-27",
-          "scheduled_hours": 161.8, "weekly_goal_pct": 68,
-          "logs": [ { "phase": "...", "percent": 50, "is_on_track": false,
-                       "note_text": "...", "logged_at": "..." } ] }
-      ]
-    }
-  ]
-}
-```
+### 1. `src/components/DilnaDashboard.tsx`
+- Načítať `working_days` z už-fetchnutého `capacityRes` (default 5, clamp 1–5).
+- Prepočítať `dayFraction` na **`completedWorkdays / weekWorkingDays`**:
+  - Ak je dnes pracovný deň → `dayFraction = (workdayIdx - 1) / weekWorkingDays` (deň ešte beží = "počas dňa už ráta", ako si schválil).
+  - Cez víkend / po skončení skráteného týždňa → 1.
+  - Past week → 1, future week → 0.
+- **Ramp aj pre full bundles** (okrem prelitých zo spillu):
+  - `bundleExpectedPctScaled(splitGroupId, isSpilled)`: ak `isSpilled === true` (bundle prišiel z T-1) → drží 100%. Inak full → ramp `0 → 100` podľa `dayFraction`. Split → existujúci chain-window ramp.
+  - Update všetkých 3 call sites (riadky 681, 770, `expectedForBundle`).
 
-## Implementácia (`supabase/functions/daily-report/index.ts`)
-1. CORS preflight + JSON response helpers (vzor podľa `project-summary`).
-2. Validácia inputu Zodom (`date` = optional ISO date).
-3. Service-role klient → `supabase.rpc('get_daily_report', { report_date })`.
-4. Roztriediť `row_kind = 'plan' | 'log'`, zoskupiť do `by_project` → `bundles` → `logs`.
-5. Vrátiť aj raw `rows` (pre flexibilitu konzumentov ako AMI/Slack).
-6. Žiadne nové RPC, žiadne migrácie.
+### 2. `supabase/migrations/*` — update SQL funkcie `get_daily_report`
+- Pridať CTE `week_capacity` ktorá vyberie `working_days` z `production_capacity` pre `current_week_monday` (default 5).
+- Prepočítať `day_idx`:
+  - Skipovať dni mimo `working_days` (napr. v skrátenom týždni s 1.5.=sviatok piatok = 1, ráta sa Po=0..Št=3).
+  - Definovať `completed_workdays` ako počet pracovných dní pred dnešným dátumom v aktuálnom týždni.
+- Goal vzorec: `chain_prior_hours + this_week_hours * completed_workdays / week_working_days`.
+- Pre full bundles (non-split) nepridávať special case v SQL — funkcia už počíta `chain_total_hours = this_week_hours` pre full bundle, takže ramp 0→100 príde automaticky. Spillover handling pre full bundles necháme len v UI (SQL nemá info o spille).
 
-## config.toml
-Pridať blok pre `daily-report` len ak treba override (default `verify_jwt = false` postačí, validácia JWT v kóde). Inak nemeniť.
+## Test
+1. Reklamace Bar terasa (Z-2604-003) etapa A v utorok 28.4. → očakávaný goal **25%** (1 dokončený deň / 4 pracovné dni).
+2. Allianz A-6 (split) → 68% (chain-window slice ramp ostáva korektný).
+3. Allianz B (spilled full bundle) → 100% (špeciálny prípad v UI).
+4. Edge funkcia `daily-report?date=2026-04-28` vráti pre Z-2604-003 etapu A `weekly_goal_pct = 25`.
 
-## Test plán
-Po deployi `curl_edge_functions` na `/daily-report?date=2026-04-27` a overiť, že:
-- Allianz A-6 má `weekly_goal_pct = 68`
-- Allianz D-1 má `weekly_goal_pct = 15`
-- Allianz B (full bundle) má `weekly_goal_pct = 100`
+## Súbory
+- `src/components/DilnaDashboard.tsx` — ramp full bundles, `weekWorkingDays`-aware dayFraction, signature update.
+- `supabase/migrations/<new>_get_daily_report_working_days.sql` — `CREATE OR REPLACE FUNCTION public.get_daily_report` s rešpektovaním `production_capacity.working_days`.

@@ -198,6 +198,12 @@ function useDilnaData(weekOffset: number) {
         Number((capacityRes.data as any)?.capacity_hours) ||
         Number(settingsRes.data?.weekly_capacity_hours) ||
         875;
+      // Skutočné pracovné dni v zobrazenom týždni (sviatky/firemné dni znižujú).
+      // Default 5, clamp 1..5 keď chýba kapacitný riadok.
+      const weekWorkingDays = Math.max(
+        1,
+        Math.min(5, Number((capacityRes.data as any)?.working_days) || 5),
+      );
 
       const overheadSet = new Set<string>(
         (((overheadRes.data || []) as unknown) as Array<{ project_code: string }>).map(o => o.project_code)
@@ -529,20 +535,6 @@ function useDilnaData(weekOffset: number) {
         chainWindowBySplitGroup.set(sg, { start, end });
       }
 
-      // Day-fraction-scaled per-bundle target.
-      // Full bundle (vrátane prelitých z T-1) = balík mal byť hotový tento týždeň → cieľ 100 % po celý týždeň.
-      // Split bundle ramps from chain-window start (Sunday) to chain-window end (Friday) by dayFraction.
-      function bundleExpectedPctScaled(splitGroupId: string | null): number {
-        if (!splitGroupId) return 100;
-        const window = chainWindowBySplitGroup.get(splitGroupId);
-        if (!window) return 100;
-        const { start, end } = window;
-        // Future weeks: target = END of slice (full weekly goal — bar shouldn't pre-shrink to start).
-        // Current week: ramp from start → end by dayFraction. Past week: dayFraction=1 → end.
-        if (!isCurrentWeek && !isPastWeek) return Math.round(end);
-        return Math.round(start + (end - start) * dayFraction);
-      }
-
       // ── Spilled projects: have prior weeks with active status (in_progress/paused) ──
       const spilledProjects = new Set<string>();
       for (const row of allSched) {
@@ -553,12 +545,44 @@ function useDilnaData(weekOffset: number) {
       }
 
       // ── dayFraction: how far into the displayed week we are ──
+      // Mid-day already counts the in-progress day (e.g. utorok ráno → 1 dokončený deň).
+      // Sat/Sun → all working days completed.
+      // V skrátenom týždni (sviatok) sa delí skutočným počtom pracovných dní z production_capacity.
       const todayDate = new Date();
       const isCurrentWeek = weekOffset === 0;
       const isPastWeek = weekOffset < 0;
       const dayOfWeek = todayDate.getDay(); // 0=Ne … 6=So
-      const workdayIdx = dayOfWeek === 0 ? 5 : Math.min(dayOfWeek, 5); // Po=1 … Pá=5
-      const dayFraction = isPastWeek ? 1 : isCurrentWeek ? workdayIdx / 5 : 0;
+      // Po=1 … Pá=5, víkend → maxWorkdayIdx (všetko hotové).
+      const workdayIdx = dayOfWeek === 0 || dayOfWeek === 6
+        ? weekWorkingDays
+        : Math.min(dayOfWeek, weekWorkingDays);
+      const dayFraction = isPastWeek
+        ? 1
+        : isCurrentWeek
+          ? Math.min(1, workdayIdx / weekWorkingDays)
+          : 0;
+
+      // Day-fraction-scaled per-bundle target.
+      // Full bundle (non-spilled) → ramp 0 → 100 podľa pracovných dní v týždni.
+      // Full bundle SPILLED z T-1 → balík mal byť hotový už minulý týždeň → drží 100 %.
+      // Split bundle → ramp v rámci chain-window slice tohto týždňa.
+      function bundleExpectedPctScaled(splitGroupId: string | null, isSpilled: boolean): number {
+        // Spilled full/split bundle → 100% (balík mal byť hotový minulý týždeň).
+        if (isSpilled) return 100;
+        // Future weeks → END of slice (alebo 100 pre full bundle).
+        if (!isCurrentWeek && !isPastWeek) {
+          if (!splitGroupId) return 100;
+          const w = chainWindowBySplitGroup.get(splitGroupId);
+          return w ? Math.round(w.end) : 100;
+        }
+        // Full bundle → window 0..100.
+        // Split bundle → chain-window slice (start..end).
+        const window = splitGroupId
+          ? (chainWindowBySplitGroup.get(splitGroupId) ?? { start: 0, end: 100 })
+          : { start: 0, end: 100 };
+        const { start, end } = window;
+        return Math.round(start + (end - start) * dayFraction);
+      }
 
       function expectedFor(pid: string, plannedHours: number): number | null {
         if (plannedHours <= 0) return null;
@@ -678,7 +702,7 @@ function useDilnaData(weekOffset: number) {
               : label;
             // Per-bundle weekly target: full → stable 100%, split → chain-window ramped by dayFraction
             // (Sunday = window start = end of prev week's chain slice; Friday = window end at this week).
-            const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
+            const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id, !!b.isSpilled);
             // Per-bundle completion: resolved by bundle identity (no cross-bundle bleed).
             // Identity uses the bundle's stage_id from the first row in the entry.
             // Spilled bundles live in prevSchedule (T-1), not in current week's schedule.
@@ -767,7 +791,7 @@ function useDilnaData(weekOffset: number) {
           const label = b.bundle_label || "A";
           const displayLabel = b.bundle_type === "split" && b.split_part ? `${label}-${b.split_part}` : label;
           // Per-bundle weekly target: full → stable 100%, split → chain-window ramped by dayFraction.
-          const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id);
+          const bExpected = isUnmatched ? null : bundleExpectedPctScaled(b.split_group_id, true);
           // Resolve per-bundle pct via identity. For spilled bundles, stage_id comes from prevSchedule.
           const stageIdForBundle = prevSchedule.find(s => s.id === b.bundleId)?.stage_id ?? null;
           const bCompletion = isUnmatched
