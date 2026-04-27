@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -51,12 +52,9 @@ export function CompletionDialog({
   }, [items]);
 
   const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return sortedItems;
-    return sortedItems.filter(i =>
-      (i.item_code || "").toLowerCase().includes(q) ||
-      (i.item_name || "").toLowerCase().includes(q)
-    );
+    return sortedItems.filter(i => fuzzyMatchAny([i.item_code, i.item_name], q));
   }, [sortedItems, search]);
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();

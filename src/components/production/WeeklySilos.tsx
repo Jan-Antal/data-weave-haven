@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { productionCzkToSellingPrice } from "@/lib/currency";
 import { GripVertical, ChevronRight, AlertTriangle, Lock, LockOpen } from "lucide-react";
 import type { ForecastBlock } from "@/hooks/useForecastMode";
@@ -80,9 +81,10 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 
 function bundleMatchesSearch(bundle: { project_name: string; project_id: string; items: Array<{ item_code: string | null }> }, query: string, pm?: string | null): boolean {
   if (!query) return false;
-  const q = query.toLowerCase();
-  if (pm && pm.toLowerCase().includes(q)) return true;
-  return bundle.project_name.toLowerCase().includes(q) || bundle.project_id.toLowerCase().includes(q) || bundle.items.some(i => i.item_code?.toLowerCase().includes(q));
+  if (pm && fuzzyMatch(pm, query)) return true;
+  if (fuzzyMatch(bundle.project_name, query)) return true;
+  if (fuzzyMatch(bundle.project_id, query)) return true;
+  return bundle.items.some(i => i.item_code && fuzzyMatch(i.item_code, query));
 }
 
 interface Props {

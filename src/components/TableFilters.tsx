@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,9 +76,7 @@ function PersonFilterDropdown({ value, onChange }: { value: string | null; onCha
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = uniqueNames.filter((n) =>
-    n.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = uniqueNames.filter((n) => fuzzyMatch(n, search));
 
   useEffect(() => {
     if (open) {
@@ -138,7 +137,7 @@ function StatusFilterDropdown({ value, onChange }: { value: string[]; onChange: 
 
   const statusValues = getStatusFilterOptionValues(statusOptions.map((s) => s.label));
   const filtered = statusValues.filter((statusValue) =>
-    getStatusFilterLabel(statusValue).toLowerCase().includes(search.toLowerCase())
+    fuzzyMatch(getStatusFilterLabel(statusValue), search)
   );
 
   useEffect(() => {

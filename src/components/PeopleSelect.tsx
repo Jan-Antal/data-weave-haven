@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { usePeople } from "@/hooks/usePeople";
@@ -20,9 +21,7 @@ export function PeopleSelect({ role, value, onValueChange, open, onOpenChange }:
   const { openPeopleManagement } = usePeopleManagement();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = people.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = people.filter((p) => fuzzyMatch(p.name, search));
 
   useEffect(() => {
     if (open && inputRef.current) {

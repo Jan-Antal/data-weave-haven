@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,8 +64,7 @@ export function PeopleManagement({ open, onOpenChange }: PeopleManagementProps) 
 
   const filtered = useMemo(() => {
     if (!search) return grouped;
-    const s = search.toLowerCase();
-    return grouped.filter((p) => p.name.toLowerCase().includes(s));
+    return grouped.filter((p) => fuzzyMatch(p.name, search));
   }, [grouped, search]);
 
   useEffect(() => {

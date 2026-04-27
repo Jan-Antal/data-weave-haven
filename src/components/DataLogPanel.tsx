@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { useActivityLog, useActivityLogUsers, type ActivityLogEntry, type DateRange } from "@/hooks/useActivityLog";
 import { useUserSessions, formatSessionDuration, formatRelativeTime, type UserSessionSummary } from "@/hooks/useUserAnalytics";
 import { useProjects } from "@/hooks/useProjects";
@@ -134,9 +135,8 @@ function ProjectFilterCombobox({
 
   const filtered = useMemo(() => {
     if (!search) return projects.slice(0, 30);
-    const q = search.toLowerCase();
     return projects.filter(
-      p => p.project_id.toLowerCase().includes(q) || p.project_name.toLowerCase().includes(q)
+      p => fuzzyMatchAny([p.project_id, p.project_name], search)
     ).slice(0, 30);
   }, [projects, search]);
 

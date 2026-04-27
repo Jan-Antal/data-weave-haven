@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Search, Trash2, ChevronDown } from "lucide-react";
@@ -108,14 +109,10 @@ export function OsobyExternisti() {
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return rows;
     return rows.filter(r =>
-      r.name.toLowerCase().includes(q) ||
-      (r.firma ?? "").toLowerCase().includes(q) ||
-      (r.phone ?? "").toLowerCase().includes(q) ||
-      (r.email ?? "").toLowerCase().includes(q) ||
-      rolesSummary(r).toLowerCase().includes(q),
+      fuzzyMatchAny([r.name, r.firma, r.phone, r.email, rolesSummary(r)], q)
     );
   }, [rows, search]);
 

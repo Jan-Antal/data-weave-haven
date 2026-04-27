@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { Search, Plus, Trash2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -38,12 +39,10 @@ export function EmployeeManagement() {
   }, [employees]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return employees;
     return employees.filter(e =>
-      (e.meno ?? "").toLowerCase().includes(q) ||
-      (e.usek ?? "").toLowerCase().includes(q) ||
-      ((e as any).pracovni_skupina ?? "").toLowerCase().includes(q),
+      fuzzyMatchAny([e.meno, e.usek, (e as any).pracovni_skupina], q),
     );
   }, [employees, search]);
 

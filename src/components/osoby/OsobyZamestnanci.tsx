@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { fuzzyMatch, fuzzyMatchAny } from "@/lib/fuzzySearch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, MoreVertical, Plus, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -156,16 +157,11 @@ export function OsobyZamestnanci() {
   }, [employees]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     return employees.filter((e) => {
       if (strediskoFilter !== "all" && (e.stredisko ?? "Nepriradené") !== strediskoFilter) return false;
       if (!q) return true;
-      return (
-        (e.meno ?? "").toLowerCase().includes(q) ||
-        (e.usek ?? "").toLowerCase().includes(q) ||
-        (e.usek_nazov ?? "").toLowerCase().includes(q) ||
-        (e.pozicia ?? "").toLowerCase().includes(q)
-      );
+      return fuzzyMatchAny([e.meno, e.usek, e.usek_nazov, e.pozicia], q);
     });
   }, [employees, search, strediskoFilter]);
 
