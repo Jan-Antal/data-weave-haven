@@ -505,6 +505,13 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canAccessDaylog",
     ...analyticsFull,
   ),
+  finance: preset(
+    ...projectInfoReadOnly,
+    "canAccessPlanVyroby",
+    "canAccessDaylog",
+    ...analyticsFull,
+    "canSeePrices",
+  ),
   vyroba: preset(
     ...projectInfoReadOnly,
     "canEdit",
