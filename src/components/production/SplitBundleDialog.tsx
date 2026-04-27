@@ -23,6 +23,7 @@ interface BundleSplitItem {
   scheduled_hours: number;
   scheduled_czk: number;
   split_group_id: string | null;
+  bundle_label?: string | null;
 }
 
 interface SplitBundleDialogProps {
