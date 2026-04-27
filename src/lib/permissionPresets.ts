@@ -183,6 +183,7 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canAccessAnalyticsRezije: "Záložka: Réžie",
   canAccessAnalyticsDilna: "Záložka: Dílna",
   canAccessAnalyticsVykaz: "Záložka: Výkaz",
+  canAccessAnalyticsAbsence: "Záložka: Absence",
   canViewProjectInfoTab: "View: Project Info",
   canWriteProjectInfoTab: "Write: Project Info",
   canViewPMStatusTab: "View: PM Status",
