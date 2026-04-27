@@ -118,6 +118,21 @@ export function SplitBundleDialog({
           ? crypto.randomUUID()
           : `bundle-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
+      // Preserve the original bundle_label across the chain. If the items
+      // don't carry it (legacy), fall back to whatever label the DB row has.
+      let targetBundleLabel: string | null =
+        items.find((i) => i.bundle_label)?.bundle_label ?? null;
+      if (!targetBundleLabel) {
+        const { data: existingRow } = await supabase
+          .from("production_schedule")
+          .select("bundle_label")
+          .in("id", items.map((i) => i.id))
+          .not("bundle_label", "is", null)
+          .limit(1)
+          .maybeSingle();
+        targetBundleLabel = (existingRow as any)?.bundle_label ?? null;
+      }
+
       // Snapshot original state of all items being touched (for undo)
       const touchedIds = [...toMove, ...toSplit].map((i) => i.id);
       const { data: originalRows } = touchedIds.length
@@ -138,6 +153,8 @@ export function SplitBundleDialog({
               .update({
                 scheduled_week: targetWeek,
                 split_group_id: bundleGroupId,
+                bundle_label: targetBundleLabel,
+                bundle_type: "split",
               })
               .eq("id", item.id)
           )
@@ -156,6 +173,8 @@ export function SplitBundleDialog({
                 scheduled_hours: keepHours,
                 scheduled_czk: keepHours * czkPerHour,
                 split_group_id: bundleGroupId,
+                bundle_label: targetBundleLabel,
+                bundle_type: "split",
                 item_name: cleanName,
               }).eq("id", item.id),
               supabase.from("production_schedule").insert({
@@ -165,6 +184,8 @@ export function SplitBundleDialog({
                 scheduled_czk: spillHours * czkPerHour, position: 999,
                 status: "scheduled", created_by: user.id,
                 split_group_id: bundleGroupId,
+                bundle_label: targetBundleLabel,
+                bundle_type: "split",
               }).select("id").single(),
             ];
           })
