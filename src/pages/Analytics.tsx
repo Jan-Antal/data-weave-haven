@@ -309,10 +309,13 @@ export default function Analytics() {
     { key: "vykaz", label: "Výkaz", visible: canAccessAnalyticsVykaz },
     { key: "absence", label: "Absence", visible: canAccessAnalyticsAbsence },
   ];
-  const firstVisible = tabs.find((t) => t.visible !== false)?.key ?? "dilna";
+  const dilnaVisible = tabs.find((t) => t.key === "dilna")?.visible !== false;
+  const defaultTab = dilnaVisible
+    ? "dilna"
+    : tabs.find((t) => t.visible !== false)?.key ?? "dilna";
 
   return (
-    <PageTabsShell tabs={tabs} defaultTab={firstVisible} paramName="tab">
+    <PageTabsShell tabs={tabs} defaultTab={defaultTab} paramName="tab">
       {() => (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Per-tab toolbar */}
