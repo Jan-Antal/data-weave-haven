@@ -683,6 +683,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
                 scheduled_hours: i.scheduled_hours,
                 scheduled_czk: i.scheduled_czk,
                 split_group_id: i.split_group_id,
+                bundle_label: i.bundle_label ?? bundle.bundle_label ?? null,
               })),
             });
           },
