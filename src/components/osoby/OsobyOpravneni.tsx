@@ -486,16 +486,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
       toast({ title: "Žiadni používatelia v tejto roli" });
       return;
     }
-    const customCount = targets.filter(
-      (r) =>
-        r.permissions &&
-        Object.keys(r.permissions).length > 0 &&
-        !permsEqual(ROLE_PRESETS[selectedRole], r.permissions),
-    ).length;
-    if (customCount > 0) {
-      setConfirmOverwrite({ count: customCount });
-      return;
-    }
     await persistSave();
   };
 
