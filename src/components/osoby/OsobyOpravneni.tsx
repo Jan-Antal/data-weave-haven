@@ -702,13 +702,6 @@ function OsobyOpravneniInner({ isOwner }: { isOwner: boolean }) {
             );
           })}
         </div>
-        <button
-          onClick={handleNewRole}
-          className="m-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center gap-1.5 transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nová rola
-        </button>
       </aside>
 
       {/* RIGHT PANEL */}
