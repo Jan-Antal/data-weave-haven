@@ -79,6 +79,11 @@ export function useUpdateProject() {
         });
       });
 
+      if (field === "status") {
+        qc.invalidateQueries({ queryKey: ["project_stages"] });
+        qc.invalidateQueries({ queryKey: ["all_project_stages"] });
+      }
+
       // Push to undo stack
       const parsedOld = parseField(field, oldValue);
       const parsedNew = parseField(field, value);
