@@ -3517,6 +3517,7 @@ function ProjectRow({
   const bundleDisplayLabel = formatBundleDisplayLabel({
     bundle_label: firstItem?.bundle_label ?? null,
     split_part: splitMeta.splitPart ?? firstItem?.split_part ?? null,
+    split_total: splitMeta.splitTotal ?? firstItem?.split_total ?? null,
     bundle_type: splitMeta.isSplit ? "split" : firstItem?.bundle_type ?? null,
   });
 
@@ -4124,6 +4125,7 @@ function DetailPanel({
                   const bLabel = formatBundleDisplayLabel({
                     bundle_label: item.bundle_label ?? null,
                     split_part: item.split_part ?? null,
+                    split_total: item.split_total ?? null,
                     bundle_type: (item.bundle_type as any) ?? (item.split_group_id ? "split" : "full"),
                   });
                   return (
@@ -4181,6 +4183,7 @@ function DetailPanel({
                   const bLabel = formatBundleDisplayLabel({
                     bundle_label: item.bundle_label ?? null,
                     split_part: item.split_part ?? null,
+                    split_total: item.split_total ?? splitTotal ?? null,
                     bundle_type: (item.bundle_type as any) ?? (item.split_group_id ? "split" : "full"),
                   });
                   return (

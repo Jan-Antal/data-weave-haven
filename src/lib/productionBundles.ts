@@ -53,10 +53,17 @@ export function buildBundleKey(target: {
 export function formatBundleDisplayLabel(target: {
   bundle_label: string | null;
   split_part?: number | null;
+  split_total?: number | null;
   bundle_type?: BundleType | null;
 }): string {
   const label = target.bundle_label || "A";
-  return target.bundle_type === "split" && target.split_part ? `${label}-${target.split_part}` : label;
+  // Show suffix whenever this bundle is part of a multi-part chain
+  // (split_part 1..N of N>1), regardless of bundle_type. The DB sometimes
+  // leaves the original part as bundle_type='full' even after a split.
+  const isMultiPart = !!target.split_part && (target.split_total ?? 0) > 1;
+  if (isMultiPart) return `${label}-${target.split_part}`;
+  if (target.bundle_type === "split" && target.split_part) return `${label}-${target.split_part}`;
+  return label;
 }
 
 export function deriveBundleSplitMeta<T extends {
