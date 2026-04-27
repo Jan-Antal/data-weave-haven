@@ -443,10 +443,15 @@ const ProjectRow = memo(function ProjectRow({
 }: ProjectRowProps) {
   // Merge stage data into project display for multi-stage summary
   const computedPct = useMemo(() => tpvItems ? computeTPVProgress(tpvItems) : null, [tpvItems]);
+  // When user disabled "Auto-suma z etap" (plan_use_project_price=true), the project
+  // row shows manual project values directly — no Σ aggregation, fields stay editable.
+  const useProjectOverride = (p as any).plan_use_project_price === true;
   const displayProject = useMemo(() => {
     const overrides = getProjectDisplayOverrides(stagesRaw);
     let base: Project;
-    if (overrides.isSingleStage && overrides.singleStage) {
+    if (useProjectOverride) {
+      base = p;
+    } else if (overrides.isSingleStage && overrides.singleStage) {
       const s = overrides.singleStage;
       base = {
         ...p,
@@ -477,9 +482,9 @@ const ProjectRow = memo(function ProjectRow({
       return { ...base, percent_tpv: computedPct } as Project;
     }
     return base;
-  }, [p, stagesRaw, computedPct]);
+  }, [p, stagesRaw, computedPct, useProjectOverride]);
 
-  const isSummary = stageCount > 1;
+  const isSummary = stageCount > 1 && !useProjectOverride;
 
   const bgStyle = useMemo(() => {
     const c = riskHighlight ? getProjectRiskColor(p, riskHighlight) : null;
@@ -512,7 +517,7 @@ const ProjectRow = memo(function ProjectRow({
         </TableCell>
       )}
       {v("project_name") && <TableCell style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.project_name}><span className="font-medium cursor-pointer hover:underline hover:text-primary transition-colors truncate" onClick={() => onEditProject(p)}>{p.project_name}</span></TableCell>}
-      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: stageCount > 1 ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" && !(field === "percent_tpv" && computedPct != null) : (field) => (field === "percent_tpv" && computedPct != null) ? true : isFieldReadOnly(field), isSummaryRow: isSummary }))}
+      {renderKeys.map((key) => renderColumnCell({ colKey: key, project: displayProject, save, canEdit: canEdit && (stageCount <= 1 || useProjectOverride || key === "architekt" || key === "klient" || key === "pm_poznamka" || key === "tpv_poznamka"), statusLabels, saveCurrency, customColumns, saveCustomField: (rowId, colKey, val, old) => saveCustomField(rowId, colKey, val, old), isFieldReadOnly: (stageCount > 1 && !useProjectOverride) ? (field) => field !== "architekt" && field !== "klient" && field !== "pm_poznamka" && field !== "tpv_poznamka" && !(field === "percent_tpv" && computedPct != null) : (field) => (field === "percent_tpv" && computedPct != null) ? true : isFieldReadOnly(field), isSummaryRow: isSummary }))}
     </TableRow>
   );
 });

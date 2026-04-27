@@ -96,19 +96,28 @@ export function getProjectDisplayOverrides(
   const konstrukterSummary = joinUnique(stageList.map(s => s.konstrukter));
 
   // Weighted average margin: Σ(price_i × margin_i) / Σ(price_i)
+  // - Stages without margin fall back to 15% default (matches global Margin Default rule)
+  // - If no stage has a price (totalWeight = 0), use plain average of margins
   // Result is in STORAGE/decimal format (e.g. 0.25 = 25%)
+  const DEFAULT_MARGIN = 0.15;
+  const stageMargins = stageList.map((s) => {
+    const raw = s.marze != null && s.marze !== ""
+      ? parseFloat(String(s.marze).replace(",", "."))
+      : NaN;
+    if (!isFinite(raw)) return DEFAULT_MARGIN;
+    return raw > 1 ? raw / 100 : raw;
+  });
   const totalWeight = stageList.reduce((acc, s) => acc + (s.prodejni_cena ?? 0), 0);
   let weightedMarze: number | null = null;
   if (totalWeight > 0) {
-    const weightedSum = stageList.reduce((acc, s) => {
+    const weightedSum = stageList.reduce((acc, s, i) => {
       const price = s.prodejni_cena ?? 0;
-      // marze is stored as decimal (0.25) or percentage (25) — normalize to decimal
-      const raw = s.marze ? parseFloat(String(s.marze).replace(",", ".")) : 0;
-      const decimal = raw > 1 ? raw / 100 : raw;
-      return acc + price * decimal;
+      return acc + price * stageMargins[i];
     }, 0);
-    // Result in decimal, rounded to 3 decimal places (e.g. 0.253)
     weightedMarze = Math.round((weightedSum / totalWeight) * 1000) / 1000;
+  } else if (stageMargins.length > 0) {
+    const avg = stageMargins.reduce((a, b) => a + b, 0) / stageMargins.length;
+    weightedMarze = Math.round(avg * 1000) / 1000;
   }
 
   // Average percent_tpv across stages (include 0% stages, only skip null)
