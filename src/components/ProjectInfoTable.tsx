@@ -968,6 +968,7 @@ export function ProjectInfoTable({ personFilter, statusFilter, search: externalS
                     riskHighlight={riskHighlight}
                     onEditProject={handleEditProject}
                     isFieldReadOnly={isFieldReadOnly}
+                    onOpenStageEditor={handleOpenStageEditor}
                   />
                   {expanded.has(p.project_id) && (stagesByProject.get(p.project_id)?.length ?? 0) > 1 && (
                     <StagesSection
