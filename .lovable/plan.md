@@ -1,34 +1,49 @@
-## Problém
+## Cieľ
+Vytvoriť novú edge funkciu `daily-report`, ktorá vracia per-bundle plán + denné logy s `weekly_goal_pct` (rovnaké čísla ako Dílna: A-6=68%, D-1=15% atď.).
 
-V Analytics → Dílna sa pre split bundles (Allianz A-6, D-1) zobrazuje pre všetky bundles rovnaký cieľ namiesto per-bundle. Užívateľ očakáva: A-6 = 68 %, D-1 = 15 %, B (full, prelitý z T-1) = 100 %.
+## Zdroj dát
+SQL funkcia `public.get_daily_report(report_date date)` už existuje a per-bundle goal % počíta správne (overené). Edge funkcia bude tenký wrapper okolo nej + obohatenie o agregát po projektoch.
 
-## Príčina
+## Endpoint
+`GET /functions/v1/daily-report?date=YYYY-MM-DD`
+- `date` voliteľné, default = dnes (Europe/Prague, lokálny dátum, žiadne `toISOString`)
+- Auth: vyžaduje JWT (validácia v kóde cez SUPABASE_JWKS), ako ostatné interné funkcie
 
-`src/components/DilnaDashboard.tsx`, funkcia `bundleExpectedPctScaled` (L503):
+## Response shape
+```json
+{
+  "report_date": "2026-04-27",
+  "rows": [ /* surové riadky z get_daily_report */ ],
+  "by_project": [
+    {
+      "project_id": "Z-2617-001",
+      "project_name": "Allianz",
+      "total_plan_hours": 1234,
+      "bundles": [
+        { "bundle_id": "...", "bundle_label": "A", "bundle_display_label": "A-6",
+          "split_part": "6", "scheduled_week": "2026-04-27",
+          "scheduled_hours": 161.8, "weekly_goal_pct": 68,
+          "logs": [ { "phase": "...", "percent": 50, "is_on_track": false,
+                       "note_text": "...", "logged_at": "..." } ] }
+      ]
+    }
+  ]
+}
+```
 
-1. **Krehké poradie kódu** — funkcia je definovaná na L503, ale `splitGroupWeeks` (jej zdroj dát) sa napĺňa až na L524–534. Funguje len cez closure timing.
-2. **Skoré zaokrúhľovanie** — `chainWindowBySplitGroup` ukladá `Math.round(start)` a `Math.round(end)`, takže ramping pri malých sliceq stráca presnosť.
-3. **Full bundles ostanú nedotknuté** — komentár v kóde aj user potvrdzujú: full bundle = balík mal byť dokončený tento týždeň → cieľ celý týždeň 100 % (vrátane prelitých ako Allianz B).
+## Implementácia (`supabase/functions/daily-report/index.ts`)
+1. CORS preflight + JSON response helpers (vzor podľa `project-summary`).
+2. Validácia inputu Zodom (`date` = optional ISO date).
+3. Service-role klient → `supabase.rpc('get_daily_report', { report_date })`.
+4. Roztriediť `row_kind = 'plan' | 'log'`, zoskupiť do `by_project` → `bundles` → `logs`.
+5. Vrátiť aj raw `rows` (pre flexibilitu konzumentov ako AMI/Slack).
+6. Žiadne nové RPC, žiadne migrácie.
 
-## Plán opravy
+## config.toml
+Pridať blok pre `daily-report` len ak treba override (default `verify_jwt = false` postačí, validácia JWT v kóde). Inak nemeniť.
 
-**Súbor:** `src/components/DilnaDashboard.tsx` (jediný)
-
-### 1. Reorganizovať poradie definícií (L503–547)
-Presunúť výpočet `splitGroupWeeks` a `chainWindowBySplitGroup` **pred** definíciu `bundleExpectedPctScaled`. Lineárne čítanie.
-
-### 2. Floats namiesto skorého `Math.round`
-- `chainWindowBySplitGroup` ukladá `start`/`end` ako floats.
-- `Math.round` až pri vrátení z `bundleExpectedPctScaled` (poslednýriadok funkcie).
-
-### 3. Zachovať full bundle = 100 %
-Bez zmeny správania pre `splitGroupId == null` — vracia stále `100`. Komentár doplniť: *"Full bundle (vrátane prelitých z T-1) = balík mal byť hotový tento týždeň → cieľ 100 % po celý týždeň."*
-
-### 4. Verifikácia po implementácii
-Manuálne overiť na živom UI v aktuálnom týždni (27.4.):
-- Allianz A-6 = 68 % (pondelok)
-- Allianz D-1 = 15 %
-- Allianz B (full, prelitý) = 100 %
-
-## Riziká
-Žiadne behaviour breaking changes pre full bundles. Split bundles dostanú o 1–2 % presnejšie hodnoty pri malých sliceq.
+## Test plán
+Po deployi `curl_edge_functions` na `/daily-report?date=2026-04-27` a overiť, že:
+- Allianz A-6 má `weekly_goal_pct = 68`
+- Allianz D-1 má `weekly_goal_pct = 15`
+- Allianz B (full bundle) má `weekly_goal_pct = 100`
