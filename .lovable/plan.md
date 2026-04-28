@@ -1,37 +1,34 @@
-## Problém
-Pre full bundle (napr. Reklamace Bar terasa Z-2604-003, etapa A) sa goal % nehýbe — drží 100% celý týždeň. Tento týždeň (27.4.–1.5.) má len 4 pracovné dni (1.5. = Svátek práce). Pondelok prešiel, takže by goal mal byť **25%** (1/4), nie 100%.
+## Cieľ
 
-Príčiny:
-1. **`DilnaDashboard.tsx`**: full bundles vracajú fixne 100% (`bundleExpectedPctScaled` a `expectedForBundle` skipujú ramping pre non-split bundles).
-2. **`DilnaDashboard.tsx`**: `dayFraction = workdayIdx / 5` — fixné delenie 5, ignoruje `working_days` z `production_capacity`.
-3. **SQL `get_daily_report`**: tiež delí fixne `(day_idx + 1) / 5` a používa `LEAST(ISODOW - 1, 4)` — nepozná sviatky.
+V Průvodke (PDF tlačenom z TPV) automaticky vyplniť riadok **"termín výroby"** textom `Exp. DD.MM.YY` pomocou dátumu **expedice** zo zákazky. Ak dátum chýba, zobraziť dialóg s možnosťou tlačiť bez termínu alebo doplniť manuálne neskôr.
 
-## Riešenie
+## Zmeny
 
-### 1. `src/components/DilnaDashboard.tsx`
-- Načítať `working_days` z už-fetchnutého `capacityRes` (default 5, clamp 1–5).
-- Prepočítať `dayFraction` na **`completedWorkdays / weekWorkingDays`**:
-  - Ak je dnes pracovný deň → `dayFraction = (workdayIdx - 1) / weekWorkingDays` (deň ešte beží = "počas dňa už ráta", ako si schválil).
-  - Cez víkend / po skončení skráteného týždňa → 1.
-  - Past week → 1, future week → 0.
-- **Ramp aj pre full bundles** (okrem prelitých zo spillu):
-  - `bundleExpectedPctScaled(splitGroupId, isSpilled)`: ak `isSpilled === true` (bundle prišiel z T-1) → drží 100%. Inak full → ramp `0 → 100` podľa `dayFraction`. Split → existujúci chain-window ramp.
-  - Update všetkých 3 call sites (riadky 681, 770, `expectedForBundle`).
+### 1. `src/lib/exportPdf.ts` — `buildPruvodkaHtml`
+- Pridať voliteľný parameter `expediceDate?: string | null` do `PruvodkaOptions`.
+- V info tabulke v riadku "termín výroby" vyplniť do pravej (podpisovej) bunky text `Exp. DD.MM.YY` (formát `dd.MM.yy` cez `date-fns` + `cs` locale, **lokálny čas**, podľa memory pravidla o dátumoch). Ak `expediceDate` je null → bunka ostane prázdna (`&nbsp;`).
+- Štýl: rovnaké písmo ako ostatné `sec-val` riadky, zarovnanie doľava v rámci pravej bunky.
 
-### 2. `supabase/migrations/*` — update SQL funkcie `get_daily_report`
-- Pridať CTE `week_capacity` ktorá vyberie `working_days` z `production_capacity` pre `current_week_monday` (default 5).
-- Prepočítať `day_idx`:
-  - Skipovať dni mimo `working_days` (napr. v skrátenom týždni s 1.5.=sviatok piatok = 1, ráta sa Po=0..Št=3).
-  - Definovať `completed_workdays` ako počet pracovných dní pred dnešným dátumom v aktuálnom týždni.
-- Goal vzorec: `chain_prior_hours + this_week_hours * completed_workdays / week_working_days`.
-- Pre full bundles (non-split) nepridávať special case v SQL — funkcia už počíta `chain_total_hours = this_week_hours` pre full bundle, takže ramp 0→100 príde automaticky. Spillover handling pre full bundles necháme len v UI (SQL nemá info o spille).
+### 2. `src/components/TPVList.tsx`
+- Načítať `expedice` zo `projects` tabuľky pre aktuálny `projectId`. 
+  - Použiť jednoduchý `useQuery` (alebo dorobiť do existujúceho fetch flow) — `select("expedice").eq("project_id", projectId).maybeSingle()`.
+  - Ak `projectId` patrí stage-suffixed projektu (napr. `Z-2620-001`), `expedice` na `projects` rade je relevantná (jeden riadok per project_id v projects tabuľke).
+- V `openPruvodka(itemsToPrint)` posielať `expediceDate: project?.expedice ?? null` do `buildPruvodkaHtml`.
+- V `handlePruvodka()` rozšíriť logiku:
+  - Ak `expedice` chýba **a** nie sú žiadne unapproved položky → otvoriť **nový mini-dialóg** `MissingExpediceDialog` s textom:  
+    *"Pre túto zákazku nie je nastavený dátum expedice. Termín výroby v průvodke ostane prázdny — môžete ho doplniť ručne pred tlačou."*
+    - Tlačidlá: **Tlačiť bez termínu** (pokračuje cez `openPruvodka`) / **Zrušiť**.
+  - Ak chýba expedice **a** zároveň sú unapproved položky → existujúci `pruvodkaWarning` dialóg rozšíriť o riadok upozornenia o chýbajúcom termíne (jeden flow, dve hlášky).
 
-## Test
-1. Reklamace Bar terasa (Z-2604-003) etapa A v utorok 28.4. → očakávaný goal **25%** (1 dokončený deň / 4 pracovné dni).
-2. Allianz A-6 (split) → 68% (chain-window slice ramp ostáva korektný).
-3. Allianz B (spilled full bundle) → 100% (špeciálny prípad v UI).
-4. Edge funkcia `daily-report?date=2026-04-28` vráti pre Z-2604-003 etapu A `weekly_goal_pct = 25`.
+### 3. Drobnosti
+- Format helper: použiť `format(parseISO(expedice), "dd.MM.yy", { locale: cs })`. Bezpečné parsovanie cez `safeParseLocalDate` ak existuje (memory: nikdy `toISOString` na lokálne dátumy). Skontrolujem `src/lib/dateFormat.ts` a použijem existujúci helper, inak inline `new Date(year, month-1, day)`.
+- Žiadne nové migrácie / DB zmeny — `projects.expedice` už existuje.
+
+## Edge cases
+- `expedice` ako `string` v DB môže byť ISO `YYYY-MM-DD` → parsovať lokálne, nie cez `new Date(iso)` aby sa vyhlo T-1 shiftu.
+- Tlač cez výber konkrétnych položiek — termín výroby je per-projekt, takže rovnaký pre všetky výbery.
+- Print preview cez `PdfPreviewModal` — žiadne zmeny, len HTML obsahuje vyplnenú bunku.
 
 ## Súbory
-- `src/components/DilnaDashboard.tsx` — ramp full bundles, `weekWorkingDays`-aware dayFraction, signature update.
-- `supabase/migrations/<new>_get_daily_report_working_days.sql` — `CREATE OR REPLACE FUNCTION public.get_daily_report` s rešpektovaním `production_capacity.working_days`.
+- `src/lib/exportPdf.ts` — rozšíriť typ + render bunky
+- `src/components/TPVList.tsx` — fetch expedice, dialóg pre chýbajúcu hodnotu, posielať do `buildPruvodkaHtml`
