@@ -1,55 +1,76 @@
-## Zistenie
 
-Porovnaním reportu s UI **Reporta Dílna** (`DilnaDashboard.tsx`) som našiel dva rozdiely:
+## Cieľ
 
-### 1. Plán bez logu v reporte navyše
-Náš report momentálne vracia **každý balík plánovaný na tento týždeň**, aj ak na ňom nikto nepracoval ani nelogoval (AEC Byt Enenkel, Byt Klamovka, Byt Osadní, Chata Modra, Doplnky Řezníček, Prvky Giraffe, PTS Pícha, RD Cigánkovi, Scott Webber, Štepánska, Vodafone).
+1. **Oprava dát** — vrátiť `TK.01 Kuchyňka u recepce` (Insia Z-2605-001) zo `2026-04-27` (T18) späť do `2026-04-20` (T17), aby celá split-časť A-4 bola v jednom týždni.
+2. **Prevencia** — zabrániť tomu, aby sa split-`part` v rámci jednej `split_group_id` rozpadol cez viac týždňov.
 
-UI ich síce v dátach má, ale stojí ich karty na konci so `slipStatus = "none"` — užívateľ ich na screenshote nevidí. Pre **výrobný report** chceme len projekty s **reálnou aktivitou**:
-- má log v `production_daily_logs` v aktuálnom týždni (akýkoľvek deň), **alebo**
-- má vykázané hodiny v `production_hours_log` (Alveno) v aktuálnom týždni, **alebo**
-- je spillover (nedokončené z minulého týždňa), **alebo**
-- je unplanned (log mimo plánu).
+---
 
-### 2. Příluky Valovi Dům chýba
-Příluky má **včerajší** log (27.04, pondelok, 95 % Kompletace) — UI ho zobrazuje ako "posledný známy stav". Náš report ho však spracúva len ako **plánovaný spillover bez log riadku**, lebo filter `raw_logs` berie iba logy s `(week_key + day_index) == report_date`.
+## Časť 1 — Data fix (jeden migration UPDATE)
 
-Pre dennú zmenu robotníkov chceme vidieť **najnovší log v rámci týždňa** pre baliky, ktoré dnes ešte nemajú záznam, aby vedúci dílny videl posledný stav (tak ako v UI).
+Položka:
+- `id = 8f9e1b0f-8b5d-431e-9e86-6c6d0426a70e`
+- `project_id = Z-2605-001`, `item_code = TK.01`
+- aktuálne `scheduled_week = 2026-04-27`, `split_part = 4`, `split_total = 4`, `status = completed`
+- súrodenci v split_part=4 (split_group `2e7ac40e-449a-4b72-a5b4-9a03990bfb64`) sú v `2026-04-20`
 
-## Plán
+Urobím **migration** s jediným príkazom:
 
-Migrácia ktorá v `public.get_daily_report(date)`:
+```sql
+UPDATE production_schedule
+SET scheduled_week = '2026-04-20'
+WHERE id = '8f9e1b0f-8b5d-431e-9e86-6c6d0426a70e'
+  AND scheduled_week = '2026-04-27';
+```
 
-1. **Pridá CTE `week_alveno_hours`** — projekty s vykázanými hodinami z `production_hours_log` v aktuálnom týždni (mimo TPV/ENG/PRO kódov, mimo overhead projektov).
+Po update sa vďaka tomu, že T17 už `split_part=4` má, čísla zostanú konzistentné (4/4 cez celú skupinu A-4 v T17, A-1..A-3 v T14..T16). Žiadny `renumberBundleChain` nie je potrebný — čísla sú už správne.
 
-2. **Pridá CTE `week_dlog_projects`** — projekty s logom v `production_daily_logs` v aktuálnom týždni.
+(Žiadny dopad na `production_daily_logs`, `production_expedice` ani `production_quality_checks` — tie sa neviažu na `scheduled_week`.)
 
-3. **Filter v `bundles_in_week` (len pre `is_spillover=false` a `is_unplanned=false`)**: ponechá riadok len ak projekt patrí aspoň do jedného z:
-   - `week_alveno_hours`
-   - `week_dlog_projects`
+## Časť 2 — Prevencia (kód)
 
-   Spillover a unplanned ostávajú vždy.
+### Príčina
 
-4. **Rozšíri `raw_logs`** o tzv. fallback log: pre projekty z aktuálneho týždňa, ktoré nemajú log presne pre `report_date`, vytiahne **najnovší log v týždni** (max `logged_at`). Tento riadok sa pridá ako `row_kind = 'log'` a `log_day_date` bude skutočný deň záznamu (nie report_date), aby sa to zobrazilo ako "posledný známy stav".
+Update `scheduled_week` jednotlivej položky cez `production_schedule.update({ scheduled_week })` (drag&drop, spill, completion-related rebuilds, atď.) **nesynchronizuje súrodencov v rámci toho istého `split_group_id + split_part`**. Stačí, aby sa pri "spill nedokončenej práce do ďalšieho týždňa" presunula iba jedna z N položiek splitu — a UI vykreslí 2 bundles s rovnakým labelom v 2 týždňoch.
 
-   Takto sa Příluky vráti so 95 % zo včera.
+### Riešenie — DB-side guard (najspoľahlivejšie)
 
-## Validácia po nasadení
+Pridám trigger `enforce_split_part_week_consistency` na `production_schedule`:
 
-`SELECT … FROM get_daily_report('2026-04-28')` má obsahovať práve týchto 9 projektov (bez tých 11 prázdnych plánov):
+```sql
+-- Pseudocode logiky
+AFTER UPDATE OF scheduled_week ON production_schedule
+WHEN NEW.split_group_id IS NOT NULL AND NEW.split_part IS NOT NULL
+  AND OLD.scheduled_week IS DISTINCT FROM NEW.scheduled_week
+DO:
+  -- propaguj nový týždeň na všetkých súrodencov v rovnakom (split_group_id, split_part)
+  UPDATE production_schedule
+  SET scheduled_week = NEW.scheduled_week
+  WHERE split_group_id = NEW.split_group_id
+    AND split_part   = NEW.split_part
+    AND id <> NEW.id
+    AND scheduled_week IS DISTINCT FROM NEW.scheduled_week;
+```
 
-- Allianz - 5.patro (A-6, B, D-1)
-- Příluky Valovi Dům (A) — log 95 % zo včera, plus spillover info
-- Insia (A-4, B)
-- Reklamace Bar terasa (A) — unplanned
-- RD Skalice (A-3)
-- Multisport (A-3)
-- Allianz - 6.patro — ak má hodiny v ALVENO tento týždeň
-- RD Cigánkovi Zlín — ak má hodiny v ALVENO tento týždeň
-- Gradus Kampa — ak má hodiny v ALVENO tento týždeň
+Ochrana proti nekonečnej rekurzii: trigger používa `pg_trigger_depth() = 0` guard, takže kaskádový update sa nespustí znova.
 
-## Súbory
+**Prečo trigger a nie len úprava JS volaní**: `scheduled_week` sa updatuje na ≥10 miestach v `useProductionDragDrop.ts`, v `SpillSuggestionPanel`, `CompletionDialog` a v edge funkcii `forecast-schedule`. Oprava na DB úrovni pokryje všetky cesty (vrátane budúcich) a je atomická.
 
-- Nová migrácia `supabase/migrations/<timestamp>_report_filter_active_projects.sql` — `CREATE OR REPLACE FUNCTION public.get_daily_report` s vyššie popísanými zmenami. Štruktúra návratovej tabuľky sa nemení, takže nie je potrebné `DROP FUNCTION`.
+### Doplnková ochrana — UI sanity check
 
-Pošli `ok` a nasadím.
+V `useProductionSchedule.ts` pri zostavovaní `bundleKey`: ak rovnaký `(split_group_id, split_part)` existuje vo viacerých týždňoch, vypíšem `console.warn` s detailmi (project_id, group, part, weeks). To pomôže zachytiť budúce regresie počas vývoja bez zmeny správania UI.
+
+## Technická realizácia
+
+1. **Migration #1** — data fix UPDATE pre `TK.01`.
+2. **Migration #2** — funkcia + trigger:
+   - `CREATE FUNCTION public.sync_split_part_scheduled_week() RETURNS trigger ...`
+   - `CREATE TRIGGER trg_sync_split_part_week AFTER UPDATE OF scheduled_week ON production_schedule FOR EACH ROW WHEN (...) EXECUTE FUNCTION public.sync_split_part_scheduled_week();`
+   - `SECURITY DEFINER`, `SET search_path = public`.
+3. **Code change** — pridať `console.warn` v `useProductionSchedule.ts` (po vybudovaní `byWeek` mapy spraviť per-bundle audit).
+
+## Riziká a poznámky
+
+- Trigger zmení každý budúci jednotlivý week-update položky splitu na **kaskádový** update všetkých súrodencov v rovnakom `split_part`. To je presne to, čo chceme. Drag&drop UI updaty sa nemenia (DB to vyrieši automaticky), ale invalidácia cache `production-schedule` v hookoch je už spustená pri každom takomto presune.
+- Trigger sa **netýka** zmeny `split_part` ani `split_group_id` — len `scheduled_week`. Takže explicitné re-splity (`renumberBundleChain`) fungujú ďalej bez zmeny.
+- `cancelled` riadky tiež dostanú propagáciu (zachovávame konzistenciu chronológie). Ak chceš, vieme ich vylúčiť doplnkovým `AND status <> 'cancelled'` filtrom.
