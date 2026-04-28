@@ -29,6 +29,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 import { useCreateSupplier } from "./hooks";
+import { IcoLookupField } from "./IcoLookupField";
+import type { AresCompanyData } from "@/types/ares";
 
 interface AddSupplierDialogProps {
   open: boolean;
@@ -158,13 +160,25 @@ export function AddSupplierDialog({
             />
           </div>
 
-          {/* IČO + DIČ */}
+          {/* IČO + ARES lookup */}
           <div>
             <Label className="text-xs">IČO</Label>
-            <Input
-              value={ico}
-              onChange={(e) => setIco(e.target.value)}
-              placeholder="napr. 12345678"
+            <IcoLookupField
+              ico={ico}
+              onIcoChange={setIco}
+              onLookup={(a: AresCompanyData) => {
+                if (a.obchodni_jmeno && !nazov.trim()) {
+                  setNazov(a.obchodni_jmeno);
+                }
+                if (a.dic && !dic.trim()) setDic(a.dic);
+                const composedAddr = [
+                  a.ulice,
+                  [a.psc, a.mesto].filter(Boolean).join(" "),
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+                if (composedAddr && !adresa.trim()) setAdresa(composedAddr);
+              }}
             />
           </div>
           <div>

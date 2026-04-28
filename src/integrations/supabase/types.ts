@@ -130,6 +130,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ares_cache: {
+        Row: {
+          adresa: string | null
+          datum_vzniku: string | null
+          dic: string | null
+          fetched_at: string
+          ico: string
+          mesto: string | null
+          not_found: boolean
+          obchodni_jmeno: string | null
+          pravni_forma: string | null
+          psc: string | null
+          raw_data: Json | null
+          ulice: string | null
+        }
+        Insert: {
+          adresa?: string | null
+          datum_vzniku?: string | null
+          dic?: string | null
+          fetched_at?: string
+          ico: string
+          mesto?: string | null
+          not_found?: boolean
+          obchodni_jmeno?: string | null
+          pravni_forma?: string | null
+          psc?: string | null
+          raw_data?: Json | null
+          ulice?: string | null
+        }
+        Update: {
+          adresa?: string | null
+          datum_vzniku?: string | null
+          dic?: string | null
+          fetched_at?: string
+          ico?: string
+          mesto?: string | null
+          not_found?: boolean
+          obchodni_jmeno?: string | null
+          pravni_forma?: string | null
+          psc?: string | null
+          raw_data?: Json | null
+          ulice?: string | null
+        }
+        Relationships: []
+      }
       column_labels: {
         Row: {
           column_key: string
@@ -2038,6 +2083,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tpv_material_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
           {
             foreignKeyName: "tpv_material_tpv_item_id_fkey"
             columns: ["tpv_item_id"]

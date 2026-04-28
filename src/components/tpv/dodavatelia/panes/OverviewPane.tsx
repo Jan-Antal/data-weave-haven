@@ -18,6 +18,8 @@ import {
   useSupplierSubcontracts,
 } from "../hooks";
 import { computeSupplierStats } from "../api";
+import { IcoLookupField } from "../IcoLookupField";
+import type { AresCompanyData } from "@/types/ares";
 import { formatMoneyCompact, formatDateLong } from "../../shared/helpers";
 import type { SubcontractPermissions } from "../../subdodavky/types";
 import type { TpvSupplierRow } from "../../shared/types";
@@ -226,9 +228,22 @@ function BasicInfoBox({
             />
           </FieldEdit>
           <FieldEdit label="IČO">
-            <Input
-              value={draft.ico}
-              onChange={(e) => setDraft({ ...draft, ico: e.target.value })}
+            <IcoLookupField
+              ico={draft.ico}
+              onIcoChange={(v) => setDraft((d) => ({ ...d, ico: v }))}
+              onLookup={(a: AresCompanyData) => {
+                setDraft((d) => ({
+                  ...d,
+                  // Iba doplň chýbajúce / aktualizuj základné polia,
+                  // názov prepíš ak existuje, inak nechaj.
+                  nazov: a.obchodni_jmeno || d.nazov,
+                  dic: a.dic ?? d.dic,
+                  adresa:
+                    [a.ulice, [a.psc, a.mesto].filter(Boolean).join(" ")]
+                      .filter(Boolean)
+                      .join(", ") || d.adresa,
+                }));
+              }}
             />
           </FieldEdit>
           <FieldEdit label="DIČ">

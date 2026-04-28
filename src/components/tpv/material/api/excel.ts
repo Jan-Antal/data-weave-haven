@@ -128,7 +128,7 @@ export async function parseExcelFile(file: File): Promise<ImportRowRaw[]> {
       const value =
         typeof cell === "string" ? cell.trim() : (cell as number | string);
       if (value === "" || value == null) continue;
-      (row as Record<string, unknown>)[key] = value;
+      (row as unknown as Record<string, unknown>)[key] = value;
     }
     rows.push(row);
   }
