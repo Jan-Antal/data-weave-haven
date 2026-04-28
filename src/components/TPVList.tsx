@@ -278,7 +278,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   const [missingExpediceConfirm, setMissingExpediceConfirm] = useState<{ items: typeof items } | null>(null);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
 
-  const openPruvodka = useCallback((itemsToPrint: typeof items) => {
+  const openPruvodka = useCallback((itemsToPrint: typeof items, expediceOverride?: string | null) => {
     const hasUnapproved = itemsToPrint.some(item => item.status !== "Schváleno");
     const rows = itemsToPrint.map((item, idx) => ({
       rowNum: idx + 1,
@@ -290,13 +290,16 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       isApproved: item.status === "Schváleno",
     }));
 
+    const expediceDate =
+      expediceOverride !== undefined ? expediceOverride : ((currentProject as any)?.expedice ?? null);
+
     const html = buildPruvodkaHtml({
       projectId,
       projectName: projectName || projectId,
       issuedBy: profile?.full_name || profile?.email || "—",
       rows,
       hasUnapproved,
-      expediceDate: (currentProject as any)?.expedice ?? null,
+      expediceDate,
     });
 
     setPdfHtml(html);
