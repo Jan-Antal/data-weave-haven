@@ -25,7 +25,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cs } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import { buildPruvodkaHtml } from "@/lib/exportPdf";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
