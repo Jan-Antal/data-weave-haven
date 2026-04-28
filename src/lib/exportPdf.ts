@@ -199,7 +199,7 @@ export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
   </tr>
   <tr>
     <td class="sec-val bt">termín výroby</td>
-    <td class="bt">&nbsp;</td>
+    <td class="bt" style="font-weight:700;">${expediceShort ? `Exp. ${esc(expediceShort)}` : "&nbsp;"}</td>
   </tr>
 </table>
 
