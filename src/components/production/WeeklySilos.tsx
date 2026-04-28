@@ -1892,20 +1892,26 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
 
   return (
     <div ref={setBundleNodeRef} data-bundle-key={bundleKey} className="rounded-[6px] overflow-hidden relative shrink-0" style={{
-      borderTop: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
-      borderRight: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
-      borderBottom: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
-      borderLeft: forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
+      borderTop: isHighlighted ? "2px solid #d97706" : (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2"),
+      borderRight: isHighlighted ? "2px solid #d97706" : (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2"),
+      borderBottom: isHighlighted ? "2px solid #d97706" : (forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2"),
+      borderLeft: isHighlighted ? "4px solid #d97706" : `4px solid ${borderLeftColor}`,
       backgroundColor: forecastDarkMode
         ? (isHighlighted ? "rgba(217,119,6,0.08)" : "#252a35")
-        : (shouldHighlightOverdue ? "hsl(0 75% 93%)" : isHighlighted ? "rgba(217,119,6,0.05)" : "#ffffff"),
+        : (shouldHighlightOverdue
+            ? "hsl(0 75% 95%)"
+            : isSpilled
+              ? "rgba(217,119,6,0.06)"
+              : isHighlighted
+                ? "rgba(217,119,6,0.05)"
+                : "#ffffff"),
       opacity: isDragging ? 0.3 : isDimmed ? 0.5 : 1,
       outline: isFocusedMatch ? "2px solid #d97706" : undefined,
       outlineOffset: isFocusedMatch ? "2px" : undefined,
-      boxShadow: isDropHighlighted ? "0 8px 18px hsl(var(--primary) / 0.16), 0 0 0 2px hsl(var(--primary) / 0.24)" : forecastDarkMode ? undefined : (shouldHighlightOverdue ? "inset 0 0 0 1px hsl(0 60% 86%)" : isHighlighted ? "0 0 0 2px hsl(var(--accent) / 0.15)" : undefined),
+      boxShadow: isDropHighlighted ? "0 8px 18px hsl(var(--primary) / 0.16), 0 0 0 2px hsl(var(--primary) / 0.24)" : undefined,
       paddingBottom: isDropHighlighted ? 10 : undefined,
       transform: isDropHighlighted ? "translateY(-1px)" : undefined,
-      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, box-shadow 150ms, outline 300ms, opacity 200ms, padding-bottom 160ms, transform 160ms",
+      transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, border-left-color 150ms, background-color 150ms, box-shadow 150ms, outline 300ms, opacity 200ms, padding-bottom 160ms, transform 160ms",
     }}>
 
       {isDropHighlighted && (
