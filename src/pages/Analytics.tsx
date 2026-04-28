@@ -312,7 +312,7 @@ export default function Analytics() {
   const firstVisible = tabs.find((t) => t.visible !== false)?.key ?? "dilna";
 
   return (
-    <PageTabsShell tabs={tabs} defaultTab={firstVisible} paramName="tab">
+    <PageTabsShell tabs={tabs} defaultTab="dilna" paramName="tab">
       {() => (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Per-tab toolbar */}
