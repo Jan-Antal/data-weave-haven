@@ -1832,7 +1832,7 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
 
     const isDark = !!forecastDarkMode;
     return (
-      <div className="rounded-[6px] overflow-hidden relative px-2.5 py-2"
+      <div className="rounded-[6px] overflow-hidden relative"
         style={{
           background: isDark ? "rgba(58,107,74,0.10)" : "#f1f7f3",
           border: isDark ? "1px dashed rgba(149,193,164,0.35)" : "1px dashed #b9d4c2",
@@ -1844,41 +1844,48 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
           onBundleContextMenu(e, bundle, toggleExpand);
         }}
       >
-        {/* Row 1: project name (left) + project_id (right) */}
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-          <span className="text-[11px] font-semibold truncate flex-1 min-w-0" style={{ color: isDark ? "#b8d4c0" : "#223937" }}>
-            {bundle.project_name}
-          </span>
-          <span className="font-sans text-[9px] shrink-0" style={{ color: isDark ? "#7fa089" : "#6b8a72" }}>
-            {bundle.project_id}
-          </span>
-        </div>
+        <div className="flex items-start gap-1 pr-[6px] pl-2.5 py-[5px]">
+          {/* Left column: project info */}
+          <div className="flex-1 min-w-0">
+            {/* Row 1: dot + project name */}
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+              <span className="truncate" style={{ fontSize: 14, color: isDark ? "#b8d4c0" : "#223937", fontWeight: 500 }}>
+                {bundle.project_name}
+              </span>
+            </div>
+            {/* Row 2: project_id + deadline */}
+            <div className="flex items-center gap-1.5 min-w-0 whitespace-nowrap" style={{ marginTop: 1 }}>
+              <span className="font-sans shrink-0" style={{ fontSize: 11, color: isDark ? "#7fa089" : "#6b7280" }}>
+                {bundle.project_id}
+              </span>
+              {deadlineInfo && (
+                <span className="truncate min-w-0" style={{ fontSize: 11, color: isDark ? "#5a7a76" : "#7aa8a4" }}>
+                  {deadlineInfo.label}: {deadlineInfo.dateStr}
+                </span>
+              )}
+            </div>
+            {/* Row 3: items count + optional TPV week */}
+            <div className="flex items-center gap-1.5" style={{ fontSize: 11, color: isDark ? "#7fa089" : "#5c706f", marginTop: 1 }}>
+              <span>{bundle.items.length} položek</span>
+              {tpvWeekLabel && (
+                <span className="text-[9px]" style={{ color: isDark ? "#6b8a72" : "#8aa893" }}>· TPV {tpvWeekLabel}</span>
+              )}
+            </div>
+          </div>
 
-        {/* Row 2: hours / price (right-aligned) */}
-        <div className="flex items-center justify-end mt-0.5">
-          <span className="font-sans text-[11px] font-bold" style={{ color: isDark ? "#7fa089" : "#5a7a64" }}>
-            ~{displayMode === "czk" ? formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap, exchangeRates)) : `${Math.round(bundle.total_hours)}h`}
-          </span>
-        </div>
-
-        {/* Row 3: Rezerva badge (left) + deadline (right) */}
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-[9px] rounded-full px-1.5 py-0.5" style={{
-            backgroundColor: isDark ? "rgba(149,193,164,0.18)" : "#dcebe1",
-            color: isDark ? "#b8d4c0" : "#3a6b4a",
-            fontWeight: 600,
-          }}>⏳ Rezerva</span>
-          {deadlineInfo && (
-            <span className="font-sans text-[10px]" style={{ color: isDark ? "#7fa089" : "#6b8a72" }}>
-              {deadlineInfo.label} {deadlineInfo.dateStr}
+          {/* Right column: hours (top) + Rezerva badge (bottom) */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span className="font-sans" style={{ fontSize: 15, color: isDark ? "#7fa089" : "#5a7a64", fontWeight: 600 }}>
+              ~{displayMode === "czk" ? formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap, exchangeRates)) : `${Math.round(bundle.total_hours)}h`}
             </span>
-          )}
+            <span className="text-[9px] rounded-full px-1.5 py-0.5 shrink-0" style={{
+              backgroundColor: isDark ? "rgba(149,193,164,0.18)" : "#dcebe1",
+              color: isDark ? "#b8d4c0" : "#3a6b4a",
+              fontWeight: 600,
+            }}>⏳ Rezerva</span>
+          </div>
         </div>
-
-        {tpvWeekLabel && (
-          <div className="mt-0.5 text-[10px]" style={{ color: isDark ? "#6b8a72" : "#8aa893" }}>TPV: {tpvWeekLabel}</div>
-        )}
       </div>
     );
   }
