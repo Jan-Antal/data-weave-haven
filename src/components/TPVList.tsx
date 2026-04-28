@@ -1374,6 +1374,11 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             <p className="text-xs text-muted-foreground">
               Průvodka bude vytisknuta i pro tyto prvky. Doporučujeme před tiskem získat schválení.
             </p>
+            {!(currentProject as any)?.expedice && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                ⚠ U této zakázky není nastaven termín expedice — řádek <strong>termín výroby</strong> v průvodce zůstane prázdný (lze doplnit ručně).
+              </p>
+            )}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="ghost" size="sm" onClick={() => setPruvodkaWarning(null)}>
@@ -1381,6 +1386,28 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             </Button>
             <Button size="sm" onClick={() => pruvodkaWarning && openPruvodka(pruvodkaWarning.allItems)}>
               Přesto tisknout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Missing expedice — confirm before printing */}
+      <Dialog open={!!missingExpediceConfirm} onOpenChange={(open) => { if (!open) setMissingExpediceConfirm(null); }}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>⚠ Chybí termín expedice</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2 text-sm">
+            <p className="text-muted-foreground">
+              Pro tuto zakázku není nastaven datum expedice. Řádek <strong>termín výroby</strong> v průvodce zůstane prázdný — můžete ho doplnit ručně před tiskem, nebo termín nejprve nastavit v detailu zakázky.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setMissingExpediceConfirm(null)}>
+              Zrušit
+            </Button>
+            <Button size="sm" onClick={() => missingExpediceConfirm && openPruvodka(missingExpediceConfirm.items)}>
+              Tisknout bez termínu
             </Button>
           </DialogFooter>
         </DialogContent>
