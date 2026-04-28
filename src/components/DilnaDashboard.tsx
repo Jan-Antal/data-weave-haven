@@ -903,8 +903,14 @@ function useDilnaData(weekOffset: number) {
 
       const offPlanCount = cards.filter(c => c.warning === "off_plan").length;
       const unmatchedCount = cards.filter(c => c.warning === "unmatched").length;
-      const delayCount = cards.filter(c => c.slipStatus === "delay").length;
-      const slipCount = cards.filter(c => c.slipStatus === "slip").length;
+      // Skluz/omeškanie počítame na úrovni bundlov, nie projektov — projekt môže
+      // mať viac bundlov v rôznych stavoch a "worst across bundles" by ich zlúčil do 1.
+      const allBundles = cards
+        .filter(c => c.warning === "none")
+        .flatMap(c => c.bundles);
+      const totalBundles = allBundles.length;
+      const delayCount = allBundles.filter(b => b.slipStatus === "delay").length;
+      const slipCount = allBundles.filter(b => b.slipStatus === "slip").length;
       const spilledCount = cards.filter(c => c.isSpilledOnly || c.bundles.some(b => b.isSpilled)).length;
       const totalValueCzk = cards.reduce((s, c) => s + (c.valueCzk || 0), 0);
       const totalValueTargetCzk = cards.reduce((s, c) => s + (c.valueTargetCzk || 0), 0);
