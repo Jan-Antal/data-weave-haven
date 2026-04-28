@@ -1,32 +1,48 @@
 /**
- * HodinyTab — placeholder.
+ * HodinyTab — hlavný tab modulu Hodiny.
  *
- * Plánovaný obsah:
- *   - Per-tpv_item allocation hodín (návrh / submitted / approved / returned)
- *   - Workflow: konstrukter submituje → vedúci_vyroby schvaľuje
- *   - Aggregate per projekt: schválené vs. plánované hodiny
+ * Two views:
+ *   - ProjectsList: top-level rollup of all projects with KPIs
+ *   - ProjectDetailView: drill-down to edit hours per item with workflow
  *
- * DB tabuľka: tpv_hours_allocation
- *   - stav: draft/submitted/approved/returned
- *   - submitted_by, submitted_at, approved_by, approved_at, return_reason
+ * Permissions:
+ *   canSubmitHours  → kalkulant: edit + submit
+ *   canApproveHours → PM: approve + return
  */
 
-import { Construction } from "lucide-react";
+import { useState } from "react";
+
 import type { TpvPermissions } from "../shared/types";
+import { ProjectsList } from "./components/ProjectsList";
+import { ProjectDetailView } from "./components/ProjectDetailView";
 
 interface HodinyTabProps {
   permissions: TpvPermissions;
 }
 
-export function HodinyTab({ permissions: _permissions }: HodinyTabProps) {
+export function HodinyTab({ permissions }: HodinyTabProps) {
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-      <Construction className="h-12 w-12 mb-3 opacity-30" />
-      <h3 className="text-lg font-semibold">Hodiny</h3>
-      <p className="text-sm mt-1 max-w-md text-center">
-        Sekcia v príprave — schvaľovací workflow hodín alokovaných
-        na TPV položky.
-      </p>
+    <div className="flex flex-col gap-4 p-4">
+      {selectedProject ? (
+        <ProjectDetailView
+          projectId={selectedProject}
+          onBack={() => setSelectedProject(null)}
+          canSubmit={permissions.canSubmitHours}
+          canApprove={permissions.canApproveHours}
+        />
+      ) : (
+        <>
+          <div>
+            <h2 className="text-lg font-semibold">Hodiny</h2>
+            <div className="text-xs text-muted-foreground">
+              Hodinová dotácia per projekt — kalkulant navrhuje, PM schvaľuje.
+            </div>
+          </div>
+          <ProjectsList onSelectProject={setSelectedProject} />
+        </>
+      )}
     </div>
   );
 }
