@@ -1,58 +1,38 @@
+# Odstránenie automatických refreshov aplikácie
+
 ## Problém
-
-V Analytics → Dílna sa projekt **Příluky Valovi Dům (Z-2504-019)** zobrazuje **dvakrát**:
-1. Hore ako **"Přelité z T17"** (spilled-only karta) — 11h / plán 0h
-2. Dole ako **"Mimo Plán výroby"** (off-plan karta) — 11h / plán 0h
-
-Mali by byť zlúčené pod jednu kartu (tú prelitú).
+Aplikácia sa sama reloaduje aj počas práce → uživateľ stratí rozrobený stav (rozdelená práca, otvorené sheety, neuložené úpravy).
 
 ## Príčina
+Pri riešení PWA cache busting sme pridali tri vrstvy auto-reloadu, ktoré bežia kým máš app otvorený:
 
-V `src/components/DilnaDashboard.tsx` má agregátor 4 cykly, ktoré napĺňajú `cards[]`:
-1. **Loop 1** (línia 675) — projekty so schedule v aktuálnom týždni
-2. **Loop 1.5** (línia 772) — *spilled-only* projekty (neukončené T-1 bundles, žiadny schedule v T)
-3. **Loop 2** (línia 839) — *unmatched* (logované hodiny na neznáme `project_id`)
-4. **Loop 3** (línia 865) — *off-plan* (logované hodiny na známy projekt bez schedule v T)
+1. **`useVersionCheck` (App.tsx)** — každé **2 minúty** fetchne `/`, porovná hashe `<script src="/assets/...">` a ak sa líšia, zavolá `window.location.reload()` (s 3s fallbackom). Toto sa spúšťa pri každom novom builde / preview revízii.
+2. **Service Worker `controllerchange` listener (useVersionCheck)** — keď nový SW prevezme kontrolu (a pri `skipWaiting: true` + `clientsClaim: true` sa to deje automaticky a okamžite po deployi), zavolá `window.location.reload()`.
+3. **`bootstrapCacheCheck` (main.tsx)** — porovnanie build hashu pri **štarte**. Toto je OK, deje sa to len pri load stránky, nie počas práce.
 
-Loop 1.5 pridá kartu pre `Z-2504-019` ako spilled (lebo má neukončený bundle z T17 a žiadny schedule v T18), pričom ju **správne zobrazí s `loggedHours` 11h**.
+Body 1 a 2 sú tie, ktoré ti rušia prácu počas používania appky.
 
-Loop 3 ale kontroluje len `scheduledProjects.has(pid)` — nie aj `spilledOnlyProjects.has(pid)`. Preto ten istý projekt sa pridá ešte raz ako "Mimo Plán výroby", lebo:
-- v `production_schedule` pre T18 nemá žiadny riadok (`scheduledProjects` ho neobsahuje)
-- v `projects` tabuľke existuje (`knownProjectIds` ho obsahuje)
-- má logované hodiny v T18 (`hoursByProject` má 11h)
+## Riešenie
 
-To isté riziko platí aj pre loop 2 (unmatched), aj keď tam je menej pravdepodobné.
+### 1. `src/hooks/useVersionCheck.ts` — prepísať na "soft notify"
+- Odstrániť `setInterval` polling každé 2 minúty.
+- Odstrániť `window.location.reload()` v `controllerchange` handleri.
+- Odstrániť automatický 3s fallback reload.
+- Hook nechať existovať ako no-op (alebo úplne odstrániť volanie z `App.tsx`), aby sme nerozbili importy. Nová verzia sa načíta pri ďalšom prirodzenom otvorení / refreshi appky používateľom.
 
-## Oprava
+### 2. `vite.config.ts` — zjemniť PWA správanie
+- `registerType: "autoUpdate"` → `"prompt"` (SW sa nainštaluje, ale aktivuje až pri ďalšom načítaní stránky).
+- `clientsClaim: true` → `false` (nový SW si neprivlastní existujúce taby okamžite).
+- `skipWaiting: true` ponechať pre samotného workera, ale bez `clientsClaim` a bez controllerchange reloadu sa už neprejaví ako zlomenie tvojej session.
 
-Do **loop 2** (línia 840) a **loop 3** (línia 866) pridať dodatočný `continue`, ktorý preskočí projekty už pridané v loop 1.5:
-
-```ts
-// Loop 2 — unmatched
-for (const [pid, loggedHours] of hoursByProject) {
-  if (scheduledProjects.has(pid)) continue;
-  if (spilledOnlyProjects.has(pid)) continue; // ← NOVÉ
-  if (knownProjectIds.has(pid)) continue;
-  ...
-}
-
-// Loop 3 — off-plan
-for (const [pid, loggedHours] of hoursByProject) {
-  if (scheduledProjects.has(pid)) continue;
-  if (spilledOnlyProjects.has(pid)) continue; // ← NOVÉ
-  if (!knownProjectIds.has(pid)) continue;
-  ...
-}
-```
-
-Spilled-only karta už zobrazuje `loggedHours` (línia 825), takže žiadna informácia sa nestratí — len odstránime duplicitu.
+### 3. `src/lib/cacheBuster.ts` a `bootstrapCacheCheck` v `main.tsx` — nechať
+Tieto bežia len pri **štarte** appky (otvorenie taba / hard refresh) — to je správne správanie pre PWA cache busting a používateľa neruší. `forceAppRefresh()` (manuálne tlačidlo v `MobileHeader`) zostáva tiež nedotknuté.
 
 ## Výsledok
+- Počas práce v aplikácii sa stránka **nikdy** sama nereloadne.
+- Nové verzie sa naberú prirodzene pri ďalšom otvorení / hard refreshi / kliknutí na manuálne tlačidlo refresh v menu.
+- PWA shell sa stále aktualizuje na pozadí, len bez prerušenia bežiacej session.
 
-- Príluky Valovi Dům sa v Dílna prehľade zobrazí **iba raz** — ako "Přelité z T17" karta s 11h logovanými.
-- Žiadne `Mimo Plán výroby` ghost karta.
-- Counts v hornej summary lište (`Mimo Plán / Nespárované`) sa znížia o správny počet (3 → 2 v tomto prípade).
-
-## Súbory na úpravu
-
-- `src/components/DilnaDashboard.tsx` — 2 jednoriadkové vsuvky (loop 2 a loop 3)
+## Dotknuté súbory
+- `src/hooks/useVersionCheck.ts` (prepísať na no-op)
+- `vite.config.ts` (PWA options)

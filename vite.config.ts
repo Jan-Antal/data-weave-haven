@@ -20,13 +20,19 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" so a new SW installs in the background but does NOT take over
+      // active tabs and force a reload mid-session. The new shell activates on
+      // the next natural page load.
+      registerType: "prompt",
       workbox: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/~oauth/],
-        skipWaiting: true,
-        clientsClaim: true,
+        // Do NOT auto-claim existing clients — that would invalidate the
+        // running session and (combined with controllerchange listeners) cause
+        // the page to reload while the user is working.
+        skipWaiting: false,
+        clientsClaim: false,
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
