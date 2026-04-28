@@ -550,7 +550,7 @@ export function ForecastWeekContent({
   if (mergedBlocks.length === 0) return null;
 
   return (
-    <div className="space-y-1.5 mt-1">
+    <div className="space-y-1.5">
       {mergedBlocks.map((block) =>
       <ForecastCard
         key={block.id}
