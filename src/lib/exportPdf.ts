@@ -91,10 +91,22 @@ export interface PruvodkaOptions {
     isApproved: boolean;
   }[];
   hasUnapproved: boolean;
+  /** ISO date (YYYY-MM-DD) of expedice — renders as "Exp. DD.MM.YY" in Termín výroby. Null = empty. */
+  expediceDate?: string | null;
+}
+
+/** Format YYYY-MM-DD as DD.MM.YY using local time (no UTC shift). */
+function formatExpediceShort(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  const yy = m[1].slice(2);
+  return `${m[3]}.${m[2]}.${yy}`;
 }
 
 export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
-  const { projectId, projectName, issuedBy, rows, hasUnapproved } = opts;
+  const { projectId, projectName, issuedBy, rows, hasUnapproved, expediceDate } = opts;
+  const expediceShort = formatExpediceShort(expediceDate);
   const dateStr = format(new Date(), "d. MMMM yyyy", { locale: cs });
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
