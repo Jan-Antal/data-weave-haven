@@ -275,6 +275,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
 
   // ── Průvodka state ─────────────────────────────────────────────
   const [pruvodkaWarning, setPruvodkaWarning] = useState<{ items: typeof items; allItems: typeof items } | null>(null);
+  const [missingExpediceConfirm, setMissingExpediceConfirm] = useState<{ items: typeof items } | null>(null);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
 
   const openPruvodka = useCallback((itemsToPrint: typeof items) => {
@@ -295,11 +296,13 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       issuedBy: profile?.full_name || profile?.email || "—",
       rows,
       hasUnapproved,
+      expediceDate: (currentProject as any)?.expedice ?? null,
     });
 
     setPdfHtml(html);
     setPruvodkaWarning(null);
-  }, [projectId, projectName, profile]);
+    setMissingExpediceConfirm(null);
+  }, [projectId, projectName, profile, currentProject]);
 
   const handlePruvodka = useCallback(() => {
     const itemsToPrint = selected.size > 0
@@ -307,13 +310,16 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       : sortedItems.filter(item => item.status !== "Zrušeno");
 
     const unapproved = itemsToPrint.filter(item => item.status !== "Schváleno" && item.status !== "Zrušeno");
+    const hasExpedice = !!(currentProject as any)?.expedice;
 
     if (unapproved.length > 0) {
       setPruvodkaWarning({ items: unapproved, allItems: itemsToPrint });
+    } else if (!hasExpedice) {
+      setMissingExpediceConfirm({ items: itemsToPrint });
     } else {
       openPruvodka(itemsToPrint);
     }
-  }, [selected, sortedItems, openPruvodka]);
+  }, [selected, sortedItems, openPruvodka, currentProject]);
   const handleSendToProduction = useCallback(() => {
     if (selected.size === 0) {
       toast({ title: "Vyberte alespoň jednu položku", variant: "destructive", duration: 2000 });
