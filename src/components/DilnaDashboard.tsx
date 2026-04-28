@@ -928,6 +928,7 @@ function useDilnaData(weekOffset: number) {
         unmatchedCount,
         delayCount,
         slipCount,
+        totalBundles,
         spilledCount,
         totalValueCzk,
         totalValueTargetCzk,
