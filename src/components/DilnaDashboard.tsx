@@ -945,7 +945,10 @@ function computeSlip(
   loggedHours: number,
   isSpilled: boolean,
 ): SlipStatus {
-  if (isSpilled) return "delay";
+  // Spillover: expected = 100 (mali sme byť hotoví minulý týždeň). Ak completion
+  // dosiahne 100 → bundle je dotiahnutý a ide na "ok" (zelený). Done je done.
+  // Inak default-uje na "delay" cez ref=100 v hlavnej vetve.
+  if (isSpilled && (completionPct == null || completionPct < 100)) return "delay";
   if (loggedHours <= 0 && expectedPct === null) return "none";
   if (completionPct == null) return "none";
   const ref = expectedPct ?? 100;

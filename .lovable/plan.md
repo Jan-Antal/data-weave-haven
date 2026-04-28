@@ -1,54 +1,42 @@
 ## Problém
 
-V Dílna dashboarde karta **„Ve skluzu / V omeškání"** počíta projekty, nie bundly:
+V `DilnaDashboard.tsx` má funkcia `computeSlip` hard-override:
 
 ```ts
-const delayCount = cards.filter(c => c.slipStatus === "delay").length;
-const slipCount  = cards.filter(c => c.slipStatus === "slip").length;
+if (isSpilled) return "delay";
 ```
 
-`card.slipStatus` je **„worst across bundles"** — takže projekt s 5 bundlami, z ktorých 3 meškajú, sa zaráta ako 1. Užívateľ chce vidieť reálny počet meškajúcich/skĺzajúcich **bundlov**.
+To znamená, že **každý** spillover bundle je natvrdo červený („V omeškání"), aj keď ho dílňa medzitým dotiahla na 100 %. Insia A-4 je presne ten prípad — bol prelitý z T17 do T18 a hoci je completion 100 %, stále svieti červeno.
 
 ## Riešenie
 
-V `src/components/DilnaDashboard.tsx` prepočítať `slipCount` a `delayCount` agregáciou cez `card.bundles[]` namiesto cez `cards[]`.
+Spillover bundle má `expectedPct = 100` (nastavené v `bundleExpectedPctScaled`, riadok 571). Stačí prestať hard-overridovať a nechať normálny výpočet bežať — pokým completion < 100, vyjde to ako "delay" (rovnaký výsledok ako dnes), a keď dosiahne 100, automaticky preskočí na "ok" (zelený). **Done je done.**
 
-### Zmena (riadky 906–907)
+### Zmena v `src/components/DilnaDashboard.tsx` (riadky 941–955)
 
 ```ts
-// PRED
-const delayCount = cards.filter(c => c.slipStatus === "delay").length;
-const slipCount  = cards.filter(c => c.slipStatus === "slip").length;
-
-// PO — počítame bundly naprieč všetkými projektmi (len naplánované karty,
-// nie off_plan/unmatched, ktoré nemajú bundly v pláne týždňa)
-const allBundles = cards
-  .filter(c => c.warning === "none")
-  .flatMap(c => c.bundles);
-const delayCount = allBundles.filter(b => b.slipStatus === "delay").length;
-const slipCount  = allBundles.filter(b => b.slipStatus === "slip").length;
+function computeSlip(
+  completionPct: number | null,
+  expectedPct: number | null,
+  loggedHours: number,
+  isSpilled: boolean,
+): SlipStatus {
+  // Spillover: expected = 100 (mali sme byť hotoví minulý týždeň). Ak completion
+  // dosiahne 100 → bundle je dotiahnutý a ide na "ok" (zelený). Done je done.
+  // Inak default-uje na "delay" cez ref=100 v hlavnej vetve.
+  if (isSpilled && (completionPct == null || completionPct < 100)) return "delay";
+  if (loggedHours <= 0 && expectedPct === null) return "none";
+  if (completionPct == null) return "none";
+  const ref = expectedPct ?? 100;
+  if (completionPct >= ref - SLIP_OK_TOL) return "ok";
+  if (completionPct >= ref - SLIP_RED) return "slip";
+  return "delay";
+}
 ```
 
-### Úprava popisku pod číslom (riadok 1080)
+## Dopad
 
-Aktuálny popisok hovorí o projektoch — zmeniť na bundly:
-
-```tsx
-// PRED
-<div className="text-[11px] text-muted-foreground mt-2">
-  Z {cards.filter(c => c.warning === "none").length} naplánovaných projektů
-</div>
-
-// PO
-<div className="text-[11px] text-muted-foreground mt-2">
-  Z {allBundles.length} naplánovaných bundlů
-</div>
-```
-
-`allBundles.length` musí byť dostupné v render scope — preto ho pridáme aj do `return { ... }` z `useDilnaData` (napr. ako `totalBundles`) a destruktúrneme v komponente vedľa `slipCount`/`delayCount`.
-
-## Čo zostáva nezmenené
-
-- **Karta „Mimo plán / Nespárované"** — naďalej projektová úroveň (off_plan/unmatched sú projektové príznaky, bundly tam nemajú zmysel).
-- **Sortovanie projektových kariet** podľa worst-bundle slipStatus zostáva — vizuálne usporiadanie sa nemení.
-- **Per-bundle zobrazenie** vnútri kariet sa nemení.
+- Spillover bundle s completion < 100 → naďalej červený („V omeškání") — bez zmeny.
+- Spillover bundle s completion = 100 → zelený („V plánu") — **nový správny stav**.
+- Light orange fill (`isSpilled` background) zostáva — vizuálne je stále jasné, že to je prelitý bundle, len už nie je penalizovaný farbou statusu.
+- Karta „Ve skluzu / V omeškání" automaticky odráža správny počet (počítame cez bundly).
