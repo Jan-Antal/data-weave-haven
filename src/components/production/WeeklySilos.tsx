@@ -1874,8 +1874,8 @@ function CollapsibleBundleCard({ bundle, weekKey, showCzk, hourlyRate, weeklyCap
             </div>
           </div>
 
-          {/* Right column: hours (top) + Rezerva badge (bottom) */}
-          <div className="flex flex-col items-end gap-1 shrink-0">
+          {/* Right column: hours (aligned with Z-code row) + Rezerva badge below */}
+          <div className="flex flex-col items-end gap-1 shrink-0" style={{ marginTop: 18 }}>
             <span className="font-sans" style={{ fontSize: 15, color: isDark ? "#7fa089" : "#5a7a64", fontWeight: 600 }}>
               ~{displayMode === "czk" ? formatCompactCzk(calcProdejValue(bundle.total_hours, bundle.project_id, projectLookup, planHoursMap, realHoursMap, exchangeRates)) : `${Math.round(bundle.total_hours)}h`}
             </span>
