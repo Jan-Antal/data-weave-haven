@@ -2218,6 +2218,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tpv_subcontract_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["project_id"]
+          },
+          {
             foreignKeyName: "tpv_subcontract_tpv_item_id_fkey"
             columns: ["tpv_item_id"]
             isOneToOne: false
