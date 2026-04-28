@@ -199,6 +199,30 @@ export function useProductionSchedule() {
           total_hours: bundles.reduce((s, b) => s + b.total_hours, 0),
         });
       }
+
+      // Sanity audit: detect split-parts spread across multiple weeks (rovnaký split_group_id + split_part v 2+ týždňoch).
+      // Tomu má zabraňovať DB trigger trg_sync_split_part_week — ak sa to objaví, signál na regresiu.
+      if (typeof window !== "undefined" && import.meta.env.DEV) {
+        const partWeeks = new Map<string, Set<string>>();
+        for (const [week, weekMap] of byWeek) {
+          for (const bundle of weekMap.values()) {
+            const sgid = bundle.items[0]?.split_group_id;
+            const part = bundle.split_part;
+            if (!sgid || part == null) continue;
+            const key = `${sgid}::${part}`;
+            if (!partWeeks.has(key)) partWeeks.set(key, new Set());
+            partWeeks.get(key)!.add(week);
+          }
+        }
+        for (const [key, weeks] of partWeeks) {
+          if (weeks.size > 1) {
+            console.warn(
+              `[useProductionSchedule] split-part rozpadnutý cez týždne (${weeks.size}): ${key} → ${[...weeks].sort().join(", ")}`,
+            );
+          }
+        }
+      }
+
       return result;
     },
   });
