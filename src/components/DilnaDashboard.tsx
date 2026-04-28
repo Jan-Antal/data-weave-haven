@@ -903,8 +903,14 @@ function useDilnaData(weekOffset: number) {
 
       const offPlanCount = cards.filter(c => c.warning === "off_plan").length;
       const unmatchedCount = cards.filter(c => c.warning === "unmatched").length;
-      const delayCount = cards.filter(c => c.slipStatus === "delay").length;
-      const slipCount = cards.filter(c => c.slipStatus === "slip").length;
+      // Skluz/omeškanie počítame na úrovni bundlov, nie projektov — projekt môže
+      // mať viac bundlov v rôznych stavoch a "worst across bundles" by ich zlúčil do 1.
+      const allBundles = cards
+        .filter(c => c.warning === "none")
+        .flatMap(c => c.bundles);
+      const totalBundles = allBundles.length;
+      const delayCount = allBundles.filter(b => b.slipStatus === "delay").length;
+      const slipCount = allBundles.filter(b => b.slipStatus === "slip").length;
       const spilledCount = cards.filter(c => c.isSpilledOnly || c.bundles.some(b => b.isSpilled)).length;
       const totalValueCzk = cards.reduce((s, c) => s + (c.valueCzk || 0), 0);
       const totalValueTargetCzk = cards.reduce((s, c) => s + (c.valueTargetCzk || 0), 0);
@@ -922,6 +928,7 @@ function useDilnaData(weekOffset: number) {
         unmatchedCount,
         delayCount,
         slipCount,
+        totalBundles,
         spilledCount,
         totalValueCzk,
         totalValueTargetCzk,
@@ -1043,7 +1050,7 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
     );
   }
 
-  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount, spilledCount, totalValueCzk, totalValueTargetCzk, prevWeekNum } = data;
+  const { weeklyCapacity, totalHoursWeek, todayHours, dailyTarget, lastSync, cards, offPlanCount, unmatchedCount, delayCount, slipCount, totalBundles, spilledCount, totalValueCzk, totalValueTargetCzk, prevWeekNum } = data;
   const weekPct = weeklyCapacity > 0 ? Math.min(100, Math.round((totalHoursWeek / weeklyCapacity) * 100)) : 0;
   const todayPct = dailyTarget > 0 ? Math.min(100, Math.round((todayHours / dailyTarget) * 100)) : 0;
 
@@ -1077,7 +1084,7 @@ export function DilnaDashboard({ weekOffset, onOpenProjectDetail }: { weekOffset
               <span className="text-muted-foreground mx-1">/</span>
               <span className="text-[#b1232f]">{delayCount}</span>
             </div>
-            <div className="text-[11px] text-muted-foreground mt-2">Z {cards.filter(c => c.warning === "none").length} naplánovaných projektů</div>
+            <div className="text-[11px] text-muted-foreground mt-2">Z {totalBundles} naplánovaných bundlů</div>
           </Card>
           <Card className="p-4 shadow-sm">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Mimo plán / Nespárované</div>

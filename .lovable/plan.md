@@ -1,64 +1,54 @@
+## Problém
 
-## Diagnóza
+V Dílna dashboarde karta **„Ve skluzu / V omeškání"** počíta projekty, nie bundly:
 
-Commit `5c235211` (26.4.) v `src/components/production/WeeklySilos.tsx` (~riadok 1894) prepísal celé orámovanie bundle karty na neutrálne 1px sivé. Zmizli tri vizuálne signály:
+```ts
+const delayCount = cards.filter(c => c.slipStatus === "delay").length;
+const slipCount  = cards.filter(c => c.slipStatus === "slip").length;
+```
 
-1. **4px farebný `borderLeft`** v farbe projektu (`getProjectColor(project_id)`) — primárny identifikátor projektu.
-2. **2px oranžové orámovanie** pri selekcii (`isHighlighted`).
-3. Vizuálne odlíšenie spillover a overdue stavov.
-
-Premenná `borderLeftColor` (riadok 1779) je stále v scope, takže netreba dátovú prácu.
+`card.slipStatus` je **„worst across bundles"** — takže projekt s 5 bundlami, z ktorých 3 meškajú, sa zaráta ako 1. Užívateľ chce vidieť reálny počet meškajúcich/skĺzajúcich **bundlov**.
 
 ## Riešenie
 
-Upraviť `style` objekt bundle wrappera (`<div ref={setBundleNodeRef}>` na riadku 1894) takto:
+V `src/components/DilnaDashboard.tsx` prepočítať `slipCount` a `delayCount` agregáciou cez `card.bundles[]` namiesto cez `cards[]`.
 
-### `borderLeft` — vždy 4px farba projektu
-Jednotná farba projektu pre VŠETKY stavy (spillover aj overdue). Iba pri aktívnej selekcii sa prepne na oranžovú.
+### Zmena (riadky 906–907)
 
-```tsx
-borderLeft: isHighlighted
-  ? "4px solid #d97706"
-  : `4px solid ${borderLeftColor}`,
+```ts
+// PRED
+const delayCount = cards.filter(c => c.slipStatus === "delay").length;
+const slipCount  = cards.filter(c => c.slipStatus === "slip").length;
+
+// PO — počítame bundly naprieč všetkými projektmi (len naplánované karty,
+// nie off_plan/unmatched, ktoré nemajú bundly v pláne týždňa)
+const allBundles = cards
+  .filter(c => c.warning === "none")
+  .flatMap(c => c.bundles);
+const delayCount = allBundles.filter(b => b.slipStatus === "delay").length;
+const slipCount  = allBundles.filter(b => b.slipStatus === "slip").length;
 ```
 
-### `borderTop / borderRight / borderBottom` — neutrálne, oranžové iba pri selekcii
-Overdue NEMENÍ border (užívateľ chce len pozadie).
+### Úprava popisku pod číslom (riadok 1080)
+
+Aktuálny popisok hovorí o projektoch — zmeniť na bundly:
 
 ```tsx
-borderTop:    isHighlighted ? "2px solid #d97706"
-            : forecastDarkMode ? "1px solid #3d4558" : "1px solid #ece8e2",
-borderRight:  /* totožné */,
-borderBottom: /* totožné */,
+// PRED
+<div className="text-[11px] text-muted-foreground mt-2">
+  Z {cards.filter(c => c.warning === "none").length} naplánovaných projektů
+</div>
+
+// PO
+<div className="text-[11px] text-muted-foreground mt-2">
+  Z {allBundles.length} naplánovaných bundlů
+</div>
 ```
 
-### `backgroundColor` — overdue červenkasté, spillover jemne oranžové
-```tsx
-backgroundColor: forecastDarkMode
-  ? (isHighlighted ? "rgba(217,119,6,0.08)" : "#252a35")
-  : (shouldHighlightOverdue ? "hsl(0 75% 95%)"      // jemné červenkasté pre overdue
-   : isSpilled              ? "rgba(217,119,6,0.06)" // jemný oranžový fill pre spillover
-   : isHighlighted          ? "rgba(217,119,6,0.05)"
-   :                          "#ffffff"),
-```
+`allBundles.length` musí byť dostupné v render scope — preto ho pridáme aj do `return { ... }` z `useDilnaData` (napr. ako `totalBundles`) a destruktúrneme v komponente vedľa `slipCount`/`delayCount`.
 
-### `transition` — doplniť `border-left-color`
-```tsx
-transition: "border-top-color 150ms, border-right-color 150ms, border-bottom-color 150ms, border-left-color 150ms, background-color 150ms, box-shadow 150ms, outline 300ms, opacity 200ms, padding-bottom 160ms, transform 160ms",
-```
+## Čo zostáva nezmenené
 
-## Vizuálne pravidlá (zhrnutie)
-
-| Stav | borderLeft (4px) | border (T/R/B) | Pozadie |
-|---|---|---|---|
-| Default | farba projektu | sivý 1px | biele |
-| Selekcia (`isHighlighted`) | oranžový | oranžový 2px | jemne oranžové |
-| Spillover (`isSpilled`) | farba projektu | sivý 1px | jemne oranžové |
-| Overdue (`shouldHighlightOverdue`) | farba projektu | sivý 1px | jemne červenkasté |
-| Spillover + Overdue | farba projektu | sivý 1px | červenkasté má prioritu |
-
-## Súbor
-
-- `src/components/production/WeeklySilos.tsx` — riadky **1894–1909** (style objekt v `CollapsibleBundleCard`).
-
-Žiadne ďalšie súbory netreba meniť.
+- **Karta „Mimo plán / Nespárované"** — naďalej projektová úroveň (off_plan/unmatched sú projektové príznaky, bundly tam nemajú zmysel).
+- **Sortovanie projektových kariet** podľa worst-bundle slipStatus zostáva — vizuálne usporiadanie sa nemení.
+- **Per-bundle zobrazenie** vnútri kariet sa nemení.
