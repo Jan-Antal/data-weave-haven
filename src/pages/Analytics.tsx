@@ -84,7 +84,7 @@ export default function Analytics() {
   const queryClient = useQueryClient();
   const [editMode, setEditMode] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") ?? "projekty";
+  const activeTab = searchParams.get("tab") ?? "dilna";
   const dilnaMode = activeTab === "dilna";
   const rezieMode = activeTab === "rezie";
   const vykazMode = activeTab === "vykaz";
