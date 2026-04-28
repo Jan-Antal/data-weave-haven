@@ -95,13 +95,49 @@ export interface PruvodkaOptions {
   expediceDate?: string | null;
 }
 
-/** Format YYYY-MM-DD as DD.MM.YY using local time (no UTC shift). */
-function formatExpediceShort(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return "";
-  const yy = m[1].slice(2);
-  return `${m[3]}.${m[2]}.${yy}`;
+/** Parse various stored date formats into DD.MM.YY (local, no UTC shift). */
+function formatExpediceShort(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const s = String(raw).trim();
+  if (!s) return "";
+
+  const MONTHS: Record<string, number> = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  };
+
+  let d: number | null = null, m: number | null = null, y: number | null = null;
+
+  // ISO: 2026-05-25
+  let mt = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (mt) { y = +mt[1]; m = +mt[2]; d = +mt[3]; }
+
+  // DD-Mon-YY: 02-Jul-26
+  if (d == null) {
+    mt = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+    if (mt && MONTHS[mt[2].toLowerCase()]) {
+      d = +mt[1]; m = MONTHS[mt[2].toLowerCase()]; y = +mt[3];
+      if (y < 100) y += 2000;
+    }
+  }
+
+  // Czech: D. M. YYYY
+  if (d == null) {
+    mt = s.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{2,4})$/);
+    if (mt) { d = +mt[1]; m = +mt[2]; y = +mt[3]; if (y < 100) y += 2000; }
+  }
+
+  // US: M/D/YY
+  if (d == null) {
+    mt = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+    if (mt) { m = +mt[1]; d = +mt[2]; y = +mt[3]; if (y < 100) y += 2000; }
+  }
+
+  if (d == null || m == null || y == null) return "";
+  const dd = String(d).padStart(2, "0");
+  const mm = String(m).padStart(2, "0");
+  const yy = String(y).slice(-2);
+  return `${dd}.${mm}.${yy}`;
 }
 
 export function buildPruvodkaHtml(opts: PruvodkaOptions): string {
