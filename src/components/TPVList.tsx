@@ -20,7 +20,11 @@ import {
   useBulkInsertTPVItems,
 } from "@/hooks/useTPVItems";
 import { useTPVStatusOptions } from "@/hooks/useTPVStatusOptions";
-import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer, AlertTriangle, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Trash2, FileText, Cog, Printer, AlertTriangle, Loader2, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cs } from "date-fns/locale";
 import { buildPruvodkaHtml } from "@/lib/exportPdf";
 import { PdfPreviewModal } from "./PdfPreviewModal";
 import { ProjectDetailDialog } from "./ProjectDetailDialog";
@@ -276,9 +280,10 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   // ── Průvodka state ─────────────────────────────────────────────
   const [pruvodkaWarning, setPruvodkaWarning] = useState<{ items: typeof items; allItems: typeof items } | null>(null);
   const [missingExpediceConfirm, setMissingExpediceConfirm] = useState<{ items: typeof items } | null>(null);
+  const [manualExpedice, setManualExpedice] = useState<Date | undefined>(undefined);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
 
-  const openPruvodka = useCallback((itemsToPrint: typeof items) => {
+  const openPruvodka = useCallback((itemsToPrint: typeof items, expediceOverride?: string | null) => {
     const hasUnapproved = itemsToPrint.some(item => item.status !== "Schváleno");
     const rows = itemsToPrint.map((item, idx) => ({
       rowNum: idx + 1,
@@ -290,13 +295,16 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
       isApproved: item.status === "Schváleno",
     }));
 
+    const expediceDate =
+      expediceOverride !== undefined ? expediceOverride : ((currentProject as any)?.expedice ?? null);
+
     const html = buildPruvodkaHtml({
       projectId,
       projectName: projectName || projectId,
       issuedBy: profile?.full_name || profile?.email || "—",
       rows,
       hasUnapproved,
-      expediceDate: (currentProject as any)?.expedice ?? null,
+      expediceDate,
     });
 
     setPdfHtml(html);
@@ -1391,23 +1399,82 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
         </DialogContent>
       </Dialog>
 
-      {/* Missing expedice — confirm before printing */}
-      <Dialog open={!!missingExpediceConfirm} onOpenChange={(open) => { if (!open) setMissingExpediceConfirm(null); }}>
+      {/* Missing expedice — confirm or fill in manually before printing */}
+      <Dialog
+        open={!!missingExpediceConfirm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMissingExpediceConfirm(null);
+            setManualExpedice(undefined);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[460px]">
           <DialogHeader>
             <DialogTitle>⚠ Chybí termín expedice</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2 py-2 text-sm">
+          <div className="space-y-3 py-2 text-sm">
             <p className="text-muted-foreground">
-              Pro tuto zakázku není nastaven datum expedice. Řádek <strong>termín výroby</strong> v průvodce zůstane prázdný — můžete ho doplnit ručně před tiskem, nebo termín nejprve nastavit v detailu zakázky.
+              Pro tuto zakázku není nastaven datum expedice. Můžete jej zadat ručně pro tento tisk, nebo průvodku vytisknout bez termínu.
             </p>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium">Termín expedice (volitelně)</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {manualExpedice
+                      ? format(manualExpedice, "d. MMMM yyyy", { locale: cs })
+                      : <span className="text-muted-foreground">Vyberte datum…</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={manualExpedice}
+                    onSelect={setManualExpedice}
+                    initialFocus
+                    locale={cs}
+                    weekStartsOn={1}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setMissingExpediceConfirm(null)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setMissingExpediceConfirm(null); setManualExpedice(undefined); }}
+            >
               Zrušit
             </Button>
-            <Button size="sm" onClick={() => missingExpediceConfirm && openPruvodka(missingExpediceConfirm.items)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => missingExpediceConfirm && openPruvodka(missingExpediceConfirm.items, null)}
+            >
               Tisknout bez termínu
+            </Button>
+            <Button
+              size="sm"
+              disabled={!manualExpedice}
+              onClick={() => {
+                if (missingExpediceConfirm && manualExpedice) {
+                  const yyyy = manualExpedice.getFullYear();
+                  const mm = String(manualExpedice.getMonth() + 1).padStart(2, "0");
+                  const dd = String(manualExpedice.getDate()).padStart(2, "0");
+                  openPruvodka(missingExpediceConfirm.items, `${yyyy}-${mm}-${dd}`);
+                  setManualExpedice(undefined);
+                }
+              }}
+            >
+              Tisknout s termínem
             </Button>
           </DialogFooter>
         </DialogContent>
