@@ -87,11 +87,16 @@ function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; sel
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!Array.isArray(data.blocks) || data.blocks.length === 0) return null;
-    // Stale-check: if a background process invalidated forecast since this session was saved,
-    // ignore the cached snapshot so the user is forced to regenerate fresh numbers.
+    // Stale-check 1: explicit background invalidation tick (set by useBlockerAutoReduce etc.)
     const invalidatedAt = Number(localStorage.getItem("ami_forecast_invalidated_at") || 0);
     const sessionTs = Number(data.timestamp || 0);
     if (invalidatedAt > 0 && sessionTs > 0 && invalidatedAt > sessionTs) {
+      try { localStorage.removeItem(STORAGE_KEYS[mode]); } catch { /* ignore */ }
+      return null;
+    }
+    // Stale-check 2: drop sessions older than 12h — forecast numbers are volatile and
+    // cached snapshots from previous days regularly diverge from DB reality.
+    if (sessionTs > 0 && Date.now() - sessionTs > 12 * 60 * 60 * 1000) {
       try { localStorage.removeItem(STORAGE_KEYS[mode]); } catch { /* ignore */ }
       return null;
     }
