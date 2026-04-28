@@ -1,53 +1,76 @@
-## Cieľ
+## Problém
 
-Karta "Rezerva kapacit" v Pláne výroby (`WeeklySilos.tsx`, ~r. 1820–1860) je teraz tmavá a agresívna (`#1e2025`, `2px dashed #4b5563`). Treba ju zjemniť do svetlej zelenej palety, **rozloženie zladiť s bežnými bundle kartami** (názov + kód projektu hore, hodiny vpravo, deadline pod nimi) a badge **"⏳ Rezerva"** umiestniť **vľavo dole pod hodiny**.
+V `useProductionInbox.ts` funkcia `useBlockerAutoReduce` momentálne:
 
-## Layout (zladený s bežným bundle)
+1. **Maže** Rezerva (blocker) riadky zo `production_schedule` keď sa v inboxe objavia nové reálne položky pre ten istý projekt — preto Gradus Kampa **zmizne po refreshi**.
+2. Reálne položky pritom ostanú v inboxe (status `pending`) namiesto toho aby sa naplánovali do **toho istého týždňa, kde bola rezerva**.
 
-```text
-┌──────────────────────────────────────────┐
-│ ● Gradus Kampa            Z-2617-001     │   ← názov (zelený) + kód projektu vpravo
-│                                  ~83h    │   ← hodiny / cena vpravo
-│ ⏳ Rezerva               Exp 15.07.26    │   ← badge vľavo, deadline vpravo
-│ TPV: T28                                 │   ← iba ak existuje
-└──────────────────────────────────────────┘
+To je presný opak požadovaného správania. Rezerva má v skutočnosti reprezentovať **rezervovaný slot v konkrétnom týždni**, ktorý sa má pri príchode reálnych položiek **naplniť** (nie zmazať).
+
+## Riešenie
+
+Prepísať `useBlockerAutoReduce` tak, že namiesto mazania rezervy **automaticky presunie nové inbox položky do týždňa rezervy**:
+
+### Nová logika (per projekt s rezervou):
+
+1. Pre každý nový inbox projekt nájdi jeho aktívne blocker riadky v `production_schedule` (zoradené podľa `scheduled_week ASC`).
+2. Vezmi inbox položky tohto projektu (status `pending`) zoradené podľa `sent_at ASC`.
+3. Postupne ich plánuj do **najskoršieho** blocker týždňa, kým nevyčerpáš jeho hodiny:
+   - Pre každú položku INSERT-ni nový riadok do `production_schedule` so `scheduled_week` = blocker.scheduled_week, `is_blocker = false`, `bundle_label` = label rezervy (ak existuje) inak nový label cez `getNextBundleLabel`, ostatné polia z inbox itemu (item_name, item_code, stage_id, scheduled_hours = estimated_hours, atď.).
+   - Inbox položku UPDATE-ni na `status = 'scheduled'`.
+   - Odpočítaj `estimated_hours` od zostatku rezervy.
+4. Keď zostatok rezervy klesne na 0 alebo menej:
+   - DELETE-ni vyčerpaný blocker riadok.
+   - Pokračuj v plnení ďalšieho blocker riadku (ďalší týždeň).
+5. Keď ostávajúce inbox položky presahujú celkovú rezervu:
+   - Zvyšok ostane v inboxe ako `pending` (používateľ ich môže manuálne naplánovať).
+6. Keď zostatok rezervy v týždni > 0 ale ďalšia položka by ho prekročila:
+   - **Zmenšiť** rezervu o zaplánované hodiny (UPDATE `scheduled_hours`) — rezerva ostane viditeľná ako "zostatok hodín na projekt".
+
+### Toast oznámenia
+
+- `{projectName}: 5 položek naplánováno do rezervy (T28)` — pri úspešnom presune.
+- `{projectName}: Rezerva naplnena reálnymi položkami` — keď sa všetky blocker riadky vyčerpali.
+
+### Súbor
+
+- `src/hooks/useProductionInbox.ts` — prepísať len telo `useBlockerAutoReduce` (~r. 94–172). Žiadne DB schema zmeny.
+
+### Bez vplyvu
+
+- Forecast generátor rezerv (`useForecastMode.ts`) ostáva nezmenený.
+- Vizuál karty Rezerva v `WeeklySilos.tsx` ostáva nezmenený — bude sa len správne updatovať počet hodín alebo zmizne keď sa naplní.
+- Manuálne drag-and-drop z inboxu do týždňov funguje nezmenene.
+
+## Tech detaily
+
+```typescript
+// pseudo
+for (const project of newInboxProjects) {
+  const blockers = await fetchActiveBlockersForProject(project_id); // ASC by week
+  const inboxItems = await fetchPendingInboxItems(project_id);      // ASC by sent_at
+  
+  let bIdx = 0;
+  let remaining = blockers[0]?.scheduled_hours ?? 0;
+  const inserts = [], inboxUpdates = [], blockerUpdates = [], blockerDeletes = [];
+  
+  for (const item of inboxItems) {
+    while (bIdx < blockers.length && remaining <= 0) {
+      blockerDeletes.push(blockers[bIdx].id);
+      bIdx++;
+      remaining = blockers[bIdx]?.scheduled_hours ?? 0;
+    }
+    if (bIdx >= blockers.length) break; // no more reserve
+    
+    inserts.push({ ...itemAsScheduleRow, scheduled_week: blockers[bIdx].scheduled_week, bundle_label, is_blocker: false });
+    inboxUpdates.push(item.id);
+    remaining -= item.estimated_hours;
+  }
+  
+  // Save final remainder on current blocker
+  if (bIdx < blockers.length) {
+    if (remaining <= 0) blockerDeletes.push(blockers[bIdx].id);
+    else blockerUpdates.push({ id: blockers[bIdx].id, hours: remaining });
+  }
+}
 ```
-
-Štruktúra zodpovedá normálnym bundle (názov projektu + meta vpravo, deadline dole), len badge "⏳ Rezerva" zaberá pozíciu vľavo dole pod hodinami namiesto vedľa nich.
-
-## Vizuálne zmeny — jemná zelená
-
-Light mode:
-- background `#f1f7f3` (jemná zelená)
-- border `1px dashed #b9d4c2` (namiesto `2px dashed #4b5563`)
-- názov projektu: `#223937` (brand Primary Green)
-- kód projektu: `#6b8a72` (malý chip vpravo, font-sans)
-- hodiny: `#5a7a64` font-bold
-- badge "⏳ Rezerva": pozadie `#dcebe1`, text `#3a6b4a`
-- deadline: `#6b8a72` (`Exp 15.07.26`)
-- TPV: `#8aa893`
-
-Dark mode (`forecastDarkMode`):
-- background `rgba(58,107,74,0.10)`
-- border `1px dashed rgba(149,193,164,0.35)`
-- názov `#b8d4c0`, ostatné texty `#7fa089`
-
-Opacity ~0.95 (jemne zhasnuté oproti aktívnym, ale dobre čitateľné).
-
-## Dáta (už dostupné v scope nad `if (isBlockerBundle)`)
-
-- `bundle.project_id` → kód projektu
-- `bundle.project_name` → názov
-- `deadlineInfo.label` + `deadlineInfo.dateStr` → deadline (fallback expedice → montáž → předání → smluvní). Ak `null`, riadok sa preskočí.
-- `tpvWeekLabel` → ostáva
-- `color` → ľavá farebná bodka
-
-## Súbor
-
-- `src/components/production/WeeklySilos.tsx` — upraviť iba blok `if (isBlockerBundle) { return (...) }` (~r. 1820–1861).
-
-## Bez vplyvu
-
-- Žiadna DB zmena, žiadna zmena výpočtu rezervy ani triedenia.
-- Context menu handler ostáva nezmenený.
-- Rešpektuje brand farby z `mem://style/color-palette`.
