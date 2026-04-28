@@ -1,38 +1,63 @@
-# Odstránenie automatických refreshov aplikácie
+# Daily-report endpoint pre n8n Slack workflow
 
-## Problém
-Aplikácia sa sama reloaduje aj počas práce → uživateľ stratí rozrobený stav (rozdelená práca, otvorené sheety, neuložené úpravy).
+## Cieľ
+Umožniť n8n volať existujúcu edge funkciu `daily-report` pomocou shared-secret hlavičky (bez user JWT, bez service-role kľúča), aby si mohol postaviť denný Slack report výroby s rovnakými dátami ako Analytics → Dílna.
 
-## Príčina
-Pri riešení PWA cache busting sme pridali tri vrstvy auto-reloadu, ktoré bežia kým máš app otvorený:
+## Čo sa zmení
 
-1. **`useVersionCheck` (App.tsx)** — každé **2 minúty** fetchne `/`, porovná hashe `<script src="/assets/...">` a ak sa líšia, zavolá `window.location.reload()` (s 3s fallbackom). Toto sa spúšťa pri každom novom builde / preview revízii.
-2. **Service Worker `controllerchange` listener (useVersionCheck)** — keď nový SW prevezme kontrolu (a pri `skipWaiting: true` + `clientsClaim: true` sa to deje automaticky a okamžite po deployi), zavolá `window.location.reload()`.
-3. **`bootstrapCacheCheck` (main.tsx)** — porovnanie build hashu pri **štarte**. Toto je OK, deje sa to len pri load stránky, nie počas práce.
+### 1. `supabase/functions/daily-report/index.ts` — pridať shared-secret bypass
+Pred existujúcou JWT validáciou skontrolovať hlavičku `x-report-secret`. Ak sa zhoduje s hodnotou env premennej `DAILY_REPORT_SECRET`, JWT check sa preskočí. Inak pôvodné správanie ostáva bezo zmeny (UI v aplikácii ďalej funguje cez user JWT).
 
-Body 1 a 2 sú tie, ktoré ti rušia prácu počas používania appky.
+```ts
+const sharedSecret = Deno.env.get("DAILY_REPORT_SECRET");
+const providedSecret = req.headers.get("x-report-secret");
+const isMachineCall = !!sharedSecret && providedSecret === sharedSecret;
 
-## Riešenie
+if (!isMachineCall) {
+  // existing user-JWT validation (Authorization: Bearer ...)
+}
+```
 
-### 1. `src/hooks/useVersionCheck.ts` — prepísať na "soft notify"
-- Odstrániť `setInterval` polling každé 2 minúty.
-- Odstrániť `window.location.reload()` v `controllerchange` handleri.
-- Odstrániť automatický 3s fallback reload.
-- Hook nechať existovať ako no-op (alebo úplne odstrániť volanie z `App.tsx`), aby sme nerozbili importy. Nová verzia sa načíta pri ďalšom prirodzenom otvorení / refreshi appky používateľom.
+Žiadna iná zmena v správaní funkcie — ten istý JSON response (`report_date`, `rows`, `by_project`).
 
-### 2. `vite.config.ts` — zjemniť PWA správanie
-- `registerType: "autoUpdate"` → `"prompt"` (SW sa nainštaluje, ale aktivuje až pri ďalšom načítaní stránky).
-- `clientsClaim: true` → `false` (nový SW si neprivlastní existujúce taby okamžite).
-- `skipWaiting: true` ponechať pre samotného workera, ale bez `clientsClaim` a bez controllerchange reloadu sa už neprejaví ako zlomenie tvojej session.
+### 2. Pridať runtime secret `DAILY_REPORT_SECRET`
+Po schválení tohto plánu otvorím prompt na pridanie secretu — vygeneruješ / vložíš hodnotu (napr. silný náhodný reťazec). Tú istú hodnotu si potom uložíš do n8n credentials.
 
-### 3. `src/lib/cacheBuster.ts` a `bootstrapCacheCheck` v `main.tsx` — nechať
-Tieto bežia len pri **štarte** appky (otvorenie taba / hard refresh) — to je správne správanie pre PWA cache busting a používateľa neruší. `forceAppRefresh()` (manuálne tlačidlo v `MobileHeader`) zostáva tiež nedotknuté.
+### 3. `supabase/config.toml` — bez zmeny
+`verify_jwt = false` pre `daily-report` už je nastavené, netreba nič meniť.
 
-## Výsledok
-- Počas práce v aplikácii sa stránka **nikdy** sama nereloadne.
-- Nové verzie sa naberú prirodzene pri ďalšom otvorení / hard refreshi / kliknutí na manuálne tlačidlo refresh v menu.
-- PWA shell sa stále aktualizuje na pozadí, len bez prerušenia bežiacej session.
+## Ako to bude n8n volať
+
+```
+GET https://jvkuqvwmrzttelxkhrwr.supabase.co/functions/v1/daily-report
+  ?date=2026-04-28        ← voliteľné, default = dnes (Europe/Prague)
+
+Headers:
+  Authorization:  Bearer <SUPABASE_ANON_KEY>   ← required by Supabase API gateway
+  apikey:         <SUPABASE_ANON_KEY>
+  x-report-secret: <DAILY_REPORT_SECRET>       ← naša shared-secret kontrola
+```
+
+Anon key je v projekte aj tak public (frontend ho používa). Skutočná autorizácia je `x-report-secret`.
+
+## Mapovanie odpovede na Slack message
+
+`response.by_project[].bundles[]` obsahuje všetko, čo potrebuješ:
+
+| Pole | Slack zobrazenie |
+|---|---|
+| `project_name` | nadpis sekcie |
+| `bundle_display_label` | napr. `A-4`, `B`, `D-1` |
+| `logs[0].phase` | aktuálna fáza |
+| `logs[0].percent` | aktuálne % |
+| `weekly_goal_pct` | cieľové % na dnešok |
+| `logs[0].is_on_track` | ✅ / ❌ |
+| `logs[0].note_text` | poznámka (ak je) |
+| `logs.length === 0` | ⚠️ bundle bez logu |
+
+## Testovanie po nasadení
+Spravím curl test cez `supabase--curl_edge_functions` s hlavičkou `x-report-secret`, aby sme overili, že to vracia očakávaný `by_project` JSON.
 
 ## Dotknuté súbory
-- `src/hooks/useVersionCheck.ts` (prepísať na no-op)
-- `vite.config.ts` (PWA options)
+- `supabase/functions/daily-report/index.ts` (úprava auth)
+- nový secret `DAILY_REPORT_SECRET` (pridáš ty po prompte)

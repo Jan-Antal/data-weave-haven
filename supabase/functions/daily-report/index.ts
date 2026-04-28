@@ -58,22 +58,29 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Auth: validate JWT in code (verify_jwt = false on the function).
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
-  }
-
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  const authClient = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: userData, error: userError } = await authClient.auth.getUser();
-  if (userError || !userData?.user) {
-    return jsonResponse({ error: "Unauthorized" }, 401);
+  // Auth: two paths
+  //  (1) Machine-to-machine (n8n, cron, webhooks) — shared secret in `x-report-secret`.
+  //  (2) Interactive UI calls — user JWT validated in code (verify_jwt = false on the function).
+  const sharedSecret = Deno.env.get("DAILY_REPORT_SECRET");
+  const providedSecret = req.headers.get("x-report-secret");
+  const isMachineCall = !!sharedSecret && providedSecret === sharedSecret;
+
+  if (!isMachineCall) {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userError } = await authClient.auth.getUser();
+    if (userError || !userData?.user) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
   }
 
   // Parse date param (?date=YYYY-MM-DD), default = today (Europe/Prague).
