@@ -2684,6 +2684,7 @@ export type Database = {
           bundle_label: string
           bundle_split_part: string
           is_on_track: boolean
+          is_unplanned: boolean
           log_day_date: string
           logged_at: string
           note_text: string
