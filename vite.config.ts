@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
       // the next natural page load.
       registerType: "prompt",
       workbox: {
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/~oauth/],
         // Do NOT auto-claim existing clients — that would invalidate the
