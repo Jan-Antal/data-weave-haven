@@ -280,6 +280,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
   // ── Průvodka state ─────────────────────────────────────────────
   const [pruvodkaWarning, setPruvodkaWarning] = useState<{ items: typeof items; allItems: typeof items } | null>(null);
   const [missingExpediceConfirm, setMissingExpediceConfirm] = useState<{ items: typeof items } | null>(null);
+  const [manualExpedice, setManualExpedice] = useState<Date | undefined>(undefined);
   const [pdfHtml, setPdfHtml] = useState<string | null>(null);
 
   const openPruvodka = useCallback((itemsToPrint: typeof items, expediceOverride?: string | null) => {
