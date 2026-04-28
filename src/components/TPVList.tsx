@@ -1384,7 +1384,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             </p>
             {!(currentProject as any)?.expedice && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-                ⚠ U této zakázky není nastaven termín expedice — řádek <strong>termín výroby</strong> v průvodce zůstane prázdný (lze doplnit ručně).
+                ⚠ U této zakázky není nastaven termín expedice — po potvrzení budete moci datum doplnit ručně, nebo průvodku vytisknout bez termínu.
               </p>
             )}
           </div>
