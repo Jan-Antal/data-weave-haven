@@ -29,6 +29,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 import { useCreateSupplier } from "./hooks";
+import { IcoLookupField } from "./IcoLookupField";
+import type { AresCompanyData } from "@/types/ares";
 
 interface AddSupplierDialogProps {
   open: boolean;
