@@ -243,6 +243,15 @@ export function useBlockerAutoReduce(inboxProjects: InboxProject[] | undefined) 
 
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
       qc.invalidateQueries({ queryKey: ["production-inbox"] });
+
+      // Auto-fill changed underlying schedule/inbox data → invalidate cached forecast
+      // sessions so user doesn't see stale numbers (e.g. blocker hours that no longer exist).
+      try {
+        localStorage.removeItem("ami_forecast_session");
+        localStorage.removeItem("ami_forecast_session_scratch");
+        // Bump a tick so any active useForecastMode listeners can react if needed.
+        localStorage.setItem("ami_forecast_invalidated_at", String(Date.now()));
+      } catch { /* ignore */ }
     })();
   }, [inboxProjects, qc]);
 }

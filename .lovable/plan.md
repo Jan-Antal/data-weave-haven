@@ -1,76 +1,57 @@
 ## Problém
 
-V `useProductionInbox.ts` funkcia `useBlockerAutoReduce` momentálne:
+Karty Gradus Kampa vo Forecast prehľade ukazujú nezmyselné čísla:
+- **Zelená INBOX karta**: `810h` / "2 položky" — v DB je len 145.9h v pending inboxe
+- **Oranžová AI karta**: `~255h` / "12 položek" — správny zostatok je ~954h
 
-1. **Maže** Rezerva (blocker) riadky zo `production_schedule` keď sa v inboxe objavia nové reálne položky pre ten istý projekt — preto Gradus Kampa **zmizne po refreshi**.
-2. Reálne položky pritom ostanú v inboxe (status `pending`) namiesto toho aby sa naplánovali do **toho istého týždňa, kde bola rezerva**.
+### Príčina
 
-To je presný opak požadovaného správania. Rezerva má v skutočnosti reprezentovať **rezervovaný slot v konkrétnom týždni**, ktorý sa má pri príchode reálnych položiek **naplniť** (nie zmazať).
+1. **Forecast je kešovaný v localStorage** (`ami_forecast_session`) a regeneruje sa len ručne (tlačidlo "Generate" / "Reset").
+2. Keď v pozadí prebehol nový **auto-fill blockerov** (pred. krok, `useBlockerAutoReduce`):
+   - Zmazal 2× rezervu 256h, presunul položky z inboxu do schedule.
+   - Tým sa zmenili reálne čísla v DB (`production_inbox`, `production_schedule`).
+3. Ale forecast karty sa **nepregenerovali** → ukazujú snapshot stavu spred auto-fillu (vrátane už neexistujúcich rezerv, ktoré sčítaval do 810h aj 255h).
+4. Naviac: 12 historických **midflight rows** (`is_midflight=true`, `Gradus Kampa — T45..T13`, spolu 233.4h, `completed_at` nastavený) sú legitímny záznam o už hotovej práci — ale forecast ich rátal ako "už naplánované", takže AI estimate vyšla nízka.
+
+### Reálny stav v DB (overenené)
+- Plán projektu: **1334h** (12 TPV položiek)
+- Hotové (midflight): **233.4h**
+- V inbox pending: **145.9h** (AT.01=107h + AT.06=38.9h)
+- Zostáva odhadnúť: ~**954.7h**
 
 ## Riešenie
 
-Prepísať `useBlockerAutoReduce` tak, že namiesto mazania rezervy **automaticky presunie nové inbox položky do týždňa rezervy**:
+### 1. Invalidovať forecast cache, keď sa DB zmení v pozadí
 
-### Nová logika (per projekt s rezervou):
+V `src/hooks/useForecastMode.ts` pridať listener, ktorý keď je forecast aktívny a `production_inbox` alebo `production_schedule` query sa invalidne (napr. po `useBlockerAutoReduce`), automaticky:
+- Zobrazí jemný banner: *"Data sa zmenili — kliknite 'Reset' pre prepočet"*
+- ALEBO automaticky zavolá `resetAndRegenerate()` ak je to bezpečné
 
-1. Pre každý nový inbox projekt nájdi jeho aktívne blocker riadky v `production_schedule` (zoradené podľa `scheduled_week ASC`).
-2. Vezmi inbox položky tohto projektu (status `pending`) zoradené podľa `sent_at ASC`.
-3. Postupne ich plánuj do **najskoršieho** blocker týždňa, kým nevyčerpáš jeho hodiny:
-   - Pre každú položku INSERT-ni nový riadok do `production_schedule` so `scheduled_week` = blocker.scheduled_week, `is_blocker = false`, `bundle_label` = label rezervy (ak existuje) inak nový label cez `getNextBundleLabel`, ostatné polia z inbox itemu (item_name, item_code, stage_id, scheduled_hours = estimated_hours, atď.).
-   - Inbox položku UPDATE-ni na `status = 'scheduled'`.
-   - Odpočítaj `estimated_hours` od zostatku rezervy.
-4. Keď zostatok rezervy klesne na 0 alebo menej:
-   - DELETE-ni vyčerpaný blocker riadok.
-   - Pokračuj v plnení ďalšieho blocker riadku (ďalší týždeň).
-5. Keď ostávajúce inbox položky presahujú celkovú rezervu:
-   - Zvyšok ostane v inboxe ako `pending` (používateľ ich môže manuálne naplánovať).
-6. Keď zostatok rezervy v týždni > 0 ale ďalšia položka by ho prekročila:
-   - **Zmenšiť** rezervu o zaplánované hodiny (UPDATE `scheduled_hours`) — rezerva ostane viditeľná ako "zostatok hodín na projekt".
+Najjednoduchšie a najmenej invazívne: **pri auto-fille zavolať `clearStorage()` pre obidva forecast módy a invalidovať aj forecast query** v `useProductionInbox.ts` na konci úspešného auto-fillu.
 
-### Toast oznámenia
+### 2. Pridať tlačidlo "Vyčistiť cache forecast"
 
-- `{projectName}: 5 položek naplánováno do rezervy (T28)` — pri úspešnom presune.
-- `{projectName}: Rezerva naplnena reálnymi položkami` — keď sa všetky blocker riadky vyčerpali.
+Tlačidlo v forecast paneli (alebo automaticky pri otvorení), ktoré:
+- Premaže `localStorage.ami_forecast_session` a `ami_forecast_session_scratch`
+- Pretiahne čerstvé bloky z edge funkcie
 
-### Súbor
+### 3. (Voliteľné) Banner upozornenia pri stale dátach
 
-- `src/hooks/useProductionInbox.ts` — prepísať len telo `useBlockerAutoReduce` (~r. 94–172). Žiadne DB schema zmeny.
+Pri načítaní uloženej session porovnať `timestamp` s `updated_at` najnovšieho riadku v inboxe/schedule pre dotknuté projekty. Ak je session staršia → ukáže červený banner "Forecast je zastaralý, regenerovať".
 
-### Bez vplyvu
+## Akcia teraz pre používateľa
 
-- Forecast generátor rezerv (`useForecastMode.ts`) ostáva nezmenený.
-- Vizuál karty Rezerva v `WeeklySilos.tsx` ostáva nezmenený — bude sa len správne updatovať počet hodín alebo zmizne keď sa naplní.
-- Manuálne drag-and-drop z inboxu do týždňov funguje nezmenene.
+Aby sa z UI okamžite zbavil zlých čísel pre Gradus Kampa:
+- Stlačiť tlačidlo **"Reset"** vo Forecast móde (alebo zavrieť a otvoriť forecast)
+- Tým sa cache premaže a edge funkcia vráti správne hodnoty (~954h AI estimate, ~146h INBOX)
 
-## Tech detaily
+## Súbory na úpravu
 
-```typescript
-// pseudo
-for (const project of newInboxProjects) {
-  const blockers = await fetchActiveBlockersForProject(project_id); // ASC by week
-  const inboxItems = await fetchPendingInboxItems(project_id);      // ASC by sent_at
-  
-  let bIdx = 0;
-  let remaining = blockers[0]?.scheduled_hours ?? 0;
-  const inserts = [], inboxUpdates = [], blockerUpdates = [], blockerDeletes = [];
-  
-  for (const item of inboxItems) {
-    while (bIdx < blockers.length && remaining <= 0) {
-      blockerDeletes.push(blockers[bIdx].id);
-      bIdx++;
-      remaining = blockers[bIdx]?.scheduled_hours ?? 0;
-    }
-    if (bIdx >= blockers.length) break; // no more reserve
-    
-    inserts.push({ ...itemAsScheduleRow, scheduled_week: blockers[bIdx].scheduled_week, bundle_label, is_blocker: false });
-    inboxUpdates.push(item.id);
-    remaining -= item.estimated_hours;
-  }
-  
-  // Save final remainder on current blocker
-  if (bIdx < blockers.length) {
-    if (remaining <= 0) blockerDeletes.push(blockers[bIdx].id);
-    else blockerUpdates.push({ id: blockers[bIdx].id, hours: remaining });
-  }
-}
-```
+- `src/hooks/useProductionInbox.ts` — po úspešnom auto-fille volať `localStorage.removeItem("ami_forecast_session")` aj `_scratch`
+- `src/hooks/useForecastMode.ts` — pridať detekciu staleness (timestamp porovnanie pri `loadFromStorage`); ak data v DB sú novšie → ignorovať saved session a vyžiadať regeneráciu
+
+## Čo NEriešiť
+
+- Midflight rows (`is_midflight=true`) sú v poriadku — sú to historické záznamy hotovej práce, NEsmažú sa.
+- Inbox položky AT.01 (107h) a AT.06 (38.9h) sú správne — sú to zostatky po midflight reconciliation.
+- Existujúci auto-fill blockerov funguje správne.
