@@ -1384,7 +1384,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             </p>
             {!(currentProject as any)?.expedice && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-                ⚠ U této zakázky není nastaven termín expedice — řádek <strong>termín výroby</strong> v průvodce zůstane prázdný (lze doplnit ručně).
+                ⚠ U této zakázky není nastaven termín expedice — po potvrzení budete moci datum doplnit ručně, nebo průvodku vytisknout bez termínu.
               </p>
             )}
           </div>
@@ -1392,7 +1392,20 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
             <Button variant="ghost" size="sm" onClick={() => setPruvodkaWarning(null)}>
               Zrušit
             </Button>
-            <Button size="sm" onClick={() => pruvodkaWarning && openPruvodka(pruvodkaWarning.allItems)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!pruvodkaWarning) return;
+                const items = pruvodkaWarning.allItems;
+                const hasExpedice = !!(currentProject as any)?.expedice;
+                setPruvodkaWarning(null);
+                if (!hasExpedice) {
+                  setMissingExpediceConfirm({ items });
+                } else {
+                  openPruvodka(items);
+                }
+              }}
+            >
               Přesto tisknout
             </Button>
           </DialogFooter>
@@ -1415,7 +1428,7 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
           </DialogHeader>
           <div className="space-y-3 py-2 text-sm">
             <p className="text-muted-foreground">
-              Pro tuto zakázku není nastaven datum expedice. Můžete jej zadat ručně pro tento tisk, nebo průvodku vytisknout bez termínu.
+              Pro tuto zakázku není nastaven datum expedice. Můžete jej zadat ručně jen pro tento tisk (do zakázky se neuloží), nebo průvodku vytisknout bez termínu.
             </p>
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium">Termín expedice (volitelně)</span>
@@ -1432,11 +1445,12 @@ export function TPVList({ projectId, projectName, currency = "CZK", onBack, auto
                       : <span className="text-muted-foreground">Vyberte datum…</span>}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 z-[99999]" align="start">
                   <Calendar
                     mode="single"
                     selected={manualExpedice}
                     onSelect={setManualExpedice}
+                    defaultMonth={manualExpedice}
                     initialFocus
                     locale={cs}
                     weekStartsOn={1}
