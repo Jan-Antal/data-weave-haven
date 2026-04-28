@@ -838,6 +838,7 @@ function useDilnaData(weekOffset: number) {
       // 2) Unmatched: hours logged this week to a project_id with no schedule and no project record
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
+        if (spilledOnlyProjects.has(pid)) continue; // already shown as spilled card (loop 1.5)
         if (knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const usekMap = usekByProject.get(pid);
@@ -864,6 +865,7 @@ function useDilnaData(weekOffset: number) {
       // 3) Off-plan: project IS in DB (matched), has hours this week, but is not in production_schedule
       for (const [pid, loggedHours] of hoursByProject) {
         if (scheduledProjects.has(pid)) continue;
+        if (spilledOnlyProjects.has(pid)) continue; // already shown as spilled card (loop 1.5)
         if (!knownProjectIds.has(pid)) continue;
         if (loggedHours < 0.05) continue;
         const proj = projMap.get(pid)!;
