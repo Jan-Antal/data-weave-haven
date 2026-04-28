@@ -66,6 +66,28 @@ export function useUpdateSupplier() {
   });
 }
 
+/**
+ * Create a brand-new supplier. Invalidates the list query used by
+ * DodavateliaTab so the new card appears immediately.
+ */
+export function useCreateSupplier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof crmApi.createSupplier>[0]) =>
+      crmApi.createSupplier(input),
+    onSuccess: () => {
+      // Invalidate both the list query (DodavateliaTab grid) and any
+      // cached supplier-detail queries (defensive, no harm).
+      qc.invalidateQueries({ queryKey: ["tpv", "suppliers"] });
+      toast.success("Dodávateľ pridaný");
+    },
+    onError: (e: Error) =>
+      toast.error("Chyba pri pridávaní dodávateľa", {
+        description: e.message,
+      }),
+  });
+}
+
 // ============================================================
 // CRM — contacts
 // ============================================================

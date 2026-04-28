@@ -402,3 +402,62 @@ export function computeSupplierStats(
     cooperation_since: earliest ? earliest.toISOString() : null,
   };
 }
+
+// ============================================================
+// SUPPLIER — create (root entity)
+// ============================================================
+
+export interface CreateSupplierInput {
+  /** Required */
+  nazov: string;
+  /** Optional CRM fields */
+  ico?: string | null;
+  dic?: string | null;
+  kontakt_meno?: string | null;
+  kontakt_email?: string | null;
+  kontakt_telefon?: string | null;
+  kontakt_pozice?: string | null;
+  web?: string | null;
+  adresa?: string | null;
+  kategorie?: string[] | null;
+  rating?: number | null;
+  notes?: string | null;
+}
+
+/**
+ * Create a new supplier (root entity in tpv_supplier table).
+ * is_active defaults to true via DB default.
+ *
+ * Returns the inserted row including its new uuid id, ready to be
+ * used to immediately open the SupplierCRMDialog for further edits.
+ */
+export async function createSupplier(
+  input: CreateSupplierInput
+): Promise<TpvSupplierRow> {
+  const trim = (v: string | null | undefined) =>
+    v == null ? null : v.trim() || null;
+
+  const payload = {
+    nazov: input.nazov.trim(),
+    ico: trim(input.ico),
+    dic: trim(input.dic),
+    kontakt_meno: trim(input.kontakt_meno),
+    kontakt_email: trim(input.kontakt_email),
+    kontakt_telefon: trim(input.kontakt_telefon),
+    kontakt_pozice: trim(input.kontakt_pozice),
+    web: trim(input.web),
+    adresa: trim(input.adresa),
+    kategorie:
+      input.kategorie && input.kategorie.length > 0 ? input.kategorie : null,
+    rating: input.rating ?? null,
+    notes: trim(input.notes),
+  };
+
+  const { data, error } = await supabase
+    .from("tpv_supplier")
+    .insert(payload)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as TpvSupplierRow;
+}

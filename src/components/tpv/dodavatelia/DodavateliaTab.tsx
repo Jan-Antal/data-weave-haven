@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import type { TpvPermissions, TpvSupplierRow } from "../shared/types";
 import { useSupabaseSuppliersList } from "./hooks-list";
 import { SupplierCRMDialog } from "./SupplierCRMDialog";
+import { AddSupplierDialog } from "./AddSupplierDialog";
 import { subcontractPermissionsFromTpv } from "../subdodavky/types";
 
 interface DodavateliaTabProps {
@@ -35,6 +36,7 @@ export function DodavateliaTab({ permissions }: DodavateliaTabProps) {
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [openSupplierId, setOpenSupplierId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const { data: suppliers = [], isLoading } = useSupabaseSuppliersList({
     onlyActive: !showArchived,
@@ -82,7 +84,11 @@ export function DodavateliaTab({ permissions }: DodavateliaTabProps) {
         </Button>
 
         {permissions.canManageSupplier && (
-          <Button size="sm" className="ml-auto">
+          <Button
+            size="sm"
+            className="ml-auto"
+            onClick={() => setAddOpen(true)}
+          >
             <Plus className="h-4 w-4 mr-1" />
             Pridať dodávateľa
           </Button>
@@ -134,6 +140,16 @@ export function DodavateliaTab({ permissions }: DodavateliaTabProps) {
         permissions={subcontractPerms}
         open={openSupplierId !== null}
         onOpenChange={(o) => !o && setOpenSupplierId(null)}
+      />
+
+      <AddSupplierDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onCreated={(newId) => {
+          // Po vytvorení automaticky otvor CRM dialóg pre nového
+          // dodávateľa, aby user mohol hneď doplniť kontakty/cenník.
+          setOpenSupplierId(newId);
+        }}
       />
     </div>
   );
