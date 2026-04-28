@@ -87,6 +87,14 @@ function loadFromStorage(mode: ForecastPlanMode): { blocks: ForecastBlock[]; sel
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!Array.isArray(data.blocks) || data.blocks.length === 0) return null;
+    // Stale-check: if a background process invalidated forecast since this session was saved,
+    // ignore the cached snapshot so the user is forced to regenerate fresh numbers.
+    const invalidatedAt = Number(localStorage.getItem("ami_forecast_invalidated_at") || 0);
+    const sessionTs = Number(data.timestamp || 0);
+    if (invalidatedAt > 0 && sessionTs > 0 && invalidatedAt > sessionTs) {
+      try { localStorage.removeItem(STORAGE_KEYS[mode]); } catch { /* ignore */ }
+      return null;
+    }
     // Filter out stale test/demo project data from cached sessions
     const blocks = data.blocks.filter((b: ForecastBlock) => !isTestProjectId(b.project_id));
     const safetyNet = (Array.isArray(data.safetyNetProjects) ? data.safetyNetProjects : [])
