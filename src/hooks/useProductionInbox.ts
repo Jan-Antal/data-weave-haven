@@ -91,8 +91,15 @@ export function useProductionInbox() {
   });
 }
 
-/** Auto-reduce blocker rows when new inbox items arrive for the same project.
- *  Uses ONE batched query for all project blockers instead of N individual queries. */
+/** Auto-fill blocker (Rezerva) slots with new inbox items for the same project.
+ *  Instead of deleting the reserve when items arrive, plan items INTO the reserve's week.
+ *  - Items from inbox (status=pending) get inserted into production_schedule with the
+ *    blocker's scheduled_week, is_blocker=false, and the blocker's bundle_label (so they
+ *    visually merge with the reserve's bundle).
+ *  - When the blocker hours are fully consumed, the blocker row is deleted.
+ *  - When partially consumed, the blocker's scheduled_hours is reduced (showing the
+ *    remaining hours-for-project as a smaller reserve).
+ *  - Any inbox items beyond total reserve capacity stay pending in the inbox. */
 export function useBlockerAutoReduce(inboxProjects: InboxProject[] | undefined) {
   const qc = useQueryClient();
   const prevProjectIds = useRef<Set<string>>(new Set());
@@ -109,10 +116,10 @@ export function useBlockerAutoReduce(inboxProjects: InboxProject[] | undefined) 
     (async () => {
       const projectIds = newProjects.map(p => p.project_id);
 
-      // ONE batched query for all projects' blockers
+      // ONE batched query for all projects' blockers (oldest week first)
       const { data: allBlockers } = await supabase
         .from("production_schedule")
-        .select("id, scheduled_hours, scheduled_week, project_id")
+        .select("id, scheduled_hours, scheduled_week, project_id, stage_id, bundle_label, bundle_type, tpv_expected_date")
         .in("project_id", projectIds)
         .eq("is_blocker", true)
         .in("status", ["scheduled", "in_progress"])
@@ -128,45 +135,114 @@ export function useBlockerAutoReduce(inboxProjects: InboxProject[] | undefined) 
         blockersByProject.get(pid)!.push(b);
       }
 
-      // Collect all IDs to delete and updates to make in batch
-      const idsToDelete: string[] = [];
-      const updates: { id: string; hours: number }[] = [];
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || null;
 
+      // Per-project: fill blocker slots with inbox items, delete blocker when consumed
       for (const project of newProjects) {
         const blockers = blockersByProject.get(project.project_id);
         if (!blockers || blockers.length === 0) continue;
 
-        const totalBlockerHours = blockers.reduce((s, b) => s + Number(b.scheduled_hours), 0);
-        const inboxHours = project.total_hours;
+        // Fetch this project's pending inbox items, oldest first
+        const { data: inboxItems } = await supabase
+          .from("production_inbox")
+          .select("id, project_id, stage_id, item_name, item_code, estimated_hours, estimated_czk, split_group_id, split_part, split_total")
+          .eq("project_id", project.project_id)
+          .eq("status", "pending")
+          .order("sent_at", { ascending: true });
 
-        if (inboxHours >= totalBlockerHours) {
-          // Delete all blocker rows for this project
-          idsToDelete.push(...blockers.map(b => b.id));
-          toast({ title: `${project.project_name}: Rezerva nahrazena reálnými položkami` });
-        } else {
-          // Reduce lowest-week blocker
-          const lowest = blockers[0];
-          const newHours = Number(lowest.scheduled_hours) - inboxHours;
-          if (newHours <= 0) {
-            idsToDelete.push(lowest.id);
-          } else {
-            updates.push({ id: lowest.id, hours: newHours });
+        if (!inboxItems || inboxItems.length === 0) continue;
+
+        const inserts: any[] = [];
+        const inboxItemIdsScheduled: string[] = [];
+        const blockerDeletes: string[] = [];
+        const blockerUpdates: { id: string; hours: number }[] = [];
+
+        let bIdx = 0;
+        let remaining = Number(blockers[0].scheduled_hours) || 0;
+        let firstFilledWeek: string | null = null;
+
+        for (const item of inboxItems) {
+          // Skip past fully-consumed blockers
+          while (bIdx < blockers.length && remaining <= 0) {
+            blockerDeletes.push(blockers[bIdx].id);
+            bIdx++;
+            remaining = bIdx < blockers.length ? Number(blockers[bIdx].scheduled_hours) || 0 : 0;
           }
-          toast({ title: `${project.project_name}: Rezerva snížena na ${Math.round(newHours > 0 ? newHours : totalBlockerHours - inboxHours)}h` });
+          if (bIdx >= blockers.length) break; // no more reserve capacity
+
+          const blocker = blockers[bIdx];
+          if (!firstFilledWeek) firstFilledWeek = blocker.scheduled_week as unknown as string;
+
+          inserts.push({
+            project_id: item.project_id,
+            stage_id: item.stage_id ?? blocker.stage_id ?? null,
+            inbox_item_id: item.id,
+            item_name: item.item_name,
+            item_code: item.item_code,
+            scheduled_week: blocker.scheduled_week,
+            scheduled_hours: Number(item.estimated_hours) || 0,
+            scheduled_czk: Number(item.estimated_czk) || 0,
+            position: 999,
+            status: "scheduled",
+            created_by: userId,
+            is_blocker: false,
+            bundle_label: blocker.bundle_label ?? null,
+            bundle_type: blocker.bundle_type ?? "full",
+            split_group_id: item.split_group_id ?? null,
+            split_part: item.split_part ?? null,
+            split_total: item.split_total ?? null,
+          });
+          inboxItemIdsScheduled.push(item.id);
+          remaining -= Number(item.estimated_hours) || 0;
+        }
+
+        // Finalize the current blocker (if we touched it at all)
+        if (firstFilledWeek && bIdx < blockers.length) {
+          if (remaining <= 0) {
+            blockerDeletes.push(blockers[bIdx].id);
+          } else {
+            blockerUpdates.push({ id: blockers[bIdx].id, hours: remaining });
+          }
+        }
+
+        // Execute DB ops for this project
+        if (inserts.length > 0) {
+          const { error: insErr } = await supabase.from("production_schedule").insert(inserts as any);
+          if (insErr) { console.error("Auto-fill reserve insert failed", insErr); continue; }
+        }
+        if (inboxItemIdsScheduled.length > 0) {
+          await supabase
+            .from("production_inbox")
+            .update({ status: "scheduled" } as any)
+            .in("id", inboxItemIdsScheduled);
+        }
+        if (blockerDeletes.length > 0) {
+          await supabase.from("production_schedule").delete().in("id", blockerDeletes);
+        }
+        for (const u of blockerUpdates) {
+          await supabase.from("production_schedule").update({ scheduled_hours: u.hours } as any).eq("id", u.id);
+        }
+
+        if (inserts.length > 0 && firstFilledWeek) {
+          // Compute T-week label for toast
+          const d = new Date(firstFilledWeek);
+          const day = d.getDay();
+          const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+          const monday = new Date(d);
+          monday.setDate(diff);
+          const weekNum = Math.ceil(((monday.getTime() - new Date(monday.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+          const allConsumed = blockerDeletes.length === blockers.length && blockerUpdates.length === 0;
+          toast({
+            title: allConsumed
+              ? `${project.project_name}: Rezerva naplněna reálnými položkami`
+              : `${project.project_name}: ${inserts.length} položek naplánováno do rezervy (T${weekNum})`,
+          });
         }
       }
 
-      // Execute batched deletes
-      if (idsToDelete.length > 0) {
-        await supabase.from("production_schedule").delete().in("id", idsToDelete);
-      }
-
-      // Execute updates (can't batch different values, but typically only 1-2)
-      for (const u of updates) {
-        await supabase.from("production_schedule").update({ scheduled_hours: u.hours } as any).eq("id", u.id);
-      }
-
       qc.invalidateQueries({ queryKey: ["production-schedule"] });
+      qc.invalidateQueries({ queryKey: ["production-inbox"] });
     })();
   }, [inboxProjects, qc]);
 }
