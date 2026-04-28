@@ -1745,6 +1745,60 @@ export type Database = {
         }
         Relationships: []
       }
+      tpv_audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          actor_name: string | null
+          changed_fields: string[] | null
+          created_at: string
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          project_id: string | null
+          record_id: string
+          subcontract_id: string | null
+          summary: string | null
+          supplier_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          project_id?: string | null
+          record_id: string
+          subcontract_id?: string | null
+          summary?: string | null
+          supplier_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          changed_fields?: string[] | null
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          project_id?: string | null
+          record_id?: string
+          subcontract_id?: string | null
+          summary?: string | null
+          supplier_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       tpv_hours_allocation: {
         Row: {
           approved_at: string | null
@@ -2289,14 +2343,126 @@ export type Database = {
         }
         Relationships: []
       }
+      tpv_supplier_contact: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          is_primary: boolean
+          meno: string
+          pozice: string | null
+          poznamka: string | null
+          supplier_id: string
+          telefon: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          meno: string
+          pozice?: string | null
+          poznamka?: string | null
+          supplier_id: string
+          telefon?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          meno?: string
+          pozice?: string | null
+          poznamka?: string | null
+          supplier_id?: string
+          telefon?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_supplier_contact_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_supplier"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tpv_supplier_pricelist: {
+        Row: {
+          cena: number
+          created_at: string
+          id: string
+          is_active: boolean
+          jednotka: string
+          kategoria: string | null
+          leadtime_dni: number | null
+          mena: string
+          min_objednavka: number | null
+          platne_do: string | null
+          platne_od: string | null
+          polozka: string
+          poznamka: string | null
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          cena: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          jednotka?: string
+          kategoria?: string | null
+          leadtime_dni?: number | null
+          mena?: string
+          min_objednavka?: number | null
+          platne_do?: string | null
+          platne_od?: string | null
+          polozka: string
+          poznamka?: string | null
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          cena?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          jednotka?: string
+          kategoria?: string | null
+          leadtime_dni?: number | null
+          mena?: string
+          min_objednavka?: number | null
+          platne_do?: string | null
+          platne_od?: string | null
+          polozka?: string
+          poznamka?: string | null
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_supplier_pricelist_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_supplier"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tpv_supplier_task: {
         Row: {
           assigned_to: string | null
           created_at: string
           created_by: string | null
           description: string | null
+          done_at: string | null
+          done_by: string | null
           due_date: string | null
           id: string
+          priority: string
           project_id: string | null
           status: string
           subcontract_id: string | null
@@ -2309,8 +2475,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          done_at?: string | null
+          done_by?: string | null
           due_date?: string | null
           id?: string
+          priority?: string
           project_id?: string | null
           status?: string
           subcontract_id?: string | null
@@ -2323,8 +2492,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          done_at?: string | null
+          done_by?: string | null
           due_date?: string | null
           id?: string
+          priority?: string
           project_id?: string | null
           status?: string
           subcontract_id?: string | null
