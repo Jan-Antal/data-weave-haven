@@ -66,13 +66,20 @@ export type PermissionFlag =
   | "canAccessQC"
   | "canWriteDaylog"
   | "canWriteQC"
-  // ===== Sub-záložky TPV =====
+  // ===== Sub-záložky TPV (legacy 3-tab + nové 5-tab) =====
   | "canViewTpvPrehlad"
   | "canWriteTpvPrehlad"
   | "canViewTpvMaterial"
   | "canWriteTpvMaterial"
   | "canViewTpvHodinovaDotacia"
-  | "canWriteTpvHodinovaDotacia";
+  | "canWriteTpvHodinovaDotacia"
+  // ===== NOVÉ TPV sub-záložky (5-tab modul: Príprava / Subdodávky / Dodávatelia) =====
+  | "canViewTpvPriprava"
+  | "canWriteTpvPriprava"
+  | "canViewTpvSubdodavky"
+  | "canWriteTpvSubdodavky"
+  | "canViewTpvDodavatelia"
+  | "canWriteTpvDodavatelia";
 
 export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canEdit",
@@ -138,6 +145,12 @@ export const PERMISSION_FLAGS: PermissionFlag[] = [
   "canWriteTpvMaterial",
   "canViewTpvHodinovaDotacia",
   "canWriteTpvHodinovaDotacia",
+  "canViewTpvPriprava",
+  "canWriteTpvPriprava",
+  "canViewTpvSubdodavky",
+  "canWriteTpvSubdodavky",
+  "canViewTpvDodavatelia",
+  "canWriteTpvDodavatelia",
 ];
 
 export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
@@ -198,12 +211,18 @@ export const PERMISSION_LABELS: Record<PermissionFlag, string> = {
   canAccessQC: "View: Kontrola kvality (QC)",
   canWriteDaylog: "Write: Daylog",
   canWriteQC: "Write: Kontrola kvality (QC)",
-  canViewTpvPrehlad: "View: TPV Prehľad",
-  canWriteTpvPrehlad: "Write: TPV Prehľad",
+  canViewTpvPrehlad: "View: TPV Prehľad (legacy)",
+  canWriteTpvPrehlad: "Write: TPV Prehľad (legacy)",
   canViewTpvMaterial: "View: TPV Materiál",
   canWriteTpvMaterial: "Write: TPV Materiál",
-  canViewTpvHodinovaDotacia: "View: TPV Hodinová dotácia",
-  canWriteTpvHodinovaDotacia: "Write: TPV Hodinová dotácia",
+  canViewTpvHodinovaDotacia: "View: TPV Hodiny",
+  canWriteTpvHodinovaDotacia: "Write: TPV Hodiny",
+  canViewTpvPriprava: "View: TPV Príprava",
+  canWriteTpvPriprava: "Write: TPV Príprava",
+  canViewTpvSubdodavky: "View: TPV Subdodávky",
+  canWriteTpvSubdodavky: "Write: TPV Subdodávky",
+  canViewTpvDodavatelia: "View: TPV Dodávatelia",
+  canWriteTpvDodavatelia: "Write: TPV Dodávatelia",
 };
 
 export type Permissions = Record<PermissionFlag, boolean>;
@@ -311,6 +330,12 @@ const MODULE_CASCADE: Array<{ master: PermissionFlag; subs: PermissionFlag[] }> 
       "canWriteTpvMaterial",
       "canViewTpvHodinovaDotacia",
       "canWriteTpvHodinovaDotacia",
+      "canViewTpvPriprava",
+      "canWriteTpvPriprava",
+      "canViewTpvSubdodavky",
+      "canWriteTpvSubdodavky",
+      "canViewTpvDodavatelia",
+      "canWriteTpvDodavatelia",
     ],
   },
 ];
@@ -335,6 +360,9 @@ export function applyCascade(p: Permissions): Permissions {
     ["canViewTpvPrehlad", "canWriteTpvPrehlad"],
     ["canViewTpvMaterial", "canWriteTpvMaterial"],
     ["canViewTpvHodinovaDotacia", "canWriteTpvHodinovaDotacia"],
+    ["canViewTpvPriprava", "canWriteTpvPriprava"],
+    ["canViewTpvSubdodavky", "canWriteTpvSubdodavky"],
+    ["canViewTpvDodavatelia", "canWriteTpvDodavatelia"],
     ["canAccessDaylog", "canWriteDaylog"],
     ["canAccessQC", "canWriteQC"],
   ];
@@ -394,9 +422,34 @@ const systemFull: PermissionFlag[] = [
   "canAccessFormulaBuilder",
 ];
 
+// Helpers pre nový 5-tab TPV modul
+const tpvFullWrite: PermissionFlag[] = [
+  "canAccessTpv",
+  "canWriteTpv",
+  "canViewTpvPriprava",
+  "canWriteTpvPriprava",
+  "canViewTpvSubdodavky",
+  "canWriteTpvSubdodavky",
+  "canViewTpvMaterial",
+  "canWriteTpvMaterial",
+  "canViewTpvHodinovaDotacia",
+  "canWriteTpvHodinovaDotacia",
+  "canViewTpvDodavatelia",
+  "canWriteTpvDodavatelia",
+];
+
+const tpvReadOnly: PermissionFlag[] = [
+  "canAccessTpv",
+  "canViewTpvPriprava",
+  "canViewTpvSubdodavky",
+  "canViewTpvMaterial",
+  "canViewTpvHodinovaDotacia",
+  "canViewTpvDodavatelia",
+];
+
 export const ROLE_PRESETS: Record<AppRole, Permissions> = {
   owner: { ...ALL_TRUE },
-  admin: { ...ALL_TRUE, canQCOnly: false, canAccessTpv: false, canWriteTpv: false, canViewTpvPrehlad: false, canWriteTpvPrehlad: false, canViewTpvMaterial: false, canWriteTpvMaterial: false, canViewTpvHodinovaDotacia: false, canWriteTpvHodinovaDotacia: false },
+  admin: { ...ALL_TRUE, canQCOnly: false },
   vedouci_pm: preset(
     ...projectInfoFull,
     "canCreateProject",
@@ -420,6 +473,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canManageProduction",
     "canAccessDaylog",
     "canManageOverheadProjects",
+    ...tpvFullWrite,
   ),
   pm: preset(
     ...projectInfoFull,
@@ -437,6 +491,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canAccessPlanVyroby",
     "canManageProduction",
     "canAccessDaylog",
+    ...tpvFullWrite,
   ),
   nakupci: preset(
     ...projectInfoFull,
@@ -454,6 +509,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canAccessPlanVyroby",
     "canManageProduction",
     "canAccessDaylog",
+    ...tpvFullWrite,
   ),
   vedouci_konstrukter: preset(
     ...projectInfoFull,
@@ -466,6 +522,12 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     ...osobyFull,
     "canManagePeople",
     "canManageExternisti",
+    "canAccessTpv",
+    "canViewTpvPriprava",
+    "canWriteTpvPriprava",
+    "canViewTpvSubdodavky",
+    "canViewTpvMaterial",
+    "canViewTpvDodavatelia",
   ),
   konstrukter: preset(
     ...projectInfoFull,
@@ -473,6 +535,11 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canEdit",
     "canUploadDocuments",
     "canAccessRecycleBin",
+    "canAccessTpv",
+    "canViewTpvPriprava",
+    "canWriteTpvPriprava",
+    "canViewTpvSubdodavky",
+    "canViewTpvMaterial",
   ),
   vedouci_vyroby: preset(
     ...projectInfoReadOnly,
@@ -487,6 +554,9 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canWritePlanVyroby",
     "canAccessForecast",
     "canUploadDocuments",
+    "canAccessTpv",
+    "canViewTpvHodinovaDotacia",
+    "canWriteTpvHodinovaDotacia",
   ),
   mistr: preset(
     ...projectInfoReadOnly,
@@ -511,6 +581,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canAccessSystem",
     "canAccessOverheadProjects",
     "canManageOverheadProjects",
+    ...tpvReadOnly,
   ),
   viewer: preset(
     ...projectInfoReadOnly,
@@ -524,6 +595,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canAccessDaylog",
     ...analyticsFull,
     "canSeePrices",
+    ...tpvReadOnly,
   ),
   vyroba: preset(
     ...projectInfoReadOnly,
@@ -554,6 +626,7 @@ export const ROLE_PRESETS: Record<AppRole, Permissions> = {
     "canManageExternisti",
     "canAccessPlanVyroby",
     "canAccessDaylog",
+    ...tpvFullWrite,
   ),
 };
 
