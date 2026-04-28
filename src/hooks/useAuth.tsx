@@ -106,6 +106,13 @@ interface AuthContextType {
   canWriteTpvMaterial: boolean;
   canViewTpvHodinovaDotacia: boolean;
   canWriteTpvHodinovaDotacia: boolean;
+  // 6 nových flagov pre TPV 5-tab modul
+  canViewTpvPriprava: boolean;
+  canWriteTpvPriprava: boolean;
+  canViewTpvSubdodavky: boolean;
+  canWriteTpvSubdodavky: boolean;
+  canViewTpvDodavatelia: boolean;
+  canWriteTpvDodavatelia: boolean;
   canEditColumns: boolean;
   isFieldReadOnly: (field: string, currentValue?: string | null) => boolean;
   defaultTab: string;
@@ -136,15 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-
         if (session?.user) {
           if (event === "SIGNED_IN" && session.user.id && !hasLoginLoggedInCurrentTab()) {
             void logLoginEvent(session.user.id, session.user.email ?? "");
           }
           startSession(session.user.id, session.user.email ?? "", session.access_token);
-
           prevUserRef.current = session.user.id;
-
           setTimeout(async () => {
             const [{ data: profileData }, { data: roleData }, { data: defaultsData }] = await Promise.all([
               supabase
@@ -161,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .from("role_permission_defaults")
                 .select("role, permissions"),
             ]);
+
             setProfile(
               profileData
                 ? {
@@ -173,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
             setRealRole((roleData?.role as AppRole) ?? null);
             setDbPermissions(((roleData as any)?.permissions as Partial<Permissions>) ?? null);
+
             const defaultsMap: Record<string, Partial<Permissions>> = {};
             ((defaultsData ?? []) as any[]).forEach((row) => {
               defaultsMap[row.role] = (row.permissions as Partial<Permissions>) ?? {};
@@ -190,7 +196,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else {
               setLinkedPersonName(null);
             }
-
             setLoading(false);
           }, 0);
         } else {
@@ -276,20 +281,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isPM = effectiveRole === "pm" || effectiveRole === "vedouci_pm";
   const isKonstrukter = effectiveRole === "konstrukter" || effectiveRole === "vedouci_konstrukter";
   const isViewer = effectiveRole === "viewer";
-  const isVyroba =
-    effectiveRole === "vyroba" ||
-    effectiveRole === "vedouci_vyroby" ||
-    effectiveRole === "mistr";
+  const isVyroba = effectiveRole === "vyroba" || effectiveRole === "vedouci_vyroby" || effectiveRole === "mistr";
 
   // canEditColumns kept for back-compat (only admins/PMs can reorder columns; testers excluded)
   const canEditColumns = (isAdmin || isPM) && !isTestUser;
 
-  const isQCOnlyUser =
-    permissions.canQCOnly &&
-    permissions.canAccessDaylog &&
-    !permissions.canEdit &&
-    !permissions.canManageProduction &&
-    !permissions.canManageTPV;
+  const isQCOnlyUser = permissions.canQCOnly && permissions.canAccessDaylog && !permissions.canEdit && !permissions.canManageProduction && !permissions.canManageTPV;
 
   const isFieldReadOnly = (field: string, _currentValue?: string | null): boolean => {
     if (!permissions.canEdit) return true;
@@ -400,6 +397,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canWriteTpvMaterial: permissions.canWriteTpvMaterial,
     canViewTpvHodinovaDotacia: permissions.canViewTpvHodinovaDotacia,
     canWriteTpvHodinovaDotacia: permissions.canWriteTpvHodinovaDotacia,
+    // 6 nových flagov pre TPV 5-tab modul
+    canViewTpvPriprava: (permissions as any).canViewTpvPriprava ?? permissions.canAccessTpv,
+    canWriteTpvPriprava: (permissions as any).canWriteTpvPriprava ?? permissions.canWriteTpv,
+    canViewTpvSubdodavky: (permissions as any).canViewTpvSubdodavky ?? permissions.canAccessTpv,
+    canWriteTpvSubdodavky: (permissions as any).canWriteTpvSubdodavky ?? permissions.canWriteTpv,
+    canViewTpvDodavatelia: (permissions as any).canViewTpvDodavatelia ?? permissions.canAccessTpv,
+    canWriteTpvDodavatelia: (permissions as any).canWriteTpvDodavatelia ?? permissions.canWriteTpv,
     canEditColumns,
     isFieldReadOnly,
     defaultTab,

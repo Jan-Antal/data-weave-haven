@@ -1,0 +1,1 @@
+export { PripravaTab } from "./PripravaTab";
