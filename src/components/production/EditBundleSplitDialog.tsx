@@ -461,10 +461,10 @@ export function EditBundleSplitDialog({
         insertedIds = (ins || []).map((r: any) => r.id);
       }
 
-      // Renumber chain to keep N/M badges consistent
+      // Renumber chain by week so all items in the same week share split_part (1/N, 2/N, ...)
       try {
-        const { renumberAllChainsForProject } = await import("@/lib/splitChainHelpers");
-        if (projectId) await renumberAllChainsForProject(projectId);
+        const { renumberBundleChain } = await import("@/lib/splitChainHelpers");
+        await renumberBundleChain(splitGroupId);
       } catch { /* silent */ }
 
       const productionQueryKeys = [
