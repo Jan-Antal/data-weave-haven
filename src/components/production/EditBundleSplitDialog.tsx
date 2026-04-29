@@ -237,9 +237,18 @@ export function EditBundleSplitDialog({
         });
         if (editableRowsAll.length === 0) continue;
 
-        // Total hours/czk for this code (across all rows of this code, all weeks)
-        const totalHours = codeRows.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
-        const totalCzk = codeRows.reduce((s, r) => s + (Number(r.scheduled_czk) || 0), 0);
+        // Detect duplicate rows: identical (hours, czk) appearing across multiple
+        // editable weeks for the same item_code → use MAX (canonical) instead of SUM,
+        // otherwise we'd treat the bloated total as truth.
+        const editableRowsForCode = editableRowsAll;
+        const dupKey = (r: EditBundleSplitRow) =>
+          `${Number(r.scheduled_hours)}::${Number(r.scheduled_czk)}`;
+        const dupCounts = new Map<string, number>();
+        for (const r of editableRowsForCode) {
+          const k = dupKey(r);
+          dupCounts.set(k, (dupCounts.get(k) ?? 0) + 1);
+        }
+        const hasDuplicates = Array.from(dupCounts.values()).some(c => c >= 2);
 
         // Locked rows for this code (preserve their hours)
         const lockedRows = codeRows.filter(r => {
@@ -248,6 +257,23 @@ export function EditBundleSplitDialog({
         });
         const lockedHours = lockedRows.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
         const lockedCzk = lockedRows.reduce((s, r) => s + (Number(r.scheduled_czk) || 0), 0);
+
+        // Canonical total = MAX across editable rows when duplicates detected,
+        // otherwise SUM (normal case after a clean split).
+        const editableHoursMax = editableRowsForCode.reduce(
+          (m, r) => Math.max(m, Number(r.scheduled_hours) || 0), 0
+        );
+        const editableCzkMax = editableRowsForCode.reduce(
+          (m, r) => Math.max(m, Number(r.scheduled_czk) || 0), 0
+        );
+        const editableHoursSum = editableRowsForCode.reduce(
+          (s, r) => s + (Number(r.scheduled_hours) || 0), 0
+        );
+        const editableCzkSum = editableRowsForCode.reduce(
+          (s, r) => s + (Number(r.scheduled_czk) || 0), 0
+        );
+        const totalHours = lockedHours + (hasDuplicates ? editableHoursMax : editableHoursSum);
+        const totalCzk = lockedCzk + (hasDuplicates ? editableCzkMax : editableCzkSum);
 
         const remainingHours = Math.max(0, totalHours - lockedHours);
         const remainingCzk = Math.max(0, totalCzk - lockedCzk);
