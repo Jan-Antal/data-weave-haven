@@ -769,7 +769,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
                 status: i.status,
                 is_midflight: i.is_midflight,
               }));
-            setEditSplitState({ bundleName: bundle.project_name, splitGroupId: sgId, rows: chainRows });
+            setEditSplitState({ bundleName: bundle.project_name, splitGroupId: sgId, rows: chainRows, projectId: bundle.project_id, stageId: bundle.stage_id ?? null });
           },
         });
       }
@@ -1186,6 +1186,8 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
           bundleName={editSplitState.bundleName}
           splitGroupId={editSplitState.splitGroupId}
           rows={editSplitState.rows}
+          projectId={editSplitState.projectId}
+          stageId={editSplitState.stageId}
         />
       )}
 
