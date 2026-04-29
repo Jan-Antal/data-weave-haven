@@ -4,9 +4,10 @@
  * Workflow operations (submit/approve/return) musia nastaviť
  * submitted_by/approved_by + timestamps konzistentne.
  *
- * Embedded joins (no explicit FK names — Supabase auto-resolves):
- *   tpv_item: tpv_items(...)
- *   project:  projects(...)
+ * Joining strategy: tpv_hours_allocation has FK to tpv_items but
+ * NOT to projects. So we use:
+ *   - tpv_item: tpv_items(...) embedded (FK exists)
+ *   - projects fetched separately and woven in JS
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -26,16 +27,6 @@ import type {
 // HELPERS
 // ============================================================
 
-const SELECT_FULL = `
-  *,
-  tpv_item:tpv_items(
-    id, project_id, item_code, nazev, popis, status, hodiny_plan, hodiny_source
-  ),
-  project:projects(
-    project_id, project_name, pm, klient, status, is_active
-  )
-` as const;
-
 async function getCurrentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();
   return data.user?.id ?? null;
@@ -48,9 +39,19 @@ async function getCurrentUserId(): Promise<string | null> {
 export async function fetchAllocations(
   filters: HoursFilters = {}
 ): Promise<HoursAllocationView[]> {
+  // We avoid embedded join on projects because tpv_hours_allocation
+  // has no FK to projects in DB. Instead: fetch allocations + tpv_items
+  // (FK exists), then fetch projects in one batched query, then weave.
   let query = supabase
     .from("tpv_hours_allocation")
-    .select(SELECT_FULL)
+    .select(
+      `
+      *,
+      tpv_item:tpv_items(
+        id, project_id, item_code, nazev, popis, status, hodiny_plan, hodiny_source
+      )
+    `
+    )
     .order("updated_at", { ascending: false });
 
   if (filters.project_id) {
@@ -74,7 +75,37 @@ export async function fetchAllocations(
 
   const { data, error } = await query;
   if (error) throw error;
-  let rows = (data as HoursAllocationView[]) ?? [];
+
+  type AllocWithItem = Omit<HoursAllocationView, "project">;
+  const baseRows = (data as AllocWithItem[]) ?? [];
+
+  if (baseRows.length === 0) return [];
+
+  // Batch-fetch projects for all distinct project_ids
+  const projectIds = Array.from(
+    new Set(baseRows.map((r) => r.project_id))
+  );
+  const projRes = await supabase
+    .from("projects")
+    .select("project_id, project_name, pm, klient, status, is_active")
+    .in("project_id", projectIds);
+  if (projRes.error) throw projRes.error;
+  const byProjectId = new Map<string, HoursAllocationView["project"]>();
+  for (const p of (projRes.data as Array<{
+    project_id: string;
+    project_name: string | null;
+    pm: string | null;
+    klient: string | null;
+    status: string | null;
+    is_active: boolean;
+  }>) ?? []) {
+    byProjectId.set(p.project_id, p);
+  }
+
+  let rows: HoursAllocationView[] = baseRows.map((r) => ({
+    ...r,
+    project: byProjectId.get(r.project_id) ?? null,
+  }));
 
   if (filters.active_only !== false) {
     rows = rows.filter((r) => r.project?.is_active !== false);
