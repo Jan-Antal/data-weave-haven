@@ -268,7 +268,7 @@ export function WeeklySilos({ showCzk, onToggleCzk, overDroppableId, activeDrag,
   const [completionState, setCompletionState] = useState<CompletionState | null>(null);
   const [splitState, setSplitState] = useState<SplitState | null>(null);
   const [bundleSplitState, setBundleSplitState] = useState<BundleSplitState | null>(null);
-  const [editSplitState, setEditSplitState] = useState<{ bundleName: string; splitGroupId: string; rows: EditBundleSplitRow[] } | null>(null);
+  const [editSplitState, setEditSplitState] = useState<{ bundleName: string; splitGroupId: string; rows: EditBundleSplitRow[]; projectId: string; stageId: string | null } | null>(null);
   const [pauseState, setPauseState] = useState<PauseState | null>(null);
   const [cancelState, setCancelState] = useState<CancelState | null>(null);
   const [dismissedSpillWeeks, setDismissedSpillWeeks] = useState<Set<string>>(new Set());
