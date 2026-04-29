@@ -398,6 +398,11 @@ export function EditBundleSplitDialog({
           <div className="text-xs text-muted-foreground mt-1 truncate">
             {bundleName} · celkem {Math.round(grandTotal)}h · {weekBuckets.length} týdnů
           </div>
+          {duplicateCodes.length > 0 && (
+            <div className="mt-2 px-2 py-1.5 rounded-md text-[11px]" style={{ background: "rgba(217,151,6,0.08)", border: "1px solid rgba(217,151,6,0.3)", color: "#a06a00" }}>
+              ⚠ Duplicitní hodnoty u {duplicateCodes.length} položek ({duplicateCodes.slice(0, 3).join(", ")}{duplicateCodes.length > 3 ? "…" : ""}). Používám MAX, ne součet.
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
