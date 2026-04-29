@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "./useProjects";
 import { useAllTPVItems } from "./useAllTPVItems";
 import { useTpvPreparationAll } from "./useTpvPreparation";
@@ -40,8 +42,19 @@ export function useTpvPipelineProjects() {
   const { data: tpvItems = [], itemsByProject, isLoading: il } = useAllTPVItems();
   const { data: preps = [], isLoading: ppl } = useTpvPreparationAll();
   const { data: materials = [], isLoading: ml } = useTpvMaterialAll();
+  const { data: links = [], isLoading: lll } = useQuery({
+    queryKey: ["tpv_material_item_link_all"],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tpv_material_item_link")
+        .select("material_id, tpv_item_id");
+      if (error) throw error;
+      return (data ?? []) as { material_id: string; tpv_item_id: string }[];
+    },
+  });
 
-  const isLoading = pl || il || ppl || ml;
+  const isLoading = pl || il || ppl || ml || lll;
 
   const rows = useMemo<TpvProjectRow[]>(() => {
     if (!projects.length) return [];
@@ -49,17 +62,17 @@ export function useTpvPipelineProjects() {
     const prepByItem = new Map<string, TpvPreparation>();
     for (const p of preps) prepByItem.set(p.tpv_item_id, p);
 
-    // tpv_material no longer has tpv_item_id directly; build via link table.
-    // We approximate per-item materials by matching project + presence of any
-    // material rows for the project. For readiness/doc counts this is sufficient
-    // because computeReadiness only cares whether materials exist for an item.
-    const matsByProject = new Map<string, TpvMaterial[]>();
-    for (const m of materials) {
-      const arr = matsByProject.get(m.project_id);
-      if (arr) arr.push(m);
-      else matsByProject.set(m.project_id, [m]);
-    }
+    // Build per-item materials map via link table.
+    const materialById = new Map<string, TpvMaterial>();
+    for (const m of materials) materialById.set(m.id, m);
     const matsByItem = new Map<string, TpvMaterial[]>();
+    for (const link of links) {
+      const mat = materialById.get(link.material_id);
+      if (!mat) continue;
+      const arr = matsByItem.get(link.tpv_item_id);
+      if (arr) arr.push(mat);
+      else matsByItem.set(link.tpv_item_id, [mat]);
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
