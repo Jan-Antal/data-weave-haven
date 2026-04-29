@@ -1,88 +1,130 @@
+## Čo som zistil
 
-## Diagnóza – Multisport (Z-2607-008)
+Multisport je momentálne v databáze takto:
 
-### Hodiny vôbec nesedia na TPV
-
-**TPV (kanonická dotácia):**
-- Schválené položky: **579 h / 670 629 Kč** (celkom 586 h vrátane Zrušených)
-- Nemáš tam 561 h ale **579 h cost-side** (resp. ~492 h pri 15% marži z 579, alebo 498 h v cene)
-
-**Aktuálny `production_schedule` (per týždeň):**
-
-| Týždeň | Hod | Kč | Pozn. |
-|---|---|---|---|
-| T16 (04-13) | 33.9 | 0 | midflight history (1 riadok `Z-2607-008`) |
-| T17 (04-20) | 59.9 | 73 149 | 29 položiek |
-| T18 (04-27) | 60.8 | 76 214 | 33 položiek |
-| T19 (05-04) | 61.2 | 76 218 | 33 položiek |
-| **SPOLU** | **215.8** | **225 581** | |
-
-Schválené TPV položky majú napr.:
-- AT.01 = 104 h, v pláne na T17/T18/T19 dostáva len 10.8 h každý (= ~32 h spolu)
-- AT.07 = 56 h, v pláne 5.8 h × 3 = 17.4 h
-- AT.26 = 29 h, **vôbec nie je v pláne**
-
-**Záver:** rozdiel ~250 h chýba, niektoré položky sú v pláne v silne podhodnotených hodnotách, iné chýbajú úplne. Vyzerá to ako pozostatok zlomeného splitu — pri minulej "repair" migrácii sa kanonické totály zle vypočítali (vzal sa MAX miesto SUM, alebo sa poslala do inboxu len časť TPV).
-
-### ⚙ "Upravit rozdělení po týdnech"
-
-Akcia v `WeeklySilos.tsx` riadok 757–774 stále existuje, ale podmienka `weeks.size >= 2` ju zobrazí len ak chain má 2+ týždne. **Pre Multisport (4 týždne) by mala fungovať.**
-
-Reálny problém je inde — v `EditBundleSplitDialog.handleSave()` (riadok 282–297). Po poslednej oprave detekcie duplikátov sa pre túto reťaz `hasDuplicates = false` (rôzne hodnoty po týždňoch), takže použije **SUM** = 215.8 h ako "kanonický total" → pri uložení rozsplitne tých 215.8 h proporčne, čím sa rozdiel voči TPV ešte viac zacementuje.
-
----
-
-## Plán opravy (3 časti)
-
-### 1. Audit & re-sync Multisport z TPV
-
-Migrácia (data update) ktorá:
-1. Zmaže všetky `production_schedule` riadky pre `Z-2607-008` okrem `is_midflight = true` (history T16 ostane).
-2. Zmaže všetky `production_inbox` riadky pre `Z-2607-008` so statusom `pending` alebo `scheduled`.
-3. Znovu vloží do `production_inbox` všetky **schválené** TPV položky s `hodiny_plan > 0` v **plnej** TPV hodnote (`hodiny_plan` h, `cena` Kč). Ďalej budú normálne preplánované cez UI.
-
-Užívateľ následne v UI vyberie ako rozdeliť do týždňov (môže použiť opravený split dialóg).
-
-### 2. Oprava ⚙ split dialógu — kanonický total = TPV, nie schedule
-
-V `EditBundleSplitDialog.tsx` (handleSave, ~r. 253) zmeniť logiku tak, aby **kanonický total per `item_code` brala z `tpv_items` (`hodiny_plan`, `cena`)**, nie zo súčtu/maxima existujúcich schedule riadkov. Schedule môže byť rozhádzaný — TPV je zdroj pravdy.
-
-Fallback (ak TPV položka neexistuje, napr. ad-hoc): použiť MAX/SUM logiku ako dnes.
-
-UI pridať info riadok: "Kanonický základ z TPV: AT.01 = 104 h / 125 694 Kč" pri každej položke, aby user videl koľko sa rozdeľuje.
-
-### 3. Globálny audit ostatných projektov
-
-Read-only SQL ktorý prejde všetky projekty s `split_group_id` a porovná `SUM(scheduled_hours per item_code) vs tpv_items.hodiny_plan` a vyhodí report do `/mnt/documents/multi_split_audit.csv`. Ty rozhodneš, ktoré projekty (okrem Multisport) chceš rovnako re-syncovať.
-
----
-
-## Technické detaily
-
-**Súbory na zmenu:**
-- `supabase/migrations/...sql` — DELETE staré schedule/inbox pre Z-2607-008 + INSERT z tpv_items do production_inbox
-- `src/components/production/EditBundleSplitDialog.tsx` — refactor `handleSave` aby kanonický total bral z TPV (fetch `tpv_items` v dialógu cez supabase pri otvorení)
-- `src/components/production/EditBundleSplitDialog.tsx` — UI: zobraziť TPV základ pri každej položke
-
-**SQL audit (krok 3):**
-```sql
-SELECT ps.project_id, ps.item_code,
-       SUM(ps.scheduled_hours) FILTER (WHERE NOT ps.is_midflight) AS sched_hrs,
-       ti.hodiny_plan AS tpv_hrs,
-       SUM(ps.scheduled_hours) FILTER (WHERE NOT ps.is_midflight) - ti.hodiny_plan AS diff
-FROM production_schedule ps
-LEFT JOIN tpv_items ti USING (project_id, item_code)
-WHERE ps.split_group_id IS NOT NULL AND ti.deleted_at IS NULL
-GROUP BY ps.project_id, ps.item_code, ti.hodiny_plan
-HAVING ABS(SUM(ps.scheduled_hours) FILTER (WHERE NOT ps.is_midflight) - ti.hodiny_plan) > 1;
+```text
+T16 history: 33.9 h
+T17:        157.6 h
+T18:        179.6 h
+T19:        179.6 h
+Spolu:      550.7 h
+TPV aktívny plán: 569 h
+Rozdiel:   -18.3 h
 ```
 
----
+Po tvojej úprave percent splitu sa data nerozhodili na súčet 80/294/177 h, lebo v session je vidieť, že akcia bola potom vrátená cez Undo. Ale funkcia je stále riziková a zle navrhnutá:
 
-## Otázka pred schválením
+1. Dialóg `Upravit rozdělení po týdnech` dnes berie ako základ `grandTotal` zo schedule riadkov, nie z kanonického TPV plánu.
+2. Pri uložení počíta každú položku len z existujúcich riadkov v schedule. Keď niektorý item v niektorom týždni chýba, percentá sa aplikujú na neúplnú maticu a celok sa môže rozpadnúť.
+3. Aktuálny Multisport má v T17 len 24 z 28 aktívnych TPV itemov. Chýbajú tam AT.28–AT.31, preto samotné prepercentovanie nemá stabilný základ.
+4. `Přepočítat` síce volá globálnu funkciu, ale tá pre splitované položky aktuálne delí hodiny podľa počtu častí, nie podľa existujúcich percent splitu a nie podľa histórie + budúcich týždňov. Tým vie prepísať ručne nastavené percentá alebo ich obnoviť na nesprávny rovnomerný split.
+5. Navyše `renumberAllChainsForProject` používa per-item číslovanie (`renumberChain`), čo je v rozpore s projektovým/bundle splitom podľa týždňov. To súvisí aj s console warningom o rozpadnutom split parte.
 
-Pre Multisport pri re-syncu inboxu z TPV — **chceš** :
-- **A)** Plné TPV hodnoty (579 h, "selling" cena 670k Kč) → výroba uvidí brutto čísla
-- **B)** TPV s aplikovanou maržou 15% → 492 h / 569k Kč (cost-side, štandard pre výrobu)
+## Navrhovaný fix
 
-Predpokladám **B)** podľa Core memory ("Default margin 15%, cost = price × (1−margin)"). Potvrď, alebo zvoľ A.
+### 1. Opraviť logiku split dialógu
+
+V `EditBundleSplitDialog.tsx` doplním kanonický zdroj pravdy:
+
+- načítať TPV položky pre projekt/split group podľa `item_code`,
+- základ pre každú položku = `tpv_items.hodiny_plan`,
+- historické/midflight alebo completed/expedice riadky ostanú zamknuté,
+- editovateľné týždne dostanú len zvyšok:
+
+```text
+remaining_item_hours = TPV item hodiny_plan - locked/history hours for that item
+new_week_hours = remaining_item_hours * week_percentage / editable_percentage_sum
+```
+
+Tým pádom slider nebude nikdy vychádzať z už pokazenej schedule sumy.
+
+### 2. Doplniť chýbajúce riadky pri uložení splitu
+
+Ak split percentá obsahujú týždne T17/T18/T19 a pre niektorý TPV item v týždni riadok chýba, ukladanie splitu ho doplní ako `production_schedule` riadok s 0 alebo vypočítanými hodinami podľa percenta.
+
+Pre Multisport to vyrieši hlavne chýbajúce položky v T17:
+
+```text
+AT.28
+AT.29
+AT.30
+AT.31
+```
+
+### 3. Opraviť `Přepočítat`
+
+V `src/lib/recalculateProductionHours.ts` upravím prepočet tak, aby:
+
+- chránil `is_midflight`, `completed`, `expedice`, `paused`, `cancelled`,
+- pri split_group_id nepoužil rovnomerné delenie podľa počtu častí,
+- zachoval aktuálny pomer týždňov pre daný split chain,
+- históriu odpočítal z TPV základu a zvyšok rozdelil len do budúcich/editovateľných týždňov,
+- ak chýbajú riadky pre aktívny TPV item v existujúcom split týždni, doplnil ich.
+
+### 4. Opraviť renumbering split chainov
+
+V `splitChainHelpers.ts` upravím `renumberAllChainsForProject`, aby pre projektové/bundle chainy používal týždňové číslovanie (`renumberProjectChain` / bundle-week logic), nie per-item číslovanie. Cieľ:
+
+```text
+T16 = 1/4
+T17 = 2/4
+T18 = 3/4
+T19 = 4/4
+```
+
+všetky itemy v rovnakom týždni budú mať rovnaký `split_part`.
+
+### 5. Data fix pre Multisport
+
+Spravím migračný fix len pre `Z-2607-008`:
+
+- ponechať T16 history 33.9 h zamknutú,
+- dorovnať aktívny plán zo schedule na TPV základ 569 h,
+- teda budúce T17–T19 spolu majú byť približne `569 - 33.9 = 535.1 h`,
+- zachovať aktuálne percentá budúcich týždňov podľa dnešného rozdelenia, ak neurčíš iné:
+
+```text
+T17: 157.6 / 516.8 = 30.5 % z budúcnosti
+T18: 179.6 / 516.8 = 34.75 % z budúcnosti
+T19: 179.6 / 516.8 = 34.75 % z budúcnosti
+```
+
+Po dorovnaní by to vyšlo približne:
+
+```text
+T16: 33.9 h
+T17: 163.2 h
+T18: 186.0 h
+T19: 185.9 h
+Spolu: 569.0 h
+```
+
+### 6. UI spätná väzba
+
+V split dialógu doplním informačný riadok:
+
+```text
+Kanonický základ z TPV: 569 h
+Zamknuto/history: 33.9 h
+Rozděluji zbytek: 535.1 h
+```
+
+A pri tlačidle `Přepočítat` zlepším chybové hlásenie tak, aby pri zlyhaní neukázalo len všeobecné „Chyba při přepočtu“, ale aj konkrétny dôvod.
+
+## Súbory, ktoré upravím
+
+- `src/components/production/EditBundleSplitDialog.tsx`
+- `src/lib/recalculateProductionHours.ts`
+- `src/lib/splitChainHelpers.ts`
+- prípadne `src/pages/PlanVyroby.tsx` len pre lepšiu chybu/progress pri `Přepočítat`
+- nová databázová migrácia pre dorovnanie Multisport a prípadné helpery/indexy, ak budú potrebné
+
+## Očakávaný výsledok
+
+Po fixe:
+
+- percentuálna úprava splitu už nebude meniť celkový TPV plán,
+- history T16 ostane chránená,
+- T17/T18/T19 budú len redistribúcia zvyšných hodín,
+- `Přepočítat` nebude rozbíjať ručne nastavený split,
+- Multisport bude sedieť na 569 h podľa aktuálneho `project_plan_hours`, resp. 561 h len ak sa rozhodneme ako zdroj vynútiť projektovú dotáciu namiesto TPV.
