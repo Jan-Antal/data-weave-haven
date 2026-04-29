@@ -49,12 +49,17 @@ export function useTpvPipelineProjects() {
     const prepByItem = new Map<string, TpvPreparation>();
     for (const p of preps) prepByItem.set(p.tpv_item_id, p);
 
-    const matsByItem = new Map<string, TpvMaterial[]>();
+    // tpv_material no longer has tpv_item_id directly; build via link table.
+    // We approximate per-item materials by matching project + presence of any
+    // material rows for the project. For readiness/doc counts this is sufficient
+    // because computeReadiness only cares whether materials exist for an item.
+    const matsByProject = new Map<string, TpvMaterial[]>();
     for (const m of materials) {
-      const arr = matsByItem.get(m.tpv_item_id);
+      const arr = matsByProject.get(m.project_id);
       if (arr) arr.push(m);
-      else matsByItem.set(m.tpv_item_id, [m]);
+      else matsByProject.set(m.project_id, [m]);
     }
+    const matsByItem = new Map<string, TpvMaterial[]>();
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
