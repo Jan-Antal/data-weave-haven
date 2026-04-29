@@ -1,10 +1,5 @@
 /**
- * Materiál hooks — React Query wrappers over api/index.ts.
- *
- * Query keys hierarchy:
- *   ["tpv", "material", "list", filters]      — list
- *   ["tpv", "material", "detail", id]         — single row
- *   ["tpv", "material", "summaries", scope]   — derived aggregates
+ * Materiál hooks — React Query wrappers over api/index.ts (PR #6).
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,9 +8,12 @@ import { toast } from "sonner";
 import * as api from "../api";
 import type {
   MaterialFilters,
-  MaterialStav,
   CreateMaterialInput,
   UpdateMaterialInput,
+  UpsertLinkInput,
+  MergeMaterialsInput,
+  CreateSampleInput,
+  UpdateSampleInput,
 } from "../types";
 
 export const materialKeys = {
@@ -23,10 +21,12 @@ export const materialKeys = {
   list: (filters: MaterialFilters) =>
     [...materialKeys.all, "list", filters] as const,
   detail: (id: string) => [...materialKeys.all, "detail", id] as const,
+  samples: (materialId: string) =>
+    [...materialKeys.all, "samples", materialId] as const,
 };
 
 // ============================================================
-// QUERIES
+// Materials — list / detail
 // ============================================================
 
 export function useMaterials(filters: MaterialFilters = {}) {
@@ -40,14 +40,11 @@ export function useMaterials(filters: MaterialFilters = {}) {
 export function useMaterial(id: string | null) {
   return useQuery({
     queryKey: materialKeys.detail(id ?? "—"),
-    queryFn: () => (id ? api.fetchMaterialById(id) : Promise.resolve(null)),
+    queryFn: () =>
+      id ? api.fetchMaterialById(id) : Promise.resolve(null),
     enabled: !!id,
   });
 }
-
-// ============================================================
-// MUTATIONS
-// ============================================================
 
 export function useCreateMaterial() {
   const qc = useQueryClient();
@@ -57,11 +54,8 @@ export function useCreateMaterial() {
       qc.invalidateQueries({ queryKey: materialKeys.all });
       toast.success("Materiál pridaný");
     },
-    onError: (err: Error) => {
-      toast.error("Pridanie materiálu zlyhalo", {
-        description: err.message,
-      });
-    },
+    onError: (err: Error) =>
+      toast.error("Pridanie zlyhalo", { description: err.message }),
   });
 }
 
@@ -73,11 +67,8 @@ export function useUpdateMaterial() {
       qc.invalidateQueries({ queryKey: materialKeys.all });
       qc.invalidateQueries({ queryKey: materialKeys.detail(row.id) });
     },
-    onError: (err: Error) => {
-      toast.error("Úprava materiálu zlyhala", {
-        description: err.message,
-      });
-    },
+    onError: (err: Error) =>
+      toast.error("Úprava zlyhala", { description: err.message }),
   });
 }
 
@@ -89,41 +80,128 @@ export function useDeleteMaterial() {
       qc.invalidateQueries({ queryKey: materialKeys.all });
       toast.success("Materiál zmazaný");
     },
-    onError: (err: Error) => {
-      toast.error("Zmazanie zlyhalo", {
-        description: err.message,
-      });
-    },
+    onError: (err: Error) =>
+      toast.error("Zmazanie zlyhalo", { description: err.message }),
   });
 }
 
-export function useBulkInsertMaterials() {
+// ============================================================
+// Links — material ↔ items
+// ============================================================
+
+export function useUpsertLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (rows: CreateMaterialInput[]) => api.bulkInsertMaterials(rows),
-    onSuccess: (rows) => {
+    mutationFn: (input: UpsertLinkInput) => api.upsertLink(input),
+    onSuccess: (row) => {
       qc.invalidateQueries({ queryKey: materialKeys.all });
-      toast.success(`Importovaných ${rows.length} položiek`);
+      qc.invalidateQueries({ queryKey: materialKeys.detail(row.material_id) });
     },
-    onError: (err: Error) => {
-      toast.error("Import zlyhal", { description: err.message });
-    },
+    onError: (err: Error) =>
+      toast.error("Naviazanie zlyhalo", { description: err.message }),
   });
 }
 
-export function useBulkUpdateStatus() {
+export function useRemoveLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ ids, stav }: { ids: string[]; stav: MaterialStav }) =>
-      api.bulkUpdateStatus(ids, stav),
+    mutationFn: (linkId: string) => api.removeLink(linkId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: materialKeys.all });
+    },
+    onError: (err: Error) =>
+      toast.error("Odpojenie zlyhalo", { description: err.message }),
+  });
+}
+
+// ============================================================
+// Merge
+// ============================================================
+
+export function useMergeMaterials() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: MergeMaterialsInput) => api.mergeMaterials(input),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: materialKeys.all });
-      toast.success(`Stav aktualizovaný (${vars.ids.length} položiek)`);
+      toast.success(
+        `Zlúčené ${vars.source_ids.length} materiálov do cieľového`
+      );
     },
-    onError: (err: Error) => {
-      toast.error("Hromadná aktualizácia zlyhala", {
-        description: err.message,
+    onError: (err: Error) =>
+      toast.error("Zlúčenie zlyhalo", { description: err.message }),
+  });
+}
+
+// ============================================================
+// Samples
+// ============================================================
+
+export function useSamples(materialId: string | null) {
+  return useQuery({
+    queryKey: materialKeys.samples(materialId ?? "—"),
+    queryFn: () =>
+      materialId
+        ? api.fetchSamplesForMaterial(materialId)
+        : Promise.resolve([]),
+    enabled: !!materialId,
+    staleTime: 15_000,
+  });
+}
+
+export function useCreateSample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateSampleInput) => api.createSample(input),
+    onSuccess: (row) => {
+      qc.invalidateQueries({
+        queryKey: materialKeys.samples(row.material_id),
       });
+      qc.invalidateQueries({ queryKey: materialKeys.all });
+      toast.success("Vzorka pridaná");
     },
+    onError: (err: Error) =>
+      toast.error("Pridanie vzorky zlyhalo", { description: err.message }),
+  });
+}
+
+export function useUpdateSample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateSampleInput) => api.updateSample(input),
+    onSuccess: (row) => {
+      qc.invalidateQueries({
+        queryKey: materialKeys.samples(row.material_id),
+      });
+      qc.invalidateQueries({ queryKey: materialKeys.all });
+    },
+    onError: (err: Error) =>
+      toast.error("Úprava vzorky zlyhala", { description: err.message }),
+  });
+}
+
+export function useDeleteSample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteSample(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: materialKeys.all });
+    },
+    onError: (err: Error) =>
+      toast.error("Zmazanie vzorky zlyhalo", { description: err.message }),
+  });
+}
+
+export function useApproveSample() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sampleId: string) =>
+      api.approveSampleAndUpdateMaterial(sampleId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: materialKeys.all });
+      toast.success("Vzorka schválená — materiál aktualizovaný");
+    },
+    onError: (err: Error) =>
+      toast.error("Schválenie zlyhalo", { description: err.message }),
   });
 }
