@@ -49,7 +49,33 @@ export function AutoSplitPopover({
 
   const [choice, setChoice] = useState<"whole" | "split">(splitViable ? "split" : "whole");
   const [submitting, setSubmitting] = useState(false);
+  const [hasExistingInOtherWeek, setHasExistingInOtherWeek] = useState(false);
   const qc = useQueryClient();
+
+  // Detect: does the bundle already contain a row with the same item_code
+  // in a different week? If yes, "Vložit celé" creates a duplicate.
+  useEffect(() => {
+    if (!open || !splitGroupId || !itemCode) {
+      setHasExistingInOtherWeek(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("production_schedule")
+        .select("id")
+        .eq("split_group_id", splitGroupId)
+        .eq("item_code", itemCode)
+        .neq("scheduled_week", targetWeekKey)
+        .limit(1);
+      if (cancelled) return;
+      if (!error && data && data.length > 0) {
+        setHasExistingInOtherWeek(true);
+        if (splitViable) setChoice("split");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, splitGroupId, itemCode, targetWeekKey, splitViable]);
 
   const handleConfirm = useCallback(async () => {
     setSubmitting(true);
