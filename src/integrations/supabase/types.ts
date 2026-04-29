@@ -2068,6 +2068,7 @@ export type Database = {
           ai_confidence?: number | null
           ai_extracted?: boolean
           ai_source_doc?: string | null
+          cena_celkova?: number | null
           cena_jednotkova?: number | null
           created_at?: string
           created_by?: string | null
@@ -2094,6 +2095,7 @@ export type Database = {
           ai_confidence?: number | null
           ai_extracted?: boolean
           ai_source_doc?: string | null
+          cena_celkova?: number | null
           cena_jednotkova?: number | null
           created_at?: string
           created_by?: string | null
