@@ -136,7 +136,7 @@ export function useTpvPipelineProjects() {
     });
 
     return result;
-  }, [projects, tpvItems, itemsByProject, preps, materials]);
+  }, [projects, tpvItems, itemsByProject, preps, materials, links]);
 
   return { rows, isLoading };
 }
