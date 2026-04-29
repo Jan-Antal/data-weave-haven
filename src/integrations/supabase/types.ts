@@ -2038,51 +2038,92 @@ export type Database = {
       }
       tpv_material: {
         Row: {
+          ai_confidence: number | null
+          ai_extracted: boolean
+          ai_source_doc: string | null
+          cena_celkova: number | null
+          cena_jednotkova: number | null
           created_at: string
-          dodane_dat: string | null
-          dodavatel: string | null
+          created_by: string | null
+          dodava_arkhe: boolean
+          dodavatel_id: string | null
+          hrana: string | null
           id: string
+          internal_code: string | null
           jednotka: string | null
-          mnozstvo: number | null
+          kategoria: string | null
+          mena: string
+          mnozstvo_kumulovane: number | null
           nazov: string
-          objednane_dat: string | null
-          poznamka: string | null
+          nutno_vzorovat: boolean
+          poznamky: string | null
+          prefix: string | null
+          produkt_ref: string | null
           project_id: string
+          specifikacia: string | null
           stav: string
-          tpv_item_id: string
           updated_at: string
         }
         Insert: {
+          ai_confidence?: number | null
+          ai_extracted?: boolean
+          ai_source_doc?: string | null
+          cena_jednotkova?: number | null
           created_at?: string
-          dodane_dat?: string | null
-          dodavatel?: string | null
+          created_by?: string | null
+          dodava_arkhe?: boolean
+          dodavatel_id?: string | null
+          hrana?: string | null
           id?: string
+          internal_code?: string | null
           jednotka?: string | null
-          mnozstvo?: number | null
+          kategoria?: string | null
+          mena?: string
+          mnozstvo_kumulovane?: number | null
           nazov: string
-          objednane_dat?: string | null
-          poznamka?: string | null
+          nutno_vzorovat?: boolean
+          poznamky?: string | null
+          prefix?: string | null
+          produkt_ref?: string | null
           project_id: string
+          specifikacia?: string | null
           stav?: string
-          tpv_item_id: string
           updated_at?: string
         }
         Update: {
+          ai_confidence?: number | null
+          ai_extracted?: boolean
+          ai_source_doc?: string | null
+          cena_jednotkova?: number | null
           created_at?: string
-          dodane_dat?: string | null
-          dodavatel?: string | null
+          created_by?: string | null
+          dodava_arkhe?: boolean
+          dodavatel_id?: string | null
+          hrana?: string | null
           id?: string
+          internal_code?: string | null
           jednotka?: string | null
-          mnozstvo?: number | null
+          kategoria?: string | null
+          mena?: string
+          mnozstvo_kumulovane?: number | null
           nazov?: string
-          objednane_dat?: string | null
-          poznamka?: string | null
+          nutno_vzorovat?: boolean
+          poznamky?: string | null
+          prefix?: string | null
+          produkt_ref?: string | null
           project_id?: string
+          specifikacia?: string | null
           stav?: string
-          tpv_item_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tpv_material_dodavatel_id_fkey"
+            columns: ["dodavatel_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_supplier"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tpv_material_project_id_fkey"
             columns: ["project_id"]
@@ -2090,11 +2131,111 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["project_id"]
           },
+        ]
+      }
+      tpv_material_item_link: {
+        Row: {
+          created_at: string
+          id: string
+          jednotka: string | null
+          material_id: string
+          mnozstvo_per_item: number | null
+          notes: string | null
+          occurrences: number | null
+          tpv_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          jednotka?: string | null
+          material_id: string
+          mnozstvo_per_item?: number | null
+          notes?: string | null
+          occurrences?: number | null
+          tpv_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          jednotka?: string | null
+          material_id?: string
+          mnozstvo_per_item?: number | null
+          notes?: string | null
+          occurrences?: number | null
+          tpv_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "tpv_material_tpv_item_id_fkey"
+            foreignKeyName: "tpv_material_item_link_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tpv_material_item_link_tpv_item_id_fkey"
             columns: ["tpv_item_id"]
             isOneToOne: false
             referencedRelation: "tpv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tpv_material_sample: {
+        Row: {
+          created_at: string
+          foto_url: string | null
+          id: string
+          material_id: string
+          nazov_vzorky: string
+          poradie: number
+          poznamka: string | null
+          schvalene_kedy: string | null
+          schvalene_kym: string | null
+          specifikacia: string | null
+          stav: string
+          updated_at: string
+          zamietnutie_dovod: string | null
+        }
+        Insert: {
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          material_id: string
+          nazov_vzorky: string
+          poradie?: number
+          poznamka?: string | null
+          schvalene_kedy?: string | null
+          schvalene_kym?: string | null
+          specifikacia?: string | null
+          stav?: string
+          updated_at?: string
+          zamietnutie_dovod?: string | null
+        }
+        Update: {
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          material_id?: string
+          nazov_vzorky?: string
+          poradie?: number
+          poznamka?: string | null
+          schvalene_kedy?: string | null
+          schvalene_kym?: string | null
+          specifikacia?: string | null
+          stav?: string
+          updated_at?: string
+          zamietnutie_dovod?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tpv_material_sample_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "tpv_material"
             referencedColumns: ["id"]
           },
         ]
@@ -2205,16 +2346,22 @@ export type Database = {
       }
       tpv_subcontract: {
         Row: {
+          ai_confidence: number | null
+          ai_extracted: boolean | null
+          ai_source_doc: string | null
           cena_finalna: number | null
           cena_predpokladana: number | null
           created_at: string
           dodane_dat: string | null
           dodavatel_id: string | null
           id: string
+          internal_code: string | null
           jednotka: string | null
+          kategoria: string | null
           mena: string
           mnozstvo: number | null
           nazov: string
+          nutno_vzorovat: boolean | null
           objednane_dat: string | null
           popis: string | null
           poznamka: string | null
@@ -2222,18 +2369,25 @@ export type Database = {
           stav: string
           tpv_item_id: string | null
           updated_at: string
+          vazba_na_vyrobu: boolean | null
         }
         Insert: {
+          ai_confidence?: number | null
+          ai_extracted?: boolean | null
+          ai_source_doc?: string | null
           cena_finalna?: number | null
           cena_predpokladana?: number | null
           created_at?: string
           dodane_dat?: string | null
           dodavatel_id?: string | null
           id?: string
+          internal_code?: string | null
           jednotka?: string | null
+          kategoria?: string | null
           mena?: string
           mnozstvo?: number | null
           nazov: string
+          nutno_vzorovat?: boolean | null
           objednane_dat?: string | null
           popis?: string | null
           poznamka?: string | null
@@ -2241,18 +2395,25 @@ export type Database = {
           stav?: string
           tpv_item_id?: string | null
           updated_at?: string
+          vazba_na_vyrobu?: boolean | null
         }
         Update: {
+          ai_confidence?: number | null
+          ai_extracted?: boolean | null
+          ai_source_doc?: string | null
           cena_finalna?: number | null
           cena_predpokladana?: number | null
           created_at?: string
           dodane_dat?: string | null
           dodavatel_id?: string | null
           id?: string
+          internal_code?: string | null
           jednotka?: string | null
+          kategoria?: string | null
           mena?: string
           mnozstvo?: number | null
           nazov?: string
+          nutno_vzorovat?: boolean | null
           objednane_dat?: string | null
           popis?: string | null
           poznamka?: string | null
@@ -2260,6 +2421,7 @@ export type Database = {
           stav?: string
           tpv_item_id?: string | null
           updated_at?: string
+          vazba_na_vyrobu?: boolean | null
         }
         Relationships: [
           {

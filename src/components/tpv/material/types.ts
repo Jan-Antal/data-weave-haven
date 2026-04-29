@@ -1,20 +1,21 @@
 /**
- * Materiál tab — types.
+ * Materiál tab — types (rewritten for new schema, PR #6).
  *
- * tpv_material (DB, 13 columns, verified 26.4.2026):
- *   id uuid PK
- *   tpv_item_id uuid NOT NULL  → FK tpv_items.id
- *   project_id text NOT NULL   → FK projects.project_id
- *   nazov text NOT NULL
- *   mnozstvo numeric
- *   jednotka text
- *   dodavatel text             — voľný text, NIE FK na tpv_supplier
- *   objednane_dat date
- *   dodane_dat date
- *   stav text NOT NULL         CHECK (nezadany|objednane|caka|dodane)
- *   poznamka text
- *   created_at timestamptz NOT NULL
- *   updated_at timestamptz NOT NULL
+ * Tables:
+ *   tpv_material              — material catalog (project-scoped)
+ *   tpv_material_item_link    — N:M to tpv_items
+ *   tpv_material_sample       — sampling alternatives
+ *
+ * Workflow stavy:
+ *   extracted    — AI extraction landed, awaits review
+ *   needs_review — flagged for human review
+ *   confirmed    — confirmed real item (post-review)
+ *   sampling     — sampling round in progress
+ *   sample_ok    — approved by client
+ *   specified    — final spec + price done
+ *   ordering     — order being prepared
+ *   ordered      — sent to supplier
+ *   delivered    — physically received
  */
 
 import type { TpvItemRef, ProjectRef } from "../shared/types";
@@ -23,21 +24,75 @@ import type { TpvItemRef, ProjectRef } from "../shared/types";
 // CONSTANTS
 // ============================================================
 
-export const MATERIAL_STAV = ["nezadany", "objednane", "caka", "dodane"] as const;
+export const MATERIAL_STAV = [
+  "extracted",
+  "needs_review",
+  "confirmed",
+  "sampling",
+  "sample_ok",
+  "specified",
+  "ordering",
+  "ordered",
+  "delivered",
+] as const;
 export type MaterialStav = (typeof MATERIAL_STAV)[number];
 
 export const STAV_LABEL: Record<MaterialStav, string> = {
-  nezadany: "Nezadané",
-  objednane: "Objednané",
-  caka: "Čaká na dodanie",
-  dodane: "Dodané",
+  extracted: "Vyťažené (AI)",
+  needs_review: "Treba prejsť",
+  confirmed: "Potvrdené",
+  sampling: "Vzorovanie",
+  sample_ok: "Vzorka OK",
+  specified: "Špecifikované",
+  ordering: "Pripravuje sa objednávka",
+  ordered: "Objednané",
+  delivered: "Dodané",
 };
 
-export const STAV_TONE: Record<MaterialStav, "neutral" | "info" | "warn" | "ok"> = {
-  nezadany: "neutral",
-  objednane: "info",
-  caka: "warn",
-  dodane: "ok",
+export const STAV_TONE: Record<MaterialStav, "neutral" | "info" | "warn" | "ok" | "primary"> = {
+  extracted: "neutral",
+  needs_review: "warn",
+  confirmed: "info",
+  sampling: "primary",
+  sample_ok: "info",
+  specified: "info",
+  ordering: "warn",
+  ordered: "info",
+  delivered: "ok",
+};
+
+export const PREFIX_OPTIONS = ["M", "U"] as const;
+export type MaterialPrefix = (typeof PREFIX_OPTIONS)[number];
+
+export const KATEGORIA_OPTIONS = [
+  "ltd",
+  "mdf",
+  "dyha",
+  "kompakt",
+  "sklo",
+  "zrkadlo",
+  "kamen",
+  "uchytka",
+  "kovanie",
+  "noha",
+  "led",
+  "ine",
+] as const;
+export type MaterialKategoria = (typeof KATEGORIA_OPTIONS)[number];
+
+export const KATEGORIA_LABEL: Record<MaterialKategoria, string> = {
+  ltd: "LTD",
+  mdf: "MDF",
+  dyha: "Dýha",
+  kompakt: "Kompakt",
+  sklo: "Sklo",
+  zrkadlo: "Zrkadlo",
+  kamen: "Kameň",
+  uchytka: "Úchytka",
+  kovanie: "Kovanie",
+  noha: "Nábytková noha",
+  led: "LED",
+  ine: "Iné",
 };
 
 export const JEDNOTKA_OPTIONS = [
@@ -49,41 +104,118 @@ export const JEDNOTKA_OPTIONS = [
   "l",
   "bal",
   "set",
+  "bm",
 ] as const;
 
+// Sample workflow
+export const SAMPLE_STAV = [
+  "navrhnute",
+  "objednane",
+  "dorucene",
+  "schvalene",
+  "zamietnute",
+] as const;
+export type SampleStav = (typeof SAMPLE_STAV)[number];
+
+export const SAMPLE_STAV_LABEL: Record<SampleStav, string> = {
+  navrhnute: "Navrhnuté",
+  objednane: "Objednané",
+  dorucene: "Doručené",
+  schvalene: "Schválené klientom",
+  zamietnute: "Zamietnuté",
+};
+
 // ============================================================
-// DB ROW
+// DB ROWS
 // ============================================================
 
 export interface TpvMaterialRow {
   id: string;
-  tpv_item_id: string;
   project_id: string;
+  internal_code: string | null;
+  prefix: MaterialPrefix | null;
   nazov: string;
-  mnozstvo: number | null;
+  specifikacia: string | null;
+  hrana: string | null;
+  kategoria: string | null;
+  dodava_arkhe: boolean;
+  nutno_vzorovat: boolean;
+  poznamky: string | null;
+  mnozstvo_kumulovane: number | null;
   jednotka: string | null;
-  dodavatel: string | null;
-  objednane_dat: string | null;
-  dodane_dat: string | null;
+  cena_jednotkova: number | null;
+  cena_celkova: number | null;
+  mena: string;
+  dodavatel_id: string | null;
+  produkt_ref: string | null;
   stav: MaterialStav;
+  ai_extracted: boolean;
+  ai_confidence: number | null;
+  ai_source_doc: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export interface TpvMaterialItemLinkRow {
+  id: string;
+  material_id: string;
+  tpv_item_id: string;
+  mnozstvo_per_item: number | null;
+  jednotka: string | null;
+  occurrences: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TpvMaterialSampleRow {
+  id: string;
+  material_id: string;
+  poradie: number;
+  nazov_vzorky: string;
+  specifikacia: string | null;
+  foto_url: string | null;
+  stav: SampleStav;
+  schvalene_kym: string | null;
+  schvalene_kedy: string | null;
+  zamietnutie_dovod: string | null;
   poznamka: string | null;
   created_at: string;
   updated_at: string;
 }
 
 // ============================================================
-// VIEW MODEL — row joined with tpv_item + project
+// VIEW MODELS
 // ============================================================
 
+/** Material with project ref and link info (one row per material). */
 export interface MaterialView extends TpvMaterialRow {
-  tpv_item: Pick<
-    TpvItemRef,
-    "id" | "project_id" | "item_code" | "nazev" | "popis" | "status"
-  > | null;
   project: Pick<
     ProjectRef,
     "project_id" | "project_name" | "pm" | "klient" | "status" | "is_active"
   > | null;
+  /** All linked tpv_items via tpv_material_item_link (with mnozstvo_per_item). */
+  links: Array<
+    TpvMaterialItemLinkRow & {
+      tpv_item: Pick<
+        TpvItemRef,
+        "id" | "project_id" | "item_code" | "nazev" | "popis" | "status"
+      >;
+    }
+  >;
+  supplier: {
+    id: string;
+    nazov: string | null;
+  } | null;
+}
+
+/** Sample with parent material reference. */
+export interface SampleView extends TpvMaterialSampleRow {
+  material: Pick<
+    TpvMaterialRow,
+    "id" | "internal_code" | "nazov" | "specifikacia" | "project_id"
+  >;
 }
 
 // ============================================================
@@ -92,88 +224,93 @@ export interface MaterialView extends TpvMaterialRow {
 
 export interface MaterialFilters {
   project_id?: string;
-  tpv_item_id?: string;
+  prefix?: MaterialPrefix;
+  kategoria?: string;
   stav?: MaterialStav | MaterialStav[];
+  dodava_arkhe?: boolean;
+  nutno_vzorovat?: boolean;
+  ai_extracted?: boolean;
   search?: string;
-  /** Iba aktívne projekty? Default true. */
   active_only?: boolean;
-  /** Iba s dodávateľom? */
-  has_dodavatel?: boolean;
-  /** Iba po termíne (objednane > 14 dní bez dodania)? */
-  overdue_only?: boolean;
 }
 
 // ============================================================
-// CREATE / UPDATE INPUTS
+// MUTATION INPUTS
 // ============================================================
 
 export interface CreateMaterialInput {
-  tpv_item_id: string;
   project_id: string;
+  internal_code?: string | null;
+  prefix?: MaterialPrefix | null;
   nazov: string;
-  mnozstvo?: number | null;
+  specifikacia?: string | null;
+  hrana?: string | null;
+  kategoria?: string | null;
+  dodava_arkhe?: boolean;
+  nutno_vzorovat?: boolean;
+  poznamky?: string | null;
   jednotka?: string | null;
-  dodavatel?: string | null;
-  poznamka?: string | null;
-  /** default 'nezadany' */
+  cena_jednotkova?: number | null;
+  mena?: string;
+  dodavatel_id?: string | null;
+  produkt_ref?: string | null;
   stav?: MaterialStav;
+  ai_extracted?: boolean;
+  ai_confidence?: number | null;
+  ai_source_doc?: string | null;
 }
 
 export interface UpdateMaterialInput {
   id: string;
+  internal_code?: string | null;
+  prefix?: MaterialPrefix | null;
   nazov?: string;
-  mnozstvo?: number | null;
+  specifikacia?: string | null;
+  hrana?: string | null;
+  kategoria?: string | null;
+  dodava_arkhe?: boolean;
+  nutno_vzorovat?: boolean;
+  poznamky?: string | null;
   jednotka?: string | null;
-  dodavatel?: string | null;
-  objednane_dat?: string | null;
-  dodane_dat?: string | null;
+  cena_jednotkova?: number | null;
+  mena?: string;
+  dodavatel_id?: string | null;
+  produkt_ref?: string | null;
   stav?: MaterialStav;
+}
+
+export interface UpsertLinkInput {
+  material_id: string;
+  tpv_item_id: string;
+  mnozstvo_per_item?: number | null;
+  jednotka?: string | null;
+  occurrences?: number | null;
+  notes?: string | null;
+}
+
+export interface MergeMaterialsInput {
+  /** Target material that will absorb the source. */
+  target_id: string;
+  /** Source materials to be merged into target (will be deleted). */
+  source_ids: string[];
+}
+
+export interface CreateSampleInput {
+  material_id: string;
+  poradie?: number;
+  nazov_vzorky: string;
+  specifikacia?: string | null;
+  foto_url?: string | null;
   poznamka?: string | null;
+  stav?: SampleStav;
 }
 
-// ============================================================
-// EXCEL IMPORT
-// ============================================================
-
-/** Single row pulled out of an Excel sheet — pre-validation. */
-export interface MaterialImportRow {
-  /** 1-based row index in the source sheet (for error reporting). */
-  rowIndex: number;
-  /** Item code lookup target — e.g. "T01". Resolved to tpv_item_id. */
-  item_code: string;
-  nazov: string;
-  mnozstvo: number | null;
-  jednotka: string | null;
-  dodavatel: string | null;
-  poznamka: string | null;
-}
-
-export interface MaterialImportError {
-  rowIndex: number;
-  field: keyof MaterialImportRow | "general";
-  message: string;
-}
-
-export interface MaterialImportPreview {
-  rows: MaterialImportRow[];
-  errors: MaterialImportError[];
-  /** Resolved per-row: tpv_item_id we'd insert with. */
-  resolvedItemIds: Record<number, string | null>;
-}
-
-// ============================================================
-// AGGREGATES
-// ============================================================
-
-/** Per-project material summary. Used in Per-projekt view header. */
-export interface MaterialProjectSummary {
-  project_id: string;
-  project_name: string | null;
-  total: number;
-  nezadany: number;
-  objednane: number;
-  caka: number;
-  dodane: number;
-  /** items overdue: objednané > 14d ago bez dodania */
-  overdue: number;
+export interface UpdateSampleInput {
+  id: string;
+  nazov_vzorky?: string;
+  specifikacia?: string | null;
+  foto_url?: string | null;
+  stav?: SampleStav;
+  zamietnutie_dovod?: string | null;
+  poznamka?: string | null;
 }

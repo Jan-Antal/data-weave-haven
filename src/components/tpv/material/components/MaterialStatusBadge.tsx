@@ -1,10 +1,20 @@
 /**
- * MaterialStatusBadge — visual representation of stav field.
+ * MaterialStatusBadge — workflow stav visualization.
  */
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, Inbox, Truck } from "lucide-react";
+import {
+  CheckCircle2,
+  ClipboardCheck,
+  Clock,
+  Eye,
+  Inbox,
+  Sparkles,
+  ShoppingCart,
+  Truck,
+  Package,
+} from "lucide-react";
 
 import type { MaterialStav } from "../types";
 import { STAV_LABEL } from "../types";
@@ -21,22 +31,44 @@ export function MaterialStatusBadge({
   className,
 }: MaterialStatusBadgeProps) {
   const Icon =
-    stav === "dodane"
-      ? CheckCircle2
-      : stav === "objednane"
-        ? Truck
-        : stav === "caka"
-          ? Clock
-          : Inbox;
+    stav === "extracted"
+      ? Sparkles
+      : stav === "needs_review"
+        ? Eye
+        : stav === "confirmed"
+          ? ClipboardCheck
+          : stav === "sampling"
+            ? Inbox
+            : stav === "sample_ok"
+              ? CheckCircle2
+              : stav === "specified"
+                ? ClipboardCheck
+                : stav === "ordering"
+                  ? Clock
+                  : stav === "ordered"
+                    ? ShoppingCart
+                    : stav === "delivered"
+                      ? Package
+                      : Truck;
 
   const tone =
-    stav === "dodane"
+    stav === "delivered"
       ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-      : stav === "objednane"
-        ? "border-sky-500/40 bg-sky-500/15 text-sky-300"
-        : stav === "caka"
-          ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
-          : "border-muted-foreground/30 bg-muted/40 text-muted-foreground";
+      : stav === "sample_ok"
+        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+        : stav === "ordered"
+          ? "border-sky-500/40 bg-sky-500/15 text-sky-300"
+          : stav === "ordering"
+            ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+            : stav === "needs_review"
+              ? "border-amber-500/40 bg-amber-500/15 text-amber-200"
+              : stav === "sampling"
+                ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
+                : stav === "extracted"
+                  ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
+                  : stav === "confirmed" || stav === "specified"
+                    ? "border-sky-500/40 bg-sky-500/15 text-sky-300"
+                    : "border-muted-foreground/30 bg-muted/40 text-muted-foreground";
 
   return (
     <Badge

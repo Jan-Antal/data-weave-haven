@@ -1,13 +1,9 @@
 /**
- * NewMaterialDialog — create/edit single material entry.
+ * NewMaterialDialog — quick create of a new material.
  *
- * Used both for "Nová položka" and edit. If `materialId` is provided,
- * fetches the row and pre-fills the form (edit mode).
- *
- * Workflow notes:
- *   - project_id sa vyberá z aktívnych projektov
- *   - po výbere projektu sa naloaduje zoznam tpv_items pre lookup
- *   - dodavatel je voľný text (DB schéma — môže byť budúca migrácia na FK)
+ * Minimum required: project_id + nazov.
+ * After save, parent can immediately open MaterialDetailDialog
+ * for the new id to fill in links/samples.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -17,15 +13,16 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -34,189 +31,118 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { useCreateMaterial } from "../hooks";
 import {
-  useCreateMaterial,
-  useMaterial,
-  useUpdateMaterial,
-} from "../hooks";
-import { JEDNOTKA_OPTIONS, MATERIAL_STAV, STAV_LABEL } from "../types";
-import type { MaterialStav } from "../types";
+  KATEGORIA_OPTIONS,
+  KATEGORIA_LABEL,
+  JEDNOTKA_OPTIONS,
+  PREFIX_OPTIONS,
+  type MaterialPrefix,
+} from "../types";
 
 interface NewMaterialDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Edit mode if provided */
-  materialId?: string | null;
-  /** Pre-select project if creating */
   initialProjectId?: string;
-  /** Pre-select item if creating */
-  initialTpvItemId?: string;
-}
-
-interface ProjectOption {
-  project_id: string;
-  project_name: string | null;
-  klient: string | null;
-}
-interface ItemOption {
-  id: string;
-  item_code: string;
-  nazev: string | null;
+  /** Called with the new material's id after successful create. */
+  onCreated?: (newId: string) => void;
 }
 
 export function NewMaterialDialog({
   open,
   onClose,
-  materialId,
   initialProjectId,
-  initialTpvItemId,
+  onCreated,
 }: NewMaterialDialogProps) {
-  const isEdit = !!materialId;
-  const detailQ = useMaterial(materialId ?? null);
-
-  // ----- form state -----
   const [projectId, setProjectId] = useState<string>(initialProjectId ?? "");
-  const [tpvItemId, setTpvItemId] = useState<string>(initialTpvItemId ?? "");
+  const [internalCode, setInternalCode] = useState("");
+  const [prefix, setPrefix] = useState<MaterialPrefix | "">("");
   const [nazov, setNazov] = useState("");
-  const [mnozstvo, setMnozstvo] = useState<string>("");
-  const [jednotka, setJednotka] = useState<string>("ks");
-  const [dodavatel, setDodavatel] = useState("");
-  const [stav, setStav] = useState<MaterialStav>("nezadany");
-  const [poznamka, setPoznamka] = useState("");
+  const [specifikacia, setSpecifikacia] = useState("");
+  const [hrana, setHrana] = useState("");
+  const [kategoria, setKategoria] = useState("");
+  const [jednotka, setJednotka] = useState("");
+  const [dodavaArkhe, setDodavaArkhe] = useState(false);
+  const [nutnoVzorovat, setNutnoVzorovat] = useState(true);
+  const [poznamky, setPoznamky] = useState("");
 
-  // pre-fill from detail when in edit mode
+  // Reset on open
   useEffect(() => {
-    if (!isEdit || !detailQ.data) return;
-    const m = detailQ.data;
-    setProjectId(m.project_id);
-    setTpvItemId(m.tpv_item_id);
-    setNazov(m.nazov);
-    setMnozstvo(m.mnozstvo == null ? "" : String(m.mnozstvo));
-    setJednotka(m.jednotka ?? "ks");
-    setDodavatel(m.dodavatel ?? "");
-    setStav(m.stav);
-    setPoznamka(m.poznamka ?? "");
-  }, [isEdit, detailQ.data]);
+    if (!open) return;
+    setProjectId(initialProjectId ?? "");
+    setInternalCode("");
+    setPrefix("");
+    setNazov("");
+    setSpecifikacia("");
+    setHrana("");
+    setKategoria("");
+    setJednotka("");
+    setDodavaArkhe(false);
+    setNutnoVzorovat(true);
+    setPoznamky("");
+  }, [open, initialProjectId]);
 
-  // ----- projects + items dropdowns -----
   const projectsQ = useQuery({
-    queryKey: ["tpv", "material", "projects-active"],
-    queryFn: async (): Promise<ProjectOption[]> => {
+    queryKey: ["projects-active-for-material"],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("project_id, project_name, klient, is_active")
+        .select("project_id, project_name, klient")
         .eq("is_active", true)
         .order("project_name");
       if (error) throw error;
-      return (
-        (data as ProjectOption[]) ?? []
-      ).map((p) => ({
-        project_id: p.project_id,
-        project_name: p.project_name,
-        klient: p.klient,
-      }));
+      return (data as Array<{
+        project_id: string;
+        project_name: string | null;
+        klient: string | null;
+      }>) ?? [];
     },
     enabled: open,
     staleTime: 60_000,
   });
 
-  const itemsQ = useQuery({
-    queryKey: ["tpv", "material", "items", projectId],
-    queryFn: async (): Promise<ItemOption[]> => {
-      if (!projectId) return [];
-      const { data, error } = await supabase
-        .from("tpv_items")
-        .select("id, item_code, nazev")
-        .eq("project_id", projectId)
-        .is("deleted_at", null)
-        .order("item_code");
-      if (error) throw error;
-      return (data as ItemOption[]) ?? [];
-    },
-    enabled: open && !!projectId,
-    staleTime: 30_000,
-  });
+  const create = useCreateMaterial();
 
-  // reset item when project changes (only in create mode)
-  useEffect(() => {
-    if (isEdit) return;
-    setTpvItemId(initialTpvItemId ?? "");
-  }, [projectId, isEdit, initialTpvItemId]);
-
-  // ----- mutations -----
-  const createM = useCreateMaterial();
-  const updateM = useUpdateMaterial();
-  const submitting = createM.isPending || updateM.isPending;
-
-  // ----- validation -----
-  const valid = useMemo(() => {
-    if (!projectId.trim()) return false;
-    if (!tpvItemId.trim()) return false;
-    if (!nazov.trim()) return false;
-    if (mnozstvo.trim()) {
-      const n = Number(mnozstvo.replace(",", "."));
-      if (!Number.isFinite(n) || n < 0) return false;
-    }
-    return true;
-  }, [projectId, tpvItemId, nazov, mnozstvo]);
-
-  function handleClose() {
-    if (submitting) return;
-    onClose();
-  }
+  const valid = useMemo(
+    () => !!projectId && nazov.trim().length > 0,
+    [projectId, nazov]
+  );
 
   async function handleSubmit() {
-    const mn = mnozstvo.trim()
-      ? Number(mnozstvo.replace(",", "."))
-      : null;
-    if (isEdit && materialId) {
-      await updateM.mutateAsync({
-        id: materialId,
-        nazov: nazov.trim(),
-        mnozstvo: mn,
-        jednotka: jednotka || null,
-        dodavatel: dodavatel.trim() || null,
-        stav,
-        poznamka: poznamka.trim() || null,
-      });
-    } else {
-      await createM.mutateAsync({
-        project_id: projectId,
-        tpv_item_id: tpvItemId,
-        nazov: nazov.trim(),
-        mnozstvo: mn,
-        jednotka: jednotka || null,
-        dodavatel: dodavatel.trim() || null,
-        stav,
-        poznamka: poznamka.trim() || null,
-      });
-    }
+    if (!valid || create.isPending) return;
+    const created = await create.mutateAsync({
+      project_id: projectId,
+      internal_code: internalCode || null,
+      prefix: (prefix || null) as MaterialPrefix | null,
+      nazov: nazov.trim(),
+      specifikacia: specifikacia || null,
+      hrana: hrana || null,
+      kategoria: kategoria || null,
+      jednotka: jednotka || null,
+      dodava_arkhe: dodavaArkhe,
+      nutno_vzorovat: nutnoVzorovat,
+      poznamky: poznamky || null,
+      stav: "confirmed",
+    });
     onClose();
+    onCreated?.(created.id);
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+    <Dialog open={open} onOpenChange={(v) => !v && !create.isPending && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Upraviť materiál" : "Nová položka materiálu"}
-          </DialogTitle>
+          <DialogTitle>Nový materiál</DialogTitle>
           <DialogDescription>
-            {isEdit
-              ? "Zmena parametrov položky. Audit log zaznamená všetky úpravy."
-              : "Pridaj materiál naviazaný na konkrétny TPV prvok."}
+            Pridaj nový materiál ručne. Po uložení môžeš naviazať na prvky a
+            pridať vzorovanie.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* project */}
+        <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <Label className="text-xs">Projekt *</Label>
-            <Select
-              value={projectId}
-              onValueChange={setProjectId}
-              disabled={isEdit}
-            >
+            <Select value={projectId} onValueChange={setProjectId}>
               <SelectTrigger>
                 <SelectValue placeholder="Vyber projekt..." />
               </SelectTrigger>
@@ -231,61 +157,72 @@ export function NewMaterialDialog({
             </Select>
           </div>
 
-          {/* item */}
-          <div className="col-span-2">
-            <Label className="text-xs">TPV prvok *</Label>
+          <div>
+            <Label className="text-xs">Interný kód</Label>
+            <Input
+              value={internalCode}
+              onChange={(e) => setInternalCode(e.target.value)}
+              placeholder="napr. M01"
+              className="font-mono"
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Prefix</Label>
             <Select
-              value={tpvItemId}
-              onValueChange={setTpvItemId}
-              disabled={isEdit || !projectId}
+              value={prefix}
+              onValueChange={(v) => setPrefix(v as MaterialPrefix)}
             >
               <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    !projectId
-                      ? "Najprv vyber projekt"
-                      : itemsQ.data?.length
-                        ? "Vyber prvok..."
-                        : "Žiadne prvky"
-                  }
-                />
+                <SelectValue placeholder="—" />
               </SelectTrigger>
               <SelectContent>
-                {itemsQ.data?.map((it) => (
-                  <SelectItem key={it.id} value={it.id}>
-                    {it.item_code}
-                    {it.nazev ? ` — ${it.nazev}` : ""}
+                {PREFIX_OPTIONS.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p === "M" ? "M — materiál" : "U — úchytka/kovanie"}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* nazov */}
           <div className="col-span-2">
-            <Label className="text-xs">Názov materiálu *</Label>
+            <Label className="text-xs">Názov *</Label>
             <Input
               value={nazov}
               onChange={(e) => setNazov(e.target.value)}
-              placeholder="napr. MDF doska 18mm bielá"
+              placeholder="napr. LTD tl. 18 mm"
             />
           </div>
 
-          {/* mnozstvo + jednotka */}
-          <div>
-            <Label className="text-xs">Množstvo</Label>
+          <div className="col-span-2">
+            <Label className="text-xs">Špecifikácia</Label>
             <Input
-              value={mnozstvo}
-              onChange={(e) => setMnozstvo(e.target.value)}
-              inputMode="decimal"
-              placeholder="napr. 12"
+              value={specifikacia}
+              onChange={(e) => setSpecifikacia(e.target.value)}
+              placeholder="napr. Egger U708 ST9 Světle šedá"
             />
+          </div>
+
+          <div>
+            <Label className="text-xs">Kategória</Label>
+            <Select value={kategoria} onValueChange={setKategoria}>
+              <SelectTrigger>
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>
+                {KATEGORIA_OPTIONS.map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {KATEGORIA_LABEL[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label className="text-xs">Jednotka</Label>
             <Select value={jednotka} onValueChange={setJednotka}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="—" />
               </SelectTrigger>
               <SelectContent>
                 {JEDNOTKA_OPTIONS.map((j) => (
@@ -297,57 +234,55 @@ export function NewMaterialDialog({
             </Select>
           </div>
 
-          {/* dodavatel */}
           <div className="col-span-2">
-            <Label className="text-xs">Dodávateľ</Label>
+            <Label className="text-xs">Hrana / detail</Label>
             <Input
-              value={dodavatel}
-              onChange={(e) => setDodavatel(e.target.value)}
-              placeholder="voľný text — napr. Demos, Egger, ..."
+              value={hrana}
+              onChange={(e) => setHrana(e.target.value)}
+              placeholder="napr. hrana 1 mm dle dekoru desky"
             />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Pole je momentálne text. Budúca migrácia ho prepojí na CRM.
-            </p>
           </div>
 
-          {/* stav */}
-          <div className="col-span-2">
-            <Label className="text-xs">Stav</Label>
-            <Select
-              value={stav}
-              onValueChange={(v) => setStav(v as MaterialStav)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MATERIAL_STAV.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STAV_LABEL[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="col-span-2 flex items-center gap-6 py-2">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={dodavaArkhe}
+                onCheckedChange={(v) => setDodavaArkhe(!!v)}
+              />
+              Dodáva ARKHE — len montujeme
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={nutnoVzorovat}
+                onCheckedChange={(v) => setNutnoVzorovat(!!v)}
+              />
+              Nutno vzorovať
+            </label>
           </div>
 
-          {/* poznamka */}
           <div className="col-span-2">
-            <Label className="text-xs">Poznámka</Label>
+            <Label className="text-xs">Poznámky</Label>
             <Textarea
-              value={poznamka}
-              onChange={(e) => setPoznamka(e.target.value)}
+              value={poznamky}
+              onChange={(e) => setPoznamky(e.target.value)}
               rows={2}
-              placeholder="napr. matný lak, špecifické rozmery..."
             />
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={submitting}>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={create.isPending}
+          >
             Zrušiť
           </Button>
-          <Button onClick={handleSubmit} disabled={!valid || submitting}>
-            {submitting ? "Ukladám..." : isEdit ? "Uložiť" : "Pridať"}
+          <Button
+            onClick={handleSubmit}
+            disabled={!valid || create.isPending}
+          >
+            {create.isPending ? "Pridávam..." : "Pridať materiál"}
           </Button>
         </DialogFooter>
       </DialogContent>
