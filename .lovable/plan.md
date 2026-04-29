@@ -1,159 +1,76 @@
+## Diagnóza — 4 bundles s rozdvojenými plánovanými hodnotami
 
-# ARES IČO auto-doplnenie firmy
+| # | Projekt | split_group_id | Plánované týždne | Item codes | Bloated → Canonical |
+|---|---|---|---|---|---|
+| 1 | **Allianz 5.p** (Z-2617-001) | c722ec3f… | T17 + T18 | T.01–T.06 (6 ks) | 323.6h / 862 984 → **161.8h / 431 492** |
+| 2 | **RD Skalice** (Z-2604-002) | 6e4c7c2e… | T18 + T19 | T.02, T.03 | 106.6h / 304 840 → **53.3h / 152 420** |
+| 3 | **Allianz 5.p** | d4beee3c… | T18 + T19 | T.07, T.08 | 72.0h / 194 726 → **36.0h / 97 363** |
+| 4 | **Multisport** (Z-2607-008) | a5804482… | T17 + T18 + T19 (33 item_codes) | AT.01–AT.32, OB.01–03 | 7.2h / 12 248 → **3.6h / 6 124** + nerovnomerné T17 |
 
-Implementácia kompletného flow: užívateľ napíše 8-miestne IČO → systém zavolá ARES (cez edge function s cache vrstvou) → automaticky doplní názov firmy, DIČ, adresu, mesto, PSČ, ulicu.
+História (midflight, is_midflight=true) je vo všetkých prípadoch **agregovaná per týždeň** s **hodnotou Kč už nastavenou** (alebo 0, podľa pôvodu). **Necháva sa nedotknutá.**
 
-## Poznámka k integrácii
+Multisport (#4) má T17 s len 29 item_codes, T18+T19 s 33 → T17 je **už neúplný plán**, nie čistý duplikát. Potrebuje špeciálne ošetrenie.
 
-V projekte neexistuje `SupplierForm.tsx`. IČO sa zadáva na 2 miestach a obe dostanú lookup:
-1. `src/components/tpv/dodavatelia/AddSupplierDialog.tsx` (vytvorenie nového dodávateľa)
-2. `src/components/tpv/dodavatelia/panes/OverviewPane.tsx` (editácia existujúceho)
+## Plán riešenia
 
-Aby sa logika neduplikovala, vytvorím jeden zdieľaný komponent `IcoLookupField` a použijem ho na oboch miestach.
+### KROK A — Repair migrácia pre všetky 4 bundles (jednorazová)
 
-## Krok 1 — DB migrácia: `ares_cache`
+**Algoritmus per bundle:**
 
-```sql
-create table public.ares_cache (
-  ico text primary key check (ico ~ '^\d{8}$'),
-  raw_data jsonb,
-  obchodni_jmeno text,
-  dic text,
-  adresa text,
-  mesto text,
-  psc text,
-  ulice text,
-  pravni_forma text,
-  datum_vzniku date,
-  not_found boolean not null default false,
-  fetched_at timestamptz not null default now()
-);
+1. `canonical_per_item` = MAX(scheduled_hours, scheduled_czk) per item_code naprieč všetkými plánovanými (non-midflight) týždňami.
+2. `planned_weeks` = zoznam týždňov, kde sa item_code vyskytuje (zachová sa pôvodný počet týždňov).
+3. Pre každý item_code: rozdeliť canonical **rovnomerne** medzi jeho `planned_weeks` (½, ⅓, …).
+4. Drobné rounding rezíduá (±1 Kč) padnú na prvý týždeň.
+5. **Midflight riadky sa NEDOTÝKAJÚ.**
 
-create index ares_cache_fetched_at_idx on public.ares_cache (fetched_at);
+**Špecialita Multisport (#4):** T17 obsahuje len 29/33 item_codes — pre item_codes existujúce v T17+T18+T19 → split na 3, pre item_codes len v T18+T19 → split na 2. (Algoritmus to zvládne automaticky cez `planned_weeks` per item_code.)
 
-alter table public.ares_cache enable row level security;
+**Output:** SQL migrácia, ktorá ti pred aplikáciou v komentári vygeneruje BEFORE/AFTER preview pre každý postihnutý riadok. Spustí sa cez tool `migration` (Supabase) — ja kontrolujem výpočty, ty potvrdíš v Lovable Cloud confirm UI.
 
--- Akýkoľvek autentifikovaný user smie čítať cache
-create policy "ares_cache_select_authenticated"
-  on public.ares_cache for select
-  to authenticated
-  using (true);
+### KROK B — Trvalá oprava `EditBundleSplitDialog.tsx`
 
--- Zápis robí výhradne edge function cez service role → žiadna client-side INSERT/UPDATE policy.
-```
+Aktuálne počíta `totalHours = SUM(scheduled_hours)` a `totalCzk = SUM(scheduled_czk)` per item_code → pri duplikátoch dostane 2× viac.
 
-## Krok 2 — Edge function `lookup-ico`
+**Zmena:**
+- Detekcia duplikátu: ak v 2+ týždňoch existujú identické (`scheduled_hours`, `scheduled_czk`) páry pre rovnaký item_code, použiť **MAX** namiesto **SUM** ako canonical total.
+- Locked rows (midflight/completed/expedice/cancelled/paused) → odpočítať z canonical.
+- Slider rozdelí zvyšok podľa zvolených % medzi editovateľné týždne.
+- UI: badge `⚠ Detegovaný duplikát — používam MAX (X h / Y Kč)` na item_codes, ktorých sa to týka.
 
-Súbor: `supabase/functions/lookup-ico/index.ts`
+### KROK C — Prevencia v `AutoSplitPopover.tsx`
 
-Logika:
-1. POST `{ ico: string }`. Validácia: presne 8 číslic (`/^\d{8}$/`) → inak 400 `"Neplatné IČO"`.
-2. Cache lookup pomocou service-role klienta (`SUPABASE_SERVICE_ROLE_KEY`):
-   - Ak existuje záznam a `fetched_at > now() - 30 days`:
-     - `not_found = true` → 404 `"IČO nenájdené v ARES"`
-     - inak 200 `{ source: "cache", data: {...} }`
-3. Cache miss / expired:
-   - `fetch("https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/" + ico)` s timeout (8s).
-   - 404 → UPSERT s `not_found = true`, vráti 404 klientovi.
-   - 200 → mapuj polia, UPSERT, vráti 200 `{ source: "ares", data: {...} }`.
-   - 5xx / network / timeout → 503, **NEUKLADAJ** do cache (aby sa retry dalo).
-4. Mapovanie ARES → cache columns:
-   - `obchodniJmeno → obchodni_jmeno`
-   - `dic → dic` (môže chýbať)
-   - `sidlo.textovaAdresa → adresa`
-   - `sidlo.nazevObce → mesto`
-   - `String(sidlo.psc) → psc`
-   - `sidlo.nazevUlice` + ` ` + `sidlo.cisloDomovni` → `ulice` (concat ak oba existujú; inak ten ktorý existuje)
-   - `pravniForma → pravni_forma`
-   - `datumVzniku → datum_vzniku`
-5. CORS headers na všetkých odpovediach (vrátane error). OPTIONS preflight handler. Žiadny JWT verify potrebný — funkcia je bezpečná na anonymné volanie (read-only ARES proxy s rate-limitom cez cache).
+Pri drag-drop nového týždňa do bundlu, ktorý už pre rovnaký item_code v inom týždni existuje:
+- Nová možnosť **„Rozdělit s existujícím týdnem"** vedľa „Vložit celé".
+- Default 50/50 split (slider).
+- **Nevytvorí duplikát** — UPDATE existujúceho riadku na pomernú časť + INSERT nového na zvyšok.
 
-`supabase/config.toml` doplniť ak treba:
-```toml
-[functions.lookup-ico]
-verify_jwt = false
-```
+### KROK D — Build error fix `useTpvPipelineProjects.ts`
 
-## Krok 3 — TypeScript typy
-
-Súbor: `src/types/ares.ts`
-
-```ts
-export interface AresCompanyData {
-  ico: string;
-  obchodni_jmeno: string;
-  dic: string | null;
-  adresa: string;
-  mesto: string;
-  psc: string;
-  ulice: string | null;
-  pravni_forma: string;
-  datum_vzniku: string; // ISO date
-}
-
-export interface AresLookupResponse {
-  data?: AresCompanyData;
-  source: 'cache' | 'ares';
-  error?: string;
-}
-```
-
-## Krok 4 — Reusable komponent `IcoLookupField`
-
-Súbor: `src/components/tpv/dodavatelia/IcoLookupField.tsx`
-
-Props:
-```ts
-interface Props {
-  ico: string;
-  onIcoChange: (v: string) => void;
-  /** Volá sa keď ARES vráti dáta — parent doplní svoje form polia. */
-  onLookup: (data: AresCompanyData) => void;
-  disabled?: boolean;
-}
-```
-
-Správanie:
-- Input s `inputMode="numeric"`, `maxLength=8`, filter na číslice. Vedľa neho tlačidlo "Načítať z ARES" s ikonou `Search` z `lucide-react`.
-- Tlačidlo: disabled ak IČO nemá 8 číslic alebo prebieha loading. V loading stave spinner `Loader2 animate-spin` + "Načítavam...".
-- Klik → `supabase.functions.invoke('lookup-ico', { body: { ico } })`.
-- Auto-trigger: `onBlur` na inpute spustí lookup ak má presne 8 číslic a IČO sa od posledného volania zmenilo (deduplikácia cez ref).
-- Toasty (sonner):
-  - Success cache: `toast.success("Údaje načítané", { description: "z cache" })`
-  - Success ARES: `toast.success("Údaje načítané z ARES")`
-  - 404: `toast.warning("IČO {ico} sa v registri ARES nenašlo. Vyplň údaje ručne.")`
-  - 400: `toast.error("IČO musí mať presne 8 číslic")`
-  - 503/network: `toast.error("ARES je momentálne nedostupné, skús neskôr alebo vyplň ručne.")`
-- Style: existujúci dark theme + brand orange accent (#EA592A) ako focus ring na akčnom tlačidle, ladí so zvyškom dialógov.
-
-## Krok 5 — Integrácia
-
-**`AddSupplierDialog.tsx`** — nahraď samostatné pole IČO komponentom `IcoLookupField`. V `onLookup` callbacku:
-```
-setNazov(data.obchodni_jmeno)
-setDic(data.dic ?? "")
-setAdresa(data.ulice ? `${data.ulice}, ${data.psc} ${data.mesto}` : `${data.psc} ${data.mesto}`)
-```
-(Existujúci dialog má iba `adresa` ako voľný textový riadok — zložím adresu z ulice + PSČ + mesto. Polia ostanú editovateľné.)
-
-**`OverviewPane.tsx`** — v edit móde nahraď IČO input rovnakým komponentom; `onLookup` aktualizuje `draft` (nazov, dic, adresa).
+`tpv_material` linkuje cez tabuľku `tpv_material_item_link` (nie cez `tpv_item_id` priamo). Načítam linky a postavím `matsByItem` cez ne, fix typov.
 
 ## Súbory
 
-Nové:
-- `supabase/migrations/<timestamp>_ares_cache.sql`
-- `supabase/functions/lookup-ico/index.ts`
-- `src/types/ares.ts`
-- `src/components/tpv/dodavatelia/IcoLookupField.tsx`
+- `supabase/migrations/<ts>_repair_bloated_bundles.sql` — repair pre 4 bundles
+- `src/components/production/EditBundleSplitDialog.tsx` — MAX detekcia + UI badge
+- `src/components/production/AutoSplitPopover.tsx` — pridať „Rozdělit s existujícím týdnem"
+- `src/hooks/useTpvPipelineProjects.ts` — fix link table fetch
 
-Upravené:
-- `src/components/tpv/dodavatelia/AddSupplierDialog.tsx`
-- `src/components/tpv/dodavatelia/panes/OverviewPane.tsx`
-- `supabase/config.toml` (ak treba `verify_jwt = false`)
+## Príklad výpočtu — Allianz T17/T18 (po repair)
 
-## Bezpečnosť & výkon
+```
+Item   Canonical    →  T17 (50%)        T18 (50%)
+T.01   29.0h/76 733 →  14.5h/38 367 Kč  14.5h/38 366 Kč
+T.02   22.9h/60 937 →  11.45h/30 469    11.45h/30 468
+T.03   16.8h/45 457 →  8.4h/22 729      8.4h/22 728
+T.04   58.0h/154 086→  29.0h/77 043     29.0h/77 043
+T.05   31.4h/83 674 →  15.7h/41 837     15.7h/41 837
+T.06    3.7h/10 605 →  1.85h/5 303      1.85h/5 302
+       ────────────    ────────────     ────────────
+       161.8h/431 492  80.9h/215 748    80.9h/215 744
+```
 
-- Edge function používa service role key iba server-side. Klient nikdy nemá write access na `ares_cache`.
-- Negative caching (`not_found=true`) zabráni opakovaným ARES requestom pre neexistujúce IČO.
-- TTL 30 dní. Index na `fetched_at` umožní budúcu cleanup úlohu (nie je súčasťou tohto kroku).
-- Server-side fetch → žiadne CORS issues s ARES.
+História T12–T15 (24.5+24.6+15.1+13.6 = 77.8h, 0 Kč) **ostane nedotknutá**.
+
+## Akcia
+
+Po schválení spustím migráciu (s BEFORE/AFTER výpisom v komentári), upravím 3 súbory s logikou a pošlem ti finálny stav na overenie v UI.

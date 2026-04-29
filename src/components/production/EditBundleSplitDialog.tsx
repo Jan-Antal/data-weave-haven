@@ -88,6 +88,27 @@ export function EditBundleSplitDialog({
     [weekBuckets]
   );
 
+  // Detect duplicated rows: identical (hours, czk) per item_code across editable weeks.
+  const duplicateCodes = useMemo<string[]>(() => {
+    const editableRows = rows.filter(r => {
+      const b = weekBuckets.find(x => x.weekKey === r.scheduled_week);
+      return b && !b.locked;
+    });
+    const byCode = new Map<string, Map<string, number>>();
+    for (const r of editableRows) {
+      const code = r.item_code || "__no_code__";
+      const k = `${Number(r.scheduled_hours)}::${Number(r.scheduled_czk)}`;
+      if (!byCode.has(code)) byCode.set(code, new Map());
+      const inner = byCode.get(code)!;
+      inner.set(k, (inner.get(k) ?? 0) + 1);
+    }
+    const result: string[] = [];
+    for (const [code, inner] of byCode) {
+      if (Array.from(inner.values()).some(c => c >= 2)) result.push(code);
+    }
+    return result;
+  }, [rows, weekBuckets]);
+
   // Locked weeks: percentages are derived from current DB hours, displayed read-only
   const lockedPct = useMemo<Record<string, number>>(() => {
     const result: Record<string, number> = {};
@@ -237,9 +258,18 @@ export function EditBundleSplitDialog({
         });
         if (editableRowsAll.length === 0) continue;
 
-        // Total hours/czk for this code (across all rows of this code, all weeks)
-        const totalHours = codeRows.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
-        const totalCzk = codeRows.reduce((s, r) => s + (Number(r.scheduled_czk) || 0), 0);
+        // Detect duplicate rows: identical (hours, czk) appearing across multiple
+        // editable weeks for the same item_code → use MAX (canonical) instead of SUM,
+        // otherwise we'd treat the bloated total as truth.
+        const editableRowsForCode = editableRowsAll;
+        const dupKey = (r: EditBundleSplitRow) =>
+          `${Number(r.scheduled_hours)}::${Number(r.scheduled_czk)}`;
+        const dupCounts = new Map<string, number>();
+        for (const r of editableRowsForCode) {
+          const k = dupKey(r);
+          dupCounts.set(k, (dupCounts.get(k) ?? 0) + 1);
+        }
+        const hasDuplicates = Array.from(dupCounts.values()).some(c => c >= 2);
 
         // Locked rows for this code (preserve their hours)
         const lockedRows = codeRows.filter(r => {
@@ -248,6 +278,23 @@ export function EditBundleSplitDialog({
         });
         const lockedHours = lockedRows.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
         const lockedCzk = lockedRows.reduce((s, r) => s + (Number(r.scheduled_czk) || 0), 0);
+
+        // Canonical total = MAX across editable rows when duplicates detected,
+        // otherwise SUM (normal case after a clean split).
+        const editableHoursMax = editableRowsForCode.reduce(
+          (m, r) => Math.max(m, Number(r.scheduled_hours) || 0), 0
+        );
+        const editableCzkMax = editableRowsForCode.reduce(
+          (m, r) => Math.max(m, Number(r.scheduled_czk) || 0), 0
+        );
+        const editableHoursSum = editableRowsForCode.reduce(
+          (s, r) => s + (Number(r.scheduled_hours) || 0), 0
+        );
+        const editableCzkSum = editableRowsForCode.reduce(
+          (s, r) => s + (Number(r.scheduled_czk) || 0), 0
+        );
+        const totalHours = lockedHours + (hasDuplicates ? editableHoursMax : editableHoursSum);
+        const totalCzk = lockedCzk + (hasDuplicates ? editableCzkMax : editableCzkSum);
 
         const remainingHours = Math.max(0, totalHours - lockedHours);
         const remainingCzk = Math.max(0, totalCzk - lockedCzk);
@@ -351,6 +398,11 @@ export function EditBundleSplitDialog({
           <div className="text-xs text-muted-foreground mt-1 truncate">
             {bundleName} · celkem {Math.round(grandTotal)}h · {weekBuckets.length} týdnů
           </div>
+          {duplicateCodes.length > 0 && (
+            <div className="mt-2 px-2 py-1.5 rounded-md text-[11px]" style={{ background: "rgba(217,151,6,0.08)", border: "1px solid rgba(217,151,6,0.3)", color: "#a06a00" }}>
+              ⚠ Duplicitní hodnoty u {duplicateCodes.length} položek ({duplicateCodes.slice(0, 3).join(", ")}{duplicateCodes.length > 3 ? "…" : ""}). Používám MAX, ne součet.
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">

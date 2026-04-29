@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "./useProjects";
 import { useAllTPVItems } from "./useAllTPVItems";
 import { useTpvPreparationAll } from "./useTpvPreparation";
@@ -40,8 +42,19 @@ export function useTpvPipelineProjects() {
   const { data: tpvItems = [], itemsByProject, isLoading: il } = useAllTPVItems();
   const { data: preps = [], isLoading: ppl } = useTpvPreparationAll();
   const { data: materials = [], isLoading: ml } = useTpvMaterialAll();
+  const { data: links = [], isLoading: lll } = useQuery({
+    queryKey: ["tpv_material_item_link_all"],
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tpv_material_item_link")
+        .select("material_id, tpv_item_id");
+      if (error) throw error;
+      return (data ?? []) as { material_id: string; tpv_item_id: string }[];
+    },
+  });
 
-  const isLoading = pl || il || ppl || ml;
+  const isLoading = pl || il || ppl || ml || lll;
 
   const rows = useMemo<TpvProjectRow[]>(() => {
     if (!projects.length) return [];
@@ -49,11 +62,16 @@ export function useTpvPipelineProjects() {
     const prepByItem = new Map<string, TpvPreparation>();
     for (const p of preps) prepByItem.set(p.tpv_item_id, p);
 
+    // Build per-item materials map via link table.
+    const materialById = new Map<string, TpvMaterial>();
+    for (const m of materials) materialById.set(m.id, m);
     const matsByItem = new Map<string, TpvMaterial[]>();
-    for (const m of materials) {
-      const arr = matsByItem.get(m.tpv_item_id);
-      if (arr) arr.push(m);
-      else matsByItem.set(m.tpv_item_id, [m]);
+    for (const link of links) {
+      const mat = materialById.get(link.material_id);
+      if (!mat) continue;
+      const arr = matsByItem.get(link.tpv_item_id);
+      if (arr) arr.push(mat);
+      else matsByItem.set(link.tpv_item_id, [mat]);
     }
 
     const today = new Date();
@@ -118,7 +136,7 @@ export function useTpvPipelineProjects() {
     });
 
     return result;
-  }, [projects, tpvItems, itemsByProject, preps, materials]);
+  }, [projects, tpvItems, itemsByProject, preps, materials, links]);
 
   return { rows, isLoading };
 }
