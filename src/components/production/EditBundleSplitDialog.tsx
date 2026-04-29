@@ -23,6 +23,10 @@ interface EditBundleSplitDialogProps {
   bundleName: string;
   splitGroupId: string;
   rows: EditBundleSplitRow[];
+  /** Project for canonical TPV lookup (preferred). If omitted, dialog falls back to schedule sums. */
+  projectId?: string;
+  /** Stage for new schedule rows (auto-created for missing items) */
+  stageId?: string | null;
 }
 
 interface WeekBucket {
@@ -33,6 +37,14 @@ interface WeekBucket {
   locked: boolean;
 }
 
+interface TpvCanonical {
+  item_code: string;
+  item_name: string;
+  hodiny_plan: number;
+  cena: number;
+  pocet: number;
+}
+
 function fmtDate(weekKey: string): string {
   try {
     const d = new Date(weekKey);
@@ -40,22 +52,60 @@ function fmtDate(weekKey: string): string {
   } catch { return weekKey; }
 }
 
+function normalizeItemCode(code: string | null | undefined): string {
+  if (!code) return "";
+  return code.replace(/_[a-z0-9]{4,8}$/i, "");
+}
+
 export function EditBundleSplitDialog({
-  open, onOpenChange, bundleName, splitGroupId, rows,
+  open, onOpenChange, bundleName, splitGroupId, rows, projectId, stageId,
 }: EditBundleSplitDialogProps) {
   const qc = useQueryClient();
   const { pushUndo } = useUndoRedo();
-  // percentages = user-edited values for editable weeks (excluding the auto-anchor week).
-  // Locked week percentages are derived from DB hours (read-only).
-  // The "auto" week absorbs the remainder (100 - sum(locked) - sum(others)).
-  // By default the auto-anchor is the LAST editable week, but it shifts when the user
-  // moves that week's slider so the user's input is always preserved.
   const [percentages, setPercentages] = useState<Record<string, number>>({});
   const [autoKey, setAutoKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const initializedFor = useRef<string | null>(null);
 
-  // Group rows by week — recomputes when `rows` reference changes
+  // Canonical TPV per item_code for the project (fetched on open)
+  const [tpvByCode, setTpvByCode] = useState<Map<string, TpvCanonical> | null>(null);
+  const [hourlyRate, setHourlyRate] = useState<number>(550);
+
+  useEffect(() => {
+    if (!open || !projectId) { setTpvByCode(null); return; }
+    let cancelled = false;
+    (async () => {
+      const [tpvRes, settRes] = await Promise.all([
+        supabase
+          .from("tpv_items")
+          .select("item_code, nazev, hodiny_plan, cena, pocet, status")
+          .eq("project_id", projectId)
+          .is("deleted_at", null),
+        supabase.from("production_settings").select("hourly_rate").limit(1).single(),
+      ]);
+      if (cancelled) return;
+      const map = new Map<string, TpvCanonical>();
+      for (const t of (tpvRes.data || []) as any[]) {
+        if (!t.item_code) continue;
+        if (t.status === "Zrušeno") continue;
+        if (!(Number(t.cena) > 0)) continue;
+        if (!(Number(t.hodiny_plan) > 0)) continue;
+        map.set(t.item_code, {
+          item_code: t.item_code,
+          item_name: t.nazev || t.item_code,
+          hodiny_plan: Number(t.hodiny_plan) || 0,
+          cena: Number(t.cena) || 0,
+          pocet: Number(t.pocet) || 1,
+        });
+      }
+      setTpvByCode(map);
+      const hr = Number((settRes.data as any)?.hourly_rate) || 550;
+      setHourlyRate(hr);
+    })();
+    return () => { cancelled = true; };
+  }, [open, projectId]);
+
+  // Group rows by week
   const weekBuckets = useMemo<WeekBucket[]>(() => {
     const map = new Map<string, WeekBucket>();
     for (const r of rows) {
@@ -83,94 +133,116 @@ export function EditBundleSplitDialog({
     return Array.from(map.values()).sort((a, b) => a.weekKey.localeCompare(b.weekKey));
   }, [rows]);
 
-  const grandTotal = useMemo(
-    () => weekBuckets.reduce((s, b) => s + b.totalHours, 0),
-    [weekBuckets]
-  );
-
-  // Detect duplicated rows: identical (hours, czk) per item_code across editable weeks.
-  const duplicateCodes = useMemo<string[]>(() => {
-    const editableRows = rows.filter(r => {
-      const b = weekBuckets.find(x => x.weekKey === r.scheduled_week);
-      return b && !b.locked;
-    });
-    const byCode = new Map<string, Map<string, number>>();
-    for (const r of editableRows) {
-      const code = r.item_code || "__no_code__";
-      const k = `${Number(r.scheduled_hours)}::${Number(r.scheduled_czk)}`;
-      if (!byCode.has(code)) byCode.set(code, new Map());
-      const inner = byCode.get(code)!;
-      inner.set(k, (inner.get(k) ?? 0) + 1);
+  // Per-item canonical totals (TPV hours per item_code, summed across all distinct codes in chain)
+  // Chain rows tell us which item_codes belong to this bundle.
+  const chainCodes = useMemo<Set<string>>(() => {
+    const s = new Set<string>();
+    for (const r of rows) {
+      const c = normalizeItemCode(r.item_code);
+      if (c) s.add(c);
     }
-    const result: string[] = [];
-    for (const [code, inner] of byCode) {
-      if (Array.from(inner.values()).some(c => c >= 2)) result.push(code);
-    }
-    return result;
-  }, [rows, weekBuckets]);
+    return s;
+  }, [rows]);
 
-  // Locked weeks: percentages are derived from current DB hours, displayed read-only
+  // Locked hours per item_code (sum of hours in locked weeks)
+  const lockedHoursByCode = useMemo<Record<string, number>>(() => {
+    const out: Record<string, number> = {};
+    for (const b of weekBuckets) {
+      if (!b.locked) continue;
+      for (const r of b.rows) {
+        const c = normalizeItemCode(r.item_code);
+        if (!c) continue;
+        out[c] = (out[c] || 0) + (Number(r.scheduled_hours) || 0);
+      }
+    }
+    return out;
+  }, [weekBuckets]);
+
+  // Canonical TPV total for the chain — sum across item_codes present in the chain.
+  // If TPV not loaded yet (projectId not provided), fall back to schedule sum.
+  const canonicalTotalHours = useMemo(() => {
+    if (!tpvByCode) {
+      return weekBuckets.reduce((s, b) => s + b.totalHours, 0);
+    }
+    let sum = 0;
+    for (const code of chainCodes) {
+      const t = tpvByCode.get(code);
+      if (t) sum += t.hodiny_plan;
+      else {
+        // unknown code (no TPV) — fall back to its current schedule sum
+        for (const b of weekBuckets) {
+          for (const r of b.rows) {
+            if (normalizeItemCode(r.item_code) === code) sum += Number(r.scheduled_hours) || 0;
+          }
+        }
+      }
+    }
+    return Math.round(sum * 10) / 10;
+  }, [tpvByCode, chainCodes, weekBuckets]);
+
+  const lockedHoursTotal = useMemo(() => {
+    return weekBuckets
+      .filter(b => b.locked)
+      .reduce((s, b) => s + b.totalHours, 0);
+  }, [weekBuckets]);
+
+  const remainingHoursTotal = Math.max(0, Math.round((canonicalTotalHours - lockedHoursTotal) * 10) / 10);
+
+  // Locked weeks % derived from DB hours / canonical total
   const lockedPct = useMemo<Record<string, number>>(() => {
     const result: Record<string, number> = {};
-    if (grandTotal <= 0) return result;
+    if (canonicalTotalHours <= 0) return result;
     for (const b of weekBuckets) {
       if (b.locked) {
-        result[b.weekKey] = Math.round((b.totalHours / grandTotal) * 100);
+        result[b.weekKey] = Math.round((b.totalHours / canonicalTotalHours) * 100);
       }
     }
     return result;
-  }, [weekBuckets, grandTotal]);
+  }, [weekBuckets, canonicalTotalHours]);
 
-  // Default auto-anchor = last editable week
   const defaultAutoKey = useMemo(() => {
     const editable = weekBuckets.filter(b => !b.locked);
     return editable.length > 0 ? editable[editable.length - 1].weekKey : null;
   }, [weekBuckets]);
 
-  // Initialize ONLY when the dialog opens for a new splitGroupId — never on re-render.
-  // Reads exact hour ratios from DB so the dialog mirrors what the user sees in silos.
+  // Initialize percentages on dialog open. Uses current schedule ratios for editable weeks
+  // mapped to remaining (canonical − locked).
   useEffect(() => {
     if (!open) {
       initializedFor.current = null;
       return;
     }
+    // Wait until TPV loaded if projectId is given
+    if (projectId && !tpvByCode) return;
     if (initializedFor.current === splitGroupId) return;
     initializedFor.current = splitGroupId;
 
-    if (grandTotal <= 0) { setPercentages({}); setAutoKey(defaultAutoKey); return; }
+    if (canonicalTotalHours <= 0) { setPercentages({}); setAutoKey(defaultAutoKey); return; }
 
-    // Compute raw percent for every week (locked + editable)
     const rawPct: Record<string, number> = {};
     for (const b of weekBuckets) {
-      rawPct[b.weekKey] = Math.round((b.totalHours / grandTotal) * 100);
+      rawPct[b.weekKey] = Math.round((b.totalHours / canonicalTotalHours) * 100);
     }
-    // Adjust rounding so total = 100 (absorb diff into default auto week)
     const sum = Object.values(rawPct).reduce((s, v) => s + v, 0);
     if (sum !== 100 && defaultAutoKey) {
       rawPct[defaultAutoKey] = (rawPct[defaultAutoKey] || 0) + (100 - sum);
     }
-    // Keep ALL editable values in `percentages` state — even the auto-anchor,
-    // so its slider can show + the user can grab it (which then shifts the anchor).
     const init: Record<string, number> = {};
     for (const b of weekBuckets) {
       if (b.locked) continue;
-      init[b.weekKey] = rawPct[b.weekKey] ?? 0;
+      init[b.weekKey] = Math.max(0, rawPct[b.weekKey] ?? 0);
     }
     setPercentages(init);
     setAutoKey(defaultAutoKey);
-  }, [open, splitGroupId, grandTotal, weekBuckets, defaultAutoKey]);
+  }, [open, splitGroupId, canonicalTotalHours, weekBuckets, defaultAutoKey, projectId, tpvByCode]);
 
-  // Live effective percentages used for display + save.
   const effectivePct = useMemo<Record<string, number>>(() => {
     const next: Record<string, number> = {};
-    // Locked weeks = derived from DB
     for (const b of weekBuckets) if (b.locked) next[b.weekKey] = lockedPct[b.weekKey] ?? 0;
-    // Editable non-auto = user-controlled
     for (const b of weekBuckets) {
       if (b.locked || b.weekKey === autoKey) continue;
       next[b.weekKey] = Number(percentages[b.weekKey]) || 0;
     }
-    // Auto week = remainder
     if (autoKey) {
       const others = weekBuckets
         .filter(b => b.weekKey !== autoKey)
@@ -190,21 +262,17 @@ export function EditBundleSplitDialog({
     const lockedSum = Object.values(lockedPct).reduce((s, v) => s + (v || 0), 0);
     const max = 100 - lockedSum;
 
-    // If user grabs the current auto-anchor, shift the anchor to another editable
-    // week so this week becomes a fixed user value.
     let nextAutoKey = autoKey;
     if (weekKey === autoKey) {
       const editable = weekBuckets.filter(b => !b.locked).map(b => b.weekKey);
-      // Prefer the last editable that isn't this one; fallback to first other.
       const candidates = editable.filter(k => k !== weekKey);
       nextAutoKey = candidates.length > 0
         ? (candidates[candidates.length - 1] ?? null)
-        : weekKey; // only one editable: nothing to shift to
+        : weekKey;
     }
 
     setPercentages(prev => {
       const next = { ...prev, [weekKey]: value };
-      // Cap so editable sum (excluding the new auto week) does not exceed available room
       const othersSum = weekBuckets
         .filter(b => !b.locked && b.weekKey !== nextAutoKey)
         .reduce((s, b) => s + (next[b.weekKey] || 0), 0);
@@ -222,7 +290,6 @@ export function EditBundleSplitDialog({
     if (editable.length === 0) return;
     const remaining = Math.max(0, 100 - lockedSum);
     const each = Math.floor(remaining / editable.length);
-    // Reset auto-anchor to default (last editable) so leftover lands there.
     setAutoKey(defaultAutoKey);
     setPercentages(prev => {
       const next = { ...prev };
@@ -238,98 +305,139 @@ export function EditBundleSplitDialog({
     if (!isValid || submitting) return;
     setSubmitting(true);
     try {
-      // Group rows by item_code across all weeks
-      const rowsByCode = new Map<string, EditBundleSplitRow[]>();
-      for (const r of rows) {
-        const code = r.item_code || "__no_code__";
-        const arr = rowsByCode.get(code) || [];
-        arr.push(r);
-        rowsByCode.set(code, arr);
+      const editableBuckets = weekBuckets.filter(b => !b.locked);
+      const editablePctSum = editableBuckets.reduce(
+        (s, b) => s + (effectivePct[b.weekKey] || 0), 0
+      );
+      if (editablePctSum <= 0) {
+        toast({ title: "Žádný editovatelný týden" });
+        setSubmitting(false);
+        onOpenChange(false);
+        return;
+      }
+
+      // Build per-week percentage among editable
+      const pctOfEditable: Record<string, number> = {};
+      for (const b of editableBuckets) {
+        pctOfEditable[b.weekKey] = (effectivePct[b.weekKey] || 0) / editablePctSum;
+      }
+
+      // Determine canonical per-item TPV totals.
+      // For each item_code in chain, decide its TPV (or fallback to schedule sum if no TPV/projectId).
+      const codeTpvHours = new Map<string, number>();
+      const codeTpvCzk = new Map<string, number>();
+      const codeName = new Map<string, string>();
+      for (const code of chainCodes) {
+        const t = tpvByCode?.get(code);
+        if (t) {
+          codeTpvHours.set(code, t.hodiny_plan);
+          // tpv_czk full = cena * pocet (CZK assumption — same as recalculate)
+          codeTpvCzk.set(code, Math.floor(t.cena * (t.pocet || 1)));
+          codeName.set(code, t.item_name);
+        } else {
+          // Fallback: sum schedule hours/czk for this code
+          let h = 0, c = 0;
+          let nm = "";
+          for (const b of weekBuckets) {
+            for (const r of b.rows) {
+              if (normalizeItemCode(r.item_code) === code) {
+                h += Number(r.scheduled_hours) || 0;
+                c += Number(r.scheduled_czk) || 0;
+                if (!nm) nm = (r as any).item_name || code;
+              }
+            }
+          }
+          codeTpvHours.set(code, Math.round(h * 10) / 10);
+          codeTpvCzk.set(code, Math.floor(c));
+          codeName.set(code, nm || code);
+        }
+      }
+
+      // Per-code locked hours/czk (history + midflight + completed)
+      const codeLockedHours = new Map<string, number>();
+      const codeLockedCzk = new Map<string, number>();
+      for (const b of weekBuckets) {
+        if (!b.locked) continue;
+        for (const r of b.rows) {
+          const c = normalizeItemCode(r.item_code);
+          if (!c) continue;
+          codeLockedHours.set(c, (codeLockedHours.get(c) || 0) + (Number(r.scheduled_hours) || 0));
+          codeLockedCzk.set(c, (codeLockedCzk.get(c) || 0) + (Number(r.scheduled_czk) || 0));
+        }
       }
 
       const updates: Array<{ id: string; scheduled_hours: number; scheduled_czk: number }> = [];
       const undoRecords: Array<{ id: string; scheduled_hours: number; scheduled_czk: number }> = [];
+      const inserts: Array<{
+        project_id: string;
+        stage_id: string | null;
+        item_name: string;
+        item_code: string;
+        scheduled_week: string;
+        scheduled_hours: number;
+        scheduled_czk: number;
+        position: number;
+        status: string;
+        split_group_id: string;
+      }> = [];
 
-      for (const [, codeRows] of rowsByCode) {
-        // Skip codes that exist only in locked weeks (they stay untouched)
-        const editableRowsAll = codeRows.filter(r => {
-          const bucket = weekBuckets.find(b => b.weekKey === r.scheduled_week);
-          return bucket && !bucket.locked;
-        });
-        if (editableRowsAll.length === 0) continue;
+      const { data: { user } } = await supabase.auth.getUser();
 
-        // Detect duplicate rows: identical (hours, czk) appearing across multiple
-        // editable weeks for the same item_code → use MAX (canonical) instead of SUM,
-        // otherwise we'd treat the bloated total as truth.
-        const editableRowsForCode = editableRowsAll;
-        const dupKey = (r: EditBundleSplitRow) =>
-          `${Number(r.scheduled_hours)}::${Number(r.scheduled_czk)}`;
-        const dupCounts = new Map<string, number>();
-        for (const r of editableRowsForCode) {
-          const k = dupKey(r);
-          dupCounts.set(k, (dupCounts.get(k) ?? 0) + 1);
-        }
-        const hasDuplicates = Array.from(dupCounts.values()).some(c => c >= 2);
+      // For each chain code, distribute remaining (canonical − locked) across editable weeks per pctOfEditable
+      for (const code of chainCodes) {
+        const totalH = codeTpvHours.get(code) ?? 0;
+        const totalC = codeTpvCzk.get(code) ?? 0;
+        const lockedH = codeLockedHours.get(code) ?? 0;
+        const lockedC = codeLockedCzk.get(code) ?? 0;
+        const remainingH = Math.max(0, Math.round((totalH - lockedH) * 10) / 10);
+        const remainingC = Math.max(0, totalC - lockedC);
+        if (remainingH <= 0 && remainingC <= 0) continue;
 
-        // Locked rows for this code (preserve their hours)
-        const lockedRows = codeRows.filter(r => {
-          const bucket = weekBuckets.find(b => b.weekKey === r.scheduled_week);
-          return bucket?.locked;
-        });
-        const lockedHours = lockedRows.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
-        const lockedCzk = lockedRows.reduce((s, r) => s + (Number(r.scheduled_czk) || 0), 0);
-
-        // Canonical total = MAX across editable rows when duplicates detected,
-        // otherwise SUM (normal case after a clean split).
-        const editableHoursMax = editableRowsForCode.reduce(
-          (m, r) => Math.max(m, Number(r.scheduled_hours) || 0), 0
-        );
-        const editableCzkMax = editableRowsForCode.reduce(
-          (m, r) => Math.max(m, Number(r.scheduled_czk) || 0), 0
-        );
-        const editableHoursSum = editableRowsForCode.reduce(
-          (s, r) => s + (Number(r.scheduled_hours) || 0), 0
-        );
-        const editableCzkSum = editableRowsForCode.reduce(
-          (s, r) => s + (Number(r.scheduled_czk) || 0), 0
-        );
-        const totalHours = lockedHours + (hasDuplicates ? editableHoursMax : editableHoursSum);
-        const totalCzk = lockedCzk + (hasDuplicates ? editableCzkMax : editableCzkSum);
-
-        const remainingHours = Math.max(0, totalHours - lockedHours);
-        const remainingCzk = Math.max(0, totalCzk - lockedCzk);
-
-        // Sum of editable percentages used for THIS code (only weeks where this code has rows)
-        const editablePctSum = editableRowsAll.reduce(
-          (s, r) => s + (effectivePct[r.scheduled_week] || 0), 0
-        );
-        if (editablePctSum <= 0) continue;
-
+        // Allocate per editable week, last week gets remainder for exact match
         let allocatedH = 0;
         let allocatedC = 0;
-        editableRowsAll.forEach((r, idx) => {
-          const pct = effectivePct[r.scheduled_week] || 0;
-          const isLast = idx === editableRowsAll.length - 1;
+        editableBuckets.forEach((b, idx) => {
+          const isLast = idx === editableBuckets.length - 1;
+          const pct = pctOfEditable[b.weekKey] || 0;
           const newH = isLast
-            ? Math.round((remainingHours - allocatedH) * 10) / 10
-            : Math.round((remainingHours * pct / editablePctSum) * 10) / 10;
+            ? Math.round((remainingH - allocatedH) * 10) / 10
+            : Math.round(remainingH * pct * 10) / 10;
           const newC = isLast
-            ? Math.max(0, remainingCzk - allocatedC)
-            : Math.floor(remainingCzk * pct / editablePctSum);
+            ? Math.max(0, remainingC - allocatedC)
+            : Math.floor(remainingC * pct);
           allocatedH += newH;
           allocatedC += newC;
-          if (newH !== Number(r.scheduled_hours) || newC !== Number(r.scheduled_czk)) {
-            updates.push({ id: r.id, scheduled_hours: newH, scheduled_czk: newC });
-            undoRecords.push({
-              id: r.id,
-              scheduled_hours: Number(r.scheduled_hours),
-              scheduled_czk: Number(r.scheduled_czk),
+
+          // Find existing row for this code in this week
+          const existing = b.rows.find(r => normalizeItemCode(r.item_code) === code);
+          if (existing) {
+            if (newH !== Number(existing.scheduled_hours) || newC !== Number(existing.scheduled_czk)) {
+              updates.push({ id: existing.id, scheduled_hours: newH, scheduled_czk: newC });
+              undoRecords.push({
+                id: existing.id,
+                scheduled_hours: Number(existing.scheduled_hours),
+                scheduled_czk: Number(existing.scheduled_czk),
+              });
+            }
+          } else if (projectId && newH > 0) {
+            // Auto-create missing row for this active TPV item in editable week
+            inserts.push({
+              project_id: projectId,
+              stage_id: stageId ?? null,
+              item_name: codeName.get(code) || code,
+              item_code: code,
+              scheduled_week: b.weekKey,
+              scheduled_hours: newH,
+              scheduled_czk: newC,
+              position: 999,
+              status: "scheduled",
+              split_group_id: splitGroupId,
             });
           }
         });
       }
 
-      if (updates.length === 0) {
+      if (updates.length === 0 && inserts.length === 0) {
         toast({ title: "Žádné změny" });
         onOpenChange(false);
         return;
@@ -342,6 +450,22 @@ export function EditBundleSplitDialog({
           .eq("id", u.id);
         if (error) throw error;
       }
+      let insertedIds: string[] = [];
+      if (inserts.length > 0) {
+        const payload = inserts.map(i => ({ ...i, created_by: user?.id ?? null }));
+        const { data: ins, error } = await supabase
+          .from("production_schedule")
+          .insert(payload)
+          .select("id");
+        if (error) throw error;
+        insertedIds = (ins || []).map((r: any) => r.id);
+      }
+
+      // Renumber chain by week so all items in the same week share split_part (1/N, 2/N, ...)
+      try {
+        const { renumberBundleChain } = await import("@/lib/splitChainHelpers");
+        await renumberBundleChain(splitGroupId);
+      } catch { /* silent */ }
 
       const productionQueryKeys = [
         ["production-schedule"],
@@ -360,6 +484,9 @@ export function EditBundleSplitDialog({
               .update({ scheduled_hours: r.scheduled_hours, scheduled_czk: r.scheduled_czk })
               .eq("id", r.id);
           }
+          if (insertedIds.length > 0) {
+            await supabase.from("production_schedule").delete().in("id", insertedIds);
+          }
           for (const k of productionQueryKeys) qc.invalidateQueries({ queryKey: k });
         },
         redo: async () => {
@@ -369,6 +496,7 @@ export function EditBundleSplitDialog({
               .update({ scheduled_hours: u.scheduled_hours, scheduled_czk: u.scheduled_czk })
               .eq("id", u.id);
           }
+          // (Inserts not re-created on redo — undo is the recovery path; skipping is safe.)
           for (const k of productionQueryKeys) qc.invalidateQueries({ queryKey: k });
         },
         undoPayload: { table: "production_schedule", operation: "update", records: undoRecords, queryKeys: productionQueryKeys },
@@ -380,7 +508,8 @@ export function EditBundleSplitDialog({
       const summary = weekBuckets
         .map(b => `T${b.weekNum} ${effectivePct[b.weekKey] || 0}%`)
         .join(" / ");
-      toast({ title: `↻ Rozdělení uloženo: ${summary}` });
+      const insertedNote = inserts.length > 0 ? ` · doplněno ${inserts.length} řádků` : "";
+      toast({ title: `↻ Rozdělení uloženo: ${summary}${insertedNote}` });
       onOpenChange(false);
     } catch (err: any) {
       console.error("[EditBundleSplit] save failed:", err);
@@ -388,7 +517,8 @@ export function EditBundleSplitDialog({
     } finally {
       setSubmitting(false);
     }
-  }, [isValid, submitting, rows, weekBuckets, effectivePct, pushUndo, qc, bundleName, onOpenChange]);
+  }, [isValid, submitting, rows, weekBuckets, effectivePct, pushUndo, qc, bundleName, onOpenChange,
+      chainCodes, tpvByCode, projectId, stageId, splitGroupId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -396,22 +526,20 @@ export function EditBundleSplitDialog({
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <div className="text-sm font-semibold text-foreground">⚙ Upravit rozdělení po týdnech</div>
           <div className="text-xs text-muted-foreground mt-1 truncate">
-            {bundleName} · celkem {Math.round(grandTotal)}h · {weekBuckets.length} týdnů
+            {bundleName} · {weekBuckets.length} týdnů
           </div>
-          {duplicateCodes.length > 0 && (
-            <div className="mt-2 px-2 py-1.5 rounded-md text-[11px]" style={{ background: "rgba(217,151,6,0.08)", border: "1px solid rgba(217,151,6,0.3)", color: "#a06a00" }}>
-              ⚠ Duplicitní hodnoty u {duplicateCodes.length} položek ({duplicateCodes.slice(0, 3).join(", ")}{duplicateCodes.length > 3 ? "…" : ""}). Používám MAX, ne součet.
-            </div>
-          )}
+          <div className="mt-2 text-[11px] text-muted-foreground space-y-0.5 font-sans">
+            <div>Kanonický základ z TPV: <span className="font-semibold text-foreground">{canonicalTotalHours}h</span></div>
+            <div>Zamknuto/history: <span className="font-semibold text-foreground">{Math.round(lockedHoursTotal * 10) / 10}h</span></div>
+            <div>Rozděluji zbytek: <span className="font-semibold text-foreground">{remainingHoursTotal}h</span></div>
+          </div>
         </div>
 
         <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
           {weekBuckets.map(b => {
             const pct = effectivePct[b.weekKey] || 0;
-            const previewHours = Math.round((grandTotal * pct / 100) * 10) / 10;
+            const previewHours = Math.round((canonicalTotalHours * pct / 100) * 10) / 10;
             const isAuto = b.weekKey === autoKey;
-            // Slider is shown for ALL editable weeks (including the auto-anchor).
-            // Locked weeks have no slider.
             const showSlider = !b.locked;
             return (
               <div key={b.weekKey} className="space-y-1.5">

@@ -293,6 +293,37 @@ export async function recalculateProductionHours(
         activePartsByCode.set(codeNorm, (activePartsByCode.get(codeNorm) || 0) + 1);
       }
 
+      // RATIO-PRESERVING DISTRIBUTION: per (item_code, split_group_id) compute the current
+      // ratio of each row's hours to the chain sum (excluding midflight/HIST/cancelled).
+      // We use this ratio to split tpvFullHours so manual edits survive recalculation.
+      // For codes outside any split chain we fall back to equal split by activePartsByCode.
+      type RowRatio = { ratio: number };
+      const rowRatioById = new Map<string, RowRatio>();
+      const chainRowsByKey = new Map<string, any[]>(); // key = `${codeNorm}::${split_group_id}`
+      for (const s of fullSchedForProject) {
+        const codeNorm = normalizeItemCode(s.item_code);
+        if (!codeNorm || s.is_midflight) continue;
+        if (codeNorm.startsWith('HIST_')) continue;
+        if (s.status === 'cancelled') continue;
+        if (!s.split_group_id) continue;
+        const key = `${codeNorm}::${s.split_group_id}`;
+        const arr = chainRowsByKey.get(key) || [];
+        arr.push(s);
+        chainRowsByKey.set(key, arr);
+      }
+      for (const arr of chainRowsByKey.values()) {
+        const sumH = arr.reduce((s, r) => s + (Number(r.scheduled_hours) || 0), 0);
+        if (sumH > 0) {
+          for (const r of arr) {
+            rowRatioById.set(r.id, { ratio: (Number(r.scheduled_hours) || 0) / sumH });
+          }
+        } else {
+          // Equal split if all zero
+          const eq = 1 / arr.length;
+          for (const r of arr) rowRatioById.set(r.id, { ratio: eq });
+        }
+      }
+
       // Map: tpv.id → final hodiny_plan (already scaled in computePlanHours.item_hours)
       const tpvHoursById = new Map<string, number>();
       for (const ih of result.item_hours) tpvHoursById.set(ih.id, ih.hodiny_plan);
@@ -304,7 +335,7 @@ export async function recalculateProductionHours(
 
       // ===== SCHEDULE: update non-midflight rows; HIST_ rows get CZK refresh only =====
       for (const item of schedItems) {
-        if (item.is_midflight) continue; // historical, never modify
+        if (item.is_midflight) continue;
 
         if (item.item_code?.startsWith('HIST_')) {
           const histHours = Number(item.scheduled_hours) || 0;
@@ -341,9 +372,19 @@ export async function recalculateProductionHours(
         ));
 
         const tpvFullHours = (tpvHoursById.get(tpv.id) ?? 0) * remainingScale;
-        const partsCount = Math.max(1, activePartsByCode.get(itemCodeNorm) || 1);
-        const correctHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
-        const correctCzk = partsCount > 1 ? Math.floor((correctCzkFull * remainingScale) / partsCount) : Math.floor(correctCzkFull * remainingScale);
+        const ratio = rowRatioById.get(item.id)?.ratio;
+        let correctHours: number;
+        let correctCzk: number;
+        if (ratio != null) {
+          // Preserve manual split ratio
+          correctHours = Math.round((tpvFullHours * ratio) * 10) / 10;
+          correctCzk = Math.floor((correctCzkFull * remainingScale) * ratio);
+        } else {
+          // Fallback: equal split by active parts
+          const partsCount = Math.max(1, activePartsByCode.get(itemCodeNorm) || 1);
+          correctHours = Math.round((tpvFullHours / partsCount) * 10) / 10;
+          correctCzk = partsCount > 1 ? Math.floor((correctCzkFull * remainingScale) / partsCount) : Math.floor(correctCzkFull * remainingScale);
+        }
 
         if (
           correctCzk !== Number(item.scheduled_czk) ||
@@ -353,6 +394,7 @@ export async function recalculateProductionHours(
           updated++;
         }
       }
+
 
       // ===== INBOX: per-item = tpv_full_hours / activeParts (no consumed deduction) =====
       const orphans: any[] = [];
