@@ -186,6 +186,11 @@ export function AutoSplitPopover({
           <div className="text-[11px] mt-1" style={{ color: "#6b7a78" }}>
             Položka: {itemName} ({itemHours}h)
           </div>
+          {hasExistingInOtherWeek && (
+            <div className="mt-2 px-2 py-1.5 rounded-md text-[10px]" style={{ background: "rgba(217,151,6,0.08)", border: "1px solid rgba(217,151,6,0.3)", color: "#a06a00" }}>
+              ⚠ Tato položka už je v jiném týdnu téhož bundlu — „Vložit celé" vytvoří duplikát. Doporučujeme rozdělit.
+            </div>
+          )}
         </div>
 
         <div className="px-5 pb-3 space-y-2">
@@ -206,7 +211,7 @@ export function AutoSplitPopover({
             />
             <div>
               <div className="text-[11px] font-semibold" style={{ color: "#223937" }}>
-                Vložit celé
+                Vložit celé {hasExistingInOtherWeek && <span style={{ color: "#d97706" }}>(duplikát!)</span>}
               </div>
               <div className="text-[10px]" style={{ color: "#d97706" }}>
                 přetíží +{overloadHours}h
