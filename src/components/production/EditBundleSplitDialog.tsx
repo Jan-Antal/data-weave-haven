@@ -88,6 +88,27 @@ export function EditBundleSplitDialog({
     [weekBuckets]
   );
 
+  // Detect duplicated rows: identical (hours, czk) per item_code across editable weeks.
+  const duplicateCodes = useMemo<string[]>(() => {
+    const editableRows = rows.filter(r => {
+      const b = weekBuckets.find(x => x.weekKey === r.scheduled_week);
+      return b && !b.locked;
+    });
+    const byCode = new Map<string, Map<string, number>>();
+    for (const r of editableRows) {
+      const code = r.item_code || "__no_code__";
+      const k = `${Number(r.scheduled_hours)}::${Number(r.scheduled_czk)}`;
+      if (!byCode.has(code)) byCode.set(code, new Map());
+      const inner = byCode.get(code)!;
+      inner.set(k, (inner.get(k) ?? 0) + 1);
+    }
+    const result: string[] = [];
+    for (const [code, inner] of byCode) {
+      if (Array.from(inner.values()).some(c => c >= 2)) result.push(code);
+    }
+    return result;
+  }, [rows, weekBuckets]);
+
   // Locked weeks: percentages are derived from current DB hours, displayed read-only
   const lockedPct = useMemo<Record<string, number>>(() => {
     const result: Record<string, number> = {};
